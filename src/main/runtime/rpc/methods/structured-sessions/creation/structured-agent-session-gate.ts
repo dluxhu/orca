@@ -131,7 +131,6 @@ export async function requireRenameStructuredHost(
   return requireHostOrRefusal()
 }
 
-// Orca @dLux patch "Chat CLI": see PATCHES.md.
 /** A client that asked only to read and send chats (the paired CLI) gets agentSession.history and agentSession.send. */
 export function clientReadsAndSendsOnly(
   ctx: Pick<RpcContext, 'clientCapabilities' | 'clientKind'>

@@ -1,4 +1,3 @@
-// Orca @dLux patch "Chat CLI": see PATCHES.md.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../../../../../shared/agent-session/agent-session-runtime-capabilities'
 import {

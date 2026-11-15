@@ -20,7 +20,7 @@ export const STRUCTURED_AGENT_SESSION_RENAME_RUNTIME_CAPABILITY =
   'agent-session.structured.rename.v1' as const
 // A client that names chats without reading them (the paired CLI) asks for agentSession.rename alone.
 export const AGENT_SESSION_RENAME_ONLY_CLIENT_CAPABILITY = 'agent-session.rename-only.v1' as const
-// Orca @dLux patch "Chat CLI": a client that reads and sends chats without rendering tabs (the paired CLI).
+// A client that reads and sends chats without rendering tabs (the paired CLI) asks for agentSession.history and agentSession.send alone.
 export const AGENT_SESSION_CLI_READ_SEND_CLIENT_CAPABILITY =
   'agent-session.cli-read-send.v1' as const
 // Negotiate resumeFrom before sending: old strict create schemas reject it, while unproven acceptance could silently start a blank chat.

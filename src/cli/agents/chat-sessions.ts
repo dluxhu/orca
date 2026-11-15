@@ -1,4 +1,3 @@
-// Orca @dLux patch "Chat CLI": see PATCHES.md. Ported from upstream #40836 (reverted in #41241).
 import { agentSessionPromptQuestions } from '../../shared/agent-session/agent-session-question-answer'
 import { isActionableStructuredAgentSessionPrompt } from '../../shared/agent-session/view/structured-agent-session-live-turn'
 import { isRootAgentJournalItem } from '../../shared/agent-session/journal/agent-session-journal-producer'

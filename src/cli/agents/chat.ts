@@ -40,7 +40,6 @@ import {
 
 type ChatRenameResult = { name: string | null; applied: boolean }
 
-// Orca @dLux patch "Chat CLI" (list/read/send): see PATCHES.md.
 const DEFAULT_READ_LIMIT = 20
 const MAX_READ_LIMIT = 100
 

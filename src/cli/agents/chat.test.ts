@@ -9,7 +9,6 @@ import { RuntimeClient } from '../runtime/client'
 import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
 import { CHAT_HANDLERS } from './chat'
 
-// Orca @dLux patch "Chat CLI": see PATCHES.md.
 const SESSION = 'codex_8eb631ab_59c5_41e4_8672_01cfe0a6fd5f'
 
 function ok(result: unknown) {
