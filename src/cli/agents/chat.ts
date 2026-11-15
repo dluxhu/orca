@@ -9,7 +9,8 @@ import {
 import { readTextOrFileFlag } from '../arguments/command-body-input'
 import { printResult } from '../output/command-result-output'
 import type { RuntimeClient } from '../runtime/client'
-import { RuntimeClientError } from '../runtime/connection/types'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
+import { isRequestUnsent } from '../runtime/connection/client-error-recovery'
 import { readInjectedAgentSessionId } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
 import {
   AGENT_SESSION_HISTORY_MAX_LIMIT,
@@ -139,7 +140,8 @@ export const CHAT_HANDLERS: Record<string, CommandHandler> = {
       ) === true
     // The send is fenced to the runtime read here, so a chat that restarted since refuses it.
     const history = (await readHistory(client, session, 1, 'send to')).result
-    const fence = history.ok ? history.page.fence : (history.fence ?? history.page.fence)
+    // Same precedence as the renderer's send attempt: the page fence first.
+    const fence = history.page.fence ?? (!history.ok ? history.fence : undefined)
     if (fence === undefined) {
       throw new RuntimeClientError(
         'agent_session_not_running',
@@ -158,7 +160,7 @@ export const CHAT_HANDLERS: Record<string, CommandHandler> = {
         })
       )
       .catch((error: unknown) => {
-        throw explainChatRefusal(error, session, 'send to')
+        throw explainSendFailure(error, session)
       })
     if (!result.result.ok) {
       const { code, message } = result.result.refusal
@@ -177,6 +179,19 @@ export const CHAT_HANDLERS: Record<string, CommandHandler> = {
         : `Sent to ${r.session}.`
     )
   }
+}
+
+// A host answer or an unsent request is a known outcome; a timeout or a lost socket after the send is not.
+function explainSendFailure(error: unknown, sessionId: string): unknown {
+  if (error instanceof RuntimeRpcFailureError || isRequestUnsent(error)) {
+    return explainChatRefusal(error, sessionId, 'send to')
+  }
+  const code = error instanceof RuntimeClientError ? error.code : 'send_outcome_unknown'
+  const reason = error instanceof Error ? error.message : String(error)
+  return new RuntimeClientError(
+    code,
+    `${reason} The message may have been sent; check \`orca chat read\` before you send it again.`
+  )
 }
 
 // The host answers with bare wire codes; say what they mean for this command.

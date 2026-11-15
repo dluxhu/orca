@@ -6,7 +6,7 @@ import { SendParams } from '../../shared/rpc-contract/structured-agent-session/s
 import { structuredAgentSessionTabId } from '../../shared/agent-session/view/structured-agent-session-projection'
 import type { RuntimeCapability } from '../../shared/protocol-version'
 import { RuntimeClient } from '../runtime/client'
-import { RuntimeClientError } from '../runtime/connection/types'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
 import { CHAT_HANDLERS } from './chat'
 
 // Orca @dLux patch "Chat CLI": see PATCHES.md.
@@ -17,21 +17,22 @@ function ok(result: unknown) {
 }
 
 function historyPage(items: unknown[], fence: number | null = 3, hasOlder = false) {
-  return ok({
-    ok: true,
-    page: {
-      sessionId: SESSION,
-      epoch: 'e',
-      ...(fence === null ? {} : { fence }),
-      direction: 'tail',
-      items,
-      removedItemIds: [],
-      submissions: [],
-      window: { oldest: null, newest: null, nextCursor: { epoch: 'e', sequence: 9 } },
-      hasOlder,
-      hasNewer: false
-    }
-  })
+  return ok({ ok: true, page: pageOf(items, fence, hasOlder) })
+}
+
+function pageOf(items: unknown[], fence: number | null, hasOlder = false) {
+  return {
+    sessionId: SESSION,
+    epoch: 'e',
+    ...(fence === null ? {} : { fence }),
+    direction: 'tail',
+    items,
+    removedItemIds: [],
+    submissions: [],
+    window: { oldest: null, newest: null, nextCursor: { epoch: 'e', sequence: 9 } },
+    hasOlder,
+    hasNewer: false
+  }
 }
 
 function message(role: string, text: string) {
@@ -290,6 +291,54 @@ describe('chat send', () => {
     await expect(run('chat send', { session: SESSION, text: 'hi' }, client)).rejects.toMatchObject({
       code: 'agent_session_fence_mismatch'
     })
+  })
+
+  it('fences to the page fence first, as the renderer does, then to a reset fence', async () => {
+    const sent = {
+      ok: true,
+      replayed: false,
+      fence: 5,
+      cursor: null,
+      value: { clientMessageId: 'm' }
+    }
+    const reset = (fence: number | null) =>
+      ok({ ok: false, reset: 'epoch-changed', fence: 9, page: pageOf([], fence) })
+    const both = fakeClient([reset(5), ok(sent)])
+    await run('chat send', { session: SESSION, text: 'hi' }, both)
+    expect(both.call.mock.calls[1]![1].envelope.expectedRuntimeFence).toBe(5)
+    const resetOnly = fakeClient([reset(null), ok(sent)])
+    await run('chat send', { session: SESSION, text: 'hi' }, resetOnly)
+    expect(resetOnly.call.mock.calls[1]![1].envelope.expectedRuntimeFence).toBe(9)
+  })
+
+  it('says the message may have been sent when the send request was lost', async () => {
+    const client = fakeClient([historyPage([], 2)])
+    client.call.mockRejectedValueOnce(
+      new RuntimeClientError(
+        'runtime_timeout',
+        'Timed out waiting for the Orca runtime to respond.'
+      )
+    )
+    await expect(run('chat send', { session: SESSION, text: 'hi' }, client)).rejects.toMatchObject({
+      code: 'runtime_timeout',
+      message: expect.stringContaining(
+        'The message may have been sent; check `orca chat read` before you send it again.'
+      )
+    })
+  })
+
+  it('reports an RPC failure from the host as not sent', async () => {
+    const client = fakeClient([historyPage([], 2)])
+    client.call.mockRejectedValueOnce(
+      new RuntimeRpcFailureError({
+        id: 'req',
+        ok: false,
+        error: { code: 'runtime_error', message: 'structured_agent_session_unsupported' }
+      })
+    )
+    const failure = run('chat send', { session: SESSION, text: 'hi' }, client)
+    await expect(failure).rejects.toMatchObject({ code: 'incompatible_runtime' })
+    await expect(failure).rejects.not.toThrow('may have been sent')
   })
 
   it('sends nothing for an empty message or a chat with no runtime', async () => {
