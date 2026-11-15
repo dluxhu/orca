@@ -183,15 +183,23 @@ describe('chat read', () => {
     })
   })
 
-  it('refuses --limit above 100 and a paired host before any call', async () => {
+  it('refuses --limit above 100 before any call', async () => {
     const local = fakeClient([])
     await expect(run('chat read', { session: SESSION, limit: '101' }, local)).rejects.toThrow(
       '--limit must be at most 100'
     )
-    const paired = fakeClient([], { isRemote: true })
-    await expect(run('chat read', { session: SESSION }, paired)).rejects.toThrow('paired host')
     expect(local.call).not.toHaveBeenCalled()
-    expect(paired.call).not.toHaveBeenCalled()
+  })
+
+  it('explains a paired host that does not admit CLI reads', async () => {
+    const paired = fakeClient([], { isRemote: true })
+    paired.call.mockRejectedValueOnce(
+      new RuntimeClientError('runtime_error', 'structured_agent_session_unsupported')
+    )
+    await expect(run('chat read', { session: SESSION }, paired)).rejects.toMatchObject({
+      code: 'incompatible_runtime',
+      message: expect.stringContaining('cannot read chats from the CLI')
+    })
   })
 
   it('names a chat that is not open instead of the bare wire code', async () => {
@@ -284,7 +292,7 @@ describe('chat send', () => {
     })
   })
 
-  it('sends nothing for an empty message, a chat with no runtime, or a paired host', async () => {
+  it('sends nothing for an empty message or a chat with no runtime', async () => {
     const empty = fakeClient([])
     await expect(run('chat send', { session: SESSION, text: '  ' }, empty)).rejects.toThrow(
       'must not be empty'
@@ -296,12 +304,6 @@ describe('chat send', () => {
       'nothing was sent'
     )
     expect(stopped.call).toHaveBeenCalledTimes(1)
-
-    const paired = fakeClient([], { isRemote: true })
-    await expect(run('chat send', { session: SESSION, text: 'hi' }, paired)).rejects.toThrow(
-      'paired host'
-    )
-    expect(paired.call).not.toHaveBeenCalled()
   })
 })
 

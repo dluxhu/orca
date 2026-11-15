@@ -38,7 +38,7 @@ export const CHAT_COMMAND_SPECS: CommandSpec[] = [
       '--limit is the number of entries shown (messages, tool calls, errors, approvals and questions); the default is 20 and the maximum 100.',
       'Approvals and questions waiting for an answer are marked "waiting for you".',
       'With --json, truncated: true means older rows exist that the 200-row read did not reach.',
-      'Paired hosts (--environment, --pairing-code) are not supported yet.'
+      'A paired host (--environment, --pairing-code) must run Orca @dLux; other hosts refuse it.'
     ],
     examples: ['orca chat read --session codex_1234 --limit 10 --json']
   },
@@ -51,7 +51,7 @@ export const CHAT_COMMAND_SPECS: CommandSpec[] = [
       'Sends the text as your message, as if typed in the chat. --text-file - reads it from stdin.',
       'While the agent is working, hosts with a message queue hold the message until the turn ends; the result says "queued".',
       'A chat that restarted since it was read refuses the send; read it again and resend.',
-      'Paired hosts (--environment, --pairing-code) are not supported yet.'
+      'A paired host (--environment, --pairing-code) must run Orca @dLux; other hosts refuse it.'
     ],
     examples: [
       'orca chat send --session codex_1234 --text "Run the tests, then summarize failures"',

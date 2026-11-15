@@ -43,14 +43,7 @@ type ChatRenameResult = { name: string | null; applied: boolean }
 const DEFAULT_READ_LIMIT = 20
 const MAX_READ_LIMIT = 100
 
-// The paired CLI advertises only rename-only, so a paired host refuses history and send.
-function readSession(flags: Map<string, string | boolean>, client: RuntimeClient): string {
-  if (client.isRemote) {
-    throw new RuntimeClientError(
-      'runtime_unsupported',
-      'Reading and messaging chats on a paired host is not supported yet. Run this on the host machine.'
-    )
-  }
+function readSession(flags: Map<string, string | boolean>): string {
   return parseChatSessionSelector(getRequiredStringFlag(flags, 'session'))
 }
 
@@ -106,7 +99,7 @@ export const CHAT_HANDLERS: Record<string, CommandHandler> = {
     printResult({ ...result, result: { chats } }, json, formatChatList)
   },
   'chat read': async ({ flags, client, json }) => {
-    const session = readSession(flags, client)
+    const session = readSession(flags)
     const limit = getOptionalPositiveIntegerFlag(flags, 'limit') ?? DEFAULT_READ_LIMIT
     if (limit > MAX_READ_LIMIT) {
       throw new RuntimeClientError('invalid_argument', `--limit must be at most ${MAX_READ_LIMIT}.`)
@@ -127,7 +120,7 @@ export const CHAT_HANDLERS: Record<string, CommandHandler> = {
     )
   },
   'chat send': async ({ flags, client, cwd, json }) => {
-    const session = readSession(flags, client)
+    const session = readSession(flags)
     const text = (await readTextOrFileFlag(flags, cwd, 'text', true)) ?? ''
     if (text.trim().length === 0) {
       throw new RuntimeClientError('invalid_argument', 'The message must not be empty.')
