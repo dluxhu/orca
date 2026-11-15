@@ -15,5 +15,47 @@ export const CHAT_COMMAND_SPECS: CommandSpec[] = [
       'orca chat rename --name "Migrate auth to OAuth"',
       'orca chat rename --session <sessionId> --name "Release notes" --json'
     ]
+  },
+  // Orca @dLux patch "Chat CLI": see PATCHES.md.
+  {
+    path: ['chat', 'list'],
+    summary: 'List agent chats with their workspace, state and last reply',
+    usage: 'orca chat list [--state <state>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'state'],
+    notes: [
+      'Lists the top-level chats Orca shows as agent tabs. Terminal agents are read with `orca terminal`.',
+      '--state keeps chats in one state: working, blocked, waiting or done.'
+    ],
+    examples: ['orca chat list --json', 'orca chat list --state working']
+  },
+  {
+    path: ['chat', 'read'],
+    summary: 'Read the latest messages of an agent chat',
+    usage: 'orca chat read --session <id> [--limit <n>] [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'session', 'limit'],
+    notes: [
+      '--session takes the session id from `orca chat list` or `orca agent launch`.',
+      '--limit is the number of entries shown (messages, tool calls, errors, approvals and questions); the default is 20 and the maximum 100.',
+      'Approvals and questions waiting for an answer are marked "waiting for you".',
+      'With --json, truncated: true means older rows exist that the 200-row read did not reach.',
+      'Paired hosts (--environment, --pairing-code) are not supported yet.'
+    ],
+    examples: ['orca chat read --session codex_1234 --limit 10 --json']
+  },
+  {
+    path: ['chat', 'send'],
+    summary: 'Send a message to an agent chat',
+    usage: 'orca chat send --session <id> (--text <text> | --text-file <path|->) [--json]',
+    allowedFlags: [...GLOBAL_FLAGS, 'session', 'text', 'text-file'],
+    notes: [
+      'Sends the text as your message, as if typed in the chat. --text-file - reads it from stdin.',
+      'While the agent is working, hosts with a message queue hold the message until the turn ends; the result says "queued".',
+      'A chat that restarted since it was read refuses the send; read it again and resend.',
+      'Paired hosts (--environment, --pairing-code) are not supported yet.'
+    ],
+    examples: [
+      'orca chat send --session codex_1234 --text "Run the tests, then summarize failures"',
+      'cat notes.md | orca chat send --session codex_1234 --text-file - --json'
+    ]
   }
 ]
