@@ -4,7 +4,7 @@ import { structuredAgentSessionPayloadFingerprint } from '../../shared/agent-ses
 import { agentSessionSendFields } from '../../shared/agent-session/requests/structured-agent-session-send-mutation'
 import { SendParams } from '../../shared/rpc-contract/structured-agent-session/structured-agent-session-params'
 import { structuredAgentSessionTabId } from '../../shared/agent-session/view/structured-agent-session-projection'
-import type { RuntimeCapability } from '../../shared/protocol-version'
+import type { RuntimeCapability } from '../../shared/remote-runtime/protocol/protocol-version'
 import { RuntimeClient } from '../runtime/client'
 import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
 import { CHAT_HANDLERS } from './chat'
