@@ -80,6 +80,7 @@ async function chat(
     resumed?: boolean
     initialization?: Record<string, unknown>
     reply?: (call: RemoteControlCall) => Promise<unknown> | undefined
+    beforeStart?: (adapter: ReturnType<typeof adapterFor>) => void
   } = {}
 ) {
   const calls: RemoteControlCall[][] = []
@@ -147,6 +148,7 @@ async function chat(
     })
     await tick()
   }
+  options.beforeStart?.(adapter)
   await start(7)
   const userRows = (uuid: string) =>
     items.filter(
@@ -442,6 +444,62 @@ describe('Claude chat Remote Control', () => {
 
     expect(calls).toEqual([[]])
     await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('turns on a resumed chat that a launch asked for before it opened', async () => {
+    const { calls, state } = await chat({
+      resumed: true,
+      beforeStart: (adapter) =>
+        expect(adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })).toBe(true)
+    })
+
+    expect(calls).toEqual([[{ enabled: true }]])
+    await expect(state()).resolves.toEqual({
+      enabled: true,
+      sessionUrl: 'https://claude.ai/code/session_01'
+    })
+  })
+
+  it('forgets a launch choice whose create was refused', async () => {
+    const { calls, state } = await chat({
+      resumed: true,
+      beforeStart: (adapter) => {
+        adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })
+        adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', forget: true })
+      }
+    })
+
+    expect(calls).toEqual([[]])
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('leaves a running chat as it is when a launch asks for Remote Control', async () => {
+    const { adapter, calls, state, start } = await chat()
+
+    adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })
+    await adapter.closeSession('session-1')
+    await start(8)
+
+    expect(calls).toEqual([[], []])
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('leaves a running chat on Remote Control when a launch forgets its choice', async () => {
+    const { adapter, calls, state, start } = await chat()
+    await adapter.remoteControl({ sessionId: 'session-1', enabled: true })
+
+    adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', forget: true })
+    await adapter.closeSession('session-1')
+    await start(8)
+
+    expect(calls).toEqual([
+      [{ enabled: true }],
+      [{ enabled: true, reattachSessionId: 'session_01' }]
+    ])
+    await expect(state()).resolves.toEqual({
+      enabled: true,
+      sessionUrl: 'https://claude.ai/code/session_01'
+    })
   })
 
   it('adds no row and no turn for an unclaimed replay while Remote Control is off', async () => {

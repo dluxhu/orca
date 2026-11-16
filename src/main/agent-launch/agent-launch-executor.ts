@@ -179,8 +179,9 @@ export async function openAgentLaunch(
       ) {
         throw launchRefusalWithoutEffects(error, intent.target.kind)
       }
-      // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
-      if (intent.resumeFrom) {
+      // The create's own refusal says why; a terminal would start a fresh conversation or drop
+      // Remote Control.
+      if (intent.resumeFrom || intent.remoteControl) {
         // A refusal from the commit may follow a reserved session row, so its outcome stays
         // unknown; its message still names the code.
         const named = error.beforeCommit
@@ -294,6 +295,7 @@ async function createSurface(
       ...(intent.chatOptions ? { chatOptions: intent.chatOptions } : {}),
       ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),
       ...(intent.resumeFrom ? { resumeFrom: intent.resumeFrom } : {}),
+      ...(intent.remoteControl ? { remoteControl: intent.remoteControl } : {}),
       ...(reservedTabId ? { tabId: reservedTabId } : {}),
       ...launchPromptCreateInputs(intent, execution.signal),
       ...(intent.prompt ? {} : { withoutPrompt: true as const })
