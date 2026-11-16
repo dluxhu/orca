@@ -140,6 +140,9 @@ export class StructuredAgentSessionAdapterRouter implements Adapter {
 
   confirmIdle = (id: string) => this.liveOwnerOrNull(id)?.confirmIdle?.(id)
 
+  remoteControl: NonNullable<Adapter['remoteControl']> = (input) =>
+    this.liveOwnerOrNull(input.sessionId)?.remoteControl?.(input) ?? Promise.resolve(null)
+
   liveTurnId = (sessionId: string): string | null | undefined =>
     this.liveOwnerOrNull(sessionId)?.liveTurnId?.(sessionId)
 
