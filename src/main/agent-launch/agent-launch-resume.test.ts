@@ -84,6 +84,7 @@ describe('agent launch that resumes a provider session', () => {
   })
 
   it('carries the resumed session from agent.launch params into the intent', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: intent resolution reads only these three runtime members.
     const runtime = {
       showTerminalWorkspaceLaunchScope: async () => ({
         id: 'wt-1',
