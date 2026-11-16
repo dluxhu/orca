@@ -15,6 +15,7 @@ import {
   AGENT_LAUNCH_PROMPT_CARRY_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_RESUME_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY
 } from '../../shared/agent-launch/contracts/agent-launch-runtime-capability'
 import { createStructuredAgentSessionOperationId } from '../../shared/agent-session/lifecycle/structured-agent-session-mutation'
@@ -46,6 +47,7 @@ export type CliAgentLaunch = {
   sessionOptions?: Record<string, string>
   operationId?: string
   surface?: AgentLaunchSurface
+  resumeFrom?: { providerSessionId: string }
 }
 
 function readSurfaceFlag(flags: Flags): AgentLaunchSurface | undefined {
@@ -92,9 +94,17 @@ export function readCliAgentLaunch(
     throw new RuntimeClientError('invalid_argument', 'Malformed --retry-launch operation ID')
   }
   const surface = readSurfaceFlag(flags)
+  const resume = flags.has('resume') ? getRequiredStringFlag(flags, 'resume') : undefined
+  if (resume !== undefined && (surface !== 'chat' || flags.has('prompt'))) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      '--resume needs --surface chat and takes no --prompt'
+    )
+  }
   return {
     agent,
     ...(surface ? { surface } : {}),
+    ...(resume !== undefined ? { resumeFrom: { providerSessionId: resume } } : {}),
     ...(operationId ? { operationId } : {}),
     ...(typeof prompt === 'string' && prompt.trim()
       ? { prompt: { text: prompt, delivery: 'submit' as const } }
@@ -141,6 +151,12 @@ export async function callAgentLaunch(
   }
   if (launch.surface && !capabilities.includes(AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY)) {
     throw new RuntimeClientError('incompatible_runtime', SURFACE_UNSUPPORTED_MESSAGE)
+  }
+  if (launch.resumeFrom && !capabilities.includes(AGENT_LAUNCH_RESUME_RUNTIME_CAPABILITY)) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca host cannot resume a session as a chat. Update Orca on the execution host, or omit --resume.'
+    )
   }
   if (!capabilities.includes(AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY)) {
     throw new RuntimeClientError(
