@@ -12,9 +12,9 @@
 #    top patch branch (FORK_PATCHES_REF, default dlux/fork-setup).
 # 4. Makes release/<version> from the base in a new worktree, applies each patch branch in
 #    that order as one commit (its diff from the stable commit it is based on, by a 3-way
-#    cherry-pick; a stacked branch's diff is from the earlier branches it contains), tags
-#    v<version>, and moves the local release/latest. It warns when a branch does not contain
-#    the base tag.
+#    cherry-pick), tags v<version>, and moves the local release/latest. It warns when a branch
+#    does not contain the base tag. A stacked branch's diff is from the part of each earlier
+#    branch that it contains (the merge bases with each earlier tip, merged with merge-tree).
 # It never pushes. With --remote <name>, it reads the patch branches from <name>/.
 set -euo pipefail
 
@@ -116,20 +116,22 @@ for branch in "${branches[@]}"; do
   patch_base=$(git merge-base "$base_tag^{commit}" "$ref")
   # A stacked branch contains earlier branches of the release order. Its patch is its diff from
   # all of them merged, so their changes are not applied twice.
-  for earlier in ${applied[@]+"${applied[@]}"}; do
+  for earlier_tip in ${applied[@]+"${applied[@]}"}; do
     # Only the part of the earlier branch that this branch contains: an older commit of it
-    # must not bring back what its tip removed.
-    earlier=$(git merge-base "$earlier" "$ref") || continue
-    if git merge-base --is-ancestor "$patch_base" "$earlier"; then
-      patch_base=$earlier
-    elif ! git merge-base --is-ancestor "$earlier" "$patch_base"; then
-      # On a conflict, keep the tree with its markers: the branch already resolved it, so the
-      # 3-way pick stops only where the release really differs.
-      tree=$(git merge-tree --write-tree "$patch_base" "$earlier" | head -n 1 || true)
-      [ -n "$tree" ] || die "cannot merge the branches that $ref contains. $cleanup"
-      patch_base=$(git commit-tree "$tree" -p "$patch_base" -p "$earlier" \
-        -m "stack base of $branch")
-    fi
+    # must not bring back what its tip removed. A criss-cross (after the weekly tag merge) has
+    # more than one best base; every one of them is folded in.
+    for earlier in $(git merge-base --all "$earlier_tip" "$ref" || true); do
+      if git merge-base --is-ancestor "$patch_base" "$earlier"; then
+        patch_base=$earlier
+      elif ! git merge-base --is-ancestor "$earlier" "$patch_base"; then
+        # On a conflict, keep the tree with its markers: the branch already resolved it, so the
+        # 3-way pick stops only where the release really differs.
+        tree=$(git merge-tree --write-tree "$patch_base" "$earlier" | head -n 1 || true)
+        [ -n "$tree" ] || die "cannot merge the branches that $ref contains. $cleanup"
+        patch_base=$(git commit-tree "$tree" -p "$patch_base" -p "$earlier" \
+          -m "stack base of $branch")
+      fi
+    done
   done
   applied+=("$(git rev-parse "$ref")")
   if git diff --quiet "$patch_base" "$ref"; then

@@ -70,9 +70,10 @@ before fork-only ones), add a row, and add a "Branch" section below.
      one when the same base is built again.
    - It makes `release/<version>` from the base in a new worktree and adds each branch of
      "Release order" as one commit: the branch's diff from the stable commit it is based on,
-     by a 3-way cherry-pick. A stacked branch adds only its own change: its diff from the
-     earlier branches of the order that it contains. Then it tags `v<version>` and moves the
-     local `release/latest` branch to the tag. It prints the push commands. It never pushes.
+     by a 3-way cherry-pick. A stacked branch adds only its own change: its diff from the part
+     of each earlier branch of the order that it contains (all merge bases with each earlier
+     tip, merged with merge-tree). Then it tags `v<version>` and moves the local
+     `release/latest` branch to the tag. It prints the push commands. It never pushes.
    - It refuses a dirty tree and an identity that is not a GitHub noreply address.
    - It warns when a branch does not contain the base tag: merge the tag into the branch.
    - On a conflict it stops with the branch, the files and the clean-up commands. Merge the

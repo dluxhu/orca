@@ -56,9 +56,10 @@ order() {
   git -C "$repo" commit -q -m patches
 }
 
-# build <version>: runs the script; the release tree is at tag v<version>.
+# build <version> [base]: runs the script; the release tree is at tag v<version>.
 build() {
-  (cd "$repo" && TMPDIR="$root" "$script" --base v1.0.0 --version "$1") >"$root/out.txt" 2>&1
+  (cd "$repo" && TMPDIR="$root" "$script" --base "${2:-v1.0.0}" --version "$1") \
+    >"$root/out.txt" 2>&1
 }
 
 check() {
@@ -95,6 +96,7 @@ build 1.0.0-dlux.1 || true
 check 'a stack on an older commit does not bring back a removed file' \
   'git -C "$repo" rev-parse -q --verify v1.0.0-dlux.1 >/dev/null &&
    ! git -C "$repo" cat-file -e v1.0.0-dlux.1:x.txt 2>/dev/null &&
+   git -C "$repo" cat-file -e v1.0.0-dlux.1:a.txt &&
    git -C "$repo" cat-file -e v1.0.0-dlux.1:s.txt'
 
 # 3. A stack that merged two conflicting branches. Its merge records the resolution (rerere),
@@ -117,6 +119,29 @@ check 'a stack of two conflicting branches applies after the release resolved th
   'git -C "$repo" rev-parse -q --verify v1.0.0-dlux.1 >/dev/null &&
    [ "$(git -C "$repo" show v1.0.0-dlux.1:f.txt)" = "$(printf "%s" "$resolved")" ] &&
    git -C "$repo" cat-file -e v1.0.0-dlux.1:s.txt'
+
+# 4. The weekly tag merge makes a criss-cross: the earlier tip and the stack both merge a new
+#    tag, so the stack has two best bases with the earlier tip. The tip removed x; the stack
+#    still has it from an older commit. The release must not bring x back.
+new_repo crisscross
+git -C "$repo" checkout -q -b dlux/a v1.0.0
+commit dlux/a 'a adds x' x.txt 'x'
+git -C "$repo" branch -q dlux/s
+commit dlux/s 's adds s' s.txt 's'
+commit main 'upstream adds m' m.txt 'm'
+git -C "$repo" tag v1.1.0
+git -C "$repo" push -q upstream v1.1.0
+commit dlux/a 'a removes x' x.txt
+git -C "$repo" merge -q --no-edit v1.1.0 >/dev/null
+git -C "$repo" checkout -q dlux/s
+git -C "$repo" merge -q --no-edit v1.1.0 >/dev/null
+order dlux/a dlux/s
+build 1.1.0-dlux.1 v1.1.0 || true
+check 'a criss-cross stack does not bring back what the earlier tip removed' \
+  'git -C "$repo" rev-parse -q --verify v1.1.0-dlux.1 >/dev/null &&
+   ! git -C "$repo" cat-file -e v1.1.0-dlux.1:x.txt 2>/dev/null &&
+   git -C "$repo" cat-file -e v1.1.0-dlux.1:m.txt &&
+   git -C "$repo" cat-file -e v1.1.0-dlux.1:s.txt'
 
 [ "$failures" = 0 ] || { echo "$failures case(s) failed"; exit 1; }
 echo 'all cases passed'
