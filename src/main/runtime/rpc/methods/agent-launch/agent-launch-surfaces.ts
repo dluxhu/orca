@@ -31,7 +31,11 @@ import {
 import { AgentLaunchTabClosedError } from '../../../../../shared/agent-launch/contracts/agent-launch-tab-closed'
 import { AgentLaunchSurfaceUnavailableError } from '../../../../agent-launch/agent-launch-surface-refusal'
 import { formatAgentTypeLabel } from '../../../../../shared/agent-status/presentation/agent-type-label'
-import { isDefinitiveAgentSessionCreateRefusal } from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
+import {
+  isAgentSessionCreateAdmissionRefusal,
+  isDefinitiveAgentSessionCreateRefusal
+} from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
+import type { AgentSessionWireRefusal } from '../../../../../shared/agent-session/failures/agent-session-wire-refusals'
 import {
   agentLaunchMovesHostWindow,
   agentLaunchTabViewerRule,
@@ -125,7 +129,7 @@ export function agentLaunchSurfaceFactory(
         // unknown outcome may have created the chat, and it keeps the choice.
         if (
           remoteControl &&
-          (created.beforeCommit === true ||
+          (createRefusedBeforeCommit(created) ||
             isDefinitiveAgentSessionCreateRefusal(created.refusal.code))
         ) {
           requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({
@@ -141,7 +145,7 @@ export function agentLaunchSurfaceFactory(
         throw new AgentLaunchStructuredSessionRefusedError(
           created.refusal.code,
           created.refusal.message,
-          created.beforeCommit === true
+          createRefusedBeforeCommit(created)
         )
       }
       return {
@@ -262,6 +266,19 @@ export function agentLaunchSurfaceFactory(
 function launchWarning(...parts: (string | undefined)[]): { warning?: string } {
   const warning = parts.filter(Boolean).join(' ')
   return warning ? { warning } : {}
+}
+
+/** The create proved it changed nothing: refused before commit, or an attach admission refusal
+ *  that carries the attempt proof (the renderer trusts the same proof). */
+function createRefusedBeforeCommit(created: {
+  beforeCommit?: true
+  refusal: AgentSessionWireRefusal
+}): boolean {
+  return (
+    created.beforeCommit === true ||
+    (created.refusal.createAttemptRefusedBeforeCommit === true &&
+      isAgentSessionCreateAdmissionRefusal(created.refusal))
+  )
 }
 
 function requireInstalledHost(): StructuredAgentSessionHost {
