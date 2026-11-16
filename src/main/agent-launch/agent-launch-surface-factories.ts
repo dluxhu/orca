@@ -137,16 +137,23 @@ function terminalLaunchOptions(intent: Pick<AgentLaunchIntent, 'sessionOptions' 
 
 /** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
  *  terminal will receive it, after the shared preflight determines the actual route. */
-export function assertTerminalLaunchAdmissible(
-  intent: AgentLaunchIntent | AgentLaunchParams,
+/** A terminal would start a fresh conversation, not the one a resume names. */
+export function assertResumeOpensChat(
+  intent: Pick<AgentLaunchIntent, 'agent' | 'resumeFrom'>,
   mode: AgentLaunchMode
 ): void {
   if (intent.resumeFrom && mode !== 'structured') {
-    // A terminal would start a fresh conversation, not the one the resume names.
     throw new AgentLaunchSurfaceUnavailableError(
       `${formatAgentTypeLabel(intent.agent)} can't resume a session as a chat here. Nothing was started.`
     )
   }
+}
+
+export function assertTerminalLaunchAdmissible(
+  intent: AgentLaunchIntent | AgentLaunchParams,
+  mode: AgentLaunchMode
+): void {
+  assertResumeOpensChat(intent, mode)
   if (intent.reuseTerminal || intent.target.kind === 'create-worktree') {
     const options = mode === 'terminal' ? terminalLaunchOptions(intent) : intent.sessionOptions
     const preferences = toAgentLaunchPreferences(options, intent.agent)

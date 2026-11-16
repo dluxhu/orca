@@ -14,12 +14,17 @@ const RESUME: AgentLaunchIntent = {
   resumeFrom: { providerSessionId: 'claude-session-1' }
 }
 
-function harness(options: { chat: boolean; createRefuses?: boolean; supportFails?: boolean }) {
+function harness(options: {
+  chat: boolean
+  createRefuses?: boolean
+  supportFails?: boolean
+  intent?: AgentLaunchIntent
+}) {
   const createStructuredSession = vi.fn(async (_args: Record<string, unknown>) => {
     if (options.createRefuses) {
       throw new AgentLaunchStructuredSessionRefusedError(
         'structured_agent_session_unsupported',
-        'unsupported'
+        'the resumed session is still open in a terminal'
       )
     }
     return { sessionId: 'sess-1', handle: 'handle_structured', fence: 1 }
@@ -39,7 +44,7 @@ function harness(options: { chat: boolean; createRefuses?: boolean; supportFails
   const run = () =>
     executeAgentLaunch({
       runtime,
-      intent: RESUME,
+      intent: options.intent ?? RESUME,
       surfaces: {
         createStructuredSession,
         createTerminalAgent,
@@ -62,7 +67,19 @@ describe('agent launch that resumes a provider session', () => {
 
   it('never starts a fresh terminal agent when the chat create is refused', async () => {
     const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true })
-    await expect(run()).rejects.toThrow()
+    // The create's own reason reaches the caller, not a generic "can't open as a chat".
+    await expect(run()).rejects.toThrow('the resumed session is still open in a terminal')
+    expect(createTerminalAgent).not.toHaveBeenCalled()
+  })
+
+  it('never falls back to a terminal after a refused create when chat was only the default', async () => {
+    const { surface: _explicit, ...byDefault } = RESUME
+    const { run, createTerminalAgent } = harness({
+      chat: true,
+      createRefuses: true,
+      intent: byDefault
+    })
+    await expect(run()).rejects.toThrow('the resumed session is still open in a terminal')
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 

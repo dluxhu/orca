@@ -14,8 +14,8 @@ import {
   combineLaunchWarnings,
   ignoredStructuredLaunchInputsWarning
 } from './agent-launch-warnings'
+import { createTerminalSurface } from './agent-launch-terminal-surface'
 import {
-  argvLaunchPrompt,
   launchPromptCreateInputs,
   deliverTerminalLaunchPrompt,
   HANDED_TO_TERMINAL,
@@ -178,6 +178,10 @@ export async function openAgentLaunch(
       ) {
         throw error
       }
+      // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
+      if (intent.resumeFrom) {
+        throw error
+      }
       // Cancellation must prevent a fallback from starting a new agent and argv prompt.
       assertAgentPromptRequestActive(execution.signal)
       settled = downgradeAgentLaunchModeForStructuredRefusal(settled, vocabulary, settlement)
@@ -272,7 +276,6 @@ async function createSurface(
   settled: AgentLaunchModeReceipt
 ): Promise<CreatedSurface> {
   const { intent, surfaces } = execution
-  assertTerminalLaunchAdmissible(intent, settled.mode)
   if (settled.mode === 'structured') {
     const reservedTabId = intent.paneKey ? parsePaneKey(intent.paneKey)?.tabId : undefined
     const session = await surfaces.createStructuredSession({
@@ -298,29 +301,4 @@ async function createSurface(
     }
   }
   return createTerminalSurface(execution, workspace)
-}
-
-async function createTerminalSurface(
-  execution: AgentLaunchSurfaceExecution,
-  workspace: { worktreeId: string; connectionId?: string | null }
-): Promise<CreatedSurface> {
-  const { intent, surfaces } = execution
-  const startupPrompt = argvLaunchPrompt(intent)
-  const terminal = await surfaces.createTerminalAgent({
-    worktreeId: workspace.worktreeId,
-    agent: intent.agent,
-    ...(startupPrompt ? { startupPrompt } : {}),
-    ...terminalLaunchInputs(intent),
-    viewMode: 'terminal'
-  })
-  return {
-    outcome: {
-      kind: 'terminal',
-      handle: terminal.handle,
-      ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {})
-    },
-    terminalCreation: terminal.terminalCreation,
-    ...(terminal.warning ? { warning: terminal.warning } : {}),
-    ...(startupPrompt && terminal.promptRodeLaunchCommand ? { promptRodeLaunchCommand: true } : {})
-  }
 }
