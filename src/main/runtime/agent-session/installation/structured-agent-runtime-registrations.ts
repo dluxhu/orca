@@ -132,6 +132,9 @@ function createClaudeAdapter(
     atRestCommandProbe: createClaudeCommandCatalogProbe(claudeListingDeps(context)),
     onLifecycleEvent: context.deliverLifecycle,
     logger: deps.logger,
+    ...(deps.claudeRemoteControlForNewChats
+      ? { remoteControlForNewChats: deps.claudeRemoteControlForNewChats }
+      : {}),
     onChildWorkEvidence: (sessionId, evidence, producer) =>
       host()?.publishChildWorkEvidence(sessionId, evidence, producer),
     onDispatchSettledLate: followUps.onDispatchSettledLate,

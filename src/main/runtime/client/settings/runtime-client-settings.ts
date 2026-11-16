@@ -79,6 +79,7 @@ export class RuntimeClientSettingsController {
       // Always present, so a client can tell this host accepts the setting (older hosts omit it).
       codexShareHistoryAcrossAccounts: settings.codexShareHistoryAcrossAccounts !== false,
       claudeSubagentNavigationEnabled: settings.claudeSubagentNavigationEnabled !== false,
+      claudeRemoteControlForNewChats: settings.claudeRemoteControlForNewChats === true,
       // Mobile honors this Copy option; absence from older hosts means on (#19770).
       terminalCopyTrimsGutter: settings.terminalCopyTrimsGutter !== false,
       defaultTaskSource: settings.defaultTaskSource ?? 'github',
