@@ -16,6 +16,7 @@ import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
 import type { AgentLaunchParams } from '../../shared/rpc-contract/agent-launch/agent-launch-params'
 import { toAgentLaunchPreferences } from '../../shared/agent-launch/choices/agent-launch-preferences'
 import { assertOpenCodeModelLaunchPreferencesAbsent } from '../opencode/model-launch/opencode-model-startup-plan'
+import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
 
 /** Inject creation so orchestration can add subscriptions without duplicating launch sequencing. */
 export type AgentLaunchSurfaceFactory = {
@@ -83,11 +84,28 @@ export type AgentLaunchStructuredSurface = {
 export class AgentLaunchStructuredSessionRefusedError extends Error {
   readonly code: string
 
-  constructor(code: string, message: string) {
+  constructor(
+    code: string,
+    message: string,
+    /** Refused before attach: the create started nothing. */
+    readonly beforeCommit = false
+  ) {
     super(message)
     this.name = 'AgentLaunchStructuredSessionRefusedError'
     this.code = code
   }
+}
+
+/** A chat create refused before attach in an existing workspace started nothing: report that refusal, not an unknown outcome. */
+export function launchRefusalWithoutEffects(
+  error: unknown,
+  targetKind: AgentLaunchIntent['target']['kind']
+): unknown {
+  return error instanceof AgentLaunchStructuredSessionRefusedError &&
+    error.beforeCommit &&
+    targetKind === 'existing'
+    ? new AgentLaunchSurfaceUnavailableError(error.message)
+    : error
 }
 
 export type AgentLaunchWorkspaceFactory = {

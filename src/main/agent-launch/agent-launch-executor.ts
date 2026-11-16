@@ -40,6 +40,7 @@ import {
 import {
   AgentLaunchStructuredSessionRefusedError,
   assertTerminalLaunchAdmissible,
+  launchRefusalWithoutEffects,
   terminalLaunchInputs,
   type AgentLaunchStructuredSurface,
   type AgentLaunchWorkspaceFactory
@@ -176,7 +177,7 @@ export async function openAgentLaunch(
         !(error instanceof AgentLaunchStructuredSessionRefusedError) ||
         !isDefinitiveAgentSessionCreateRefusal(error.code)
       ) {
-        throw error
+        throw launchRefusalWithoutEffects(error, intent.target.kind)
       }
       // Cancellation must prevent a fallback from starting a new agent and argv prompt.
       assertAgentPromptRequestActive(execution.signal)
