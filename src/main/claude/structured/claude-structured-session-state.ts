@@ -177,7 +177,9 @@ export type ClaudeSession = {
   closeEnded?: boolean
   translator: ClaudeJournalTranslator | null
   /** Set only while the CLI confirms Remote Control is on for this process. */
-  remoteControl?: { sessionUrl: string | null; seenReplayUuids: Set<string> }
+  remoteControl?: { sessionUrl: string | null }
+  /** Replay uuids already settled or shown; see `rememberClaudeReplayUuid`. */
+  seenReplayUuids?: Set<string>
   events: StructuredAgentSessionEventSink | undefined
   delivery: ClaudeJournalBoundDelivery
   unbindReadingControl?: () => void

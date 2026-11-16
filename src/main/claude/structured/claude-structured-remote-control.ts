@@ -28,14 +28,12 @@ export function observeClaudeBridgeState(
   }
 }
 
+// shortcut: remembers the last 256 replay uuids; an older re-echo shows again.
 const REMEMBERED_REPLAY_UUIDS = 256
 
-/** Replays already shown, so a repeated echo adds no second prompt row; only kept while Remote Control is on. */
+/** Replays a send settled or a prompt row showed, so a repeated echo adds no second prompt row. */
 export function rememberClaudeReplayUuid(session: ClaudeSession, uuid: string): void {
-  const seen = session.remoteControl?.seenReplayUuids
-  if (!seen) {
-    return
-  }
+  const seen = (session.seenReplayUuids ??= new Set())
   seen.add(uuid)
   const [oldest] = seen
   if (seen.size > REMEMBERED_REPLAY_UUIDS && oldest !== undefined) {
@@ -55,16 +53,21 @@ export function isClaudeRemotePrompt(
     origin !== 'peer' &&
     origin !== 'channel' &&
     typeof message.uuid === 'string' &&
-    !session.remoteControl.seenReplayUuids.has(message.uuid)
+    session.seenReplayUuids?.has(message.uuid) !== true
   )
 }
 
-/** Remote Control per chat. A chat stays on across its process restarts and reattaches to the same claude.ai session. */
+/**
+ * Remote Control per chat. The user's latest choice is recorded before any request goes out; a CLI
+ * answer only confirms its own request, and only while that request is the session's latest.
+ */
 export class ClaudeRemoteControl {
-  /** Per chat: the bridge session to reattach while on, or false after the user turned it off. */
-  private readonly chats = new Map<string, string | null | false>()
-  /** Only the newest request of a process may write its answer. */
-  private readonly generations = new WeakMap<ClaudeSession, number>()
+  /** What each chat should be, across its process restarts until the app quits. */
+  private readonly intents = new Map<string, boolean>()
+  /** The bridge session to reattach to on the next Turn On or restart. */
+  private readonly bridges = new Map<string, string>()
+  private readonly latest = new WeakMap<ClaudeSession, number>()
+  private requests = 0
 
   constructor(
     private readonly sessions: ReadonlyMap<string, ClaudeSession>,
@@ -86,9 +89,13 @@ export class ClaudeRemoteControl {
   }
 
   async set(sessionId: string, enabled: boolean): Promise<AgentSessionRemoteControlState | null> {
+    this.intents.set(sessionId, enabled)
+    if (!enabled) {
+      this.bridges.delete(sessionId)
+    }
     const session = this.sessions.get(sessionId)
     if (session) {
-      await this.apply(session, sessionId, enabled)
+      await this.request(session, sessionId, enabled)
     }
     return this.state(sessionId)
   }
@@ -99,18 +106,17 @@ export class ClaudeRemoteControl {
     initialization: unknown,
     newConversation: boolean
   ): void {
-    const chosen = this.chats.get(sessionId)
-    // A Turn Off in this chat outranks the setting and the CLI's auto-connect.
+    // A choice made in this chat outranks the setting and the CLI's auto-connect.
     const on =
-      chosen !== false &&
-      (chosen !== undefined ||
-        (newConversation && this.deps.remoteControlForNewChats?.() === true) ||
+      this.intents.get(sessionId) ??
+      ((newConversation && this.deps.remoteControlForNewChats?.() === true) ||
         claudeRemoteControlAutoEnable(initialization))
     if (!on) {
       return
     }
+    this.intents.set(sessionId, true)
     // The chat works without Remote Control; a refusal only leaves it off.
-    void this.apply(session, sessionId, true).catch((error: unknown) => {
+    void this.request(session, sessionId, true).catch((error: unknown) => {
       if (!session.connection.closed) {
         this.deps.logger?.warn('turning on Claude Remote Control failed', {
           scope: 'claude-remote-control',
@@ -121,35 +127,47 @@ export class ClaudeRemoteControl {
     })
   }
 
-  private async apply(session: ClaudeSession, sessionId: string, enabled: boolean): Promise<void> {
+  private async request(
+    session: ClaudeSession,
+    sessionId: string,
+    enabled: boolean
+  ): Promise<void> {
     const set = session.connection.setRemoteControl
     if (!set) {
       throw new ClaudeControlRequestError('remote_control', 'this SDK exposes no remote_control')
     }
-    const chosen = this.chats.get(sessionId)
-    const reattachSessionId = typeof chosen === 'string' ? chosen : undefined
-    const generation = (this.generations.get(session) ?? 0) + 1
-    this.generations.set(session, generation)
-    const reply = claudeRecord(
-      await set(enabled, {
-        ...(this.deps.requestTimeoutMs === undefined
-          ? {}
-          : { timeoutMs: this.deps.requestTimeoutMs }),
-        ...(enabled && reattachSessionId ? { reattachSessionId } : {})
-      })
-    )
-    if (this.generations.get(session) !== generation || this.sessions.get(sessionId) !== session) {
+    const request = ++this.requests
+    this.latest.set(session, request)
+    const current = (): boolean =>
+      this.latest.get(session) === request && this.sessions.get(sessionId) === session
+    const reattachSessionId = enabled ? this.bridges.get(sessionId) : undefined
+    let reply: Record<string, unknown> | null
+    try {
+      reply = claudeRecord(
+        await set(enabled, {
+          ...(this.deps.requestTimeoutMs === undefined
+            ? {}
+            : { timeoutMs: this.deps.requestTimeoutMs }),
+          ...(reattachSessionId ? { reattachSessionId } : {})
+        })
+      )
+    } catch (error) {
+      if (current()) {
+        delete session.remoteControl
+      }
+      throw error
+    }
+    if (!current()) {
       return
     }
     if (!enabled) {
       delete session.remoteControl
-      this.chats.set(sessionId, false)
       return
     }
-    session.remoteControl = {
-      sessionUrl: claudeText(reply?.session_url),
-      seenReplayUuids: session.remoteControl?.seenReplayUuids ?? new Set()
+    session.remoteControl = { sessionUrl: claudeText(reply?.session_url) }
+    const bridge = claudeText(reply?.bridge_session_id)
+    if (bridge) {
+      this.bridges.set(sessionId, bridge)
     }
-    this.chats.set(sessionId, claudeText(reply?.bridge_session_id))
   }
 }

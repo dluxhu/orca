@@ -41,6 +41,26 @@ const STOP_MARKER: Record<string, unknown> = JSON.parse(
   ).split('\n')[16]!
 ).frame
 
+/** CLI answers the test settles by hand, in the order it chooses. */
+function heldReplies() {
+  const held: PromiseWithResolvers<unknown>[] = []
+  let holding = false
+  return {
+    hold: () => {
+      holding = true
+    },
+    reply: () => {
+      if (!holding) {
+        return undefined
+      }
+      const answer = Promise.withResolvers<unknown>()
+      held.push(answer)
+      return answer.promise
+    },
+    answer: (index: number) => held[index]!
+  }
+}
+
 const promptRow = (uuid: string) => ({ provider: 'claude', sessionId: PROVIDER_SESSION_ID, uuid })
 
 const owned: { claude: ReturnType<typeof fakeClaude>; adapter: ClaudeStructuredSessionAdapter }[] =
@@ -57,6 +77,7 @@ afterEach(async () => {
 async function chat(
   options: {
     newChats?: boolean
+    resumed?: boolean
     initialization?: Record<string, unknown>
     reply?: (call: RemoteControlCall) => Promise<unknown> | undefined
   } = {}
@@ -111,7 +132,7 @@ async function chat(
     }
     return connection
   }
-  const adapter = adapterFor(claude)
+  const adapter = adapterFor(claude, options.resumed ? { resumesTranscript: true } : {})
   Object.assign(adapter['deps'], {
     remoteControlForNewChats: () => options.newChats === true,
     logger
@@ -306,17 +327,144 @@ describe('Claude chat Remote Control', () => {
     expect(calls).toEqual([[{ enabled: true }, { enabled: false }, { enabled: true }]])
   })
 
-  it('reads off after a Turn Off that overtakes a Turn On still in flight', async () => {
-    const pending = Promise.withResolvers<unknown>()
-    const { turnOn, turnOff, state } = await chat({
-      reply: (call) => (call.enabled ? pending.promise : undefined)
-    })
+  it('keeps a newer Turn On that succeeded when an older Turn Off fails late', async () => {
+    const cli = heldReplies()
+    const { adapter, turnOn, turnOff, state } = await chat({ reply: cli.reply })
+    await turnOn()
+    cli.hold()
+
+    const off = turnOff().catch(() => null)
     const on = turnOn()
-    await turnOff()
-    pending.resolve({ session_url: 'https://claude.ai/code/session_01', bridge_session_id: 'b' })
+    cli.answer(1).resolve({ session_url: 'https://claude.ai/code/session_02' })
+    await on
+    cli.answer(0).reject(new Error('remote_control timed out'))
+    await off
+
+    await expect(state()).resolves.toEqual({
+      enabled: true,
+      sessionUrl: 'https://claude.ai/code/session_02'
+    })
+    await expect(adapter.confirmIdle('session-1')).resolves.toBe('busy')
+  })
+
+  it('keeps a newer Turn Off that failed when an older Turn On succeeds late', async () => {
+    const cli = heldReplies()
+    const { adapter, turnOn, turnOff, state } = await chat({ reply: cli.reply })
+    cli.hold()
+
+    const on = turnOn()
+    const off = turnOff().catch(() => null)
+    cli.answer(1).reject(new Error('remote_control timed out'))
+    await off
+    cli.answer(0).resolve({ session_url: 'https://claude.ai/code/session_01' })
     await on
 
     await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+    expect(adapter.confirmIdle('session-1')).toBeUndefined()
+  })
+
+  it('reads off and lets the idle stop run when the latest request fails', async () => {
+    const cli = heldReplies()
+    const { adapter, turnOn, state } = await chat({ reply: cli.reply })
+    await turnOn()
+    cli.hold()
+
+    const again = turnOn().catch(() => null)
+    cli.answer(0).reject(new Error('Remote Control is disabled by your organization'))
+    await again
+
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+    expect(adapter.confirmIdle('session-1')).toBeUndefined()
+  })
+
+  it('stays off after a restart while its Turn Off is still in flight', async () => {
+    const cli = heldReplies()
+    const { adapter, calls, start, turnOff } = await chat({
+      initialization: { remote_control_auto_enable: true },
+      reply: cli.reply
+    })
+    cli.hold()
+    void turnOff().catch(() => null)
+    await adapter.closeSession('session-1')
+
+    await start(8)
+
+    expect(calls).toEqual([[{ enabled: true }, { enabled: false }], []])
+  })
+
+  it("ignores an old process's late answer after the chat restarted", async () => {
+    let first = true
+    const late = Promise.withResolvers<unknown>()
+    const { adapter, calls, start, turnOn } = await chat({
+      reply: () => {
+        if (!first) {
+          return undefined
+        }
+        first = false
+        return late.promise
+      }
+    })
+    const on = turnOn()
+    await adapter.closeSession('session-1')
+    await start(8)
+    late.resolve({ session_url: 'https://claude.ai/code/old', bridge_session_id: 'old' })
+    await on
+    await adapter.closeSession('session-1')
+
+    await start(9)
+
+    expect(calls.map((process) => process.at(-1))).toEqual([
+      { enabled: true },
+      { enabled: true },
+      { enabled: true, reattachSessionId: 'session_01' }
+    ])
+  })
+
+  it('leaves Remote Control off for a resumed chat even with the new-chat setting on', async () => {
+    const { calls, state } = await chat({ newChats: true, resumed: true })
+
+    expect(calls).toEqual([[]])
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('adds no row and no turn for an unclaimed replay while Remote Control is off', async () => {
+    const { frame, userRows, runningTurnsOn } = await chat()
+
+    frame(REMOTE_PROMPT)
+
+    expect([userRows('remote-prompt-1'), runningTurnsOn('remote-prompt-1')]).toEqual([[], []])
+  })
+
+  it('adds no row for an echo settled before Remote Control turned on', async () => {
+    const { adapter, frame, turnOn, userRows } = await chat()
+    await adapter.dispatch({
+      sessionId: 'session-1',
+      clientMessageId: 'client-turn-1',
+      body: USER_MESSAGE,
+      fence: 7
+    })
+    await turnOn()
+
+    frame({ ...REMOTE_PROMPT, uuid: 'user-uuid-0' })
+
+    expect(userRows('user-uuid-0')).toEqual([])
+  })
+
+  it('adds no row for an echo settled before a Turn Off and Turn On', async () => {
+    const { adapter, frame, turnOn, turnOff, userRows } = await chat()
+    await turnOn()
+    await adapter.dispatch({
+      sessionId: 'session-1',
+      clientMessageId: 'client-turn-1',
+      body: USER_MESSAGE,
+      fence: 7
+    })
+    await turnOff()
+    await turnOn()
+
+    frame({ ...REMOTE_PROMPT, uuid: 'user-uuid-0' })
+
+    expect(userRows('user-uuid-0')).toEqual([])
   })
 
   it.each(['failed', 'policy_disabled'])(
