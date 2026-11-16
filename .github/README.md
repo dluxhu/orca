@@ -9,8 +9,8 @@ profile. Use one of the two apps at a time.
 Get the app from the [releases](https://github.com/dluxhu/orca/releases). The app updates
 itself from the same releases.
 
-The app is not signed with an Apple Developer ID and Apple did not notarize it. macOS blocks
-the first start. To open it: in Finder, Control-click the app, select **Open**, then select
+The app is signed with a Developer ID, but Apple did not notarize it. macOS blocks the first
+start. The releases are for Apple Silicon (arm64) Macs only. To open it: in Finder, Control-click the app, select **Open**, then select
 **Open** again.
 
 ## How it is different from official Orca
