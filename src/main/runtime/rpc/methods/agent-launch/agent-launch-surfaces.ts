@@ -29,6 +29,8 @@ import {
   type TerminalSpawnDispatch
 } from '../../../../agent-launch/agent-launch-not-started'
 import { AgentLaunchTabClosedError } from '../../../../../shared/agent-launch/contracts/agent-launch-tab-closed'
+import { isAgentSessionCreateAdmissionRefusal } from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
+import type { AgentSessionWireRefusal } from '../../../../../shared/agent-session/failures/agent-session-wire-refusals'
 import {
   agentLaunchMovesHostWindow,
   agentLaunchTabViewerRule,
@@ -113,7 +115,7 @@ export function agentLaunchSurfaceFactory(
         throw new AgentLaunchStructuredSessionRefusedError(
           created.refusal.code,
           created.refusal.message,
-          created.beforeCommit === true
+          createRefusedBeforeCommit(created)
         )
       }
       return {
@@ -234,6 +236,19 @@ export function agentLaunchSurfaceFactory(
 function launchWarning(...parts: (string | undefined)[]): { warning?: string } {
   const warning = parts.filter(Boolean).join(' ')
   return warning ? { warning } : {}
+}
+
+/** The create proved it changed nothing: refused before commit, or an attach admission refusal
+ *  that carries the attempt proof (the renderer trusts the same proof). */
+function createRefusedBeforeCommit(created: {
+  beforeCommit?: true
+  refusal: AgentSessionWireRefusal
+}): boolean {
+  return (
+    created.beforeCommit === true ||
+    (created.refusal.createAttemptRefusedBeforeCommit === true &&
+      isAgentSessionCreateAdmissionRefusal(created.refusal))
+  )
 }
 
 function requireInstalledHost(): StructuredAgentSessionHost {
