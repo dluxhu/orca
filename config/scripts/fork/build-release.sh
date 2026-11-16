@@ -12,8 +12,9 @@
 #    top patch branch (FORK_PATCHES_REF, default dlux/fork-setup).
 # 4. Makes release/<version> from the base in a new worktree, applies each patch branch in
 #    that order as one commit (its diff from the stable commit it is based on, by a 3-way
-#    cherry-pick; a stacked branch's diff is from the earlier branches it contains), tags v<version>, and moves the local release/latest. It warns when a
-#    branch does not contain the base tag.
+#    cherry-pick; a stacked branch's diff is from the earlier branches it contains), tags
+#    v<version>, and moves the local release/latest. It warns when a branch does not contain
+#    the base tag.
 # It never pushes. With --remote <name>, it reads the patch branches from <name>/.
 set -euo pipefail
 
@@ -116,13 +117,18 @@ for branch in "${branches[@]}"; do
   # A stacked branch contains earlier branches of the release order. Its patch is its diff from
   # all of them merged, so their changes are not applied twice.
   for earlier in ${applied[@]+"${applied[@]}"}; do
-    git merge-base --is-ancestor "$earlier" "$ref" || continue
+    # Only the part of the earlier branch that this branch contains: an older commit of it
+    # must not bring back what its tip removed.
+    earlier=$(git merge-base "$earlier" "$ref") || continue
     if git merge-base --is-ancestor "$patch_base" "$earlier"; then
       patch_base=$earlier
     elif ! git merge-base --is-ancestor "$earlier" "$patch_base"; then
-      tree=$(git merge-tree --write-tree "$patch_base" "$earlier") ||
-        die "the branches that $ref contains do not merge cleanly; merge them into $branch first. $cleanup"
-      patch_base=$(git commit-tree "$tree" -p "$patch_base" -p "$earlier" -m "stack base of $branch")
+      # On a conflict, keep the tree with its markers: the branch already resolved it, so the
+      # 3-way pick stops only where the release really differs.
+      tree=$(git merge-tree --write-tree "$patch_base" "$earlier" | head -n 1 || true)
+      [ -n "$tree" ] || die "cannot merge the branches that $ref contains. $cleanup"
+      patch_base=$(git commit-tree "$tree" -p "$patch_base" -p "$earlier" \
+        -m "stack base of $branch")
     fi
   done
   applied+=("$(git rev-parse "$ref")")
