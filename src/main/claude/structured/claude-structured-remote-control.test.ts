@@ -333,13 +333,17 @@ describe('Claude chat Remote Control', () => {
     await turnOn()
     cli.hold()
 
-    const off = turnOff().catch(() => null)
+    const off = turnOff()
     const on = turnOn()
     cli.answer(1).resolve({ session_url: 'https://claude.ai/code/session_02' })
     await on
     cli.answer(0).reject(new Error('remote_control timed out'))
-    await off
 
+    // The user's latest choice took effect, so the older request reports no failure.
+    await expect(off).resolves.toEqual({
+      enabled: true,
+      sessionUrl: 'https://claude.ai/code/session_02'
+    })
     await expect(state()).resolves.toEqual({
       enabled: true,
       sessionUrl: 'https://claude.ai/code/session_02'
@@ -375,6 +379,19 @@ describe('Claude chat Remote Control', () => {
 
     await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
     expect(adapter.confirmIdle('session-1')).toBeUndefined()
+  })
+
+  it('keeps a chat on after a restart once the new-chat setting turned it on', async () => {
+    const { adapter, calls, start } = await chat({ newChats: true })
+    Object.assign(adapter['deps'], { remoteControlForNewChats: () => false })
+    await adapter.closeSession('session-1')
+
+    await start(8)
+
+    expect(calls).toEqual([
+      [{ enabled: true }],
+      [{ enabled: true, reattachSessionId: 'session_01' }]
+    ])
   })
 
   it('stays off after a restart while its Turn Off is still in flight', async () => {

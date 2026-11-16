@@ -28,7 +28,7 @@ export function observeClaudeBridgeState(
   }
 }
 
-// shortcut: remembers the last 256 replay uuids; an older re-echo shows again.
+// shortcut: remembers only the last 256 replay uuids, so an older re-echo shows again; keep more if the CLI re-echoes older prompts.
 const REMEMBERED_REPLAY_UUIDS = 256
 
 /** Replays a send settled or a prompt row showed, so a repeated echo adds no second prompt row. */
@@ -152,9 +152,11 @@ export class ClaudeRemoteControl {
         })
       )
     } catch (error) {
-      if (current()) {
-        delete session.remoteControl
+      // A newer choice owns the state; this failure no longer concerns the user.
+      if (!current()) {
+        return
       }
+      delete session.remoteControl
       throw error
     }
     if (!current()) {
