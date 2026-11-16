@@ -7,6 +7,8 @@ import type { StructuredAgentSessionHost } from '../../../../../native-chat/agen
 import { STRUCTURED_AGENT_SESSION_START_WAIT_MS } from '../../../../../native-chat/agent-session-wire/delivery/structured-agent-session-send-settlement'
 import type { RpcContext } from '../../../core'
 import {
+  clientReadsAndSendsOnly,
+  requireReadSendStructuredHost,
   requireStructuredSessionHost,
   structuredCallerFor
 } from '../creation/structured-agent-session-gate'
@@ -19,7 +21,9 @@ export async function sendStructuredAgentSessionForClient(
   params: Parameters<StructuredAgentSessionHost['send']>[1],
   context: RpcContext
 ) {
-  const host = requireStructuredSessionHost(context, params.envelope.sessionId)
+  const host = clientReadsAndSendsOnly(context)
+    ? await requireReadSendStructuredHost(context)
+    : requireStructuredSessionHost(context, params.envelope.sessionId)
   // Person provenance lets undelivered text recover as an ordinary queued card.
   const result = await host.send(structuredCallerFor(context), {
     ...params,
