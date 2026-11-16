@@ -95,6 +95,26 @@ export function AgentsPane({
           }
           ariaLabel={getClaudeSubagentNavigationTitle(t)}
         />
+        <SettingsSwitchRow
+          label={t(
+            'components.settings.agents.claudeRemoteControl.title',
+            'Remote Control for new Claude chats'
+          )}
+          description={t(
+            'components.settings.agents.claudeRemoteControl.description',
+            'Connect each new Claude chat to claude.ai and the Claude app, so you can follow and answer it from there.'
+          )}
+          checked={settings.claudeRemoteControlForNewChats === true}
+          onChange={() =>
+            updateSettings({
+              claudeRemoteControlForNewChats: settings.claudeRemoteControlForNewChats !== true
+            })
+          }
+          ariaLabel={t(
+            'components.settings.agents.claudeRemoteControl.title',
+            'Remote Control for new Claude chats'
+          )}
+        />
         {!isPairedWebClientWindow() ? (
           <>
             <AgentWorkspaceTrustSetting settings={settings} updateSettings={updateSettings} />
