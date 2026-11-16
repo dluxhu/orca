@@ -266,7 +266,9 @@ link to any `.app` launcher as "stale" and replaces it without a word.
 
 **What.** The fork front page `.github/README.md`, this file,
 `config/scripts/fork/build-release.sh` and `config/scripts/fork/graft-orcad-template-targets.mjs`
-(see "Release steps").
+(see "Release steps"). The graft script refuses an upstream app of another version and a
+file that does not match upstream's manifest. Its test is
+`config/scripts/fork/graft-orcad-template-targets.test.mjs`.
 
 ### Part 5: macOS CLI launcher
 
@@ -305,7 +307,7 @@ tests change only their expected literals to the fork values:
 pnpm install
 pnpm run typecheck
 pnpm run lint
-pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host
+pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork
 ```
 
 By hand, on macOS, with official Orca signed in first:
@@ -335,7 +337,8 @@ Source and config (24): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`.
 
-Tests (18): `src/main/startup/fork-identity.test.ts` (new),
+Tests (19): `src/main/startup/fork-identity.test.ts` (new),
+`config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
 `src/main/cli/installation/cli-installer-other-app-notice.test.ts` (new),
 `src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (Part 5) and the 14 files in
