@@ -40,7 +40,9 @@ describe('a chat create refused before attach', () => {
     )
     const error = await run.catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
-    expect(error).toMatchObject({ message: 'Orca cannot find that conversation.' })
+    expect(error).toMatchObject({
+      message: 'Orca cannot find that conversation. (agent_session_identity_required)'
+    })
     expect(launchFailureWithoutEffectsCode(error, 'existing', trackTerminalSpawnDispatch())).toBe(
       'agent_launch_surface_unavailable'
     )

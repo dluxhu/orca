@@ -10,6 +10,6 @@ export function launchRefusalWithoutEffects(
   return error instanceof AgentLaunchStructuredSessionRefusedError &&
     error.beforeCommit &&
     targetKind === 'existing'
-    ? new AgentLaunchSurfaceUnavailableError(error.message)
+    ? new AgentLaunchSurfaceUnavailableError(`${error.message} (${error.code})`)
     : error
 }
