@@ -300,7 +300,7 @@ export async function createStructuredAgentSessionForWorktree(args: {
   firstMessage?: StructuredAgentSessionFirstMessage
   resumeFrom?: StructuredAgentSessionResumeSource
   signal?: AbortSignal
-}): Promise<AgentSessionMutationResult<AgentSessionAttachResult>> {
+}): Promise<AgentSessionMutationResult<AgentSessionAttachResult> & { beforeCommit?: true }> {
   // An at-rest create's ledger row is keyed by its intent, as a client's create is.
   const envelope = args.atRest
     ? {
@@ -313,7 +313,8 @@ export async function createStructuredAgentSessionForWorktree(args: {
     args.agent
   )
   if ('refusal' in prepared) {
-    return { ok: false, refusal: prepared.refusal }
+    // Nothing was attached yet, so the caller may report the refusal as a launch without effects.
+    return { ok: false, refusal: prepared.refusal, beforeCommit: true }
   }
   assertAgentPromptRequestActive(args.signal)
   return commitStructuredAgentSessionCreate({
