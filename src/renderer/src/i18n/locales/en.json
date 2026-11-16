@@ -21536,7 +21536,8 @@
         "turnOff": "Turn Off Remote Control",
         "turnOn": "Turn On Remote Control",
         "open": "Open in Claude"
-      }
+      },
+      "quoteChip": "Quote"
     },
     "tab": {
       "bar": {

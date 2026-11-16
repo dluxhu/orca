@@ -28,27 +28,47 @@ export function promptLeafString(
   return type === 'hardBreak' ? '\n' : (text ?? String(attrs?.token ?? ''))
 }
 
-/** All text-to-document paths must reconstruct image chips and pending-paste pills. */
-export function promptTextContent(text: string): JSONContent {
-  return {
-    type: 'doc',
-    content: text.split('\n').map((line) => ({
-      type: 'paragraph',
-      content: splitImageReferences(line).flatMap((part) =>
-        typeof part === 'string'
-          ? part
-              .split(NATIVE_CHAT_PASTED_TEXT_TOKEN)
-              .flatMap((piece, index): JSONContent[] =>
-                piece === ''
-                  ? []
-                  : index % 2 === 1
-                    ? [{ type: FILE_REFERENCE_NODE, attrs: { token: piece, path: '' } }]
-                    : [{ type: 'text', text: piece }]
-              )
-          : [{ type: IMAGE_REFERENCE_NODE, attrs: { attachmentId: part.attachmentId } }]
-      )
-    }))
+export const QUOTE_NODE = 'nativeChatQuote'
+const QUOTE_LINE = /^>( |$)/
+
+function promptLineContent(line: string): JSONContent[] {
+  return splitImageReferences(line).flatMap((part) =>
+    typeof part === 'string'
+      ? part
+          .split(NATIVE_CHAT_PASTED_TEXT_TOKEN)
+          .flatMap((piece, index): JSONContent[] =>
+            piece === ''
+              ? []
+              : index % 2 === 1
+                ? [{ type: FILE_REFERENCE_NODE, attrs: { token: piece, path: '' } }]
+                : [{ type: 'text', text: piece }]
+          )
+      : [{ type: IMAGE_REFERENCE_NODE, attrs: { attachmentId: part.attachmentId } }]
+  )
+}
+
+/**
+ * All text-to-document paths must reconstruct image chips and pending-paste pills.
+ * Quoted lines that a blank line or the end closes become one quote chip, as "Add to chat" writes
+ * them. `literal` text (a paste) keeps its quoted lines as text.
+ */
+export function promptTextContent(text: string, options?: { literal?: boolean }): JSONContent {
+  const lines = text.split('\n')
+  const content: JSONContent[] = []
+  for (let index = 0; index < lines.length; index++) {
+    let end = index
+    while (!options?.literal && end < lines.length && QUOTE_LINE.test(lines[end])) {
+      end++
+    }
+    if (end > index && (end === lines.length || lines[end] === '')) {
+      const token = lines.slice(index, end).join('\n')
+      content.push({ type: 'paragraph', content: [{ type: QUOTE_NODE, attrs: { token } }] })
+      index = end - 1
+    } else {
+      content.push({ type: 'paragraph', content: promptLineContent(lines[index]) })
+    }
   }
+  return { type: 'doc', content }
 }
 
 export function seedPromptSkillReferences(

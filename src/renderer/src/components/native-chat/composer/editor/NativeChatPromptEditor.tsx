@@ -24,6 +24,7 @@ import {
   fileReferenceContent,
   NativeChatFileReference,
   NativeChatImageReference,
+  NativeChatQuote,
   NativeChatSkill,
   promptLeafText,
   promptText,
@@ -103,6 +104,7 @@ function NativePromptEditor({
         NativeChatSkill,
         NativeChatFileReference,
         NativeChatImageReference,
+        NativeChatQuote,
         NativeChatUnkernedRunDecorations,
         // A disabled box still says why it is disabled, as the plain text box's placeholder does.
         Placeholder.configure({
@@ -130,7 +132,7 @@ function NativePromptEditor({
           if (text == null) {
             return false
           }
-          const content = editor?.schema.nodeFromJSON(promptTextContent(text))
+          const content = editor?.schema.nodeFromJSON(promptTextContent(text, { literal: true }))
           if (!content) {
             return false
           }
@@ -246,7 +248,7 @@ function NativePromptEditor({
         ? {
             insertAgentReferences: (references) => insertAgentReferences(editor, references),
             insertText: (text) => {
-              const content = editor.schema.nodeFromJSON(promptTextContent(text))
+              const content = editor.schema.nodeFromJSON(promptTextContent(text, { literal: true }))
               editor.view.dispatch(
                 editor.state.tr.replaceSelection(new Slice(content.content, 1, 1))
               )
