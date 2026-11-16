@@ -9,13 +9,12 @@ export function NativeChatQuotePill({ node, selected }: NodeViewProps): React.JS
   const text = quotedText(String(node.attrs.token))
   return (
     <NodeViewWrapper as="span" className="inline" contentEditable={false}>
+      <span className="sr-only">{t('components.native-chat.quoteChip', 'Quote')}: </span>
       <NativeChatPromptPill
         icon={Quote}
         label={text.replace(/\s+/g, ' ')}
         selected={selected}
         title={text}
-        aria-label={`${t('components.native-chat.quoteChip', 'Quote')}: ${text}`}
-        data-native-chat-quote=""
       />
     </NodeViewWrapper>
   )

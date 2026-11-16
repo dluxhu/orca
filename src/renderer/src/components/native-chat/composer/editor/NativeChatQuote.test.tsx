@@ -3,7 +3,10 @@ import { createRef } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NativeChatPromptEditor } from './NativeChatPromptEditor'
-import type { NativeChatComposerInput } from './native-chat-composer-input'
+import {
+  writeNativeChatComposerText,
+  type NativeChatComposerInput
+} from './native-chat-composer-input'
 import { promptEditor } from './native-chat-prompt-editor.test-support'
 import { promptTextContent } from './native-chat-prompt-document-text'
 import { formatNativeChatQuote } from '../../selection-quotes/native-chat-quote-selection'
@@ -60,9 +63,9 @@ describe('quote chips in the composer', () => {
     })
     expect(input.value).toBe(next)
     expect(chips(editor)).toBe(1)
-    await waitFor(() =>
-      expect(container.querySelector('[aria-label="Quote: quoted\nwords"]')).not.toBeNull()
-    )
+    // The chip reads "Quote: …" to a screen reader.
+    await waitFor(() => expect(container.querySelector('.sr-only')?.textContent).toBe('Quote: '))
+    expect(container.textContent).toContain('Quote: quoted words')
     expect(container.textContent).not.toContain('>')
   })
 
@@ -98,6 +101,15 @@ describe('quote chips in the composer', () => {
       editor.commands.joinBackward()
     })
     expect(input.value).toBe('> q\n\nbelow')
+  })
+
+  it('shows text written after a chip through the composer API inside the chip it is sent in', () => {
+    const { input, editor } = setup('> q\n\n')
+    act(() => writeNativeChatComposerText(input, '> q hello\n\n', '> q hello'.length))
+    expect(input.value).toBe('> q hello\n\n')
+    const first = editor.state.doc.child(0)
+    expect(first.childCount).toBe(1)
+    expect(first.child(0).attrs.token).toBe('> q hello')
   })
 
   it('pastes quoted text literally', () => {

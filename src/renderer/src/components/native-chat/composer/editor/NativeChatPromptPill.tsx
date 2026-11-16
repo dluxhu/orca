@@ -11,7 +11,6 @@ export function NativeChatPromptPill({
   label: string
   selected: boolean
   title?: string
-  'aria-label'?: string
 }): React.JSX.Element {
   return (
     <Badge variant="promptPill" data-selected={selected} {...badgeProps}>

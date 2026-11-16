@@ -142,20 +142,25 @@ export function withoutImageReferenceNodes(
     : document
 }
 
-/** Applies an appended text change without replacing existing picked nodes. */
+/**
+ * Applies an appended text change without replacing existing picked nodes.
+ * `literal` (a paste) keeps quoted lines as text, also in a draft that has no document yet.
+ */
 export function appendPromptDocumentText(
   document: JSONContent | undefined,
   before: string,
-  after: string
+  after: string,
+  options?: { literal?: boolean }
 ): JSONContent | undefined {
-  if (!document || before === after) {
+  const base = document ?? (options?.literal ? promptTextContent(before) : undefined)
+  if (!base || before === after) {
     return document
   }
   const kept = before.trimEnd()
   if (kept === '') {
-    return promptTextContent(after)
+    return promptTextContent(after, options)
   }
-  const blocks = [...(document.content ?? [])]
+  const blocks = [...(base.content ?? [])]
   while (blocks.length > 0) {
     const block = blocks.pop()
     const content = [...(block?.content ?? [])]
@@ -176,9 +181,9 @@ export function appendPromptDocumentText(
       }
     }
     if (content.length > 0 && block) {
-      const [first, ...rest] = promptTextContent(after.slice(kept.length)).content ?? []
+      const [first, ...rest] = promptTextContent(after.slice(kept.length), options).content ?? []
       return {
-        ...document,
+        ...base,
         content: [
           ...blocks,
           { ...block, content: [...content, ...(first?.content ?? [])] },
@@ -187,7 +192,7 @@ export function appendPromptDocumentText(
       }
     }
   }
-  return promptTextContent(after)
+  return promptTextContent(after, options)
 }
 
 /** Slice serialized prompt offsets while retaining selected nodes inside the range. */

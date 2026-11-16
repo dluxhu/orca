@@ -21191,6 +21191,7 @@
       "dismissDeliveryNotice": "Dismiss",
       "editDeliveryNotice": "Edit",
       "addSelectionToChat": "Add to chat",
+      "quoteChip": "Quote",
       "messageNotSent": "Message not sent",
       "messageSending": "Sending…",
       "userMessage": {
@@ -21527,8 +21528,7 @@
         "questionNotSentDetail": "Your question is still in this chat. Send /btw again to retry.",
         "questionUnconfirmed": "{{agent}} couldn't confirm the side chat got your question",
         "questionUnconfirmedDetail": "Check the side chat before asking again. Your question is still in this chat."
-      },
-      "quoteChip": "Quote"
+      }
     },
     "tab": {
       "bar": {
