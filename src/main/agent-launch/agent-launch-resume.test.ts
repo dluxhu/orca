@@ -86,6 +86,12 @@ describe('agent launch that resumes a provider session', () => {
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
+  it('reports a definitive refusal from the commit as a launch without effects', async () => {
+    const { run } = harness({ chat: true, createRefuses: true })
+    const error = await run().catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
+  })
+
   it('reports a refusal from before attach as a launch without effects', async () => {
     const { run } = harness({ chat: true, createRefuses: true, beforeCommit: true })
     const error = await run().catch((caught: unknown) => caught)
