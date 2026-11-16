@@ -9,9 +9,9 @@ import {
 import { readTextOrFileFlag } from '../arguments/command-body-input'
 import { printResult } from '../output/command-result-output'
 import type { RuntimeClient } from '../runtime/client'
-import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
-import { isRequestUnsent } from '../runtime/connection/client-error-recovery'
-import { readInjectedAgentSessionId } from '../../shared/agent-session/lifecycle/launch/agent-session-caller-env'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/types'
+import { isRequestUnsent } from '../runtime/client-error-recovery'
+import { readInjectedAgentSessionId } from '../../shared/agent-session/lifecycle/agent-session-caller-env'
 import {
   AGENT_SESSION_HISTORY_MAX_LIMIT,
   type AgentSessionHistoryResult,
@@ -23,13 +23,13 @@ import {
   AGENT_SESSION_UNATTACHED_REFUSAL_CODE,
   isUnattachedAgentSessionReadRefusal
 } from '../../shared/agent-session/failures/structured-agent-session-read-refusal'
-import { createStructuredAgentSessionOperationId } from '../../shared/agent-session/lifecycle/operations/structured-agent-session-mutation'
+import { createStructuredAgentSessionOperationId } from '../../shared/agent-session/lifecycle/structured-agent-session-mutation'
 import {
   structuredAgentSessionMessageSendMutation,
   structuredAgentSessionSendBody
 } from '../../shared/agent-session/requests/structured-agent-session-send-mutation'
 import { AGENT_STATUS_STATES } from '../../shared/agent-status/contracts/agent-status-types'
-import type { RuntimeWorktreePsResult } from '../../shared/worktree/catalog/runtime-worktree-contracts'
+import type { RuntimeWorktreePsResult } from '../../shared/runtime-worktree-contracts'
 import {
   chatTranscript,
   formatChatList,

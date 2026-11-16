@@ -5,13 +5,13 @@ import {
   AGENT_SESSION_RENAME_ONLY_CLIENT_CAPABILITY
 } from '../../../../../../shared/agent-session/structured-agent-session-surface-capabilities'
 import { setStructuredAgentSessionHost } from '../../../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
-import { HOST_TEST_SESSION as SESSION } from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-host-test-data.test-fixture'
+import { HOST_TEST_SESSION as SESSION } from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-host-test-data'
 import {
   createRestTestRig,
   foundRestTestChat,
   restTestSend
-} from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-rest-test-rig.test-fixture'
-import type { RestTestRig } from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-rest-test-rig.test-fixture'
+} from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-rest-test-rig'
+import type { RestTestRig } from '../../../../../native-chat/agent-session-wire/host/testing/structured-agent-session-rest-test-rig'
 import { OrcaRuntimeService } from '../../../../orca-runtime'
 import type { RpcResponse } from '../../../core'
 import { RpcDispatcher } from '../../../dispatcher'
