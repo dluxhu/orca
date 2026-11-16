@@ -65,6 +65,24 @@ describe('agent launch chat with Remote Control', () => {
     expect(forgotten).toEqual({ ...recorded, forget: true })
   })
 
+  it('forgets the choice when attach refused with the attempt proof', async () => {
+    turnOnMock.mockReset().mockReturnValue(true)
+    createMock.mockReset().mockResolvedValue({
+      ok: false,
+      refusal: {
+        code: 'agent_session_identity_required',
+        message: 'This conversation belongs to another directory.',
+        details: { reason: 'transcriptUnreadable' },
+        createAttemptRefusedBeforeCommit: true
+      }
+    })
+    await factory()
+      .createStructuredSession({ worktreeId: 'wt-1', agent: 'claude', remoteControl: true })
+      .catch(() => {})
+    const [[recorded], [forgotten]] = turnOnMock.mock.calls
+    expect(forgotten).toEqual({ ...recorded, forget: true })
+  })
+
   it('keeps the Remote Control choice when the create outcome is unknown', async () => {
     turnOnMock.mockReset().mockReturnValue(true)
     createMock.mockReset().mockResolvedValue({
