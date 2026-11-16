@@ -58,6 +58,7 @@ export function agentLaunchSurfaceFactory(
       tabId,
       withoutPrompt,
       firstMessage,
+      resumeFrom,
       signal
     }) => {
       const sessionId = requested ?? createStructuredAgentSessionId(agent, randomUUID)
@@ -98,6 +99,7 @@ export function agentLaunchSurfaceFactory(
         ...(tabId ? { tabId } : {}),
         ...(atRest ? { atRest: true as const } : {}),
         ...(firstMessage ? { firstMessage } : {}),
+        ...(resumeFrom ? { resumeFrom } : {}),
         ...(signal ? { signal } : {}),
         activate:
           !callerPresentsSurface &&

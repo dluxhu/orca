@@ -10,6 +10,8 @@ import type {
   AgentLaunchPrompt,
   AgentLaunchMode
 } from '../../shared/agent-launch/contracts/agent-launch-intent'
+import { formatAgentTypeLabel } from '../../shared/agent-status/presentation/agent-type-label'
+import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
 import type { StructuredAgentId } from '../../shared/agent-session/lifecycle/agent-session-provider-handle'
 import type { StructuredAgentSessionFirstMessage } from '../../shared/agent-session/structured-agent-session-create'
 import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
@@ -31,6 +33,8 @@ export type AgentLaunchSurfaceFactory = {
     /** Keep chat idle until the caller submits its first message. */
     withoutPrompt?: true
     firstMessage?: StructuredAgentSessionFirstMessage
+    /** The provider conversation the chat continues. */
+    resumeFrom?: { providerSessionId: string }
     signal?: AbortSignal
   }): Promise<AgentLaunchStructuredSurface>
   createTerminalAgent(args: {
@@ -136,12 +140,25 @@ function terminalLaunchOptions(intent: Pick<AgentLaunchIntent, 'sessionOptions' 
   return intent.sessionOptions ?? intent.chatOptions
 }
 
+/** A terminal would start a fresh conversation, not the one a resume names. */
+export function assertResumeOpensChat(
+  intent: Pick<AgentLaunchIntent, 'agent' | 'resumeFrom'>,
+  mode: AgentLaunchMode
+): void {
+  if (intent.resumeFrom && mode !== 'structured') {
+    throw new AgentLaunchSurfaceUnavailableError(
+      `${formatAgentTypeLabel(intent.agent)} can't resume a session as a chat here. Nothing was started.`
+    )
+  }
+}
+
 /** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
  *  terminal will receive it, after the shared preflight determines the actual route. */
 export function assertTerminalLaunchAdmissible(
   intent: AgentLaunchIntent | AgentLaunchParams,
   mode: AgentLaunchMode
 ): void {
+  assertResumeOpensChat(intent, mode)
   if (intent.reuseTerminal || intent.target.kind === 'create-worktree') {
     const options = mode === 'terminal' ? terminalLaunchOptions(intent) : intent.sessionOptions
     const preferences = toAgentLaunchPreferences(options, intent.agent)

@@ -14,8 +14,8 @@ import {
   combineLaunchWarnings,
   ignoredStructuredLaunchInputsWarning
 } from './agent-launch-warnings'
+import { createTerminalSurface } from './agent-launch-terminal-surface'
 import {
-  argvLaunchPrompt,
   launchPromptCreateInputs,
   deliverTerminalLaunchPrompt,
   HANDED_TO_TERMINAL,
@@ -179,6 +179,18 @@ export async function openAgentLaunch(
       ) {
         throw launchRefusalWithoutEffects(error, intent.target.kind)
       }
+      // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
+      if (intent.resumeFrom) {
+        // A refusal from the commit may follow a reserved session row, so its outcome stays
+        // unknown; its message still names the code.
+        const named = error.beforeCommit
+          ? error
+          : new AgentLaunchStructuredSessionRefusedError(
+              error.code,
+              `${error.message} (${error.code})`
+            )
+        throw launchRefusalWithoutEffects(named, intent.target.kind)
+      }
       // Cancellation must prevent a fallback from starting a new agent and argv prompt.
       assertAgentPromptRequestActive(execution.signal)
       settled = downgradeAgentLaunchModeForStructuredRefusal(settled, vocabulary, settlement)
@@ -281,6 +293,7 @@ async function createSurface(
       ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
       ...(intent.chatOptions ? { chatOptions: intent.chatOptions } : {}),
       ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),
+      ...(intent.resumeFrom ? { resumeFrom: intent.resumeFrom } : {}),
       ...(reservedTabId ? { tabId: reservedTabId } : {}),
       ...launchPromptCreateInputs(intent, execution.signal),
       ...(intent.prompt ? {} : { withoutPrompt: true as const })
@@ -297,29 +310,4 @@ async function createSurface(
     }
   }
   return createTerminalSurface(execution, workspace)
-}
-
-async function createTerminalSurface(
-  execution: AgentLaunchSurfaceExecution,
-  workspace: { worktreeId: string; connectionId?: string | null }
-): Promise<CreatedSurface> {
-  const { intent, surfaces } = execution
-  const startupPrompt = argvLaunchPrompt(intent)
-  const terminal = await surfaces.createTerminalAgent({
-    worktreeId: workspace.worktreeId,
-    agent: intent.agent,
-    ...(startupPrompt ? { startupPrompt } : {}),
-    ...terminalLaunchInputs(intent),
-    viewMode: 'terminal'
-  })
-  return {
-    outcome: {
-      kind: 'terminal',
-      handle: terminal.handle,
-      ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {})
-    },
-    terminalCreation: terminal.terminalCreation,
-    ...(terminal.warning ? { warning: terminal.warning } : {}),
-    ...(startupPrompt && terminal.promptRodeLaunchCommand ? { promptRodeLaunchCommand: true } : {})
-  }
 }
