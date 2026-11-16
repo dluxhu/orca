@@ -105,7 +105,7 @@ export function adoptedTranscriptSourceObserver(input: {
         cwd = extractString(summary?.cwd)
       }
       const workspace = normalizeRuntimePathForComparison(input.source.workspaceCwd.trim())
-      // Otherwise the first directory is probed, as before (a symlinked path still matches).
+      // A miss probes the first directory so a symlinked path still matches.
       cwd =
         [...claudeCwds].find(
           (recorded) => normalizeRuntimePathForComparison(recorded.trim()) === workspace

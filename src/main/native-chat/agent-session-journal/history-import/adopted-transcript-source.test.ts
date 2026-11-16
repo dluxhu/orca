@@ -34,6 +34,10 @@ describe('a Claude transcript adopted into a workspace', () => {
     await expect(validate(['/workspace', '/other/repo', workspace])).resolves.toBeUndefined()
   })
 
+  it('accepts a conversation that ran in this workspace between other directories', async () => {
+    await expect(validate(['/workspace', workspace, '/other/repo'])).resolves.toBeUndefined()
+  })
+
   it('accepts a conversation whose last turn ran in a subfolder of this workspace', async () => {
     await expect(validate([workspace, join(workspace, 'sub')])).resolves.toBeUndefined()
   })
