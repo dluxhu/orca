@@ -152,7 +152,7 @@ export class ClaudeRemoteControl {
         })
       )
     } catch (error) {
-      // A newer choice owns the state; this failure no longer concerns the user.
+      // A newer choice owns the state; this failure does not concern the user.
       if (!current()) {
         return
       }
