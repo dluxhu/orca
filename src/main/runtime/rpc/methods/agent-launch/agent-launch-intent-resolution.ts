@@ -60,7 +60,8 @@ async function agentLaunchIntent(
       ? { nativeChatDefault: params.nativeChatDefault }
       : {}),
     ...(params.surface ? { surface: params.surface } : {}),
-    ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {})
+    ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {}),
+    ...(params.remoteControl ? { remoteControl: params.remoteControl } : {})
   }
 }
 

@@ -106,6 +106,7 @@ describe('orca cli agent launch', () => {
         'chat',
         '--resume',
         'x',
+        '--remote-control',
         '--json'
       ],
       '/tmp/repo'
@@ -113,7 +114,43 @@ describe('orca cli agent launch', () => {
     expect(launchCalls()).toEqual([
       [
         'agent.launchReplay',
-        expect.objectContaining({ surface: 'chat', resumeFrom: { providerSessionId: 'x' } })
+        expect.objectContaining({
+          surface: 'chat',
+          resumeFrom: { providerSessionId: 'x' },
+          remoteControl: true
+        })
+      ]
+    ])
+  })
+
+  it('keeps --resume after a valueless --remote-control', async () => {
+    queueFixtures(callMock, agentLaunchHostFixture(), agentLaunchFixture(WORKTREE_ID))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await main(
+      [
+        'agent',
+        'launch',
+        '--agent',
+        'claude',
+        '--worktree',
+        `id:${WORKTREE_ID}`,
+        '--surface',
+        'chat',
+        '--remote-control',
+        '--resume',
+        'x',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(launchCalls()).toEqual([
+      [
+        'agent.launchReplay',
+        expect.objectContaining({
+          surface: 'chat',
+          resumeFrom: { providerSessionId: 'x' },
+          remoteControl: true
+        })
       ]
     ])
   })

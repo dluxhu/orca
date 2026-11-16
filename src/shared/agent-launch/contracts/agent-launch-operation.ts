@@ -26,6 +26,8 @@ export type AgentLaunchFingerprintInput = {
   surface?: string
   /** Another provider conversation names a different launch. */
   resumeFrom?: { providerSessionId: string }
+  /** Remote Control changes what the chat does. */
+  remoteControl?: true
   /** Exclude launchSource, placement and presentation: they change attribution/view, not execution. Replays truthfully retain the first launch's attribution. */
 }
 
@@ -50,7 +52,8 @@ export function computeAgentLaunchFingerprint(input: AgentLaunchFingerprintInput
     paneKey: input.paneKey,
     sessionId: input.sessionId,
     surface: input.surface,
-    resumeFrom: input.resumeFrom
+    resumeFrom: input.resumeFrom,
+    remoteControl: input.remoteControl
   })
 }
 

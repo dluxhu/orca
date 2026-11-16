@@ -112,7 +112,10 @@ export const AgentLaunchFields = z.object({
   surface: z.enum(AGENT_LAUNCH_SURFACES).optional(),
   /** Continue this provider conversation as a chat. Inside replay identity. Clients must gate on
    * agent.launch.resume.v1 because older hosts strip this field and start a fresh chat. */
-  resumeFrom: ResumeSource.omit({ cliSource: true }).optional()
+  resumeFrom: ResumeSource.omit({ cliSource: true }).optional(),
+  /** Turn Claude Remote Control on when the chat opens, for this launch only. Inside replay identity.
+   * Clients must gate on agent.launch.remote-control.v1 because older hosts strip this field. */
+  remoteControl: z.literal(true).optional()
 })
 
 /** Caller IDs must retain the agent lane encoded by host-minted IDs; a resume stays a chat. */
@@ -136,6 +139,14 @@ function refuseInconsistentLaunch(
       code: z.ZodIssueCode.custom,
       path: ['resumeFrom'],
       message: 'A resume needs surface chat, an existing workspace and no prompt'
+    })
+  }
+  // A caller-named session could name a chat that exists; only a new host-minted chat takes the choice.
+  if (launch.remoteControl && (launch.surface !== 'chat' || launch.sessionId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['remoteControl'],
+      message: 'Remote Control needs surface chat and no caller-named session'
     })
   }
 }

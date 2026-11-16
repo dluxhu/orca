@@ -88,6 +88,18 @@ describe('agent launch that resumes a provider session', () => {
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
+  it('names the create reason for a refused Remote Control chat, without a terminal', async () => {
+    const { resumeFrom: _resume, ...fresh } = { ...RESUME, remoteControl: true as const }
+    const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true, intent: fresh })
+    const error = await run().catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(AgentLaunchStructuredSessionRefusedError)
+    expect(error).toMatchObject({
+      message:
+        'the resumed session is still open in a terminal (structured_agent_session_unsupported)'
+    })
+    expect(createTerminalAgent).not.toHaveBeenCalled()
+  })
+
   it('keeps a definitive refusal from the commit unknown, names its code, and starts no terminal', async () => {
     const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true })
     const error = await run().catch((caught: unknown) => caught)
@@ -145,17 +157,34 @@ describe('agent launch that resumes a provider session', () => {
         agent: 'claude',
         target: { kind: 'existing', worktree: 'id:wt-1' },
         surface: 'chat',
-        resumeFrom: { providerSessionId: 'claude-session-1' }
+        resumeFrom: { providerSessionId: 'claude-session-1' },
+        remoteControl: true
       },
       runtime,
       null
     )
     expect(intent.resumeFrom).toEqual({ providerSessionId: 'claude-session-1' })
+    expect(intent.remoteControl).toBe(true)
+  })
+
+  it('passes Remote Control to the chat create and never opens a terminal for it', async () => {
+    const withRemoteControl = { ...RESUME, remoteControl: true as const }
+    const on = harness({ chat: true, intent: withRemoteControl })
+    await on.run()
+    expect(on.createStructuredSession.mock.calls[0]?.[0]).toMatchObject({ remoteControl: true })
+
+    const { resumeFrom: _resume, ...fresh } = withRemoteControl
+    const unknown = harness({ chat: true, supportFails: true, intent: fresh })
+    await expect(unknown.run()).rejects.toThrow(/Remote Control/)
+    expect(unknown.createTerminalAgent).not.toHaveBeenCalled()
   })
 
   it('makes the resumed session part of the launch identity', () => {
     const base = { agent: 'claude', target: { kind: 'existing' as const, worktree: 'wt-1' } }
     expect(computeAgentLaunchFingerprint({ ...base, resumeFrom: RESUME.resumeFrom })).not.toBe(
+      computeAgentLaunchFingerprint(base)
+    )
+    expect(computeAgentLaunchFingerprint({ ...base, remoteControl: true })).not.toBe(
       computeAgentLaunchFingerprint(base)
     )
   })

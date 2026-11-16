@@ -50,3 +50,22 @@ describe('agent.launch resumeFrom', () => {
     }
   })
 })
+
+describe('agent.launch remoteControl', () => {
+  const ON = { ...BASE, surface: 'chat', remoteControl: true }
+
+  it('accepts Remote Control on a chat launch', () => {
+    expect(AgentLaunch.parse(ON).remoteControl).toBe(true)
+  })
+
+  it('refuses Remote Control off a chat or on a caller-named session', () => {
+    for (const params of [
+      { ...ON, surface: undefined },
+      { ...ON, surface: 'terminal' },
+      { ...ON, sessionId: 'claude_1d39fd0e_11b0_41d0_9c4a_e3f7da9ac2fd' },
+      { ...ON, remoteControl: false }
+    ]) {
+      expect(AgentLaunch.safeParse(params).success, JSON.stringify(params)).toBe(false)
+    }
+  })
+})
