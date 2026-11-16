@@ -31,6 +31,7 @@ import {
 import { AgentLaunchTabClosedError } from '../../../../../shared/agent-launch/contracts/agent-launch-tab-closed'
 import { AgentLaunchSurfaceUnavailableError } from '../../../../agent-launch/agent-launch-surface-refusal'
 import { formatAgentTypeLabel } from '../../../../../shared/agent-status/presentation/agent-type-label'
+import { isDefinitiveAgentSessionCreateRefusal } from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
 import {
   agentLaunchMovesHostWindow,
   agentLaunchTabViewerRule,
@@ -120,8 +121,13 @@ export function agentLaunchSurfaceFactory(
           (presentation === undefined || (presentation === 'focused' && movesHostWindow))
       })
       if (!created.ok) {
-        // A refused create leaves no chat to open; its Remote Control choice must not wait for one.
-        if (remoteControl) {
+        // Forget the Remote Control choice only when the refusal proves that no chat exists; an
+        // unknown outcome may have created the chat, and it keeps the choice.
+        if (
+          remoteControl &&
+          (created.beforeCommit === true ||
+            isDefinitiveAgentSessionCreateRefusal(created.refusal.code))
+        ) {
           requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({
             sessionId,
             agent,

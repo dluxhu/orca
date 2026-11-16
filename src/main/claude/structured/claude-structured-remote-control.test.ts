@@ -484,6 +484,24 @@ describe('Claude chat Remote Control', () => {
     await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
   })
 
+  it('leaves a running chat on Remote Control when a launch forgets its choice', async () => {
+    const { adapter, calls, state, start } = await chat()
+    await adapter.remoteControl({ sessionId: 'session-1', enabled: true })
+
+    adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', forget: true })
+    await adapter.closeSession('session-1')
+    await start(8)
+
+    expect(calls).toEqual([
+      [{ enabled: true }],
+      [{ enabled: true, reattachSessionId: 'session_01' }]
+    ])
+    await expect(state()).resolves.toEqual({
+      enabled: true,
+      sessionUrl: 'https://claude.ai/code/session_01'
+    })
+  })
+
   it('adds no row and no turn for an unclaimed replay while Remote Control is off', async () => {
     const { frame, userRows, runningTurnsOn } = await chat()
 
