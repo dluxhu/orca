@@ -57,6 +57,7 @@ export const CLI_BOOLEAN_FLAGS = new Set([
   'references',
   'relations',
   'relay',
+  'remote-control',
   'removed',
   'reinstall',
   'restore-window',

@@ -6,6 +6,7 @@ import {
 } from '../../shared/agent-launch/contracts/agent-launch-runtime-capability'
 import { RuntimeClient } from '../runtime/client'
 import { callAgentLaunch, readCliAgentLaunch } from './agent-launch-request'
+import { parseArgs } from '../arguments/args'
 
 const read = (flags: Record<string, string | boolean>) =>
   readCliAgentLaunch(new Map(Object.entries(flags)), 'claude', { createsWorktree: false })
@@ -52,6 +53,14 @@ describe('orca agent launch --remote-control', () => {
       surface: 'chat',
       remoteControl: true
     })
+  })
+
+  it('reads --remote-control as a flag without a value', () => {
+    const { flags } = parseArgs(
+      ['agent', 'launch', '--remote-control', 'claude-1'],
+      [['agent', 'launch']]
+    )
+    expect(flags.get('remote-control')).toBe(true)
   })
 
   it('refuses --remote-control without --surface chat', () => {

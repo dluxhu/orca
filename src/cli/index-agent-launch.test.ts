@@ -123,6 +123,38 @@ describe('orca cli agent launch', () => {
     ])
   })
 
+  it('keeps --resume after a valueless --remote-control', async () => {
+    queueFixtures(callMock, agentLaunchHostFixture(), agentLaunchFixture(WORKTREE_ID))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await main(
+      [
+        'agent',
+        'launch',
+        '--agent',
+        'claude',
+        '--worktree',
+        `id:${WORKTREE_ID}`,
+        '--surface',
+        'chat',
+        '--remote-control',
+        '--resume',
+        'x',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(launchCalls()).toEqual([
+      [
+        'agent.launchReplay',
+        expect.objectContaining({
+          surface: 'chat',
+          resumeFrom: { providerSessionId: 'x' },
+          remoteControl: true
+        })
+      ]
+    ])
+  })
+
   it('returns an exact recovery command and removes blind retry advice after a lost reply', async () => {
     queueFixtures(callMock, agentLaunchHostFixture())
     callMock.mockRejectedValueOnce(

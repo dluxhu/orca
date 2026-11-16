@@ -179,8 +179,9 @@ export async function openAgentLaunch(
       ) {
         throw launchRefusalWithoutEffects(error, intent.target.kind)
       }
-      // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
-      if (intent.resumeFrom) {
+      // The create's own refusal says why; a terminal would start a fresh conversation or drop
+      // Remote Control.
+      if (intent.resumeFrom || intent.remoteControl) {
         // A definitive refusal proves no chat exists, even one the commit refused.
         const proven = new AgentLaunchStructuredSessionRefusedError(error.code, error.message, true)
         throw launchRefusalWithoutEffects(proven, intent.target.kind)

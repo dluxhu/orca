@@ -86,6 +86,18 @@ describe('agent launch that resumes a provider session', () => {
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
+  it('reports the create reason for a refused Remote Control chat, without a terminal', async () => {
+    const { resumeFrom: _resume, ...fresh } = { ...RESUME, remoteControl: true as const }
+    const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true, intent: fresh })
+    const error = await run().catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
+    expect(error).toMatchObject({
+      message:
+        'the resumed session is still open in a terminal (structured_agent_session_unsupported)'
+    })
+    expect(createTerminalAgent).not.toHaveBeenCalled()
+  })
+
   it('reports a definitive refusal from the commit as a launch without effects', async () => {
     const { run } = harness({ chat: true, createRefuses: true })
     const error = await run().catch((caught: unknown) => caught)
