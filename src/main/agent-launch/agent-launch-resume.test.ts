@@ -2,6 +2,7 @@ import { EVERY_AGENT_CHAT } from '../../shared/native-chat/every-agent-chat.test
 import { describe, expect, it, vi } from 'vitest'
 import { executeAgentLaunch, type AgentLaunchExecution } from './agent-launch-executor'
 import { AgentLaunchStructuredSessionRefusedError } from './agent-launch-surface-factories'
+import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
 import type { AgentLaunchIntent } from '../../shared/agent-launch/contracts/agent-launch-intent'
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch/contracts/agent-launch-operation'
 import { resolveUnlaunchedIntent } from '../runtime/rpc/methods/agent-launch/agent-launch-intent-resolution'
@@ -17,6 +18,7 @@ const RESUME: AgentLaunchIntent = {
 function harness(options: {
   chat: boolean
   createRefuses?: boolean
+  beforeCommit?: boolean
   supportFails?: boolean
   intent?: AgentLaunchIntent
 }) {
@@ -24,7 +26,8 @@ function harness(options: {
     if (options.createRefuses) {
       throw new AgentLaunchStructuredSessionRefusedError(
         'structured_agent_session_unsupported',
-        'the resumed session is still open in a terminal'
+        'the resumed session is still open in a terminal',
+        options.beforeCommit
       )
     }
     return { sessionId: 'sess-1', handle: 'handle_structured', fence: 1 }
@@ -81,6 +84,16 @@ describe('agent launch that resumes a provider session', () => {
     })
     await expect(run()).rejects.toThrow('the resumed session is still open in a terminal')
     expect(createTerminalAgent).not.toHaveBeenCalled()
+  })
+
+  it('reports a refusal from before attach as a launch without effects', async () => {
+    const { run } = harness({ chat: true, createRefuses: true, beforeCommit: true })
+    const error = await run().catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
+    expect(error).toMatchObject({
+      message:
+        'the resumed session is still open in a terminal (structured_agent_session_unsupported)'
+    })
   })
 
   it('refuses before any effect when the agent cannot open as a chat', async () => {
