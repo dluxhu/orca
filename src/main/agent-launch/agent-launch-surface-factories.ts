@@ -135,8 +135,6 @@ function terminalLaunchOptions(intent: Pick<AgentLaunchIntent, 'sessionOptions' 
   return intent.sessionOptions ?? intent.chatOptions
 }
 
-/** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
- *  terminal will receive it, after the shared preflight determines the actual route. */
 /** A terminal would start a fresh conversation, not the one a resume names. */
 export function assertResumeOpensChat(
   intent: Pick<AgentLaunchIntent, 'agent' | 'resumeFrom'>,
@@ -149,6 +147,8 @@ export function assertResumeOpensChat(
   }
 }
 
+/** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
+ *  terminal will receive it, after the shared preflight determines the actual route. */
 export function assertTerminalLaunchAdmissible(
   intent: AgentLaunchIntent | AgentLaunchParams,
   mode: AgentLaunchMode
