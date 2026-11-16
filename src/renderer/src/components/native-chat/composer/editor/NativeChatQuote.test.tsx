@@ -74,6 +74,8 @@ describe('quote chips in the composer', () => {
       editor.commands.insertContent('above')
     })
     expect(input.value).toBe('above\n> q\n\n')
+    // The caret stays after the typed text, not on the chip's line.
+    expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
     act(() => {
       editor.commands.insertContent('!')
     })
