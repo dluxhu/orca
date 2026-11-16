@@ -35,6 +35,8 @@ export type AgentLaunchSurfaceFactory = {
     firstMessage?: StructuredAgentSessionFirstMessage
     /** The provider conversation the chat continues. */
     resumeFrom?: { providerSessionId: string }
+    /** Turn Remote Control on when the chat opens. */
+    remoteControl?: true
     signal?: AbortSignal
   }): Promise<AgentLaunchStructuredSurface>
   createTerminalAgent(args: {
@@ -135,11 +137,9 @@ function terminalLaunchOptions(intent: Pick<AgentLaunchIntent, 'sessionOptions' 
   return intent.sessionOptions ?? intent.chatOptions
 }
 
-/** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
- *  terminal will receive it, after the shared preflight determines the actual route. */
 /** A terminal would start a fresh conversation, not the one a resume names. */
 export function assertResumeOpensChat(
-  intent: Pick<AgentLaunchIntent, 'agent' | 'resumeFrom'>,
+  intent: Pick<AgentLaunchIntent, 'agent' | 'resumeFrom' | 'remoteControl'>,
   mode: AgentLaunchMode
 ): void {
   if (intent.resumeFrom && mode !== 'structured') {
@@ -147,8 +147,16 @@ export function assertResumeOpensChat(
       `${formatAgentTypeLabel(intent.agent)} can't resume a session as a chat here. Nothing was started.`
     )
   }
+  // Remote Control is a chat feature; a terminal would drop it without a word.
+  if (intent.remoteControl && mode !== 'structured') {
+    throw new AgentLaunchSurfaceUnavailableError(
+      `${formatAgentTypeLabel(intent.agent)} can't open as a chat with Remote Control here. Nothing was started.`
+    )
+  }
 }
 
+/** Refuses, before anything exists, an OpenCode terminal its host cannot verify, read as that
+ *  terminal will receive it, after the shared preflight determines the actual route. */
 export function assertTerminalLaunchAdmissible(
   intent: AgentLaunchIntent | AgentLaunchParams,
   mode: AgentLaunchMode

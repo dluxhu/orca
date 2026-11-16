@@ -16,6 +16,7 @@ import {
   AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_RESUME_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_REMOTE_CONTROL_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY
 } from '../../shared/agent-launch/contracts/agent-launch-runtime-capability'
 import { createStructuredAgentSessionOperationId } from '../../shared/agent-session/lifecycle/structured-agent-session-mutation'
@@ -48,6 +49,7 @@ export type CliAgentLaunch = {
   operationId?: string
   surface?: AgentLaunchSurface
   resumeFrom?: { providerSessionId: string }
+  remoteControl?: true
 }
 
 function readSurfaceFlag(flags: Flags): AgentLaunchSurface | undefined {
@@ -101,10 +103,15 @@ export function readCliAgentLaunch(
       '--resume needs --surface chat and takes no --prompt'
     )
   }
+  const remoteControl = flags.get('remote-control') === true
+  if (remoteControl && surface !== 'chat') {
+    throw new RuntimeClientError('invalid_argument', '--remote-control needs --surface chat')
+  }
   return {
     agent,
     ...(surface ? { surface } : {}),
     ...(resume !== undefined ? { resumeFrom: { providerSessionId: resume } } : {}),
+    ...(remoteControl ? { remoteControl: true as const } : {}),
     ...(operationId ? { operationId } : {}),
     ...(typeof prompt === 'string' && prompt.trim()
       ? { prompt: { text: prompt, delivery: 'submit' as const } }
@@ -156,6 +163,15 @@ export async function callAgentLaunch(
     throw new RuntimeClientError(
       'incompatible_runtime',
       'This Orca host cannot resume a session as a chat. Update Orca on the execution host, or omit --resume.'
+    )
+  }
+  if (
+    launch.remoteControl &&
+    !capabilities.includes(AGENT_LAUNCH_REMOTE_CONTROL_RUNTIME_CAPABILITY)
+  ) {
+    throw new RuntimeClientError(
+      'incompatible_runtime',
+      'This Orca host cannot turn on Remote Control for a launch. Update Orca on the execution host, or omit --remote-control.'
     )
   }
   if (!capabilities.includes(AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY)) {

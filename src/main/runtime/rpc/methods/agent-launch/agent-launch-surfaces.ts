@@ -29,6 +29,8 @@ import {
   type TerminalSpawnDispatch
 } from '../../../../agent-launch/agent-launch-not-started'
 import { AgentLaunchTabClosedError } from '../../../../../shared/agent-launch/contracts/agent-launch-tab-closed'
+import { AgentLaunchSurfaceUnavailableError } from '../../../../agent-launch/agent-launch-surface-refusal'
+import { formatAgentTypeLabel } from '../../../../../shared/agent-status/presentation/agent-type-label'
 import {
   agentLaunchMovesHostWindow,
   agentLaunchTabViewerRule,
@@ -59,6 +61,7 @@ export function agentLaunchSurfaceFactory(
       withoutPrompt,
       firstMessage,
       resumeFrom,
+      remoteControl,
       signal
     }) => {
       const sessionId = requested ?? createStructuredAgentSessionId(agent, randomUUID)
@@ -75,6 +78,17 @@ export function agentLaunchSurfaceFactory(
         (withoutPrompt === true &&
           context.clientCapabilities?.includes(AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY) ===
             true)
+      if (remoteControl) {
+        await context.runtime.ensureStructuredAgentSessionHost()
+        // Recorded before the chat opens, so its first start connects as a Turn On does.
+        if (
+          !requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({ sessionId, agent })
+        ) {
+          throw new AgentLaunchSurfaceUnavailableError(
+            `${formatAgentTypeLabel(agent)} has no Remote Control. Nothing was started.`
+          )
+        }
+      }
       const created = await createStructuredAgentSessionForWorktree({
         runtime: context.runtime,
         ensureHost: async () => {

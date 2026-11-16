@@ -100,6 +100,14 @@ export class ClaudeRemoteControl {
     return this.state(sessionId)
   }
 
+  /** Records Remote Control on for a chat that has not opened yet; a running chat is left as it is. */
+  turnOnAtOpen(sessionId: string): true {
+    if (!this.sessions.has(sessionId)) {
+      this.intents.set(sessionId, true)
+    }
+    return true
+  }
+
   opened(
     session: ClaudeSession,
     sessionId: string,

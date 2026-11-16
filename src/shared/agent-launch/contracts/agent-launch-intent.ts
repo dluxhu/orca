@@ -60,6 +60,8 @@ export type AgentLaunchIntent = {
   surface?: AgentLaunchSurface
   /** `agent.launch`'s `resumeFrom`: the provider conversation the chat continues. Never a terminal. */
   resumeFrom?: { providerSessionId: string }
+  /** `agent.launch`'s `remoteControl`: turn Remote Control on when this chat opens. Never a terminal. */
+  remoteControl?: true
 }
 
 /** Placement cannot fail a launch: missing groups fall back to the anchor's group, then the active group. */
