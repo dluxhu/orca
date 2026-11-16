@@ -40,7 +40,6 @@ import {
 import {
   AgentLaunchStructuredSessionRefusedError,
   assertTerminalLaunchAdmissible,
-  launchRefusalWithoutEffects,
   terminalLaunchInputs,
   type AgentLaunchStructuredSurface,
   type AgentLaunchWorkspaceFactory
@@ -52,6 +51,7 @@ import {
 } from './agent-launch-created-workspace'
 
 import { opening, type AgentLaunchOpening } from './agent-launch-opening'
+import { launchRefusalWithoutEffects } from './agent-launch-create-refusal'
 
 export type { AgentLaunchExecution } from './agent-launch-execution'
 
