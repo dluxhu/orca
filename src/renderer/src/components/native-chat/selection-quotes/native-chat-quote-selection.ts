@@ -72,3 +72,12 @@ export function formatNativeChatQuote(text: string): string {
   const lines = text.trim().split(/\r?\n/)
   return `${lines.map((line) => (line.trim() ? `> ${line}` : '>')).join('\n')}\n\n`
 }
+
+/** The text of a quote that `formatNativeChatQuote` wrote, without its `>` marks. */
+export function quotedText(quote: string): string {
+  return quote
+    .trim()
+    .split('\n')
+    .map((line) => line.replace(/^> ?/, ''))
+    .join('\n')
+}
