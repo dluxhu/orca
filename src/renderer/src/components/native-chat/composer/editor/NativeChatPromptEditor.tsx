@@ -32,7 +32,7 @@ import {
   promptTextPosition
 } from './native-chat-prompt-document'
 import { promptTextContent } from './native-chat-prompt-document-text'
-import { withAdjacentQuoteChips } from './native-chat-quote-layout'
+import { reparseQuoteChips } from './native-chat-quote-reparse'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -293,11 +293,8 @@ function NativePromptEditor({
                 end++
               }
               // A text replacement intersecting an atom replaces its entire serialized token.
-              const { from, to } = withAdjacentQuoteChips(
-                doc,
-                promptTextPosition(doc, start, 'before'),
-                promptTextPosition(doc, old.length - end, 'after')
-              )
+              const from = promptTextPosition(doc, start, 'before')
+              const to = promptTextPosition(doc, old.length - end, 'after')
               start = promptTextOffset(doc, from)
               end = old.length - promptTextOffset(doc, to)
               const content = editor.schema.nodeFromJSON(
@@ -305,6 +302,7 @@ function NativePromptEditor({
               )
               editor.commands.command(({ tr }) => {
                 tr.replaceRange(from, to, new Slice(content.content, 1, 1))
+                reparseQuoteChips(tr, from, tr.mapping.map(to))
                 tr.setMeta('preventUpdate', true)
                 return true
               })

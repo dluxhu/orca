@@ -44,20 +44,6 @@ export function layoutQuoteChips(state: { doc: ProseMirrorNode; tr: Transaction 
   return tr
 }
 
-/** Widens a replaced range over the quote chips it touches, so the new text reads them again. */
-export function withAdjacentQuoteChips(
-  doc: ProseMirrorNode,
-  from: number,
-  to: number
-): { from: number; to: number } {
-  const before = doc.resolve(from).nodeBefore
-  const after = doc.resolve(to).nodeAfter
-  return {
-    from: before?.type.name === QUOTE_NODE ? from - before.nodeSize : from,
-    to: after?.type.name === QUOTE_NODE ? to + after.nodeSize : to
-  }
-}
-
 export const nativeChatQuoteLayout = new Plugin({
   appendTransaction: (transactions, _old, state) => {
     // Programmatic writes (preventUpdate) must keep the text they set.
