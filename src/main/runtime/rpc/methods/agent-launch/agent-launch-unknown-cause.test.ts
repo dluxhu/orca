@@ -73,6 +73,7 @@ describe('an agent launch with an unknown outcome', () => {
       error: { code: 'agent_session_operation_unknown' }
     })
     expect(JSON.stringify(response)).toContain('agent_session_conflict')
+    expect(JSON.stringify(response)).not.toContain('Another chat holds this conversation.')
     // The CLI keeps the unknown outcome and prints the host's text as its cause.
     const cli = await withCliAgentLaunchRecovery(
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatch answered ok: false, checked above.
