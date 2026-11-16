@@ -26,12 +26,14 @@ script reads its "Release order" list.
 The release build adds these branches onto the upstream stable tag, in this order.
 
 1. `dlux/chat-cli` - upstream candidate: `orca chat list/read/send`.
-2. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, CLI link notice, this file. Always last.
+2. `dlux/remote-control` - upstream candidate: Claude Remote Control in chat tabs.
+3. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, CLI link notice, this file. Always last.
 
-| Branch            | Base              | Kind               | Upstream PR                                                                                                                                  | Files                               | Check                                                                                                                                              |
-| ----------------- | ----------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dlux/chat-cli`   | `upstream-stable` | upstream candidate | none yet (shape of [#40836](https://github.com/stablyai/orca/pull/40836), reverted by [#41241](https://github.com/stablyai/orca/pull/41241)) | see "Branch dlux/chat-cli"          | `pnpm exec vitest run src/cli/agents/chat.test.ts src/main/runtime/rpc/methods/structured-sessions/creation/structured-agent-session-gate.test.ts` |
-| `dlux/fork-setup` | `upstream-stable` | fork-only          | none                                                                                                                                         | see "Branch dlux/fork-setup: Files" | see "Branch dlux/fork-setup: Check"                                                                                                                |
+| Branch                | Base              | Kind               | Upstream PR                                                                                                                                  | Files                               | Check                                                                                                                                              |
+| --------------------- | ----------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dlux/chat-cli`       | `upstream-stable` | upstream candidate | none yet (shape of [#40836](https://github.com/stablyai/orca/pull/40836), reverted by [#41241](https://github.com/stablyai/orca/pull/41241)) | see "Branch dlux/chat-cli"          | `pnpm exec vitest run src/cli/agents/chat.test.ts src/main/runtime/rpc/methods/structured-sessions/creation/structured-agent-session-gate.test.ts` |
+| `dlux/remote-control` | `upstream-stable` | upstream candidate | none yet (includes the auto-enable part of [#40020](https://github.com/stablyai/orca/pull/40020))                                            | see "Branch dlux/remote-control"    | `pnpm exec vitest run src/main/claude/structured/claude-structured-remote-control.test.ts`                                                         |
+| `dlux/fork-setup`     | `upstream-stable` | fork-only          | none                                                                                                                                         | see "Branch dlux/fork-setup: Files" | see "Branch dlux/fork-setup: Check"                                                                                                                |
 
 To add a branch: base it on `upstream-stable`, add it to the numbered list above (upstream candidates
 before fork-only ones), add a row, and add a "Branch" section below.
@@ -80,6 +82,11 @@ before fork-only ones), add a row, and add a "Branch" section below.
   `upstream-stable` or a patch branch.
 
 ## Branch dlux/chat-cli
+
+Upstream candidate. Its PR on the fork holds the description, the files and the re-apply
+notes. Its check is in the table above.
+
+## Branch dlux/remote-control
 
 Upstream candidate. Its PR on the fork holds the description, the files and the re-apply
 notes. Its check is in the table above.

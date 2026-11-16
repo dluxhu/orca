@@ -15,23 +15,24 @@ the first start. To open it: in Finder, Control-click the app, select **Open**, 
 
 ## How it is different from official Orca
 
-|                              | Official Orca            | Orca @dLux                                                                    |
-| ---------------------------- | ------------------------ | ----------------------------------------------------------------------------- |
-| App name                     | Orca                     | Orca @dLux                                                                    |
-| Bundle id                    | `com.stablyai.orca`      | `com.stablyai.orca.dlux`                                                      |
-| Updates from                 | `stablyai/orca` releases | `dluxhu/orca` releases                                                        |
-| Settings, sign-ins, projects | its profile              | the same profile and the same Keychain key                                    |
-| `orca` command               | registers `orca`         | registers `orca` too, and tells you when it takes the link from the other app |
-| Chat CLI                     |                          | `orca chat list`, `orca chat read`, `orca chat send`                          |
+|                              | Official Orca            | Orca @dLux                                                                       |
+| ---------------------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| App name                     | Orca                     | Orca @dLux                                                                       |
+| Bundle id                    | `com.stablyai.orca`      | `com.stablyai.orca.dlux`                                                         |
+| Updates from                 | `stablyai/orca` releases | `dluxhu/orca` releases                                                           |
+| Settings, sign-ins, projects | its profile              | the same profile and the same Keychain key                                       |
+| `orca` command               | registers `orca`         | registers `orca` too, and tells you when it takes the link from the other app    |
+| Chat CLI                     |                          | `orca chat list`, `orca chat read`, `orca chat send`                             |
+| Claude Remote Control        |                          | turn it on and off in a Claude chat tab; prompts from claude.ai show in the chat |
 
 On the first start, macOS asks if Orca @dLux can use the "orca Safe Storage" Keychain item.
 Select **Always Allow**. Then your stored sign-ins work in both apps.
 
 ## How the fork is kept
 
-`main` is a copy of upstream. Each patch is its own branch on `main`. Once a week at most, a
+`main` is a copy of upstream. Each patch is its own branch on the newest upstream stable release. Once a week at most, a
 release squash-merges the patch branches onto the newest upstream stable release.
-`release/latest` shows the newest release. Open pull requests against `main`.
+`release/latest` shows the newest release. Open pull requests against `upstream-stable`.
 
 [docs/fork/PATCHES.md](../docs/fork/PATCHES.md) lists every patch and the release steps.
 
