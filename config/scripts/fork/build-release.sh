@@ -12,7 +12,7 @@
 #    top patch branch (FORK_PATCHES_REF, default dlux/fork-setup).
 # 4. Makes release/<version> from the base in a new worktree, applies each patch branch in
 #    that order as one commit (its diff from the stable commit it is based on, by a 3-way
-#    cherry-pick), tags v<version>, and moves the local release/latest. It warns when a
+#    cherry-pick; a stacked branch's diff is from the earlier branches it contains), tags v<version>, and moves the local release/latest. It warns when a
 #    branch does not contain the base tag.
 # It never pushes. With --remote <name>, it reads the patch branches from <name>/.
 set -euo pipefail
@@ -102,6 +102,7 @@ git worktree add -q -b "$release_branch" "$worktree" "$base_tag^{commit}"
 cleanup="Clean up: git worktree remove --force '$worktree'; git branch -D '$release_branch'"
 echo "build-release: $release_branch from $base_tag ($(git rev-parse --short "$base_tag^{commit}")) in $worktree"
 
+applied=()
 for branch in "${branches[@]}"; do
   ref="${prefix}${branch}"
   sha=$(git rev-parse --short "$ref")
@@ -112,6 +113,19 @@ for branch in "${branches[@]}"; do
     echo "build-release: warning: $ref is not based on $base_tag; merge the tag into the branch" >&2
   fi
   patch_base=$(git merge-base "$base_tag^{commit}" "$ref")
+  # A stacked branch contains earlier branches of the release order. Its patch is its diff from
+  # all of them merged, so their changes are not applied twice.
+  for earlier in ${applied[@]+"${applied[@]}"}; do
+    git merge-base --is-ancestor "$earlier" "$ref" || continue
+    if git merge-base --is-ancestor "$patch_base" "$earlier"; then
+      patch_base=$earlier
+    elif ! git merge-base --is-ancestor "$earlier" "$patch_base"; then
+      tree=$(git merge-tree --write-tree "$patch_base" "$earlier") ||
+        die "the branches that $ref contains do not merge cleanly; merge them into $branch first. $cleanup"
+      patch_base=$(git commit-tree "$tree" -p "$patch_base" -p "$earlier" -m "stack base of $branch")
+    fi
+  done
+  applied+=("$(git rev-parse "$ref")")
   if git diff --quiet "$patch_base" "$ref"; then
     echo "build-release: $ref ($sha) adds nothing; skipped"
     continue
