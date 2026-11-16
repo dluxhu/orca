@@ -5,6 +5,7 @@ import { AgentLaunchStructuredSessionRefusedError } from './agent-launch-surface
 import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
 import { launchFailureWithoutEffectsCode } from '../runtime/rpc/methods/agent-launch/agent-launch-failure-code'
 import { trackTerminalSpawnDispatch } from './agent-launch-not-started'
+import { launchRefusalWithoutEffects } from './agent-launch-create-refusal'
 
 function launch(refusal: AgentLaunchStructuredSessionRefusedError) {
   const createTerminalAgent = vi.fn(async () => ({ handle: 'term_1' }))
@@ -47,6 +48,19 @@ describe('a chat create refused before attach', () => {
       'agent_launch_surface_unavailable'
     )
     expect(createTerminalAgent).not.toHaveBeenCalled()
+  })
+
+  it('keeps an outcome unknown in a new workspace, which exists before the chat', () => {
+    const refusal = new AgentLaunchStructuredSessionRefusedError(
+      'agent_session_identity_required',
+      'Orca cannot find that conversation.',
+      true
+    )
+    const error = launchRefusalWithoutEffects(refusal, 'create-worktree')
+    expect(error).toBe(refusal)
+    expect(
+      launchFailureWithoutEffectsCode(error, 'create-worktree', trackTerminalSpawnDispatch())
+    ).toBe(null)
   })
 
   it('keeps an outcome unknown when the refusal came after attach', async () => {
