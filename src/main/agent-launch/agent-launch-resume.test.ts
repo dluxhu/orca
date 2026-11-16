@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { executeAgentLaunch, type AgentLaunchExecution } from './agent-launch-executor'
 import { AgentLaunchStructuredSessionRefusedError } from './agent-launch-surface-factories'
 import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
+import { launchFailureWithoutEffectsCode } from '../runtime/rpc/methods/agent-launch/agent-launch-failure-code'
+import { trackTerminalSpawnDispatch } from './agent-launch-not-started'
 import type { AgentLaunchIntent } from '../../shared/agent-launch/contracts/agent-launch-intent'
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch/contracts/agent-launch-operation'
 import { resolveUnlaunchedIntent } from '../runtime/rpc/methods/agent-launch/agent-launch-intent-resolution'
@@ -86,11 +88,11 @@ describe('agent launch that resumes a provider session', () => {
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
-  it('reports the create reason for a refused Remote Control chat, without a terminal', async () => {
+  it('names the create reason for a refused Remote Control chat, without a terminal', async () => {
     const { resumeFrom: _resume, ...fresh } = { ...RESUME, remoteControl: true as const }
     const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true, intent: fresh })
     const error = await run().catch((caught: unknown) => caught)
-    expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
+    expect(error).toBeInstanceOf(AgentLaunchStructuredSessionRefusedError)
     expect(error).toMatchObject({
       message:
         'the resumed session is still open in a terminal (structured_agent_session_unsupported)'
@@ -98,10 +100,18 @@ describe('agent launch that resumes a provider session', () => {
     expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
-  it('reports a definitive refusal from the commit as a launch without effects', async () => {
-    const { run } = harness({ chat: true, createRefuses: true })
+  it('keeps a definitive refusal from the commit unknown, names its code, and starts no terminal', async () => {
+    const { run, createTerminalAgent } = harness({ chat: true, createRefuses: true })
     const error = await run().catch((caught: unknown) => caught)
-    expect(error).toBeInstanceOf(AgentLaunchSurfaceUnavailableError)
+    expect(error).toBeInstanceOf(AgentLaunchStructuredSessionRefusedError)
+    expect(error).toMatchObject({
+      message:
+        'the resumed session is still open in a terminal (structured_agent_session_unsupported)'
+    })
+    expect(launchFailureWithoutEffectsCode(error, 'existing', trackTerminalSpawnDispatch())).toBe(
+      null
+    )
+    expect(createTerminalAgent).not.toHaveBeenCalled()
   })
 
   it('reports a refusal from before attach as a launch without effects', async () => {
