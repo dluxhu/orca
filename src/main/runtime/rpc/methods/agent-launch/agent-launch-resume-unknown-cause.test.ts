@@ -77,6 +77,7 @@ describe('a resume that the commit refuses', () => {
       error: { code: 'agent_session_operation_unknown' }
     })
     expect(JSON.stringify(response)).toContain('structured_agent_session_unsupported')
+    expect(JSON.stringify(response)).not.toContain('Orca cannot open this conversation as a chat.')
     // The CLI keeps the unknown outcome and prints the host's text as its cause.
     const cli = await withCliAgentLaunchRecovery(
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatch answered ok: false, checked above.
