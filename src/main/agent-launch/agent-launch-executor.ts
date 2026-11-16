@@ -51,6 +51,7 @@ import {
 } from './agent-launch-created-workspace'
 
 import { opening, type AgentLaunchOpening } from './agent-launch-opening'
+import { launchRefusalWithoutEffects } from './agent-launch-create-refusal'
 
 export type { AgentLaunchExecution } from './agent-launch-execution'
 
@@ -176,7 +177,7 @@ export async function openAgentLaunch(
         !(error instanceof AgentLaunchStructuredSessionRefusedError) ||
         !isDefinitiveAgentSessionCreateRefusal(error.code)
       ) {
-        throw error
+        throw launchRefusalWithoutEffects(error, intent.target.kind)
       }
       // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
       if (intent.resumeFrom) {
