@@ -1,5 +1,6 @@
 // Require structured.v1 across every agentSession method before exposing journals or mutations,
-// except rename, which also admits rename-only clients (requireRenameStructuredHost).
+// except rename, which also admits rename-only clients (requireRenameStructuredHost),
+// and history and send, which also admit CLI read-send clients (clientReadsAndSendsOnly).
 // Legacy tab restore may still install the host for fallback rows; that never admits agentSession calls.
 
 import { agentSessionRefusalError } from '../../../../../../shared/agent-session/failures/agent-session-wire-refusals'
