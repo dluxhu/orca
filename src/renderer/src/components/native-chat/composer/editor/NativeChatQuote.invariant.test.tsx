@@ -9,7 +9,12 @@ import {
   type NativeChatComposerInput
 } from './native-chat-composer-input'
 import { promptEditor } from './native-chat-prompt-editor.test-support'
-import { promptTextContent, QUOTE_NODE } from './native-chat-prompt-document-text'
+import {
+  appendPromptDocumentText,
+  promptLeafString,
+  promptTextContent,
+  QUOTE_NODE
+} from './native-chat-prompt-document-text'
 import {
   readNativeChatComposerDraft,
   updateNativeChatComposerDraft
@@ -154,4 +159,21 @@ it('keeps a line with a file pill as a line that ends a quote run', () => {
   expect(input.value).toBe(`> aa${before.slice(3)}`)
   expect(chipLines(editor.getJSON())).toEqual([null, null, null])
   expect(editor.getJSON().content?.[1]?.content?.[0]?.type).toBe('nativeChatFileReference')
+})
+
+const documentText = (doc: JSONContent): string =>
+  (doc.content ?? [])
+    .map((block) =>
+      (block.content ?? [])
+        .map((node) => promptLeafString(node.type, node.attrs, node.text))
+        .join('')
+    )
+    .join('\n')
+
+it('keeps the document text equal to the draft text after an append to a chip that ends in a space', () => {
+  const before = '> foo \n\n'
+  const after = '> foo \n\nhi'
+  const document = appendPromptDocumentText(promptTextContent(before), before, after)!
+  expect(documentText(document)).toBe(after)
+  expect(chipLines(document)).toEqual(chipLines(promptTextContent(after)))
 })

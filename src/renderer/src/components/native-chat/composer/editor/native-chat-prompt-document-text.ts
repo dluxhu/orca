@@ -253,6 +253,11 @@ export function appendPromptDocumentText(
           content[content.length - 1] = { ...node, text }
           break
         }
+      } else if (node?.type === QUOTE_NODE) {
+        // Trimmed as `kept` is, so the document text stays the draft text.
+        const token = String(node.attrs?.token ?? '').trimEnd()
+        content[content.length - 1] = { ...node, attrs: { ...node.attrs, token } }
+        break
       } else {
         break
       }
