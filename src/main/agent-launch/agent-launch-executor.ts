@@ -181,9 +181,15 @@ export async function openAgentLaunch(
       }
       // The create's own refusal says why the resume failed; a terminal would start a fresh conversation.
       if (intent.resumeFrom) {
-        // A definitive refusal proves no chat exists, even one the commit refused.
-        const proven = new AgentLaunchStructuredSessionRefusedError(error.code, error.message, true)
-        throw launchRefusalWithoutEffects(proven, intent.target.kind)
+        // A refusal from the commit may follow a reserved session row, so its outcome stays
+        // unknown; its message still names the code.
+        const named = error.beforeCommit
+          ? error
+          : new AgentLaunchStructuredSessionRefusedError(
+              error.code,
+              `${error.message} (${error.code})`
+            )
+        throw launchRefusalWithoutEffects(named, intent.target.kind)
       }
       // Cancellation must prevent a fallback from starting a new agent and argv prompt.
       assertAgentPromptRequestActive(execution.signal)
