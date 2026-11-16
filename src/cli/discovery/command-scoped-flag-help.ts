@@ -4,7 +4,21 @@ import { COMPUTER_WAIT_DEFAULT_TIMEOUT_MS } from '../../shared/computer-wait-tim
 const FILE_OPEN_FOCUS_HELP =
   "--focus                Bring the user to the file (switches Orca's window to its worktree)"
 
+const CHAT_SESSION_HELP = '--session <id>        Chat session id from chat list or agent launch'
+
 const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
+  'chat list': {
+    state: '--state <state>       Only chats in this state: working, blocked, waiting or done'
+  },
+  'chat read': {
+    session: CHAT_SESSION_HELP,
+    limit: '--limit <n>            Number of entries to show (default 20, at most 100)'
+  },
+  'chat send': {
+    session: CHAT_SESSION_HELP,
+    text: '--text <text>          Message to send',
+    'text-file': '--text-file <path|->  Read the message from a file or stdin'
+  },
   'extension reload': {
     'extension-id':
       '--extension-id <id>   Installed unpacked extension ID; also accepted positionally',
