@@ -27,6 +27,7 @@ import { remarkNativeChatFileDestinations } from './native-chat-markdown-file-de
 import { NativeChatLinkPeek } from '../links/previews/NativeChatLinkPeek'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
+import { NativeChatSentQuote } from '../selection-quotes/NativeChatSentQuote'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -54,6 +55,8 @@ type NativeChatMarkdownProps = Omit<
   streaming?: boolean
   /** The transcript row's identity, so reader choices inside the text outlive the row's mount. */
   rowKey?: string
+  /** Show each blockquote as a quote chip that opens on click, as a sent "Add to chat" quote. */
+  quoteChips?: boolean
 }
 
 /** Every chat surface rewrites `file:` destinations before sanitize can drop them. */
@@ -132,18 +135,21 @@ export function NativeChatMarkdown({
   rowKey,
   content,
   variant,
+  quoteChips = false,
   ...props
 }: NativeChatMarkdownProps): React.JSX.Element {
   const onLinkClick = useNativeChatLinkClick()
   const wordFadeArmed = useWordFadeArmed(fadeWords)
   const visualExtension = useNativeChatVisualMarkdownExtension(visualMessageId)
-  const extension = useMemo(
-    () =>
+  const extension = useMemo(() => {
+    const base =
       variant === 'document'
         ? createNativeChatImageExtension(visualExtension, onLinkClick)
-        : withFileDestinations(visualExtension),
-    [onLinkClick, variant, visualExtension]
-  )
+        : withFileDestinations(visualExtension)
+    return quoteChips
+      ? { ...base, components: { ...base.components, blockquote: NativeChatSentQuote } }
+      : base
+  }, [onLinkClick, quoteChips, variant, visualExtension])
   const fileLinkExists = useNativeChatFileLinkExists(
     linkifyFilePaths && onLinkClick !== undefined,
     streaming
