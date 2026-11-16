@@ -6,7 +6,7 @@ export const AGENT_LAUNCH_COMMAND_SPECS: CommandSpec[] = [
     path: ['agent', 'launch'],
     summary: 'Start an agent in an existing workspace, as a chat or a terminal',
     usage:
-      'orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--model <id>] [--effort <level>] [--surface chat|terminal] [--focus] [--retry-launch <operationId>] [--json]',
+      'orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--model <id>] [--effort <level>] [--surface chat|terminal] [--resume <session-id>] [--focus] [--retry-launch <operationId>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'agent',
@@ -15,6 +15,7 @@ export const AGENT_LAUNCH_COMMAND_SPECS: CommandSpec[] = [
       'model',
       'effort',
       'surface',
+      'resume',
       'focus',
       'retry-launch'
     ],
@@ -23,13 +24,15 @@ export const AGENT_LAUNCH_COMMAND_SPECS: CommandSpec[] = [
       '--surface chat|terminal picks for this launch instead of your setting. --surface terminal always runs the agent CLI; --surface chat is refused when Orca can establish before starting anything that this agent cannot open as a chat there. If support cannot be checked, the launch can fall back to a terminal. If chat becomes unavailable after creating a workspace, Orca keeps the workspace, setup and default tabs, then opens a terminal; the receipt explains the fallback.',
       '--worktree defaults to the native folder workspace or worktree containing the current directory. For a new checkout with its agent, use `orca worktree create --agent`.',
       '--model takes a provider model id (OMP also takes its model roles and selectors) and --effort a reasoning effort for that model; --effort requires --model. They apply to either surface.',
+      '--resume <session-id> opens that existing agent session as a chat and keeps its conversation. It needs --surface chat and takes no --prompt. It never falls back to a terminal. Close any terminal that still runs the session first.',
       'The tab opens without switching focus; pass --focus to switch to it.',
       'If the launch reply is lost, re-issue the same command from the same directory on the same host with --retry-launch <operationId> from the error. Never retry as a fresh launch; older hosts require inspecting the workspace first.'
     ],
     examples: [
       'orca agent launch --agent codex --json',
       'orca agent launch --agent codex --model gpt-6-astra --effort high --prompt "Write the design doc" --json',
-      'orca agent launch --agent claude --worktree path:/projects/myapp --focus'
+      'orca agent launch --agent claude --worktree path:/projects/myapp --focus',
+      'orca agent launch --agent claude --surface chat --resume 0b7c1f2e-5d3a-4c8b-9e61-2f4a7d9c0e13 --focus'
     ]
   }
 ]

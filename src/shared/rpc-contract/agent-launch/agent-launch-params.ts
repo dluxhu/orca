@@ -16,6 +16,7 @@ import { TerminalTabIdParam } from '../terminal/agent-session-params'
 import { SessionId } from '../structured-agent-session/structured-agent-session-identifiers'
 import { isStructuredAgentSessionIdFor } from '../../agent-session/structured-agent-session-create'
 import { AgentLaunchAccountEnv } from '../../agent-launch/startup/agent-launch-account-env'
+import { ResumeSource } from '../structured-agent-session/structured-agent-session-resume-params'
 
 const LaunchAgent = z.custom<TuiAgent>(isTuiAgent, { message: 'Unknown TUI agent' })
 
@@ -108,12 +109,15 @@ export const AgentLaunchFields = z.object({
   nativeChatDefault: z.boolean().optional(),
   /** Explicit terminal runs CLI; proven-unsupported chat refuses before creation. Inside replay identity; unknown
    * values refuse. Clients must gate on agent.launch.surface.v1 because older hosts strip this field. */
-  surface: z.enum(AGENT_LAUNCH_SURFACES).optional()
+  surface: z.enum(AGENT_LAUNCH_SURFACES).optional(),
+  /** Continue this provider conversation as a chat. Inside replay identity. Clients must gate on
+   * agent.launch.resume.v1 because older hosts strip this field and start a fresh chat. */
+  resumeFrom: ResumeSource.omit({ cliSource: true }).optional()
 })
 
-/** Caller IDs must retain the agent lane encoded by host-minted IDs. */
-function refuseSessionIdForAnotherAgent(
-  launch: { agent: string; sessionId?: string | undefined },
+/** Caller IDs must retain the agent lane encoded by host-minted IDs; a resume stays a chat. */
+function refuseInconsistentLaunch(
+  launch: z.infer<typeof AgentLaunchFields>,
   ctx: z.RefinementCtx
 ): void {
   if (launch.sessionId && !isStructuredAgentSessionIdFor(launch.agent, launch.sessionId)) {
@@ -123,13 +127,24 @@ function refuseSessionIdForAnotherAgent(
       message: 'Launch session id must be named for its agent'
     })
   }
+  // A resume is an explicit chat in an existing workspace, so no route can start a fresh conversation.
+  if (
+    launch.resumeFrom &&
+    (launch.surface !== 'chat' || launch.target.kind !== 'existing' || launch.prompt)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['resumeFrom'],
+      message: 'A resume needs surface chat, an existing workspace and no prompt'
+    })
+  }
 }
 
-export const AgentLaunch = AgentLaunchFields.superRefine(refuseSessionIdForAnotherAgent)
+export const AgentLaunch = AgentLaunchFields.superRefine(refuseInconsistentLaunch)
 
 export type AgentLaunchParams = z.infer<typeof AgentLaunch>
 
 // A distinct method prevents an older receiver from silently dropping the replay requirement.
 export const AgentLaunchReplay = AgentLaunchFields.required({ operationId: true }).superRefine(
-  refuseSessionIdForAnotherAgent
+  refuseInconsistentLaunch
 )
