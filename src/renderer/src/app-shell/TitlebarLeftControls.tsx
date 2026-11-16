@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, MoreHorizontal, PanelLeft } from 'lucide-react'
 import logo from '../../../../resources/logo.svg'
 import { useTranslate } from '@/i18n/use-translate'
+import { withForkName } from '../../../shared/fork-identity'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ContextMenu,
@@ -65,8 +66,13 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
         {layout.showSidebar && !hasCustomTitleBar && layout.showTitlebarAppName && (
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <div className="titlebar-app-name" aria-label={t('auto.App.5096cbbc86', 'Orca')}>
-                <span className="titlebar-app-name-main">{t('auto.App.5096cbbc86', 'Orca')}</span>
+              <div
+                className="titlebar-app-name"
+                aria-label={withForkName(t('auto.App.5096cbbc86', 'Orca'))}
+              >
+                <span className="titlebar-app-name-main">
+                  {withForkName(t('auto.App.5096cbbc86', 'Orca'))}
+                </span>
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>

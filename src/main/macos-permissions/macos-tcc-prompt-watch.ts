@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
+import { FORK_IDENTITY } from '../../shared/fork-identity'
 
 /** Stdin EOF tells the wrapper that Orca died. */
 export type LogStreamChild = ChildProcessByStdio<Writable, Readable, Readable>
@@ -14,7 +15,10 @@ const ORCA_RESPONSIBLE_IDENTIFIERS = new Set([
   'com.stablyai.orca.dev',
   'com.stablyai.orca.dev.helper',
   'com.stablyai.orca.local',
-  'com.stablyai.orca.local.helper'
+  'com.stablyai.orca.local.helper',
+  // Fork patch: the fork bundle and its helper. See docs/fork/PATCHES.md.
+  FORK_IDENTITY.appId,
+  `${FORK_IDENTITY.appId}.helper`
 ])
 
 const WATCHED_SERVICES = new Set([
