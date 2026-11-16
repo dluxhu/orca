@@ -33,7 +33,13 @@ it.each([
   ['a dictated word above a chip', 'hi\n> q\n\n', 'hi there\n> q\n\n'],
   ['a quote line below a chip', '> a\n\n', '> a\n> b\n\n'],
   ['a quote line above a chip', 'top\n\n> a\n\n', 'top\n> z\n> a\n\n'],
-  ['a blank line inside a quote run', 'top\n> a\n> b\n\n', 'top\n> a\n\n> b\n\n']
+  ['a blank line inside a quote run', 'top\n> a\n> b\n\n', 'top\n> a\n\n> b\n\n'],
+  ['a blank line that closes a quote run', 'p\n> a\n> b\n> c\nz', 'p\n> a\n> b\n> c\n'],
+  [
+    'a quote line above a quote run that text closes',
+    'z\n> b\n> c\n> d\nq',
+    '> a\n> b\n> c\n> d\nq'
+  ]
 ])('after %s, the chips are what the sent text parses to', (_name, before, after) => {
   const inputRef = createRef<NativeChatComposerInput>()
   render(
@@ -48,7 +54,8 @@ it.each([
   )
   const input = inputRef.current!
   const editor = promptEditor(screen.getByRole('textbox'))
-  const caret = after.length - 2
+  // At the end: a caret inside a chip's text snaps to the chip's edge.
+  const caret = after.length
   act(() => writeNativeChatComposerText(input, after, caret))
   expect(input.value).toBe(after)
   expect(chipLines(editor.getJSON())).toEqual(chipLines(promptTextContent(after)))
