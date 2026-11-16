@@ -67,8 +67,58 @@ before fork-only ones), add a row, and add a "Branch" section below.
    - On a conflict it stops with the branch, the files and the clean-up commands. Merge the
      tag into the branch and resolve there, or fix the files in the release worktree and run
      `git rerere` to record the fix. Clean up, and run the script again: rerere replays the fix.
-3. Build and test the app from that worktree.
-4. On the owner's go-ahead: `git push origin release/<version> v<version>` and
+3. Build the app in that worktree, on an Apple Silicon Mac, with Node 24 and pnpm 12.
+   Replace `<base>` with the base version (for example `1.4.259`) and `<version>` with the
+   release version:
+
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm -C mobile install --frozen-lockfile   # build:desktop also builds the mobile web page
+   pnpm run build:desktop
+   pnpm run build:computer-macos
+   pnpm run build:keyboard-layout-macos --single-arch
+   pnpm run build:process-footprint-macos --single-arch
+   pnpm run build:notification-status-macos --single-arch
+   pnpm run ensure:electron-runtime
+   # orcad template: common files (daemon and server JS) and darwin-arm64 from this worktree.
+   pnpm run build:orcad-prebuilds
+   node config/scripts/orcad-distribution/template/build-orcad-template.mjs --targets darwin-arm64
+   # The other targets' native slots: from upstream's app of the same version.
+   gh release download v<base> -R stablyai/orca -p 'Orca-<base>-arm64-mac.zip' -D /tmp/orca-upstream
+   ditto -x -k /tmp/orca-upstream/Orca-<base>-arm64-mac.zip /tmp/orca-upstream
+   node config/scripts/fork/graft-orcad-template-targets.mjs /tmp/orca-upstream/Orca.app/Contents/Resources
+   ORCA_REQUIRE_ORCAD_TEMPLATE=1 ORCA_LOCAL_BUILD_VERSION=<version> \
+     pnpm exec electron-builder --config config/electron-builder.config.cjs --mac zip dmg --arm64 --publish never
+   ```
+
+   - Headless `serve` and SSH hosts need `Resources/orcad-template`.
+     `ORCA_REQUIRE_ORCAD_TEMPLATE=1` stops the build when the template is missing.
+   - Upstream CI builds the native slots of each target on its own runner and merges them
+     (`.github/workflows/node-server-tests.yml`, job `desktop_template`). One Mac cannot build
+     them. The fork changes no native code, so it uses upstream's slots of the same version.
+     The graft script copies only `targets/`, checks each file against upstream's manifest, and
+     runs the template check for every target.
+
+4. Test the app in `dist/mac-arm64`. Use a separate profile and port, so a running Orca is not
+   touched:
+
+   ```sh
+   app="$PWD/dist/mac-arm64/Orca @dLux.app"
+   "$app/Contents/Resources/bin/orca" --help
+   probe=/tmp/orca-probe; mkdir -p "$probe/home"
+   HOME="$probe/home" ORCA_E2E_HOME_DIR="$probe/home" ORCA_E2E_USER_DATA_DIR="$probe" \
+     ORCA_USER_DATA_PATH="$probe" ORCA_CLI_INSTALL_PATH="$probe/bin/orca" \
+     "$app/Contents/Resources/bin/orca" serve --port 6799 --bind 127.0.0.1 --no-pairing
+   ```
+
+   Serve prints "Orca server ready" in less than 30 s. Stop it with Ctrl+C.
+   - The `ORCA_E2E_*` variables give serve a mock Keychain. Without them, a build with a new
+     code signature waits for the "orca Safe Storage" Keychain prompt. Serve is not ready until
+     somebody clicks "Always Allow".
+   - `--mac zip dmg` is necessary: the config lists x64 and arm64 for each target, so
+     `--arm64` alone also starts an x64 package, and that fails on an arm64-only install.
+
+5. On the owner's go-ahead: `git push origin release/<version> v<version>` and
    `git push --force-with-lease origin release/latest`. Then make the GitHub release on
    `dluxhu/orca` from the tag.
 
@@ -214,8 +264,20 @@ link to any `.app` launcher as "stale" and replaces it without a word.
 
 ### Part 4: fork documents and release script
 
-**What.** The fork front page `.github/README.md`, this file, and
-`config/scripts/fork/build-release.sh` (see "Release steps").
+**What.** The fork front page `.github/README.md`, this file,
+`config/scripts/fork/build-release.sh` and `config/scripts/fork/graft-orcad-template-targets.mjs`
+(see "Release steps").
+
+### Part 5: macOS CLI launcher
+
+**What.** `resources/darwin/bin/orca` starts the executable that `CFBundleExecutable` in
+`Info.plist` names, not `Contents/MacOS/Orca`.
+
+**Why.** The executable name follows `productName` (`Orca @dLux`). Upstream hardcodes `Orca`.
+
+**Re-apply.** Keep the `ELECTRON=` line. The test is
+`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (its macOS fixture is
+`Orca @dLux.app` with an `Info.plist`; it runs on macOS only).
 
 ### Test changes
 
@@ -256,7 +318,8 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (22): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+Source and config (24): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+`config/scripts/fork/graft-orcad-template-targets.mjs` (new), `resources/darwin/bin/orca`,
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
 `src/main/startup/profile-startup/dev-instance-identity.ts`, `src/main/menu/register-app-menu.ts`,
@@ -272,9 +335,10 @@ Source and config (22): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`.
 
-Tests (17): `src/main/startup/fork-identity.test.ts` (new),
+Tests (18): `src/main/startup/fork-identity.test.ts` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
-`src/main/cli/installation/cli-installer-other-app-notice.test.ts` (new) and the 14 files in
+`src/main/cli/installation/cli-installer-other-app-notice.test.ts` (new),
+`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (Part 5) and the 14 files in
 "Test changes".
 
 Documents (2): `.github/README.md` (new), `docs/fork/PATCHES.md` (new).
