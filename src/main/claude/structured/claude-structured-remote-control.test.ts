@@ -450,9 +450,7 @@ describe('Claude chat Remote Control', () => {
     const { calls, state } = await chat({
       resumed: true,
       beforeStart: (adapter) =>
-        expect(adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', agent: 'claude' })).toBe(
-          true
-        )
+        expect(adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })).toBe(true)
     })
 
     expect(calls).toEqual([[{ enabled: true }]])
@@ -465,7 +463,7 @@ describe('Claude chat Remote Control', () => {
   it('leaves a running chat as it is when a launch asks for Remote Control', async () => {
     const { adapter, calls, state, start } = await chat()
 
-    adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', agent: 'claude' })
+    adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })
     await adapter.closeSession('session-1')
     await start(8)
 
