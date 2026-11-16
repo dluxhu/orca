@@ -10,8 +10,17 @@ import {
 } from './native-chat-composer-input'
 import { promptEditor } from './native-chat-prompt-editor.test-support'
 import { promptTextContent, QUOTE_NODE } from './native-chat-prompt-document-text'
+import {
+  readNativeChatComposerDraft,
+  updateNativeChatComposerDraft
+} from '../../drafts/native-chat-composer-draft-store'
+import { insertNativeChatComposerDraftText } from '../../drafts/native-chat-composer-draft-insertion'
+import { clearNativeChatComposerDraftsForTests } from '../../drafts/native-chat-draft-reset'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  clearNativeChatComposerDraftsForTests()
+})
 
 /** Each line's chip token, or null for a line without a chip. */
 function chipLines(doc: JSONContent): (string | null)[] {
@@ -60,4 +69,89 @@ it.each([
   expect(input.value).toBe(after)
   expect(chipLines(editor.getJSON())).toEqual(chipLines(promptTextContent(after)))
   expect([input.selectionStart, input.selectionEnd]).toEqual([caret, caret])
+})
+
+const MIXED: JSONContent = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        { type: QUOTE_NODE, attrs: { token: '> q' } },
+        { type: 'text', text: ' hello' }
+      ]
+    },
+    { type: 'paragraph' },
+    { type: 'paragraph' }
+  ]
+}
+
+it('keeps the chips of a hidden draft after dictation joins a quote line', () => {
+  updateNativeChatComposerDraft(
+    'dictated-draft',
+    { text: '> q', document: promptTextContent('> q') },
+    'immediate'
+  )
+  insertNativeChatComposerDraftText('dictated-draft', 'hello', { dictated: true, draftOnly: true })
+  const draft = readNativeChatComposerDraft('dictated-draft')
+  expect(draft.text).toBe('> q hello')
+  expect(chipLines(draft.document!)).toEqual(chipLines(promptTextContent(draft.text)))
+})
+
+it.each(['mount', 'value'])(
+  'loads a stored draft with a mixed chip line as the chips its text has (%s)',
+  (path) => {
+    const scopeKey = `mixed-${path}`
+    const text = '> q hello\n\n'
+    const inputRef = createRef<NativeChatComposerInput>()
+    if (path === 'mount') {
+      updateNativeChatComposerDraft(scopeKey, { text, document: MIXED }, 'immediate')
+    }
+    render(
+      <NativeChatPromptEditor
+        scopeKey={scopeKey}
+        inputRef={inputRef}
+        initialValue={path === 'mount' ? text : 'x'}
+        disabled={false}
+        placeholder="Message"
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+    if (path === 'value') {
+      updateNativeChatComposerDraft(scopeKey, { text, document: MIXED }, 'immediate')
+      act(() => {
+        inputRef.current!.value = text
+      })
+    }
+    expect(inputRef.current!.value).toBe(text)
+    const editor = promptEditor(screen.getByRole('textbox'))
+    expect(chipLines(editor.getJSON())).toEqual(chipLines(promptTextContent(text)))
+  }
+)
+
+it('keeps a line with a file pill as a line that ends a quote run', () => {
+  const inputRef = createRef<NativeChatComposerInput>()
+  render(
+    <NativeChatPromptEditor
+      inputRef={inputRef}
+      initialValue={'> a\nb\n'}
+      disabled={false}
+      placeholder="Message"
+      onChange={vi.fn()}
+      onSelect={vi.fn()}
+    />
+  )
+  const input = inputRef.current!
+  const editor = promptEditor(screen.getByRole('textbox'))
+  act(() => {
+    input.setSelectionRange(4, 5)
+    input.insertFileReferences!(['/x/f.txt'])
+  })
+  const before = input.value
+  expect(before).toBe('> a\n@/x/f.txt b\n')
+  act(() => writeNativeChatComposerText(input, `> aa${before.slice(3)}`, 4))
+  expect(input.value).toBe(`> aa${before.slice(3)}`)
+  expect(chipLines(editor.getJSON())).toEqual([null, null, null])
+  expect(editor.getJSON().content?.[1]?.content?.[0]?.type).toBe('nativeChatFileReference')
 })

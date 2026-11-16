@@ -71,6 +71,83 @@ export function promptTextContent(text: string, options?: { literal?: boolean })
   return { type: 'doc', content }
 }
 
+// A line that is not a quote line and not blank: it holds the place of a line with other pills.
+const KEPT_LINE = 'x'
+
+/** A line of text and quote chips only; a line with other pills stays as it is. */
+function plainLine(block: JSONContent): string | null {
+  let text = ''
+  for (const child of block.type === 'paragraph' ? (block.content ?? []) : [null]) {
+    if (child?.type === 'text') {
+      text += child.text ?? ''
+    } else if (child?.type === QUOTE_NODE) {
+      text += String(child.attrs?.token ?? '')
+    } else {
+      return null
+    }
+  }
+  return text
+}
+
+function inQuoteRun(block: JSONContent): boolean {
+  const line = plainLine(block)
+  return line !== null && QUOTE_LINE.test(line)
+}
+
+function blockKey(block: JSONContent, index: number): string {
+  return plainLine(block) === null
+    ? `kept:${index}`
+    : JSON.stringify((block.content ?? []).map((child) => [child.type, child.text, child.attrs]))
+}
+
+/**
+ * The quote chips of blocks `first`..`last`, with their whole quote runs, as the parser reads
+ * their text: the document then has the chips the sent text has. The text stays the same.
+ * Returns null when the chips are already right.
+ */
+export function reparseQuoteBlocks(
+  count: number,
+  block: (index: number) => JSONContent,
+  first: number,
+  last: number
+): { first: number; last: number; blocks: JSONContent[] } | null {
+  // Whole quote runs, and the line after a run, which decides if the run is a chip.
+  while (first > 0 && inQuoteRun(block(first - 1))) {
+    first--
+  }
+  while (last + 1 < count && inQuoteRun(block(last))) {
+    last++
+  }
+  const blocks = Array.from({ length: last - first + 1 }, (_, index) => block(first + index))
+  const lines = blocks.map(plainLine)
+  // The block of each text line: a chip's block holds several lines.
+  const blockOfLine = lines.flatMap((text, index) =>
+    Array.from({ length: (text ?? KEPT_LINE).split('\n').length }, () => index)
+  )
+  const parsed = promptTextContent(lines.map((text) => text ?? KEPT_LINE).join('\n')).content ?? []
+  const next: JSONContent[] = []
+  let line = 0
+  for (const json of parsed) {
+    const token = json.content?.[0]?.type === QUOTE_NODE ? json.content[0].attrs?.token : null
+    const index = blockOfLine[line]
+    next.push(lines[index] === null ? blocks[index] : json)
+    line += typeof token === 'string' ? token.split('\n').length : 1
+  }
+  const same =
+    next.length === blocks.length &&
+    next.every((node, index) => blockKey(node, index) === blockKey(blocks[index], index))
+  return same ? null : { first, last, blocks: next }
+}
+
+/** A stored document with the chips its text has. */
+export function withQuoteChipsParsed(document: JSONContent): JSONContent {
+  const content = document.content ?? []
+  const result = content.length
+    ? reparseQuoteBlocks(content.length, (index) => content[index], 0, content.length - 1)
+    : null
+  return result ? { ...document, content: result.blocks } : document
+}
+
 export function seedPromptSkillReferences(
   node: JSONContent,
   skills: readonly AgentJournalSkillRef[] = [],
@@ -182,13 +259,23 @@ export function appendPromptDocumentText(
     }
     if (content.length > 0 && block) {
       const [first, ...rest] = promptTextContent(after.slice(kept.length), options).content ?? []
+      const joined = [
+        ...blocks,
+        { ...block, content: [...content, ...(first?.content ?? [])] },
+        ...rest
+      ]
+      // A paste stays literal; other text joins the quote runs it touches, as the sent text does.
+      const chips = options?.literal
+        ? null
+        : reparseQuoteBlocks(
+            joined.length,
+            (index) => joined[index],
+            Math.max(0, blocks.length - 1),
+            joined.length - 1
+          )
       return {
         ...base,
-        content: [
-          ...blocks,
-          { ...block, content: [...content, ...(first?.content ?? [])] },
-          ...rest
-        ]
+        content: chips ? [...joined.slice(0, chips.first), ...chips.blocks] : joined
       }
     }
   }

@@ -31,7 +31,7 @@ import {
   promptTextOffset,
   promptTextPosition
 } from './native-chat-prompt-document'
-import { promptTextContent } from './native-chat-prompt-document-text'
+import { promptTextContent, withQuoteChipsParsed } from './native-chat-prompt-document-text'
 import { reparseQuoteChips } from './native-chat-quote-reparse'
 import type {
   NativeChatComposerInput,
@@ -113,7 +113,9 @@ function NativePromptEditor({
           showOnlyWhenEditable: false
         })
       ],
-      content: adopted.current?.document || promptTextContent(initialValue),
+      content: adopted.current?.document
+        ? withQuoteChipsParsed(adopted.current.document)
+        : promptTextContent(initialValue),
       editable: !disabled,
       editorProps: {
         attributes: {
@@ -271,7 +273,7 @@ function NativePromptEditor({
               adopted.current = readNativeChatDraftSnapshot(scopeKey, value)
               const stored = adopted.current?.document
               if (stored) {
-                editor.commands.setContent(stored, { emitUpdate: false })
+                editor.commands.setContent(withQuoteChipsParsed(stored), { emitUpdate: false })
                 applyPosition(previousRange)
                 return
               }
