@@ -78,7 +78,10 @@ export class ClaudeProfileRouter {
     this.envReady = args.env
       ? Promise.resolve()
       : resolveLoginShellEnvironment().then((env) => {
-          this.env = env
+          // A service manager can set CLAUDE_CONFIG_DIR for this process only; keep it when the shell sets none.
+          const own = readUserClaudeConfigDirAsSet(process.env)
+          this.env =
+            env.CLAUDE_CONFIG_DIR?.trim() || !own ? env : { ...env, CLAUDE_CONFIG_DIR: own }
           this.envResolved = true
           // Recompute routing using the resolved System default.
           try {

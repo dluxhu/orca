@@ -37,12 +37,12 @@ vi.mock('@orca/process-host', () => ({ runProcess: vi.fn() }))
 const command = vi.hoisted(() => ({ path: '/unused-claude' }))
 vi.mock('../../../codex-cli/command', () => ({ resolveClaudeCommand: () => command.path }))
 
-const shell = vi.hoisted(() => ({ hang: false }))
+const shell = vi.hoisted(() => ({ hang: false, env: undefined as NodeJS.ProcessEnv | undefined }))
 vi.mock('../../../startup/shell-environment/login-shell-environment', () => ({
   resolveLoginShellEnvironment: () =>
     shell.hang
       ? new Promise(() => {})
-      : Promise.resolve({ CLAUDE_CONFIG_DIR: resolve('/shell/own') })
+      : Promise.resolve(shell.env ?? { CLAUDE_CONFIG_DIR: resolve('/shell/own') })
 }))
 // Account removal must never reach the real Keychain.
 vi.mock('../../../macos-keychain/generic-password', () => ({
@@ -54,7 +54,9 @@ vi.mock('../../../macos-keychain/generic-password', () => ({
 const roots: string[] = []
 afterEach(() => {
   vi.useRealTimers()
+  vi.unstubAllEnvs()
   shell.hang = false
+  shell.env = undefined
   installClaudeProfileRouter(undefined)
   installClaudeObservedConfigDirs(undefined)
   roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }))
@@ -321,5 +323,50 @@ describe('ClaudeProfileRouter', () => {
     getClaudeObservedConfigDirs()?.observeTranscriptPath(join(projects, '-proj', 'id.jsonl'))
     installClaudeObservedConfigDirs(observe())
     expect(claudeProfileHistoryDirs('projects')).toEqual([projects])
+  })
+})
+
+describe('System default Claude home after the login-shell capture', () => {
+  /** A router that reads the login shell, with no selected account. */
+  async function systemDefaultHome(
+    processConfigDir: string | undefined,
+    shellEnv: NodeJS.ProcessEnv
+  ) {
+    const root = mkdtempSync(join(tmpdir(), 'claude-router-shell-'))
+    roots.push(root)
+    const userHome = join(root, 'personal')
+    vi.stubEnv('CLAUDE_CONFIG_DIR', processConfigDir)
+    shell.env = shellEnv
+    const router = new ClaudeProfileRouter({
+      getSettings: () => ({
+        claudeManagedAccounts: [],
+        activeClaudeManagedAccountId: null,
+        activeClaudeManagedAccountIdsByRuntime: undefined,
+        agentStatusHooksEnabled: false,
+        disabledTuiAgents: []
+      }),
+      dataRoot: join(root, 'data'),
+      userHome
+    })
+    // With no selected account, a launch waits for the login-shell capture.
+    await router.prepareLaunch()
+    return { home: router.systemDefaultHome(), userHome }
+  }
+
+  it('keeps the process CLAUDE_CONFIG_DIR when the login shell sets none', async () => {
+    const { home } = await systemDefaultHome(resolve('/service/claude'), {})
+    expect(home).toBe(resolve('/service/claude'))
+  })
+
+  it('uses the login-shell CLAUDE_CONFIG_DIR when the shell sets one', async () => {
+    const { home } = await systemDefaultHome(resolve('/service/claude'), {
+      CLAUDE_CONFIG_DIR: resolve('/shell/own')
+    })
+    expect(home).toBe(resolve('/shell/own'))
+  })
+
+  it('falls back to ~/.claude when neither sets it', async () => {
+    const { home, userHome } = await systemDefaultHome(undefined, {})
+    expect(home).toBe(join(userHome, '.claude'))
   })
 })
