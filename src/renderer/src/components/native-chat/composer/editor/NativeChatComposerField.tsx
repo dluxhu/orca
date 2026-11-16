@@ -8,7 +8,11 @@ import { cn } from '@/lib/class-names'
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
 import { NativeChatMentionMenu, NativeChatPickerMenu } from '../pickers/NativeChatAutocompleteMenus'
-import type { NativeChatMentionFiles } from '../pickers/use-native-chat-mention-files'
+import {
+  nativeChatMentionItems,
+  type NativeChatMentionFiles
+} from '../pickers/use-native-chat-mention-files'
+import type { NativeChatMentionItem } from '../pickers/native-chat-mentions'
 import { NativeChatComposerActions } from '../controls/NativeChatComposerActions'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import type { NativeChatComposerNotice } from '../controls/native-chat-composer-notice'
@@ -76,7 +80,7 @@ export type NativeChatComposerFieldProps = {
   pickerListboxId: string
   onChoosePickerItem: (item: NativeChatPickerItem) => void
   onRetrySkills: () => void
-  onChooseMentionFile: (path: string) => void
+  onChooseMentionFile: (item: NativeChatMentionItem) => void
   onRemoveImageAttachment: (id: string) => void
   onAttach: () => void
   onDictationToggle: () => void
@@ -176,7 +180,7 @@ export function NativeChatComposerField({
     autocomplete.mode === 'slash'
       ? autocomplete.items.length
       : autocomplete.mode === 'mention'
-        ? mentionFiles.files.length
+        ? nativeChatMentionItems(mentionFiles).length
         : 0
   // Value the IME started from, and whether a programmatic clear was dropped on top of it.
   const compositionBaseRef = useRef('')

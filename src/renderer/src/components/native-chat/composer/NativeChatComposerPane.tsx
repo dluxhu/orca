@@ -128,11 +128,10 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       dismiss,
       handleDraftOrCaretChange
     } = picker
-    const mentionFiles = useNativeChatMentionFiles({
-      query: autocomplete.mode === 'mention' ? autocomplete.query : null,
-      terminalTabId,
-      structuredWorktreeId: structuredTransport?.worktreeId
-    })
+    const mentionFiles = useNativeChatMentionFiles(
+      autocomplete.mode === 'mention' ? autocomplete.query : null,
+      { terminalTabId, structuredTransport, targetPtyId }
+    )
 
     const resolveTarget = useCallback(
       () => (targetPtyId ? { ptyId: targetPtyId } : null),
