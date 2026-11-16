@@ -287,6 +287,20 @@ file that does not match upstream's manifest. Its test is
 `src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (its macOS fixture is
 `Orca @dLux.app` with an `Info.plist`; it runs on macOS only).
 
+### Part 6: headless orcad Electron fallback
+
+**What.** On macOS, `installedElectronCandidates` in
+`src/main/orcad/browser-providers/orcad-browser-provider.ts` lists only the fork's bundle:
+`/Applications/Orca @dLux.app/Contents/MacOS/Orca @dLux` and the same path in `~/Applications`.
+The names come from `FORK_IDENTITY.productName`.
+
+**Why.** Upstream lists `Orca.app/Contents/MacOS/Orca`. With both apps installed, the fork's
+headless orcad then starts official Orca's Electron, which is another version. With only the
+fork installed, it finds no Electron. The Windows and Linux paths stay upstream's.
+
+**Re-apply.** Keep the darwin branch marked "Fork patch". The test is the
+`installedElectronCandidates` case in `src/main/orcad/browser-providers/orcad-browser-provider.test.ts`.
+
 ### Test changes
 
 `src/main/startup/fork-identity.test.ts` checks the fork values end to end. These upstream
@@ -313,7 +327,7 @@ tests change only their expected literals to the fork values:
 pnpm install
 pnpm run typecheck
 pnpm run lint
-pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork
+pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork src/main/orcad/browser-providers/orcad-browser-provider.test.ts
 ```
 
 By hand, on macOS, with official Orca signed in first:
@@ -326,7 +340,7 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (24): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+Source and config (25): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
 `config/scripts/fork/graft-orcad-template-targets.mjs` (new), `resources/darwin/bin/orca`,
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
@@ -341,13 +355,15 @@ Source and config (24): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/renderer/src/components/settings/cli/install/use-cli-registration-actions.ts`,
 `src/shared/release-channel.ts`, `src/main/updater/lifecycle/updater-setup.ts`,
 `src/main/updater/releases/updater-prerelease-feed.ts`,
-`src/main/updater/releases/updater-release-readiness.ts`.
+`src/main/updater/releases/updater-release-readiness.ts`,
+`src/main/orcad/browser-providers/orcad-browser-provider.ts`.
 
-Tests (19): `src/main/startup/fork-identity.test.ts` (new),
+Tests (20): `src/main/startup/fork-identity.test.ts` (new),
 `config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
 `src/main/cli/installation/cli-installer-other-app-notice.test.ts` (new),
-`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (Part 5) and the 14 files in
+`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (Part 5),
+`src/main/orcad/browser-providers/orcad-browser-provider.test.ts` (Part 6) and the 14 files in
 "Test changes".
 
 Documents (2): `.github/README.md` (new), `docs/fork/PATCHES.md` (new).
