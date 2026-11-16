@@ -69,7 +69,9 @@ export function useCliRegistrationActions({
           'auto.components.settings.CliSection.9cbcd31338',
           'Registered `{{value0}}` in PATH.',
           { value0: next.commandName }
-        )
+        ),
+        // Fork patch: says which other Orca app lost the command. See docs/fork/PATCHES.md.
+        next.detail?.startsWith('Replaced ') ? { description: next.detail } : undefined
       )
     } catch (error) {
       if (!mountedRef.current) {
