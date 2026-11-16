@@ -30,3 +30,23 @@ describe('agent.launch params', () => {
     })
   })
 })
+
+describe('agent.launch resumeFrom', () => {
+  const RESUME = { ...BASE, surface: 'chat', resumeFrom: { providerSessionId: 'claude-1' } }
+
+  it('accepts a chat resume on an existing workspace', () => {
+    expect(AgentLaunch.parse(RESUME).resumeFrom).toEqual({ providerSessionId: 'claude-1' })
+  })
+
+  it('refuses a resume that could start a fresh conversation or run elsewhere', () => {
+    for (const params of [
+      { ...RESUME, surface: undefined },
+      { ...RESUME, surface: 'terminal' },
+      { ...RESUME, prompt: { text: 'hi', delivery: 'submit' } },
+      { ...RESUME, target: { kind: 'create-worktree', create: { repo: 'r' } } },
+      { ...RESUME, resumeFrom: { providerSessionId: '' } }
+    ]) {
+      expect(AgentLaunch.safeParse(params).success, JSON.stringify(params)).toBe(false)
+    }
+  })
+})

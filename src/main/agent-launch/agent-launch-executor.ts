@@ -272,6 +272,7 @@ async function createSurface(
   settled: AgentLaunchModeReceipt
 ): Promise<CreatedSurface> {
   const { intent, surfaces } = execution
+  assertTerminalLaunchAdmissible(intent, settled.mode)
   if (settled.mode === 'structured') {
     const reservedTabId = intent.paneKey ? parsePaneKey(intent.paneKey)?.tabId : undefined
     const session = await surfaces.createStructuredSession({
@@ -280,6 +281,7 @@ async function createSurface(
       ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
       ...(intent.chatOptions ? { chatOptions: intent.chatOptions } : {}),
       ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),
+      ...(intent.resumeFrom ? { resumeFrom: intent.resumeFrom } : {}),
       ...(reservedTabId ? { tabId: reservedTabId } : {}),
       ...launchPromptCreateInputs(intent, execution.signal),
       ...(intent.prompt ? {} : { withoutPrompt: true as const })
