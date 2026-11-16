@@ -17,6 +17,7 @@ export type RuntimeClientSettings = Pick<
   | 'agentStatusHooksEnabled'
   | 'codexShareHistoryAcrossAccounts'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'terminalCopyTrimsGutter'
   | 'defaultTaskSource'
   | 'defaultTaskViewPreset'
@@ -63,6 +64,7 @@ export type RuntimeClientSettingsUpdate = Pick<
   Partial<GlobalSettings>,
   | 'agentStatusHooksEnabled'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'experimentalConnectors'
   | 'defaultTuiAgent'
   | 'disabledTuiAgents'

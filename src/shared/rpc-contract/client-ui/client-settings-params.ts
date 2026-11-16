@@ -118,6 +118,7 @@ export const SettingsUpdate = z
     agentStatusHooksEnabled: z.boolean().optional(),
     codexShareHistoryAcrossAccounts: z.boolean().optional(),
     claudeSubagentNavigationEnabled: z.boolean().optional(),
+    claudeRemoteControlForNewChats: z.boolean().optional(),
     defaultRepoSelection: z.array(z.string()).nullable().optional(),
     defaultLinearTeamSelection: z.array(z.string()).nullable().optional(),
     compactWorktreeCards: z.boolean().optional(),

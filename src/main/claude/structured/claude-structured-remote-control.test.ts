@@ -1,13 +1,21 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Query } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentJournalItemBody } from '../../../shared/agent-session/journal/agent-session-journal-types'
 import type { AgentJournalItemIdentity } from '../../../shared/agent-session/journal/agent-session-journal-identity'
-import type { StructuredAgentSessionEventSink } from '../../native-chat/agent-session-wire/journal-ingress/structured-agent-session-event-sink'
+import type {
+  StructuredAgentSessionEventSink,
+  StructuredAgentSessionItemAppendOptions
+} from '../../native-chat/agent-session-wire/journal-ingress/structured-agent-session-event-sink'
+import type { StructuredAgentSessionLogger } from '../../native-chat/agent-session-wire/host/structured-agent-session-logger'
 import { createClaudeControlSurface } from '../sdk-transport/claude-agent-sdk-control-requests'
 import type { ClaudeStructuredSessionAdapter } from './claude-structured-session-adapter'
 import {
   PROVIDER_SESSION_ID,
+  USER_MESSAGE,
   adapterFor,
+  claudeWasSent,
   claudeFrame,
   fakeClaude,
   identityFor,
@@ -15,6 +23,25 @@ import {
 } from './claude-structured-session-test-support'
 
 type RemoteControlCall = { enabled: boolean; reattachSessionId?: string }
+
+const REMOTE_PROMPT = {
+  type: 'user',
+  uuid: 'remote-prompt-1',
+  parent_tool_use_id: null,
+  isReplay: true,
+  origin: { kind: 'human' },
+  message: { role: 'user', content: 'run the tests from my phone' }
+}
+
+/** The CLI's own Stop marker, captured from 2.1.2xx: a root user frame that is not a replay. */
+const STOP_MARKER: Record<string, unknown> = JSON.parse(
+  readFileSync(
+    join(__dirname, '../__fixtures__/claude-lifecycle-capture-interrupt-lost.jsonl'),
+    'utf8'
+  ).split('\n')[16]!
+).frame
+
+const promptRow = (uuid: string) => ({ provider: 'claude', sessionId: PROVIDER_SESSION_ID, uuid })
 
 const owned: { claude: ReturnType<typeof fakeClaude>; adapter: ClaudeStructuredSessionAdapter }[] =
   []
@@ -36,8 +63,19 @@ async function chat(
 ) {
   const calls: RemoteControlCall[][] = []
   const items: { identity: AgentJournalItemIdentity; body: AgentJournalItemBody }[] = []
+  const scopes = new Map<string, StructuredAgentSessionItemAppendOptions['turnScope']>()
+  const warnings: string[] = []
+  const logger: StructuredAgentSessionLogger = {
+    warn: (message) => warnings.push(message),
+    error: (message) => warnings.push(message)
+  }
   const sink: StructuredAgentSessionEventSink = {
-    appendItem: (identity, body) => items.push({ identity, body }),
+    appendItem: (identity, body, appendOptions) => {
+      items.push({ identity, body })
+      if (identity.provider === 'claude' && body.kind === 'message') {
+        scopes.set(identity.uuid, appendOptions.turnScope)
+      }
+    },
     appendTombstone: () => {},
     publish: () => {}
   }
@@ -74,7 +112,10 @@ async function chat(
     return connection
   }
   const adapter = adapterFor(claude)
-  Object.assign(adapter['deps'], { remoteControlForNewChats: () => options.newChats === true })
+  Object.assign(adapter['deps'], {
+    remoteControlForNewChats: () => options.newChats === true,
+    logger
+  })
   owned.push({ claude, adapter })
   const start = async (fence: number) => {
     await adapter.acquire({
@@ -86,12 +127,32 @@ async function chat(
     await tick()
   }
   await start(7)
+  const userRows = (uuid: string) =>
+    items.filter(
+      ({ identity, body }) =>
+        body.kind === 'message' &&
+        body.role === 'user' &&
+        identity.provider === 'claude' &&
+        identity.uuid === uuid
+    )
+  const runningTurnsOn = (uuid: string) =>
+    items.filter(
+      ({ body }) =>
+        body.kind === 'turn' && body.state === 'running' && body.userItemId?.endsWith(`:${uuid}`)
+    )
   return {
     adapter,
     claude,
     calls,
     items,
+    scopes,
+    warnings,
+    userRows,
+    runningTurnsOn,
     start,
+    frame: (message: Record<string, unknown>) => claudeFrame(claude.connections.at(-1)!, message),
+    turnOn: () => adapter.remoteControl({ sessionId: 'session-1', enabled: true }),
+    turnOff: () => adapter.remoteControl({ sessionId: 'session-1', enabled: false }),
     state: () => adapter.remoteControl({ sessionId: 'session-1' })
   }
 }
@@ -180,7 +241,7 @@ describe('Claude chat Remote Control', () => {
       message: { role: 'user', content: 'run the tests from my phone' }
     })
 
-    const prompt = { provider: 'claude', sessionId: PROVIDER_SESSION_ID, uuid: 'remote-prompt-1' }
+    const prompt = promptRow('remote-prompt-1')
     expect(items).toContainEqual({
       identity: prompt,
       body: {
@@ -221,5 +282,137 @@ describe('Claude chat Remote Control', () => {
       enabled: true,
       sessionUrl: 'https://claude.ai/code/session_01'
     })
+  })
+
+  it('keeps a Turn Off across a restart, even with the CLI asking to auto-connect', async () => {
+    const { calls, start, turnOff, state, adapter } = await chat({
+      initialization: { remote_control_auto_enable: true }
+    })
+    await turnOff()
+    await adapter.closeSession('session-1')
+
+    await start(8)
+
+    expect(calls).toEqual([[{ enabled: true }, { enabled: false }], []])
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('forgets the bridge session on Turn Off, so a later Turn On starts a new one', async () => {
+    const { calls, turnOn, turnOff } = await chat()
+    await turnOn()
+    await turnOff()
+    await turnOn()
+
+    expect(calls).toEqual([[{ enabled: true }, { enabled: false }, { enabled: true }]])
+  })
+
+  it('reads off after a Turn Off that overtakes a Turn On still in flight', async () => {
+    const pending = Promise.withResolvers<unknown>()
+    const { turnOn, turnOff, state } = await chat({
+      reply: (call) => (call.enabled ? pending.promise : undefined)
+    })
+    const on = turnOn()
+    await turnOff()
+    pending.resolve({ session_url: 'https://claude.ai/code/session_01', bridge_session_id: 'b' })
+    await on
+
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it.each(['failed', 'policy_disabled'])(
+    'reads off and lets the idle stop run after the bridge reports %s',
+    async (bridgeState) => {
+      const { adapter, frame, turnOn, state } = await chat()
+      await turnOn()
+
+      frame({ type: 'system', subtype: 'bridge_state', state: bridgeState, uuid: 'bridge-1' })
+
+      await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+      expect(adapter.confirmIdle('session-1')).toBeUndefined()
+    }
+  )
+
+  it('keeps the chat working and logs it when Claude refuses Remote Control at start', async () => {
+    const { adapter, claude, calls, warnings, state } = await chat({
+      newChats: true,
+      reply: () => Promise.reject(new Error('Remote Control is disabled by your organization'))
+    })
+    await tick()
+
+    await adapter.dispatch({
+      sessionId: 'session-1',
+      clientMessageId: 'client-turn-1',
+      body: USER_MESSAGE,
+      fence: 7
+    })
+
+    expect(calls).toEqual([[{ enabled: true }]])
+    expect(warnings).toEqual(['turning on Claude Remote Control failed'])
+    expect(claudeWasSent(claude.connections[0]!, 'ship it')).toBe(true)
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
+  it('does not show the Stop marker as a prompt from claude.ai', async () => {
+    const { frame, turnOn, userRows, runningTurnsOn } = await chat()
+    await turnOn()
+
+    frame({ ...STOP_MARKER, session_id: PROVIDER_SESSION_ID })
+
+    const uuid = String(STOP_MARKER.uuid)
+    expect([userRows(uuid), runningTurnsOn(uuid)]).toEqual([[], []])
+  })
+
+  it.each(['peer', 'channel'])(
+    'does not show a %s message as a prompt from claude.ai',
+    async (kind) => {
+      const { frame, turnOn, userRows } = await chat()
+      await turnOn()
+
+      frame({ ...REMOTE_PROMPT, origin: { kind, from: 'other', server: 'other' } })
+
+      expect(userRows('remote-prompt-1')).toEqual([])
+    }
+  )
+
+  it('adds a folded prompt from claude.ai to the running turn, without a new turn', async () => {
+    const { adapter, frame, turnOn, scopes, userRows, runningTurnsOn } = await chat()
+    await turnOn()
+    await adapter.dispatch({
+      sessionId: 'session-1',
+      clientMessageId: 'client-turn-1',
+      body: USER_MESSAGE,
+      fence: 7
+    })
+
+    frame(REMOTE_PROMPT)
+
+    expect(userRows('remote-prompt-1')).toHaveLength(1)
+    expect(scopes.get('remote-prompt-1')).toEqual({
+      kind: 'turn',
+      turnItemId: expect.stringContaining('user-uuid-0')
+    })
+    expect(runningTurnsOn('remote-prompt-1')).toEqual([])
+  })
+
+  it('adds no prompt row for a repeated echo', async () => {
+    const { adapter, frame, turnOn, userRows, runningTurnsOn } = await chat()
+    await turnOn()
+    await adapter.dispatch({
+      sessionId: 'session-1',
+      clientMessageId: 'client-turn-1',
+      body: USER_MESSAGE,
+      fence: 7
+    })
+    frame({ type: 'result', subtype: 'success', uuid: 'result-1', is_error: false })
+
+    frame({ ...REMOTE_PROMPT, uuid: 'user-uuid-0' })
+    frame(REMOTE_PROMPT)
+    frame({ type: 'result', subtype: 'success', uuid: 'result-2', is_error: false })
+    frame(REMOTE_PROMPT)
+
+    expect([userRows('user-uuid-0'), runningTurnsOn('remote-prompt-1')]).toEqual([
+      [],
+      [expect.objectContaining({ body: expect.objectContaining({ kind: 'turn' }) })]
+    ])
   })
 })

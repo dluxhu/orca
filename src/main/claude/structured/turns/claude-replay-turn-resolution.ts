@@ -15,6 +15,7 @@ import type {
 } from '../claude-structured-session-state'
 import { readClaudeFrameString } from '../claude-structured-init-proof'
 import { claudeDispatchContentKey } from '../claude-structured-dispatch-content'
+import { isClaudeRemotePrompt, rememberClaudeReplayUuid } from '../claude-structured-remote-control'
 
 /** Settle provider-proven delivery independently of replay-row acceptance reconciliation. */
 export type ClaudeLateDispatchSettlement = (input: ClaudeLateDispatchOutcome) => void
@@ -141,14 +142,17 @@ export function resolveClaudeReplayTurn(
         return null
       }
     }
-    return session.remoteControl
-      ? {
-          requestedAt: null,
-          clientMessageId: null,
-          remote: true,
-          ...(session.translator?.openTurnInLiveProviderCycle ? { folded: true as const } : {})
-        }
-      : null
+    // No send claims it: with Remote Control on, it came from claude.ai or the Claude app.
+    if (!isClaudeRemotePrompt(session, message)) {
+      return null
+    }
+    rememberClaudeReplayUuid(session, uuid)
+    return {
+      requestedAt: null,
+      clientMessageId: null,
+      remote: true,
+      ...(session.translator?.openTurnInLiveProviderCycle ? { folded: true as const } : {})
+    }
   }
   const current = session.dispatchWaiters[0]
   if (isCompletedCommand && !current?.acceptsResult) {
@@ -199,6 +203,7 @@ function settleWaiter(
     session.dispatchWaiters.splice(index, 1)
   }
   waiter.settledUuid = uuid
+  rememberClaudeReplayUuid(session, uuid)
   waiter.resolve(uuid)
   // Admission already returned; this replay settles delivery.
   if (waiter.clientMessageId) {
@@ -216,6 +221,7 @@ function recoverLateIdentity(
   isUserReplay: boolean,
   onSettledLate?: ClaudeLateDispatchSettlement
 ): void {
+  rememberClaudeReplayUuid(session, uuid)
   if (!isUserReplay && !waiter.acceptsResult) {
     return
   }

@@ -75,7 +75,13 @@ export function NativeChatRemoteControlMenuItems({
           : t('components.native-chat.remoteControl.turnOn', 'Turn On Remote Control')}
       </DropdownMenuItem>
       {sessionUrl ? (
-        <DropdownMenuItem onSelect={() => void window.api.shell.openUrl(sessionUrl)}>
+        <DropdownMenuItem
+          onSelect={() =>
+            void window.api.shell.openUrl(sessionUrl).catch((error: unknown) => {
+              console.warn('[native-chat-remote-control] opening the session failed', error)
+            })
+          }
+        >
           <ExternalLink />
           {t('components.native-chat.remoteControl.open', 'Open in Claude')}
         </DropdownMenuItem>

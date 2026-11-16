@@ -28,10 +28,43 @@ export function observeClaudeBridgeState(
   }
 }
 
+const REMEMBERED_REPLAY_UUIDS = 256
+
+/** Replays already shown, so a repeated echo adds no second prompt row; only kept while Remote Control is on. */
+export function rememberClaudeReplayUuid(session: ClaudeSession, uuid: string): void {
+  const seen = session.remoteControl?.seenReplayUuids
+  if (!seen) {
+    return
+  }
+  seen.add(uuid)
+  const [oldest] = seen
+  if (seen.size > REMEMBERED_REPLAY_UUIDS && oldest !== undefined) {
+    seen.delete(oldest)
+  }
+}
+
+/** An echo of a prompt sent through Remote Control, not one Orca sent or the CLI wrote itself. */
+export function isClaudeRemotePrompt(
+  session: ClaudeSession,
+  message: Record<string, unknown>
+): boolean {
+  const origin = claudeRecord(message.origin)?.kind
+  return (
+    session.remoteControl !== undefined &&
+    message.isReplay === true &&
+    origin !== 'peer' &&
+    origin !== 'channel' &&
+    typeof message.uuid === 'string' &&
+    !session.remoteControl.seenReplayUuids.has(message.uuid)
+  )
+}
+
 /** Remote Control per chat. A chat stays on across its process restarts and reattaches to the same claude.ai session. */
 export class ClaudeRemoteControl {
-  /** Chats the user turned on, with the bridge session the CLI last reported. */
-  private readonly chats = new Map<string, string | null>()
+  /** Per chat: the bridge session to reattach while on, or false after the user turned it off. */
+  private readonly chats = new Map<string, string | null | false>()
+  /** Only the newest request of a process may write its answer. */
+  private readonly generations = new WeakMap<ClaudeSession, number>()
 
   constructor(
     private readonly sessions: ReadonlyMap<string, ClaudeSession>,
@@ -66,10 +99,13 @@ export class ClaudeRemoteControl {
     initialization: unknown,
     newConversation: boolean
   ): void {
+    const chosen = this.chats.get(sessionId)
+    // A Turn Off in this chat outranks the setting and the CLI's auto-connect.
     const on =
-      this.chats.has(sessionId) ||
-      (newConversation && this.deps.remoteControlForNewChats?.() === true) ||
-      claudeRemoteControlAutoEnable(initialization)
+      chosen !== false &&
+      (chosen !== undefined ||
+        (newConversation && this.deps.remoteControlForNewChats?.() === true) ||
+        claudeRemoteControlAutoEnable(initialization))
     if (!on) {
       return
     }
@@ -90,7 +126,10 @@ export class ClaudeRemoteControl {
     if (!set) {
       throw new ClaudeControlRequestError('remote_control', 'this SDK exposes no remote_control')
     }
-    const reattachSessionId = this.chats.get(sessionId) ?? undefined
+    const chosen = this.chats.get(sessionId)
+    const reattachSessionId = typeof chosen === 'string' ? chosen : undefined
+    const generation = (this.generations.get(session) ?? 0) + 1
+    this.generations.set(session, generation)
     const reply = claudeRecord(
       await set(enabled, {
         ...(this.deps.requestTimeoutMs === undefined
@@ -99,12 +138,18 @@ export class ClaudeRemoteControl {
         ...(enabled && reattachSessionId ? { reattachSessionId } : {})
       })
     )
-    if (!enabled) {
-      delete session.remoteControl
-      this.chats.delete(sessionId)
+    if (this.generations.get(session) !== generation || this.sessions.get(sessionId) !== session) {
       return
     }
-    session.remoteControl = { sessionUrl: claudeText(reply?.session_url) }
+    if (!enabled) {
+      delete session.remoteControl
+      this.chats.set(sessionId, false)
+      return
+    }
+    session.remoteControl = {
+      sessionUrl: claudeText(reply?.session_url),
+      seenReplayUuids: session.remoteControl?.seenReplayUuids ?? new Set()
+    }
     this.chats.set(sessionId, claudeText(reply?.bridge_session_id))
   }
 }

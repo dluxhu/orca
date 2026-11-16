@@ -15,6 +15,10 @@ import {
   getAgentGeneratedTabTitlesTitle
 } from './behavior/agent-generated-tab-title-copy'
 import {
+  getClaudeRemoteControlDescription,
+  getClaudeRemoteControlTitle
+} from './behavior/claude-remote-control-copy'
+import {
   getAgentStatusHooksDescription,
   getAgentStatusHooksTitle
 } from './behavior/agent-status-hooks-copy'
@@ -96,24 +100,15 @@ export function AgentsPane({
           ariaLabel={getClaudeSubagentNavigationTitle(t)}
         />
         <SettingsSwitchRow
-          label={t(
-            'components.settings.agents.claudeRemoteControl.title',
-            'Remote Control for new Claude chats'
-          )}
-          description={t(
-            'components.settings.agents.claudeRemoteControl.description',
-            'Connect each new Claude chat to claude.ai and the Claude app, so you can follow and answer it from there.'
-          )}
+          label={getClaudeRemoteControlTitle(t)}
+          description={getClaudeRemoteControlDescription(t)}
           checked={settings.claudeRemoteControlForNewChats === true}
           onChange={() =>
             updateSettings({
               claudeRemoteControlForNewChats: settings.claudeRemoteControlForNewChats !== true
             })
           }
-          ariaLabel={t(
-            'components.settings.agents.claudeRemoteControl.title',
-            'Remote Control for new Claude chats'
-          )}
+          ariaLabel={getClaudeRemoteControlTitle(t)}
         />
         {!isPairedWebClientWindow() ? (
           <>
