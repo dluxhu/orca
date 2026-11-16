@@ -51,6 +51,20 @@ describe('agent launch chat with Remote Control', () => {
     expect(turnOnMock).toHaveBeenCalledWith({ sessionId: created.sessionId, agent: 'claude' })
   })
 
+  it('forgets the Remote Control choice when the create is refused', async () => {
+    turnOnMock.mockReset().mockReturnValue(true)
+    createMock.mockReset().mockResolvedValue({
+      ok: false,
+      refusal: { code: 'agent_session_identity_required', message: 'no transcript' },
+      beforeCommit: true
+    })
+    await factory()
+      .createStructuredSession({ worktreeId: 'wt-1', agent: 'claude', remoteControl: true })
+      .catch(() => {})
+    const [[recorded], [forgotten]] = turnOnMock.mock.calls
+    expect(forgotten).toEqual({ ...recorded, forget: true })
+  })
+
   it('refuses before the create when the agent has no Remote Control', async () => {
     turnOnMock.mockReset().mockReturnValue(false)
     createMock.mockReset()

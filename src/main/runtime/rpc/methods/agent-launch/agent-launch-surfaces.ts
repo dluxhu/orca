@@ -120,6 +120,14 @@ export function agentLaunchSurfaceFactory(
           (presentation === undefined || (presentation === 'focused' && movesHostWindow))
       })
       if (!created.ok) {
+        // A refused create leaves no chat to open; its Remote Control choice must not wait for one.
+        if (remoteControl) {
+          requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({
+            sessionId,
+            agent,
+            forget: true
+          })
+        }
         // A caller-named session conflict must surface to that caller, never downgrade to terminal.
         if (requested && created.refusal.code === 'agent_session_conflict') {
           throw new AgentLaunchSessionAlreadyExistsError()

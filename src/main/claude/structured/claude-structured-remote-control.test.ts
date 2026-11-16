@@ -460,6 +460,19 @@ describe('Claude chat Remote Control', () => {
     })
   })
 
+  it('forgets a launch choice whose create was refused', async () => {
+    const { calls, state } = await chat({
+      resumed: true,
+      beforeStart: (adapter) => {
+        adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1' })
+        adapter.turnOnRemoteControlAtOpen({ sessionId: 'session-1', forget: true })
+      }
+    })
+
+    expect(calls).toEqual([[]])
+    await expect(state()).resolves.toEqual({ enabled: false, sessionUrl: null })
+  })
+
   it('leaves a running chat as it is when a launch asks for Remote Control', async () => {
     const { adapter, calls, state, start } = await chat()
 
