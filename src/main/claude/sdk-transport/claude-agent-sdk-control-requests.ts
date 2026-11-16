@@ -61,6 +61,20 @@ export function claudeQuerySessionRenamer(
     : null
 }
 
+// shortcut: sdk.d.ts (0.3.319) omits Query.enableRemoteControl, so its runtime signature is typed here; drop it once the SDK declares it.
+type ClaudeEnableRemoteControl = (
+  enabled: boolean,
+  name?: string,
+  options?: { reattachSessionId?: string }
+) => Promise<unknown>
+
+function claudeQueryRemoteControl(query: Query): ClaudeEnableRemoteControl | null {
+  const enable = 'enableRemoteControl' in query ? query.enableRemoteControl : null
+  return typeof enable === 'function'
+    ? (...args) => Promise.resolve(enable.apply(query, args))
+    : null
+}
+
 export type ClaudeControlOptions = { timeoutMs?: number }
 
 // Orca owns the deadline; null disables it. Query closure remains a transport failure.
@@ -115,6 +129,11 @@ export type ClaudeControlSurface = {
   /** Names `sessionId` as the user's rename; refused once the CLI has moved to another session. */
   renameSession: (title: string, sessionId: string, options?: ClaudeControlOptions) => Promise<void>
   generateSessionTitle?: (description: string) => Promise<unknown>
+  /** `remote_control`: links this chat to claude.ai and the Claude app; answers with its URL. */
+  setRemoteControl?: (
+    enabled: boolean,
+    options?: ClaudeControlOptions & { reattachSessionId?: string }
+  ) => Promise<unknown>
 }
 
 type InterruptingQuery = {
@@ -125,7 +144,25 @@ type InterruptingQuery = {
 
 export function createClaudeControlSurface(query: Query): ClaudeControlSurface {
   const title = 'generateSessionTitle' in query ? query.generateSessionTitle : null
+  const remoteControl = claudeQueryRemoteControl(query)
   return {
+    ...(remoteControl
+      ? {
+          setRemoteControl: (enabled, options) =>
+            runClaudeControl(
+              'remote_control',
+              () =>
+                remoteControl(
+                  enabled,
+                  undefined,
+                  options?.reattachSessionId
+                    ? { reattachSessionId: options.reattachSessionId }
+                    : undefined
+                ),
+              options?.timeoutMs
+            )
+        }
+      : {}),
     ...(typeof title === 'function'
       ? {
           generateSessionTitle: (description: string) =>

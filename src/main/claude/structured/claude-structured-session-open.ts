@@ -19,6 +19,8 @@ type ClaudeOpenInput = {
   sessions: Map<string, ClaudeSession>
   deps: ClaudeStructuredSessionAdapterDeps
   emit: (session: ClaudeSession, event: ClaudeStructuredSessionEvent) => void
+  /** Runs once the chat is open, with the CLI's initialize reply. */
+  afterOpen?: (session: ClaudeSession, initialization: unknown, newConversation: boolean) => void
 }
 
 export async function openClaudeStructuredSession(
@@ -45,20 +47,21 @@ async function openStartingClaudeSession(
 ): Promise<StructuredAgentSessionProviderOpenResult> {
   const { request, session, sessions, deps, emit } = input
   const { proof, account, resumesTranscript, onLateRefusal, startup } = session.initialization
+  const facts =
+    session.initialization.facts ??
+    readClaudeStartupFacts({
+      connection: session.connection,
+      initProof: proof,
+      sessionId: request.sessionId,
+      providerSessionId: session.providerSessionId,
+      resumesTranscript,
+      account,
+      requestTimeoutMs: deps.requestTimeoutMs,
+      emit: (event) => emit(session, event)
+    })
   const opened = openClaudeSession({
     session,
-    facts:
-      session.initialization.facts ??
-      readClaudeStartupFacts({
-        connection: session.connection,
-        initProof: proof,
-        sessionId: request.sessionId,
-        providerSessionId: session.providerSessionId,
-        resumesTranscript,
-        account,
-        requestTimeoutMs: deps.requestTimeoutMs,
-        emit: (event) => emit(session, event)
-      }),
+    facts,
     readSettings: () =>
       readClaudeStructuredSessionSettings(session.connection, deps.requestTimeoutMs),
     isCurrent: () => sessions.get(request.sessionId) === session,
@@ -117,5 +120,7 @@ async function openStartingClaudeSession(
     current()
   }
   startup.open()
+  // After catch-up, so a turn sent from claude.ai cannot race the transcript catch-up.
+  input.afterOpen?.(session, (await facts).initialization, !resumesTranscript)
   return { ...result, link: session.link, newConversation: !resumesTranscript }
 }
