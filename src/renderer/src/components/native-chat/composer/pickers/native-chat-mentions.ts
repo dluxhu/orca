@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import { structuredAgentSessionTabId } from '../../../../../../shared/agent-session/view/structured-agent-session-projection'
 import {
   formatOrcaSessionAddress,
@@ -23,6 +24,12 @@ export type NativeChatMentionSession = {
   hostKey: string
   /** The workspace of the session, to tell same-named sessions apart. */
   detail: string
+}
+
+export function nativeChatMentionKindLabel(kind: AgentReferenceKind): string {
+  return kind === 'chat'
+    ? translate('components.native-chat.composer.mentionChat', 'Chat')
+    : translate('components.native-chat.composer.mentionTerminal', 'Terminal')
 }
 
 /** A workspace file path, or another chat or terminal. */
@@ -98,7 +105,7 @@ export function filterNativeChatMentionSessions(
 
 /** A file becomes its `@path` text; a session becomes a chip whose send note names the orca command. */
 export function completeNativeChatMention(
-  input: NativeChatComposerInput | null,
+  input: Pick<NativeChatComposerInput, 'value' | 'selectionStart' | 'insertAgentReferences'> | null,
   item: NativeChatMentionItem,
   [draft, caret]: [string, number],
   commit: (result: { draft: string; caret: number }) => void
@@ -107,10 +114,15 @@ export function completeNativeChatMention(
     commit(applyMentionSuggestion(draft, caret, item))
     return
   }
-  if (!input?.insertAgentReferences) {
-    return
-  }
-  commit(removeMentionToken(draft, caret))
+  const token = removeMentionToken(draft, caret)
   const { kind, label, address, hostKey } = item
-  input.insertAgentReferences([{ kind, label, address, hostKey }])
+  // A session that is already a chip inserts nothing, so the typed token stays.
+  if (
+    input?.insertAgentReferences?.([{ kind, label, address, hostKey }], {
+      from: token.caret,
+      to: caret
+    })
+  ) {
+    commit({ draft: input.value, caret: input.selectionStart ?? input.value.length })
+  }
 }

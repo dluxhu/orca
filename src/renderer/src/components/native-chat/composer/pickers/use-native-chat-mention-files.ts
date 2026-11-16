@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type Dispatch, type SetStateAction } from 'react'
 import { useAppStore } from '@/store/index'
 import { useRuntimeFileListForWorktree } from '@/components/quick-open-file-list'
 import { rankQuickOpenFilesWithHistory } from '@/components/quick-open-history-ranking'
@@ -8,6 +8,7 @@ import { useFileListWorktree } from '@/store/workspaces/selection/use-selected-w
 
 import type { NativeChatMentionItem, NativeChatMentionSession } from './native-chat-mentions'
 import { useNativeChatMentionSessions } from './use-native-chat-mention-sessions'
+import { useNativeChatMentionRowKeeper } from './use-native-chat-mention-row-keeper'
 import type { NativeChatStructuredComposerTransport } from '../submit/native-chat-structured-composer-transport'
 
 const MENTION_FILE_LIMIT = 20
@@ -34,11 +35,14 @@ export function useNativeChatMentionFiles(
     terminalTabId: string
     structuredTransport?: Pick<NativeChatStructuredComposerTransport, 'worktreeId' | 'sessionId'>
     targetPtyId: string | null
+    draft: string
+    caret: number
+    setActiveSuggestion: Dispatch<SetStateAction<number>>
   }
 ): NativeChatMentionFiles {
   const { terminalTabId, structuredTransport, targetPtyId } = composer
   const structuredWorktreeId = structuredTransport?.worktreeId
-  const sessions = useNativeChatMentionSessions({
+  const { sessions, loading: sessionsLoading } = useNativeChatMentionSessions({
     query,
     terminalTabId,
     structuredWorktreeId,
@@ -63,7 +67,7 @@ export function useNativeChatMentionFiles(
   })
   const failed = list.loadError !== null
 
-  return useMemo(
+  const mention = useMemo(
     () => ({
       files:
         query === null
@@ -71,10 +75,17 @@ export function useNativeChatMentionFiles(
           : rankQuickOpenFilesWithHistory(query, list.files, history)
               .slice(0, MENTION_FILE_LIMIT)
               .map((item) => item.path),
-      loading: list.loading,
+      // Enter on an empty menu waits for both lists, so it never sends the `@` token.
+      loading: list.loading || sessionsLoading,
       failed,
       sessions
     }),
-    [failed, history, list.files, list.loading, query, sessions]
+    [failed, history, list.files, list.loading, query, sessions, sessionsLoading]
   )
+  useNativeChatMentionRowKeeper(
+    query === null ? null : nativeChatMentionItems(mention),
+    `${composer.caret}\0${composer.draft}`,
+    composer.setActiveSuggestion
+  )
+  return mention
 }

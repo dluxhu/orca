@@ -14,20 +14,23 @@ import {
 const LIST_TIMEOUT_MS = 5_000
 const NO_SESSIONS: readonly NativeChatMentionSession[] = []
 
-/** The chats and terminals on this composer's host, read once each time an `@` token opens. */
+/** The chats and terminals on this composer's host, read once each time an `@` token opens.
+ * `loading` is true until both lists settle. */
 export function useNativeChatMentionSessions(args: {
   query: string | null
   terminalTabId: string
   structuredWorktreeId?: string
   sessionId?: string
   ptyId: string | null
-}): readonly NativeChatMentionSession[] {
+}): { sessions: readonly NativeChatMentionSession[]; loading: boolean } {
   const { query, terminalTabId, structuredWorktreeId, sessionId, ptyId } = args
   const open = query !== null
   const [sessions, setSessions] = useState(NO_SESSIONS)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     setSessions(NO_SESSIONS)
+    setLoading(false)
     if (!open) {
       return
     }
@@ -40,6 +43,7 @@ export function useNativeChatMentionSessions(args: {
     }
     const hostKey = target.kind === 'local' ? 'local' : target.environmentId
     let live = true
+    setLoading(true)
     // A failed list leaves its kind out; files still show.
     void Promise.allSettled([
       callRuntimeRpc<RuntimeWorktreePsResult>(
@@ -56,6 +60,7 @@ export function useNativeChatMentionSessions(args: {
       )
     ]).then(([ps, terminals]) => {
       if (live) {
+        setLoading(false)
         setSessions(
           listNativeChatMentionSessions(
             ps.status === 'fulfilled' ? ps.value : null,
@@ -72,7 +77,10 @@ export function useNativeChatMentionSessions(args: {
   }, [open, ptyId, sessionId, structuredWorktreeId, terminalTabId])
 
   return useMemo(
-    () => (query === null ? NO_SESSIONS : filterNativeChatMentionSessions(sessions, query)),
-    [query, sessions]
+    () => ({
+      sessions: query === null ? NO_SESSIONS : filterNativeChatMentionSessions(sessions, query),
+      loading
+    }),
+    [loading, query, sessions]
   )
 }

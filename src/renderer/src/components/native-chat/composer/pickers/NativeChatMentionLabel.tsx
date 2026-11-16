@@ -1,8 +1,8 @@
 import { MessageSquare, SquareTerminal } from 'lucide-react'
 import { FilenameFirstPath } from '@/components/file-path-cursor-tooltip'
 import { FileTypeIcon } from '@/components/FileTypeIcon'
-import { useTranslate } from '@/i18n/use-translate'
-import type { NativeChatMentionItem } from './native-chat-mentions'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { nativeChatMentionKindLabel, type NativeChatMentionItem } from './native-chat-mentions'
 
 const ICON_CLASS = 'mt-0.5 size-3.5 shrink-0 text-muted-foreground'
 
@@ -12,7 +12,7 @@ export function NativeChatMentionLabel({
 }: {
   item: NativeChatMentionItem
 }): React.JSX.Element {
-  const t = useTranslate()
+  useUiLanguageRevision()
   if (typeof item === 'string') {
     return (
       <>
@@ -22,15 +22,20 @@ export function NativeChatMentionLabel({
     )
   }
   const Icon = item.kind === 'chat' ? MessageSquare : SquareTerminal
+  // The spaces between the spans keep the row's accessible name "<name> <kind> <workspace>".
   return (
     <>
-      <Icon className={ICON_CLASS} />
-      <span className="min-w-0 truncate">{item.label}</span>
+      <Icon aria-hidden="true" className={ICON_CLASS} />
+      <span className="min-w-0 truncate">{item.label}</span>{' '}
       <span className="ml-auto shrink-0 truncate pl-2 text-muted-foreground">
-        {item.kind === 'chat'
-          ? t('components.native-chat.composer.mentionChat', 'Chat')
-          : t('components.native-chat.composer.mentionTerminal', 'Terminal')}
-        {item.detail ? ` · ${item.detail}` : ''}
+        {nativeChatMentionKindLabel(item.kind)}
+        {item.detail ? (
+          <>
+            {' '}
+            <span aria-hidden="true">· </span>
+            {item.detail}
+          </>
+        ) : null}
       </span>
     </>
   )

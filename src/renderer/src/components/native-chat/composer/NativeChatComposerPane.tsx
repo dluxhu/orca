@@ -130,7 +130,7 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
     } = picker
     const mentionFiles = useNativeChatMentionFiles(
       autocomplete.mode === 'mention' ? autocomplete.query : null,
-      { terminalTabId, structuredTransport, targetPtyId }
+      { terminalTabId, structuredTransport, targetPtyId, draft, caret, setActiveSuggestion }
     )
 
     const resolveTarget = useCallback(
