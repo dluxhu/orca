@@ -15,6 +15,8 @@ export function NativeChatQuotePill({ node, selected }: NodeViewProps): React.JS
         label={text.replace(/\s+/g, ' ')}
         selected={selected}
         title={text}
+        // As wide as the quote, to a fixed limit; a long quote ends in an ellipsis.
+        className="max-w-[min(100%,24rem)]"
       />
     </NodeViewWrapper>
   )
