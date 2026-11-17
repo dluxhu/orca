@@ -25,6 +25,9 @@ afterEach(() => {
 
 describe('send key with Cmd/Ctrl+Enter sending', () => {
   it('names Cmd/Ctrl+Alt+Enter as the other way of sending', () => {
+    useAppStore.setState({
+      settings: { ...getDefaultSettings('/tmp'), nativeChatSendWithModEnter: true }
+    })
     render(
       <NativeChatComposerActions
         attachDisabled={false}
@@ -33,7 +36,6 @@ describe('send key with Cmd/Ctrl+Enter sending', () => {
         isWorking
         hasDraft
         alternateSend="steer"
-        sendWithModEnter
         isDictating={false}
         isDictationHoldMode={false}
         onAttach={vi.fn()}

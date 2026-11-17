@@ -207,6 +207,17 @@ export function editReplacesTriggerToken(
   return commonPrefix < tokenEnd && previous.length - commonSuffix > triggerPosition
 }
 
+/** Deletes the `@query` token before the caret, so a session chip can take its place. */
+export function removeMentionToken(draft: string, caret: number): { draft: string; caret: number } {
+  const before = draft.slice(0, caret)
+  const match = before.match(/(^|\s)@(\S*)$/)
+  if (!match) {
+    return { draft, caret }
+  }
+  const tokenStart = before.length - match[2].length - 1
+  return { draft: before.slice(0, tokenStart) + draft.slice(caret), caret: tokenStart }
+}
+
 export function applyMentionSuggestion(
   draft: string,
   caret: number,

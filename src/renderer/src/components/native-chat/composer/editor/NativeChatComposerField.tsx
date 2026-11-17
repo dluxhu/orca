@@ -8,14 +8,16 @@ import { cn } from '@/lib/class-names'
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
 import { NativeChatMentionMenu, NativeChatPickerMenu } from '../pickers/NativeChatAutocompleteMenus'
-import type { NativeChatMentionFiles } from '../pickers/use-native-chat-mention-files'
+import {
+  nativeChatMentionItems,
+  type NativeChatMentionFiles
+} from '../pickers/use-native-chat-mention-files'
+import type { NativeChatMentionItem } from '../pickers/native-chat-mentions'
 import { NativeChatComposerActions } from '../controls/NativeChatComposerActions'
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import type { NativeChatComposerNotice } from '../controls/native-chat-composer-notice'
 import type { NativeChatContextUsageSummary } from '../../../../../../shared/native-chat/native-chat-context-usage-summary'
-import { nativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
-import { useAppStore } from '@/store'
-import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
+import { useNativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
 import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-target'
 import type {
   SessionOptionDescriptor,
@@ -78,7 +80,7 @@ export type NativeChatComposerFieldProps = {
   pickerListboxId: string
   onChoosePickerItem: (item: NativeChatPickerItem) => void
   onRetrySkills: () => void
-  onChooseMentionFile: (path: string) => void
+  onChooseMentionFile: (item: NativeChatMentionItem) => void
   onRemoveImageAttachment: (id: string) => void
   onAttach: () => void
   onDictationToggle: () => void
@@ -173,14 +175,13 @@ export function NativeChatComposerField({
   workspaceFooter
 }: NativeChatComposerFieldProps): React.JSX.Element {
   const t = useTranslate()
-  // Enter adds a new line then, so the placeholder and Send's hint name the send keys.
-  const modEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
+  const defaultPlaceholder = useNativeChatComposerPlaceholder(hasPty, canSend, afterStop)
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
     autocomplete.mode === 'slash'
       ? autocomplete.items.length
       : autocomplete.mode === 'mention'
-        ? mentionFiles.files.length
+        ? nativeChatMentionItems(mentionFiles).length
         : 0
   // Value the IME started from, and whether a programmatic clear was dropped on top of it.
   const compositionBaseRef = useRef('')
@@ -368,8 +369,7 @@ export function NativeChatComposerField({
                           'components.native-chat.goal.placeholder',
                           'Describe your goal, define measurable outcomes for best results'
                         )
-                      : (unavailableHint ??
-                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, modEnter))
+                      : (unavailableHint ?? defaultPlaceholder)
               }
               // Let layout handle wrapping and touch targets; scroll after eight lines (a launch prompt: one line growing to six) without JavaScript measurement.
               // An empty launch prompt also grows to fit a wrapping placeholder: a paragraph-wide float that keeps its height, with a zero-width margin box so the caret line stays put.
@@ -404,7 +404,6 @@ export function NativeChatComposerField({
                 isWorking={isWorking}
                 hasDraft={hasDraft}
                 alternateSend={alternateSend}
-                sendWithModEnter={modEnter}
                 isStopping={isStopping}
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}

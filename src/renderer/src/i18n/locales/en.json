@@ -20754,6 +20754,8 @@
           "xhigh": "XHigh"
         },
         "imageUnavailable": "Preview unavailable",
+        "mentionChat": "Chat",
+        "mentionTerminal": "Terminal",
         "placeholderSendWithModEnter": "Ask anything, @ to mention files, / for commands, {{shortcut}} to send"
       },
       "tool": {

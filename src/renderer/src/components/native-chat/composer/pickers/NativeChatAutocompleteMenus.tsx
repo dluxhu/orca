@@ -7,11 +7,14 @@ import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { cn } from '@/lib/class-names'
 import type { SkillSourceKind } from '../../../../../../shared/skills'
-import { FilenameFirstPath } from '@/components/file-path-cursor-tooltip'
-import { FileTypeIcon } from '@/components/FileTypeIcon'
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
-import type { NativeChatMentionFiles } from './use-native-chat-mention-files'
+import {
+  nativeChatMentionItems,
+  type NativeChatMentionFiles
+} from './use-native-chat-mention-files'
+import type { NativeChatMentionItem } from './native-chat-mentions'
+import { NativeChatMentionLabel } from './NativeChatMentionLabel'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
@@ -364,19 +367,20 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
   mention: NativeChatMentionFiles
   activeIndex: number
   listboxId: string
-  onChoose: (path: string) => void
+  onChoose: (item: NativeChatMentionItem) => void
 }): React.JSX.Element {
   const t = useTranslate()
   useUiLanguageRevision()
   const activeItemRef = useRef<HTMLButtonElement | null>(null)
-  const selectedIndex = Math.min(activeIndex, mention.files.length - 1)
+  const items = nativeChatMentionItems(mention)
+  const selectedIndex = Math.min(activeIndex, items.length - 1)
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [selectedIndex, mention.files])
+  }, [selectedIndex, mention.files, mention.sessions])
 
   const statusText =
-    mention.files.length > 0
+    items.length > 0
       ? null
       : mention.loading
         ? t('components.native-chat.composer.loadingFiles', 'Loading files...')
@@ -386,19 +390,15 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
 
   return (
     <PickerListbox id={listboxId}>
-      {mention.files.map((path, index) => (
+      {items.map((item, index) => (
         <PickerOptionButton
-          key={path}
+          key={typeof item === 'string' ? item : `${item.kind}:${item.address}`}
           id={`${listboxId}-option-${index}`}
           selected={index === selectedIndex}
           activeItemRef={activeItemRef}
-          onChoose={() => onChoose(path)}
+          onChoose={() => onChoose(item)}
         >
-          <FileTypeIcon
-            filePath={path}
-            className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
-          />
-          <FilenameFirstPath path={path} />
+          <NativeChatMentionLabel item={item} />
         </PickerOptionButton>
       ))}
       {statusText ? (

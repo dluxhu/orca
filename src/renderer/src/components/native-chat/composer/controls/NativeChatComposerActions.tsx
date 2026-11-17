@@ -9,6 +9,8 @@ import {
   getScreenSubmitShortcutLabel
 } from '@/lib/keyboard/screen-submit-shortcut'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { useAppStore } from '@/store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
 import type { NativeChatFollowUpBehavior } from '../../../../../../shared/native-chat/input/native-chat-follow-up-behavior'
 import type {
   SessionOptionDescriptor,
@@ -41,8 +43,6 @@ export type NativeChatComposerActionsProps = {
   hasDraft?: boolean
   /** While the agent works: what Cmd/Ctrl+Enter would do instead of a plain send, when it differs. */
   alternateSend?: NativeChatFollowUpBehavior
-  /** The other way of sending is Cmd/Ctrl+Alt+Enter. */
-  sendWithModEnter?: boolean
   /** This client's Stop request is in flight: the Stop control is disabled and says so. */
   isStopping?: boolean
   isDictating: boolean
@@ -81,7 +81,6 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
   isWorking,
   hasDraft = false,
   alternateSend,
-  sendWithModEnter = false,
   isStopping = false,
   isDictating,
   isDictationHoldMode,
@@ -126,6 +125,8 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
     ? t('components.native-chat.composer.stopDictation', 'Stop dictation')
     : t('components.native-chat.composer.startDictation', 'Start dictation')
   const sendReason = stops ? null : (sendBlockedReason ?? null)
+  // While Cmd/Ctrl+Enter sends, the other way of sending is Cmd/Ctrl+Alt+Enter.
+  const sendWithModEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
   const alternateShortcut = sendWithModEnter
     ? getScreenSubmitAltShortcutLabel()
     : getScreenSubmitShortcutLabel()

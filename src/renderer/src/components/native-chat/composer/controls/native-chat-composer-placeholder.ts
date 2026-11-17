@@ -1,6 +1,8 @@
 import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-target'
 import { translate } from '../../../../i18n/i18n'
-import type { Translate } from '../../../../i18n/use-translate'
+import { useTranslate, type Translate } from '../../../../i18n/use-translate'
+import { useAppStore } from '../../../../store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
 import { getScreenSubmitShortcutLabel } from '../../../../lib/keyboard/screen-submit-shortcut'
 import {
   NATIVE_CHAT_TURN_STATUS_COPY,
@@ -43,4 +45,15 @@ export function nativeChatComposerPlaceholder(
     )
   }
   return t('components.native-chat.composer.placeholder', NATIVE_CHAT_COMPOSER_PLACEHOLDER)
+}
+
+/** The default placeholder; it names the send key while Cmd/Ctrl+Enter sends. */
+export function useNativeChatComposerPlaceholder(
+  hasPty: boolean,
+  canSend: boolean,
+  afterStop?: NativeChatAfterStopSend
+): string {
+  const t = useTranslate()
+  const sendWithModEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
+  return nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, sendWithModEnter)
 }
