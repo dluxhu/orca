@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { lstat, readFile, readlink } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import type { CliInstallMethod, CliInstallStatus } from '../../../shared/cli-install-types'
@@ -19,10 +19,16 @@ const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca', '/opt/orca-ide', '/opt
 
 const MAC_APP_LAUNCHER_RE = /^(.*?\.app)[/\\]Contents[/\\]Resources[/\\]bin[/\\][^/\\]+$/
 
-/** The other .app bundle that owns `target`, when it is not the bundle of `launcherPath`. */
+/** The other .app bundle that owns `target`, when `target` exists and is not in the bundle of `launcherPath`. */
 export function otherMacAppBundle(target: string | null, launcherPath: string): string | null {
-  const other = target?.match(MAC_APP_LAUNCHER_RE)?.[1] ?? null
-  return other && other !== launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1] ? other : null
+  const other = target?.match(MAC_APP_LAUNCHER_RE)?.[1]
+  // A missing app cannot take the link back.
+  if (!target || !other || !existsSync(target)) {
+    return null
+  }
+  const ours = launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1]
+  // Another path to our own bundle is not another app.
+  return ours && existsSync(ours) && realpathSync(other) === realpathSync(ours) ? null : other
 }
 
 export class CliCommandInspection extends CliInstallLocation {
