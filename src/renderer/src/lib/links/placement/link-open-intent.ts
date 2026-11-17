@@ -15,7 +15,7 @@ export type LinkPlacementState = Pick<
 >
 
 /** The unified tab a link came from; a terminal surface may know only its backing terminal id. */
-function findLinkSourceTab(
+export function findLinkSourceTab(
   tabs: readonly LinkSourceTab[],
   sourceTabId: string
 ): LinkSourceTab | undefined {

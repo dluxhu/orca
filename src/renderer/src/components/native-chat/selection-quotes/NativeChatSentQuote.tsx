@@ -11,6 +11,7 @@ import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
+import { recordNativeChatQuoteJump } from './native-chat-quote-history'
 import { quotedText } from './native-chat-quote-selection'
 import { CommentMarkdownBlockLineContext } from '@/components/sidebar/comment-markdown-code-renderers'
 
@@ -79,8 +80,9 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           variant="outline"
           size="xs"
           className="my-1 max-w-full"
-          onClick={() =>
-            jumpToQuoteSource(sourceText, {
+          onClick={(event) => {
+            const chip = event.currentTarget
+            const jumped = jumpToQuoteSource(sourceText, {
               jumpToMessage,
               openFile: (location) => openQuotedFile(location, fileLinkContext),
               notifyMissing: () =>
@@ -91,7 +93,10 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
                   )
                 )
             })
-          }
+            if (jumped !== 'missing') {
+              recordNativeChatQuoteJump(chip, fileLinkContext)
+            }
+          }}
           data-native-chat-sent-quote=""
         >
           <Quote aria-hidden="true" />

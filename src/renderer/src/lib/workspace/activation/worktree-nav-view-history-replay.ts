@@ -1,8 +1,13 @@
 import { useAppStore } from '@/store/index'
-import type { WorktreeNavHistoryViewEntry } from '@/store/slices/ui/workspace-navigation-history'
+import type {
+  WorktreeNavHistoryChatQuoteEntry,
+  WorktreeNavHistoryViewEntry
+} from '@/store/slices/ui/workspace-navigation-history'
 
 // Replay via setActiveView: open*Page would mutate previousViewBefore* or duplicate history (navigateToIndex).
-export function applyWorktreeNavViewEntry(entry: WorktreeNavHistoryViewEntry): void {
+export function applyWorktreeNavViewEntry(
+  entry: Exclude<WorktreeNavHistoryViewEntry, WorktreeNavHistoryChatQuoteEntry>
+): void {
   if (entry === 'automations' || entry === 'artifacts' || entry === 'skills') {
     useAppStore.getState().setActiveView(entry)
     return

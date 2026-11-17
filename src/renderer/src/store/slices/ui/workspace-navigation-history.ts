@@ -52,9 +52,21 @@ export type WorktreeNavHistoryTaskDetailEntry =
       issue: JiraIssue
       sourceContext?: TaskSourceContext | null
     }
+/** A place in an agent chat: a sent quote chip, or the source that the chip jumps to. */
+export type WorktreeNavHistoryChatQuoteEntry = {
+  kind: 'native-chat-quote'
+  worktreeId: string
+  tabId: string
+  /** The message that holds the chip. */
+  messageId: string
+  /** The chip's index among the quote chips of its message. */
+  chip: number
+  at: 'chip' | 'source'
+}
 export type WorktreeNavHistoryViewEntry =
   | WorktreeNavHistorySimpleViewEntry
   | WorktreeNavHistoryTaskDetailEntry
+  | WorktreeNavHistoryChatQuoteEntry
 export type WorktreeNavHistoryEntry = (string & {}) | WorktreeNavHistoryViewEntry
 
 export type WorktreeNavHistorySlice = {
@@ -109,6 +121,9 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
   if (typeof entry === 'string') {
     return isSimpleViewEntry(entry) ? `view:${entry}` : `worktree:${entry}`
   }
+  if (entry.kind === 'native-chat-quote') {
+    return `chat:${entry.tabId}:${entry.messageId}:${entry.chip}:${entry.at}`
+  }
   if (entry.source === 'github') {
     const sourceScope =
       entry.sourceContext?.provider === 'github'
@@ -138,6 +153,11 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
 }
 
 function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
+  if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
+    return (
+      state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ?? false
+    )
+  }
   if (isViewEntry(entry)) {
     return true
   }
