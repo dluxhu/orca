@@ -19613,6 +19613,7 @@
           "xhigh": "Sehr hoch"
         },
         "imageUnavailable": "Vorschau nicht verfügbar",
+        "placeholderSendWithModEnter": "Frage stellen, @ für Dateiverweise, / für Befehle, {{shortcut}} zum Senden",
         "moreControls": "Weitere Chat-Steuerelemente",
         "exitPlanMode": "Planungsmodus verlassen"
       },
@@ -20680,7 +20681,11 @@
         "turnDiffsTitle": "Durchgangsänderungen",
         "turnDiffsCopy": "Zeigt unter der Antwort die in jedem Durchgang geänderten Dateien mit Zeilenzahlen an.",
         "turnDiffsSearchChangedFiles": "geänderte Dateien",
-        "turnDiffsSearchEdits": "Änderungen"
+        "turnDiffsSearchEdits": "Änderungen",
+        "sendWithModEnterTitle": "Mit {{shortcut}} senden",
+        "sendWithModEnterCopy": "Enter fügt eine neue Zeile ein, statt zu senden. Die andere Art zu senden, Einreihen oder Steuern, liegt dann auf {{shortcut}}.",
+        "sendWithModEnterSearchNewLine": "neue Zeile",
+        "sendWithModEnterSearchShortcut": "Tastenkürzel"
       },
       "voice": {
         "dictationLanguage": {

@@ -19035,6 +19035,7 @@
         "pasteNotSaved": "此粘贴内容未保存。请重新粘贴或将其移除",
         "pastedTextTooLarge": "此次粘贴会使消息超过单条消息 256 KB 的上限。请缩短后再粘贴",
         "imageUnavailable": "预览不可用",
+        "placeholderSendWithModEnter": "随心输入，@ 引用文件，/ 使用命令，{{shortcut}} 发送",
         "draftNotSaved": "此草稿尚未保存成功，Orca 会继续尝试",
         "imageNotBroughtBack": "无法随此草稿恢复 {{name}}，请重新附加或将其移除",
         "pastedImageNotBroughtBack": "无法随此草稿恢复这张粘贴的图片，请将其移除，如仍需要请重新粘贴",
@@ -20285,6 +20286,10 @@
         "turnDiffsCopy": "在回复下方显示每轮更改的文件及其行数。",
         "turnDiffsSearchChangedFiles": "已更改文件",
         "turnDiffsSearchEdits": "编辑",
+        "sendWithModEnterTitle": "使用 {{shortcut}} 发送",
+        "sendWithModEnterCopy": "Enter 会换行而不发送。另一种发送方式（加入队列或立即发送）改用 {{shortcut}}。",
+        "sendWithModEnterSearchNewLine": "换行",
+        "sendWithModEnterSearchShortcut": "键盘快捷键",
         "markNewMessagesTitle": "返回聊天时标记新消息",
         "markNewMessagesCopy": "返回聊天时，在你离开期间收到的内容上方显示“新消息”分隔线；如果你之前在看最新消息，会滚动到该处。",
         "markNewMessagesSearchUnread": "未读"

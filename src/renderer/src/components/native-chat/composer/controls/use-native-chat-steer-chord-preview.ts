@@ -4,6 +4,8 @@ import { createNativeChatSteerChordPreviewHook } from '../../../../../../shared/
 
 import type { NativeChatComposerSendIntent } from '../submit/native-chat-composer-send-intent'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'
+import { useAppStore } from '@/store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
 
 const useSteerChordPreview = createNativeChatSteerChordPreviewHook({ useEffect, useState })
 
@@ -19,9 +21,11 @@ export function useNativeChatSteerChordPreview(
   send: (intent?: NativeChatComposerSendIntent) => void,
   pickerOpen: boolean
 ) {
+  // Cmd/Ctrl+Enter sends plainly then, so a held Cmd/Ctrl has no other send to preview.
+  const sendWithModEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
   return useSteerChordPreview(
     root,
-    sendState,
+    sendWithModEnter ? { hasDraft: sendState.hasDraft, chordSteersHead: false } : sendState,
     steerHead,
     () => send({ alternate: true }),
     pickerOpen,

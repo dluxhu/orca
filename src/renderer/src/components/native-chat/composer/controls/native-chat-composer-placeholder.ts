@@ -1,6 +1,7 @@
 import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-target'
 import { translate } from '../../../../i18n/i18n'
 import type { Translate } from '../../../../i18n/use-translate'
+import { getScreenSubmitShortcutLabel } from '../../../../lib/keyboard/screen-submit-shortcut'
 import {
   NATIVE_CHAT_TURN_STATUS_COPY,
   NATIVE_CHAT_COMPOSER_PLACEHOLDER
@@ -10,7 +11,8 @@ export function nativeChatComposerPlaceholder(
   hasPty: boolean,
   canSend: boolean,
   afterStop?: NativeChatAfterStopSend,
-  t: Translate = translate
+  t: Translate = translate,
+  sendWithModEnter = false
 ): string {
   if (!hasPty) {
     return t(
@@ -31,6 +33,13 @@ export function nativeChatComposerPlaceholder(
     return t(
       'components.native-chat.status.sendAfterStop',
       NATIVE_CHAT_TURN_STATUS_COPY.sendAfterStop
+    )
+  }
+  if (sendWithModEnter) {
+    return t(
+      'components.native-chat.composer.placeholderSendWithModEnter',
+      'Ask anything, @ to mention files, / for commands, {{shortcut}} to send',
+      { shortcut: getScreenSubmitShortcutLabel() }
     )
   }
   return t('components.native-chat.composer.placeholder', NATIVE_CHAT_COMPOSER_PLACEHOLDER)

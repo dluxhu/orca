@@ -14,6 +14,8 @@ import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices
 import type { NativeChatComposerNotice } from '../controls/native-chat-composer-notice'
 import type { NativeChatContextUsageSummary } from '../../../../../../shared/native-chat/native-chat-context-usage-summary'
 import { nativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
+import { useAppStore } from '@/store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
 import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-target'
 import type {
   SessionOptionDescriptor,
@@ -171,6 +173,8 @@ export function NativeChatComposerField({
   workspaceFooter
 }: NativeChatComposerFieldProps): React.JSX.Element {
   const t = useTranslate()
+  // Enter adds a new line then, so the placeholder and Send's hint name the send keys.
+  const modEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
     autocomplete.mode === 'slash'
@@ -365,7 +369,7 @@ export function NativeChatComposerField({
                           'Describe your goal, define measurable outcomes for best results'
                         )
                       : (unavailableHint ??
-                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t))
+                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, modEnter))
               }
               // Let layout handle wrapping and touch targets; scroll after eight lines (a launch prompt: one line growing to six) without JavaScript measurement.
               // An empty launch prompt also grows to fit a wrapping placeholder: a paragraph-wide float that keeps its height, with a zero-width margin box so the caret line stays put.
@@ -400,6 +404,7 @@ export function NativeChatComposerField({
                 isWorking={isWorking}
                 hasDraft={hasDraft}
                 alternateSend={alternateSend}
+                sendWithModEnter={modEnter}
                 isStopping={isStopping}
                 isDictating={isDictating}
                 isDictationHoldMode={isDictationHoldMode}

@@ -2,6 +2,10 @@ import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import type { SettingsSearchEntry } from '../search/settings-search'
+import {
+  getScreenSubmitAltShortcutLabel,
+  getScreenSubmitShortcutLabel
+} from '@/lib/keyboard/screen-submit-shortcut'
 import { NATIVE_CHAT_RESUME_SETTING_SECTION_ID } from './native-chat-resume-setting-target'
 import { NATIVE_CHAT_USAGE_LIMIT_CONTINUE_SETTING_SECTION_ID } from './native-chat-usage-limit-continue-setting-target'
 
@@ -62,6 +66,26 @@ export const getChatBehaviorEntriesByKey = createLocalizedCatalog(() => ({
     keywords: [
       translate('components.settings.nativeChat.queueSearchQueue', 'queue'),
       translate('components.settings.nativeChat.queueSearchSteer', 'steer')
+    ]
+  },
+  sendWithModEnter: {
+    targetSectionId: 'chat-send-with-mod-enter',
+    title: translate(
+      'components.settings.nativeChat.sendWithModEnterTitle',
+      'Send with {{shortcut}}',
+      { shortcut: getScreenSubmitShortcutLabel() }
+    ),
+    description: translate(
+      'components.settings.nativeChat.sendWithModEnterCopy',
+      'Enter adds a new line instead of sending. The other way of sending, to queue or to steer, moves to {{shortcut}}.',
+      { shortcut: getScreenSubmitAltShortcutLabel() }
+    ),
+    keywords: [
+      translate('components.settings.nativeChat.sendWithModEnterSearchNewLine', 'new line'),
+      translate(
+        'components.settings.nativeChat.sendWithModEnterSearchShortcut',
+        'keyboard shortcut'
+      )
     ]
   },
   scrollToLatestOnSend: {

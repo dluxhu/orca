@@ -20753,7 +20753,8 @@
           "medium": "Med",
           "xhigh": "XHigh"
         },
-        "imageUnavailable": "Preview unavailable"
+        "imageUnavailable": "Preview unavailable",
+        "placeholderSendWithModEnter": "Ask anything, @ to mention files, / for commands, {{shortcut}} to send"
       },
       "tool": {
         "exitCode": "exit {{value0}}",
@@ -21995,7 +21996,11 @@
         "turnDiffsTitle": "Turn diffs",
         "turnDiffsCopy": "Shows the files each turn changed, with line counts, below the reply.",
         "turnDiffsSearchChangedFiles": "changed files",
-        "turnDiffsSearchEdits": "edits"
+        "turnDiffsSearchEdits": "edits",
+        "sendWithModEnterTitle": "Send with {{shortcut}}",
+        "sendWithModEnterCopy": "Enter adds a new line instead of sending. The other way of sending, to queue or to steer, moves to {{shortcut}}.",
+        "sendWithModEnterSearchNewLine": "new line",
+        "sendWithModEnterSearchShortcut": "keyboard shortcut"
       },
       "voice": {
         "dictationLanguage": {
