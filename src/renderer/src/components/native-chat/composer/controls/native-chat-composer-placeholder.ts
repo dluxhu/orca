@@ -47,13 +47,55 @@ export function nativeChatComposerPlaceholder(
   return t('components.native-chat.composer.placeholder', NATIVE_CHAT_COMPOSER_PLACEHOLDER)
 }
 
-/** The default placeholder; it names the send key while Cmd/Ctrl+Enter sends. */
-export function useNativeChatComposerPlaceholder(
-  hasPty: boolean,
-  canSend: boolean,
+/** The composer placeholder; while Cmd/Ctrl+Enter sends, it names that key. */
+export function useNativeChatComposerPlaceholder({
+  hasPty,
+  canSend,
+  afterStop,
+  editing,
+  goal,
+  unavailableHint,
+  launchPrompt
+}: {
+  hasPty: boolean
+  canSend: boolean
   afterStop?: NativeChatAfterStopSend
-): string {
+  editing: boolean
+  goal: boolean
+  /** The reason the composer is disabled; no key sends, so it names none. */
+  unavailableHint?: string
+  /** A launch prompt keeps Enter as its send. */
+  launchPrompt?: string
+}): string {
   const t = useTranslate()
   const sendWithModEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
-  return nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, sendWithModEnter)
+  const shortcut = { shortcut: getScreenSubmitShortcutLabel() }
+  if (launchPrompt !== undefined) {
+    return launchPrompt
+  }
+  if (editing) {
+    return sendWithModEnter
+      ? t(
+          'components.native-chat.queuedMessages.editMessageWithModEnter',
+          'Edit message, {{shortcut}} to save',
+          shortcut
+        )
+      : t('components.native-chat.queuedMessages.editMessage', 'Edit message')
+  }
+  if (goal) {
+    return sendWithModEnter
+      ? t(
+          'components.native-chat.goal.placeholderWithModEnter',
+          'Describe your goal, define measurable outcomes for best results, {{shortcut}} to send',
+          shortcut
+        )
+      : t(
+          'components.native-chat.goal.placeholder',
+          'Describe your goal, define measurable outcomes for best results'
+        )
+  }
+  return (
+    unavailableHint ??
+    nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, sendWithModEnter)
+  )
 }

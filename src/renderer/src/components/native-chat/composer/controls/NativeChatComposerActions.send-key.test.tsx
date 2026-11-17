@@ -50,12 +50,17 @@ describe('send key with Cmd/Ctrl+Enter sending', () => {
     expect(screen.getByText(`${getScreenSubmitAltShortcutLabel()} to steer`)).toBeTruthy()
   })
 
-  function Preview(): React.JSX.Element {
+  // A typed draft goes the other way; an empty composer steers the head card.
+  const typed = { alternateSend: 'steer' as const, hasDraft: true, chordSteersHead: false }
+  const empty = { hasDraft: false, chordSteersHead: true }
+  const steerHead = (): boolean => true
+
+  function Preview({ draft }: { draft: 'typed' | 'empty' }): React.JSX.Element {
     const root = useRef<HTMLDivElement>(null)
     const { preview } = useNativeChatSteerChordPreview(
       root,
-      { alternateSend: 'steer', hasDraft: true, chordSteersHead: false },
-      undefined,
+      draft === 'typed' ? typed : empty,
+      draft === 'typed' ? undefined : steerHead,
       vi.fn(),
       { mode: 'none' }
     )
@@ -66,13 +71,13 @@ describe('send key with Cmd/Ctrl+Enter sending', () => {
     )
   }
 
-  function holdChordKey(sendWithModEnter: boolean): string {
+  function holdChordKey(sendWithModEnter: boolean, draft: 'typed' | 'empty' = 'typed'): string {
     useAppStore.setState({
       settings: { ...getDefaultSettings('/tmp'), nativeChatSendWithModEnter: sendWithModEnter }
     })
     vi.useFakeTimers()
     vi.spyOn(document, 'hasFocus').mockReturnValue(true)
-    render(<Preview />)
+    render(<Preview draft={draft} />)
     const root = screen.getByTestId('root')
     fireEvent.keyDown(root, { key: isMacPlatform() ? 'Meta' : 'Control' })
     act(() => vi.advanceTimersByTime(200))
@@ -83,5 +88,11 @@ describe('send key with Cmd/Ctrl+Enter sending', () => {
     expect(holdChordKey(false)).toBe('steer')
     cleanup()
     expect(holdChordKey(true)).toBe('none')
+  })
+
+  it('previews no head-card steer on an empty composer while Enter sends', () => {
+    expect(holdChordKey(false, 'empty')).toBe('steer-queued')
+    cleanup()
+    expect(holdChordKey(true, 'empty')).toBe('none')
   })
 })

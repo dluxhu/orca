@@ -21,13 +21,27 @@ describe('nativeChatComposerPlaceholder', () => {
     )
   })
 
+  const base = { hasPty: true, canSend: true, editing: false, goal: false }
+
   it('follows the setting', () => {
-    const placeholder = renderHook(() => useNativeChatComposerPlaceholder(true, true))
+    const placeholder = renderHook(() => useNativeChatComposerPlaceholder(base))
     expect(placeholder.result.current).not.toContain(getScreenSubmitShortcutLabel())
     useAppStore.setState({
       settings: { ...getDefaultSettings('/tmp'), nativeChatSendWithModEnter: true }
     })
     placeholder.rerender()
     expect(placeholder.result.current).toContain(`${getScreenSubmitShortcutLabel()} to send`)
+  })
+
+  it('names the send key in the edit and goal placeholders, not in a disabled reason', () => {
+    useAppStore.setState({
+      settings: { ...getDefaultSettings('/tmp'), nativeChatSendWithModEnter: true }
+    })
+    const shortcut = getScreenSubmitShortcutLabel()
+    const placeholder = (args: Partial<typeof base> & { unavailableHint?: string }) =>
+      renderHook(() => useNativeChatComposerPlaceholder({ ...base, ...args })).result.current
+    expect(placeholder({ editing: true })).toBe(`Edit message, ${shortcut} to save`)
+    expect(placeholder({ goal: true })).toContain(`${shortcut} to send`)
+    expect(placeholder({ unavailableHint: 'Install the agent' })).toBe('Install the agent')
   })
 })
