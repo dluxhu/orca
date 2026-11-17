@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import type * as NodeFs from 'node:fs'
 import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,12 +13,30 @@ vi.mock('electron', () => ({
   }
 }))
 
+// While `failing` is set, realpath throws, as when the target goes away after the check.
+const realpathControl = vi.hoisted(() => ({ failing: false }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFs>()
+  const guard = <T extends (...args: never[]) => unknown>(call: T): T =>
+    ((...args: Parameters<T>) => {
+      if (realpathControl.failing) {
+        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+      }
+      return call(...args)
+    }) as T
+  const realpathSync = Object.assign(guard(actual.realpathSync), {
+    native: guard(actual.realpathSync.native)
+  })
+  return { ...actual, default: { ...actual, realpathSync }, realpathSync }
+})
+
 import { CliInstaller } from '../cli-installer'
 import { otherMacAppBundle } from './cli-command-inspection'
 
 const roots: string[] = []
 
 afterEach(async () => {
+  realpathControl.failing = false
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -180,6 +200,59 @@ describe('CLI link owned by another Orca app', () => {
       const after = await installer.install()
       expect(after.state).toBe('stale')
       expect(after.detail).toBe(`Registered at ${commandPath}.`)
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'keeps the non-Orca text for a link to a non-Orca tool inside another .app',
+    async () => {
+      const root = await tempRoot()
+      const tool = join(root, 'Tool.app', 'Contents', 'Resources', 'bin', 'tool')
+      await mkdir(join(root, 'Tool.app', 'Contents', 'Resources', 'bin'), { recursive: true })
+      await writeFile(tool, '', 'utf8')
+      const ours = await writeLauncher(join(root, 'Orca Beta.app'))
+      const { installer, commandPath } = await installerLinkedTo(root, tool, ours)
+
+      const status = await installer.getStatus()
+      expect(status.state).toBe('conflict')
+      expect(status.detail).toBe(`${commandPath} points to a non-Orca launcher.`)
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'keeps the older-launcher text for our own bundle in another letter case',
+    async (context) => {
+      const root = await tempRoot()
+      const ours = await writeLauncher(join(root, 'Orca Beta.app'))
+      const otherCase = launcherIn(join(root, 'orca beta.app')).launcher
+      // Only a case-insensitive disk finds the bundle under the other letter case.
+      if (!existsSync(otherCase)) {
+        context.skip()
+      }
+      const { installer, commandPath } = await installerLinkedTo(root, otherCase, ours)
+
+      expect(otherMacAppBundle(otherCase, ours.launcher)).toBeNull()
+      const status = await installer.getStatus()
+      expect(status.state).toBe('stale')
+      expect(status.detail).toBe(`${commandPath} points to an older Orca launcher.`)
+    }
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'names no other app when realpath fails, and Register still resolves',
+    async () => {
+      const root = await tempRoot()
+      const other = await writeLauncher(join(root, 'Orca.app'))
+      const ours = await writeLauncher(join(root, 'Orca Beta.app'))
+      const { installer, commandPath } = await installerLinkedTo(root, other.launcher, ours)
+
+      realpathControl.failing = true
+      expect(otherMacAppBundle(other.launcher, ours.launcher)).toBeNull()
+      const after = await installer.install()
+      realpathControl.failing = false
+      expect(after.state).toBe('installed')
+      expect(after.detail).toBe(`Registered at ${commandPath}.`)
+      expect(await readlink(commandPath)).toBe(ours.launcher)
     }
   )
 })
