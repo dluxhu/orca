@@ -15,18 +15,34 @@ start. The releases are for Apple Silicon (arm64) Macs only. To open it: in Find
 
 ## How it is different from official Orca
 
-|                              | Official Orca            | Orca @dLux                                                                       |
-| ---------------------------- | ------------------------ | -------------------------------------------------------------------------------- |
-| App name                     | Orca                     | Orca @dLux                                                                       |
-| Bundle id                    | `com.stablyai.orca`      | `com.stablyai.orca.dlux`                                                         |
-| Updates from                 | `stablyai/orca` releases | `dluxhu/orca` releases                                                           |
-| Settings, sign-ins, projects | its profile              | the same profile and the same Keychain key                                       |
-| `orca` command               | registers `orca`         | registers `orca` too, and tells you when it takes the link from the other app    |
-| Chat CLI                     |                          | `orca chat list`, `orca chat read`, `orca chat send`                             |
-| Claude Remote Control        |                          | turn it on and off in a Claude chat tab; prompts from claude.ai show in the chat |
+|                              | Official Orca            | Orca @dLux                                 |
+| ---------------------------- | ------------------------ | ------------------------------------------ |
+| App name                     | Orca                     | Orca @dLux                                 |
+| Bundle id                    | `com.stablyai.orca`      | `com.stablyai.orca.dlux`                   |
+| Updates from                 | `stablyai/orca` releases | `dluxhu/orca` releases                     |
+| Settings, sign-ins, projects | its profile              | the same profile and the same Keychain key |
 
 On the first start, macOS asks if Orca @dLux can use the "orca Safe Storage" Keychain item.
 Select **Always Allow**. Then your stored sign-ins work in both apps.
+
+## Patches
+
+Features:
+
+- **Claude Code chat mode.** Turn Claude Remote Control on and off in a chat tab, and resume a Claude session by its id as a chat ([#3](https://github.com/dluxhu/orca/pull/3)).
+- **Chat CLI.** `orca chat list`, `orca chat read` and `orca chat send` let an agent read and message other chats ([#2](https://github.com/dluxhu/orca/pull/2)).
+- **Mention chats and terminals.** Type `@` in a chat to mention another chat or terminal of the same host ([#10](https://github.com/dluxhu/orca/pull/10)).
+- **Quote chips.** "Add to chat" quotes show as chips; a click jumps back to the quoted text and highlights it ([#12](https://github.com/dluxhu/orca/pull/12)).
+- **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
+
+Fixes:
+
+- A chat that is refused before it starts names the reason, not an unknown outcome ([#14](https://github.com/dluxhu/orca/pull/14)).
+- A chat adopts a Claude conversation that moved into its workspace after it started elsewhere ([#17](https://github.com/dluxhu/orca/pull/17)).
+- The macOS `orca` command starts the app even when its executable is not named "Orca" ([#18](https://github.com/dluxhu/orca/pull/18)).
+- Register says when it replaces the `orca` command link of another Orca app ([#19](https://github.com/dluxhu/orca/pull/19)).
+
+[docs/fork/PATCHES.md](../docs/fork/PATCHES.md) has the release order and the upstream state of each patch.
 
 ## How the fork is kept
 
