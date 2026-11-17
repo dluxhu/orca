@@ -60,14 +60,20 @@ describe('packaged CLI assets', () => {
         await writeFile(cliPath, '', 'utf8')
         if (launcherFixture.asset === darwinLauncherAsset) {
           const executableName = launcherFixture.executable.at(-1) ?? ''
-          await writeFile(join(appDir, 'Contents', 'Info.plist'), infoPlist(executableName), 'utf8')
+          const infoPlistPath = join(appDir, 'Contents', 'Info.plist')
+          await writeFile(infoPlistPath, infoPlist(executableName), 'utf8')
           if (process.platform !== 'darwin') {
-            // PlistBuddy exists only on macOS. A stub prints the executable name instead.
+            // PlistBuddy exists only on macOS. A stub prints the executable name instead,
+            // and fails for any other key or file.
             const plistBuddy = join(root, 'PlistBuddy')
-            await writeFile(plistBuddy, `#!/usr/bin/env bash\necho '${executableName}'\n`, {
-              encoding: 'utf8',
-              mode: 0o755
-            })
+            await writeFile(
+              plistBuddy,
+              `#!/usr/bin/env bash
+[ $# -eq 3 ] && [ "$1" = -c ] && [ "$2" = 'Print :CFBundleExecutable' ] && [ "$3" = '${infoPlistPath}' ] || exit 1
+echo '${executableName}'
+`,
+              { encoding: 'utf8', mode: 0o755 }
+            )
             const launcher = await readFile(launcherPath, 'utf8')
             await writeFile(
               launcherPath,
