@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { lstat, readFile, readlink } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import type { CliInstallMethod, CliInstallStatus } from '../../../shared/cli-install-types'
@@ -16,6 +16,28 @@ import { extractLegacyAppImageCliWrapperTarget } from '../appimage/legacy-appima
 
 // Match after-install.sh's electron-builder name variants when reclaiming packaged launchers.
 const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca', '/opt/orca-ide', '/opt/orca']
+
+const MAC_APP_LAUNCHER_RE = /^(.*?\.app)[/\\]Contents[/\\]Resources[/\\]bin[/\\][^/\\]+$/
+
+/** The other .app bundle that owns `target`, when `target` exists and is not in the bundle of `launcherPath`. */
+export function otherMacAppBundle(target: string | null, launcherPath: string): string | null {
+  const other = target?.match(MAC_APP_LAUNCHER_RE)?.[1]
+  // A missing app cannot take the link back.
+  if (!target || !other || !existsSync(target)) {
+    return null
+  }
+  const ours = launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1]
+  try {
+    // Another path to our own bundle is not another app. The native realpath gives the
+    // letter case on disk, so a case-insensitive disk compares the same bundle as equal.
+    return ours && existsSync(ours) && realpathSync.native(other) === realpathSync.native(ours)
+      ? null
+      : other
+  } catch {
+    // The app went away after the check: it cannot take the link back.
+    return null
+  }
+}
 
 export class CliCommandInspection extends CliInstallLocation {
   protected async inspectSymlink(
@@ -80,6 +102,7 @@ export class CliCommandInspection extends CliInstallLocation {
       }
       const resolvedCurrentTarget = resolve(dirname(commandPath), currentTarget)
       const resolvedLauncher = resolve(launcherPath)
+      const otherApp = otherMacAppBundle(resolvedCurrentTarget, resolvedLauncher)
       const isInstalled = resolvedCurrentTarget === resolvedLauncher && existsSync(resolvedLauncher)
       const isManagedStaleTarget =
         !isInstalled &&
@@ -94,9 +117,11 @@ export class CliCommandInspection extends CliInstallLocation {
         currentTarget: resolvedCurrentTarget,
         detail: isInstalled
           ? `Registered at ${commandPath}.`
-          : isManagedStaleTarget
-            ? `${commandPath} points to an older Orca launcher.`
-            : `${commandPath} points to a non-Orca launcher.`
+          : isManagedStaleTarget && otherApp
+            ? `${commandPath} belongs to another Orca app (${otherApp}). Register replaces it. To switch back, register the CLI again in that app.`
+            : isManagedStaleTarget
+              ? `${commandPath} points to an older Orca launcher.`
+              : `${commandPath} points to a non-Orca launcher.`
       })
     } catch (error) {
       if (isMissingError(error)) {
