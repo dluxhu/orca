@@ -2,35 +2,65 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   jumpToQuoteSource,
-  nativeChatQuoteMessageId,
+  nativeChatQuoteSource,
   quotedFileLocation,
   rememberNativeChatQuoteSource
 } from './native-chat-quote-sources'
 
 afterEach(() => localStorage.clear())
 
+const place = { offset: 4, length: 6, hash: 'h' }
+const source = (messageId: string) => ({ messageId, place })
+
 describe('quote sources', () => {
-  it('finds the message of a quote by its text, whitespace aside', () => {
-    rememberNativeChatQuoteSource('first line\nsecond  line', 'reply-1')
-    expect(nativeChatQuoteMessageId('first line second line')).toBe('reply-1')
-    expect(nativeChatQuoteMessageId('other text')).toBeNull()
+  it('finds the source of a quote by its text, line ends and trailing spaces aside', () => {
+    rememberNativeChatQuoteSource('  first line  \r\nsecond line\n', source('reply-1'))
+    expect(nativeChatQuoteSource('first line\nsecond line')).toEqual(source('reply-1'))
+    expect(nativeChatQuoteSource('first line second line')).toBeNull()
+    expect(nativeChatQuoteSource('other text')).toBeNull()
+  })
+
+  it('keeps quotes that differ only in symbols apart', () => {
+    rememberNativeChatQuoteSource('x & y', source('m1'))
+    rememberNativeChatQuoteSource('x y', source('m2'))
+    rememberNativeChatQuoteSource('C++', source('m3'))
+    rememberNativeChatQuoteSource('C', source('m4'))
+    expect(nativeChatQuoteSource('x & y')?.messageId).toBe('m1')
+    expect(nativeChatQuoteSource('C++')?.messageId).toBe('m3')
   })
 
   it('keeps the newest 200 sources and survives bad storage', () => {
     for (let index = 0; index < 201; index++) {
-      rememberNativeChatQuoteSource(`quote ${index}`, `m${index}`)
+      rememberNativeChatQuoteSource(`quote ${index}`, source(`m${index}`))
     }
-    expect(nativeChatQuoteMessageId('quote 0')).toBeNull()
-    expect(nativeChatQuoteMessageId('quote 200')).toBe('m200')
-    localStorage.setItem('orca.nativeChat.quoteSources.v1', '{bad')
-    expect(nativeChatQuoteMessageId('quote 200')).toBeNull()
+    expect(nativeChatQuoteSource('quote 0')).toBeNull()
+    expect(nativeChatQuoteSource('quote 200')?.messageId).toBe('m200')
+    localStorage.setItem('orca.nativeChat.quoteSources.v2', '{bad')
+    expect(nativeChatQuoteSource('quote 200')).toBeNull()
   })
 
-  it('reads the file and first line of an editor quote', () => {
-    expect(quotedFileLocation('src/a b.ts:12-20')).toEqual({ pathText: 'src/a b.ts', line: 12 })
-    expect(quotedFileLocation('README.md:3')).toEqual({ pathText: 'README.md', line: 3 })
-    expect(quotedFileLocation('Terminal')).toBeNull()
-    expect(quotedFileLocation('just some words')).toBeNull()
+  it('removes the first storage version, which held the quoted text', () => {
+    localStorage.setItem('orca.nativeChat.quoteSources.v1', '[["quoted text","m1"]]')
+    rememberNativeChatQuoteSource('new quote', source('m2'))
+    expect(localStorage.getItem('orca.nativeChat.quoteSources.v1')).toBeNull()
+    expect(localStorage.getItem('orca.nativeChat.quoteSources.v2')).not.toContain('quote')
+  })
+
+  it('reads the file of a quote only from a header line that a code fence follows', () => {
+    expect(quotedFileLocation('src/a b.ts:12-20', true)).toEqual({
+      pathText: 'src/a b.ts',
+      line: 12
+    })
+    expect(quotedFileLocation('README.md:3', true)).toEqual({ pathText: 'README.md', line: 3 })
+    expect(quotedFileLocation('README.md', true)).toEqual({ pathText: 'README.md', line: 1 })
+    expect(quotedFileLocation('Meeting Notes.md', true)).toEqual({
+      pathText: 'Meeting Notes.md',
+      line: 1
+    })
+    expect(quotedFileLocation('Terminal', true)).toBeNull()
+    for (const chat of ['v1.2', 'e.g', 'and/or', 'example.com', 'README.md:3']) {
+      expect(quotedFileLocation(chat, false)).toBeNull()
+    }
   })
 })
 
@@ -40,26 +70,29 @@ describe('jumpToQuoteSource', () => {
     openFile: vi.fn(() => true),
     notifyMissing: vi.fn()
   })
+  const fileQuote = 'src/a.ts:7-9\n```ts\nconst a = 1\n```'
 
   it('goes to the remembered message first', () => {
-    rememberNativeChatQuoteSource('quoted', 'reply-1')
+    rememberNativeChatQuoteSource(fileQuote, source('reply-1'))
     const fake = deps()
-    expect(jumpToQuoteSource('quoted', 'src/a.ts:1', fake)).toBe('message')
-    expect(fake.jumpToMessage).toHaveBeenCalledWith('reply-1', 'quoted')
+    expect(jumpToQuoteSource(fileQuote, fake)).toBe('message')
+    expect(fake.jumpToMessage).toHaveBeenCalledWith(source('reply-1'), fileQuote)
     expect(fake.openFile).not.toHaveBeenCalled()
   })
 
   it('opens the quoted file when no message is known or the message is gone', () => {
-    rememberNativeChatQuoteSource('quoted', 'gone')
+    rememberNativeChatQuoteSource(fileQuote, source('gone'))
     const fake = { ...deps(), jumpToMessage: vi.fn(() => false) }
-    expect(jumpToQuoteSource('quoted', 'src/a.ts:7-9', fake)).toBe('file')
+    expect(jumpToQuoteSource(fileQuote, fake)).toBe('file')
     expect(fake.openFile).toHaveBeenCalledWith({ pathText: 'src/a.ts', line: 7 })
   })
 
-  it('shows a notice when the quote has no source to go back to', () => {
-    const fake = deps()
-    expect(jumpToQuoteSource('typed by hand', 'typed by hand', fake)).toBe('missing')
-    expect(fake.notifyMissing).toHaveBeenCalledOnce()
-    expect(fake.jumpToMessage).not.toHaveBeenCalled()
+  it('shows a notice for a chat quote that only looks like a path', () => {
+    for (const text of ['v1.2', 'example.com', 'and/or\nmore text']) {
+      const fake = deps()
+      expect(jumpToQuoteSource(text, fake)).toBe('missing')
+      expect(fake.openFile).not.toHaveBeenCalled()
+      expect(fake.notifyMissing).toHaveBeenCalledOnce()
+    }
   })
 })

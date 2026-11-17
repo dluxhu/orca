@@ -3,8 +3,9 @@ import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcr
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
 import { showQuotedText } from './native-chat-quote-highlight'
+import type { QuoteSource } from './native-chat-quote-sources'
 
-export type NativeChatQuoteJump = (messageId: string, text: string) => boolean
+export type NativeChatQuoteJump = (source: QuoteSource, text: string) => boolean
 
 /** The transcript's jump to a quoted message; null outside a transcript. */
 export const NativeChatQuoteJumpContext = createContext<NativeChatQuoteJump | null>(null)
@@ -25,7 +26,7 @@ export function useNativeChatQuoteJump({
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
   return useCallback(
-    (messageId, text) => {
+    ({ messageId, place }, text) => {
       const index = nativeChatSlotIndexOf(slots, messageId)
       if (index === -1) {
         return false
@@ -41,7 +42,7 @@ export function useNativeChatQuoteJump({
             `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
           )
           if (source) {
-            showQuotedText(source, text)
+            showQuotedText(source, text, place)
           }
         })
       )

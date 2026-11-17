@@ -7,7 +7,7 @@ import {
   readNativeChatTranscriptSelection
 } from './native-chat-quote-selection'
 import { SelectionAddToChatPopover } from './SelectionAddToChatPopover'
-import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
+import { rememberNativeChatQuoteSource, type QuoteSource } from './native-chat-quote-sources'
 
 function copyTranscriptSelectionOnSelect(root: HTMLElement): void {
   if (!useAppStore.getState().settings?.terminalClipboardOnSelect) {
@@ -24,10 +24,10 @@ function copyTranscriptSelectionOnSelect(root: HTMLElement): void {
 export function addTranscriptQuote(
   composer: NativeChatComposerHandle | null,
   text: string,
-  messageId: string | null
+  source: QuoteSource | null
 ): void {
-  if (messageId) {
-    rememberNativeChatQuoteSource(text, messageId)
+  if (source) {
+    rememberNativeChatQuoteSource(text, source)
   }
   composer?.appendText(formatNativeChatQuote(text))
 }
@@ -41,7 +41,7 @@ export function NativeChatSelectionQuote({
   composerRef: RefObject<NativeChatComposerHandle | null>
   enabled: boolean
 }): React.JSX.Element {
-  const offeredMessageId = useRef<string | null>(null)
+  const offeredSource = useRef<QuoteSource | null>(null)
   return (
     <SelectionAddToChatPopover
       rootRef={rootRef}
@@ -50,11 +50,11 @@ export function NativeChatSelectionQuote({
         const quotable = composerRef.current?.acceptsText()
           ? readNativeChatQuotableSelection(root)
           : null
-        offeredMessageId.current = quotable?.messageId ?? null
+        offeredSource.current = quotable?.source ?? null
         return quotable
       }}
       onSelectionSettled={copyTranscriptSelectionOnSelect}
-      onAdd={(text) => addTranscriptQuote(composerRef.current, text, offeredMessageId.current)}
+      onAdd={(text) => addTranscriptQuote(composerRef.current, text, offeredSource.current)}
     />
   )
 }

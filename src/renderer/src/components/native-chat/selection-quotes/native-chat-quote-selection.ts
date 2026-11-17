@@ -1,3 +1,5 @@
+import { quotePlace } from './native-chat-quote-highlight'
+import type { QuoteSource } from './native-chat-quote-sources'
 import { markdownMathSelectionText } from '../../../../../shared/markdown-math-selection'
 
 /** Only agent-reply prose marked with this attribute may be quoted; its value is the message id. */
@@ -24,7 +26,7 @@ export function readNativeChatTranscriptSelection(root: HTMLElement): string {
 
 export function readNativeChatQuotableSelection(
   root: HTMLElement
-): { text: string; range: Range; messageId: string | null } | null {
+): { text: string; range: Range; source: QuoteSource | null } | null {
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount !== 1) {
     return null
@@ -39,7 +41,8 @@ export function readNativeChatQuotableSelection(
   if (!edges || !source || !source.contains(edges.last) || text === '') {
     return null
   }
-  return { text, range, messageId: source.getAttribute('data-native-chat-quote-source') || null }
+  const messageId = source.getAttribute('data-native-chat-quote-source')
+  return { text, range, source: messageId ? { messageId, place: quotePlace(source, range) } : null }
 }
 
 // Triple-click ranges can end outside the reply; check selected text edges instead of range endpoints.
@@ -80,6 +83,6 @@ export function quotedText(quote: string): string {
   return quote
     .trim()
     .split('\n')
-    .map((line) => line.replace(/^> ?/, ''))
+    .map((line) => line.replace(/^ {0,3}> ?/, ''))
     .join('\n')
 }

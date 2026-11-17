@@ -16,7 +16,8 @@ vi.mock('sonner', () => ({ toast: opened.toast }))
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
-import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
+import { NativeChatQuoteJumpContext, type NativeChatQuoteJump } from './use-native-chat-quote-jump'
+import { formatNativeChatQuote } from './native-chat-quote-selection'
 import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 
 afterEach(() => {
@@ -32,7 +33,7 @@ const OWNER = {
   isVisible: true
 }
 
-function sent(content: string, jump: (id: string, text: string) => boolean = () => true) {
+function sent(content: string, jump: NativeChatQuoteJump = () => true) {
   return render(
     <TooltipProvider delayDuration={0}>
       <NativeChatMarkdownImageOwnerContext.Provider value={OWNER}>
@@ -45,23 +46,38 @@ function sent(content: string, jump: (id: string, text: string) => boolean = () 
 }
 
 it('shows a sent quote as a button that jumps to its message, with no open or close state', () => {
-  rememberNativeChatQuoteSource('quoted words', 'reply-1')
+  rememberNativeChatQuoteSource('quoted\nwords', { messageId: 'reply-1', place: null })
   const jump = vi.fn(() => true)
   sent('> quoted\n> words\n\nmy reply', jump)
   const chip = screen.getByRole('button', { name: 'Quote: quoted words' })
   expect(chip).not.toHaveAttribute('aria-expanded')
   expect(screen.getByText('my reply')).toBeInTheDocument()
   fireEvent.click(chip)
-  expect(jump).toHaveBeenCalledWith('reply-1', 'quoted\nwords')
+  expect(jump).toHaveBeenCalledWith({ messageId: 'reply-1', place: null }, 'quoted\nwords')
   expect(document.querySelector('blockquote')).toBeNull()
 })
 
-it('jumps from a quote of code comment and diff lines to its message', () => {
-  rememberNativeChatQuoteSource('# a comment\n- removed line', 'reply-2')
+// Each quote, as "Add to chat" took it from a reply, and as the user sends it after their own text.
+it.each([
+  'use <div className="x">hello</div> there',
+  'a <br> b',
+  'x &amp; y',
+  '```ts\nconst a = 1\n```',
+  '# a comment\n- removed line',
+  '- removed',
+  '1. step',
+  'v1.2',
+  'const x = 1',
+  'C++',
+  '  indented code\n\n  more'
+])('jumps from the sent quote of %j to its message', (quote) => {
+  const place = { offset: 2, length: 5, hash: 'h' }
+  rememberNativeChatQuoteSource(quote, { messageId: 'reply-2', place })
   const jump = vi.fn(() => true)
-  sent('> # a comment\n> - removed line\n\nreply', jump)
-  fireEvent.click(screen.getByRole('button', { name: /^Quote: a comment/ }))
-  expect(jump).toHaveBeenCalledWith('reply-2', expect.stringContaining('removed line'))
+  sent(`my words\n\n${formatNativeChatQuote(quote)}reply`, jump)
+  fireEvent.click(screen.getByRole('button', { name: /^Quote: / }))
+  expect(jump).toHaveBeenCalledWith({ messageId: 'reply-2', place }, quote.trim())
+  expect(opened.toast).not.toHaveBeenCalled()
 })
 
 it('shows the full quoted text when the chip has keyboard focus', async () => {

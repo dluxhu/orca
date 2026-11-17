@@ -27,7 +27,10 @@ import { remarkNativeChatFileDestinations } from './native-chat-markdown-file-de
 import { NativeChatLinkPeek } from '../links/previews/NativeChatLinkPeek'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
-import { NativeChatSentQuote } from '../selection-quotes/NativeChatSentQuote'
+import {
+  NativeChatQuoteContentContext,
+  NativeChatSentQuote
+} from '../selection-quotes/NativeChatSentQuote'
 import { remarkNativeChatQuoteBlankLines } from './native-chat-quote-blank-lines'
 import './native-chat-markdown.css'
 
@@ -162,30 +165,32 @@ export function NativeChatMarkdown({
   const { githubRepo } = useContext(NativeChatLinkPeekContext)
   return (
     <NativeChatMarkdownRowKeyContext.Provider value={rowKey}>
-      <CommentMarkdown
-        {...props}
-        variant={variant}
-        growing={growing || streaming}
-        // Only the document variant's links can peek; bare #123 links follow it.
-        githubRepo={variant === 'document' ? githubRepo?.referenceRepo : undefined}
-        onLinkClick={onLinkClick}
-        allowFileUriLinks={onLinkClick !== undefined}
-        content={
-          visualExtension && streaming
-            ? withoutPendingNativeChatVisualDirectiveTail(content)
-            : content
-        }
-        math
-        extension={extension}
-        fileLinkExists={fileLinkExists}
-        fadeWords={fadeWords}
-        renderMermaid={!streaming}
-        keepMermaidSourceWhilePending
-        unknownHtmlAsText
-        data-word-fade={wordFadeArmed ? '' : undefined}
-        data-block-fade={wordFadeArmed && streaming ? '' : undefined}
-        className={cn('native-chat-markdown', className)}
-      />
+      <NativeChatQuoteContentContext.Provider value={quoteChips ? content : null}>
+        <CommentMarkdown
+          {...props}
+          variant={variant}
+          growing={growing || streaming}
+          // Only the document variant's links can peek; bare #123 links follow it.
+          githubRepo={variant === 'document' ? githubRepo?.referenceRepo : undefined}
+          onLinkClick={onLinkClick}
+          allowFileUriLinks={onLinkClick !== undefined}
+          content={
+            visualExtension && streaming
+              ? withoutPendingNativeChatVisualDirectiveTail(content)
+              : content
+          }
+          math
+          extension={extension}
+          fileLinkExists={fileLinkExists}
+          fadeWords={fadeWords}
+          renderMermaid={!streaming}
+          keepMermaidSourceWhilePending
+          unknownHtmlAsText
+          data-word-fade={wordFadeArmed ? '' : undefined}
+          data-block-fade={wordFadeArmed && streaming ? '' : undefined}
+          className={cn('native-chat-markdown', className)}
+        />
+      </NativeChatQuoteContentContext.Provider>
     </NativeChatMarkdownRowKeyContext.Provider>
   )
 }

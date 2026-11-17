@@ -9,7 +9,7 @@ import type { NativeChatComposerHandle } from '../composer/native-chat-composer-
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatSelectionQuote } from './NativeChatSelectionQuote'
 import { nativeChatQuoteSourceProps } from './native-chat-quote-selection'
-import { nativeChatQuoteMessageId } from './native-chat-quote-sources'
+import { nativeChatQuoteSource, textHash } from './native-chat-quote-sources'
 
 vi.mock('@/i18n/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof I18n>()),
@@ -107,7 +107,15 @@ describe('NativeChatSelectionQuote', () => {
     releaseSelection(screen.getByTestId('first'))
     fireEvent.click(screen.getByRole('button', { name: 'Add to chat' }))
     expect(appendText).toHaveBeenCalledWith('> Use the draft store.\n>\n> It already appends.\n\n')
-    expect(nativeChatQuoteMessageId('Use the draft store. It already appends.')).toBe('reply-1')
+    // The place is in the reply element's own text.
+    expect(nativeChatQuoteSource('Use the draft store.\n\nIt already appends.')).toEqual({
+      messageId: 'reply-1',
+      place: {
+        offset: 0,
+        length: 41,
+        hash: textHash('Use the draft store.\n\nIt already appends.')
+      }
+    })
   })
 })
 

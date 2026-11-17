@@ -1,4 +1,4 @@
-import { useContext } from 'react'
+import { createContext, useContext } from 'react'
 import { Quote } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,33 @@ import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
+import { quotedText } from './native-chat-quote-selection'
+import { CommentMarkdownBlockLineContext } from '@/components/sidebar/comment-markdown-code-renderers'
 
-type HastNode = { type: string; tagName?: string; value?: string; children?: HastNode[] }
+type HastNode = {
+  type: string
+  value?: string
+  children?: HastNode[]
+  position?: { start: { line: number }; end: { line: number } }
+}
+
+/** The Markdown of the message that holds the sent quotes; null where no message gives it. */
+export const NativeChatQuoteContentContext = createContext<string | null>(null)
+
+/** The quote's lines in the message, without the `>` marks: the text "Add to chat" wrote. */
+function quoteSourceText(
+  content: string | null,
+  blockLine: number,
+  node?: HastNode
+): string | null {
+  const position = node?.position
+  if (content === null || !position) {
+    return null
+  }
+  const first = blockLine - 1 + position.start.line - 1
+  const last = blockLine - 1 + position.end.line
+  return quotedText(content.split('\n').slice(first, last).join('\n'))
+}
 
 function hastText(node: HastNode | undefined): string {
   return node?.type === 'text' ? (node.value ?? '') : (node?.children ?? []).map(hastText).join('')
@@ -40,7 +65,12 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
   const jumpToMessage = useContext(NativeChatQuoteJumpContext)
   const fileLinkContext = useContext(NativeChatMarkdownImageOwnerContext)?.fileLinkContext ?? null
   const text = hastText(node).trim()
-  const firstLine = hastText(node?.children?.find((child) => child.tagName === 'p'))
+  const sourceText =
+    quoteSourceText(
+      useContext(NativeChatQuoteContentContext),
+      useContext(CommentMarkdownBlockLineContext),
+      node
+    ) ?? text
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -50,7 +80,7 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           size="xs"
           className="my-1 max-w-full"
           onClick={() =>
-            jumpToQuoteSource(text, firstLine, {
+            jumpToQuoteSource(sourceText, {
               jumpToMessage,
               openFile: (location) => openQuotedFile(location, fileLinkContext),
               notifyMissing: () =>

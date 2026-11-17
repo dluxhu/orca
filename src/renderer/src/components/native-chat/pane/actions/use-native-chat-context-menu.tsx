@@ -295,7 +295,7 @@ export function useNativeChatContextMenu({
             target={target}
             onQuote={(text) => {
               flushSync(() => setState((prev) => ({ ...prev, open: false })))
-              addTranscriptQuote(composerRef.current, text, target.quoteMessageId)
+              addTranscriptQuote(composerRef.current, text, target.quoteSource)
             }}
             rewind={rewind}
           />

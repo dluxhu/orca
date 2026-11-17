@@ -21,6 +21,7 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
     '<div data-index="0"><div data-index="1">a tool step</div></div>' +
     '<div data-index="1"><div data-native-chat-quote-source="reply-1">The quoted text.</div></div>'
   const issue = vi.fn()
+  const place = { offset: 4, length: 11, hash: 'h' }
   const beginNavigation = vi.fn()
   const readerLeavesEnd = vi.fn()
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
@@ -37,9 +38,9 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
       readerLeavesEnd
     })
   )
-  expect(result.current('missing', 'x')).toBe(false)
+  expect(result.current({ messageId: 'missing', place: null }, 'x')).toBe(false)
   expect(issue).not.toHaveBeenCalled()
-  expect(result.current('reply-1', 'quoted text')).toBe(true)
+  expect(result.current({ messageId: 'reply-1', place }, 'quoted text')).toBe(true)
   expect(beginNavigation).toHaveBeenCalledOnce()
   expect(readerLeavesEnd).toHaveBeenCalledOnce()
   expect(issue).toHaveBeenCalledWith({ kind: 'rail', messageId: 'reply-1', requestId: 7 })
@@ -48,6 +49,7 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
   vi.advanceTimersToNextFrame()
   expect(shown).toHaveBeenCalledWith(
     scroller.querySelector('[data-native-chat-quote-source="reply-1"]'),
-    'quoted text'
+    'quoted text',
+    place
   )
 })
