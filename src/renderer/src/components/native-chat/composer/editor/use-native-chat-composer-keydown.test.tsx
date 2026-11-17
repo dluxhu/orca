@@ -188,12 +188,14 @@ describe('useNativeChatComposerKeyDown', () => {
         sendWithModEnter,
         draft = 'hello',
         composing = false,
-        menuOpen = false
+        menuOpen = false,
+        launchPrompt = false
       }: {
         sendWithModEnter: boolean
         draft?: string
         composing?: boolean
         menuOpen?: boolean
+        launchPrompt?: boolean
       }
     ) {
       useAppStore.setState({
@@ -217,6 +219,7 @@ describe('useNativeChatComposerKeyDown', () => {
           send,
           steerHead,
           chordSteersHead: true,
+          launchPrompt,
           setActiveSuggestion: vi.fn(),
           setDraft: vi.fn(),
           setCaret: vi.fn()
@@ -273,6 +276,15 @@ describe('useNativeChatComposerKeyDown', () => {
       const steer = press({ ...mod, shiftKey: true }, on)
       expect(steer.send).not.toHaveBeenCalled()
       expect(steer.steerHead).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps Enter as the send in a launch prompt while the option is on', () => {
+      // The launch panel takes Cmd/Ctrl+Enter for the other surface, so only Enter launches.
+      const enter = press({}, { sendWithModEnter: true, launchPrompt: true })
+      expect(enter.claimed).toBe(true)
+      expect(enter.send.mock.calls).toEqual([[]])
+      const shiftEnter = press({ shiftKey: true }, { sendWithModEnter: true, launchPrompt: true })
+      expect(shiftEnter.send).not.toHaveBeenCalled()
     })
 
     it.each([false, true])('picks the menu item with Enter, option on: %s', (sendWithModEnter) => {

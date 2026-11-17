@@ -20,7 +20,11 @@ import {
 } from '../../../../../shared/native-chat/native-chat-appearance-settings'
 import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
-import { getChatBehaviorEntriesByKey, getChatBehaviorTitle } from './chat-behavior-search'
+import {
+  getChatBehaviorEntriesByKey,
+  getChatBehaviorTitle,
+  getQueueFollowUpsDescription
+} from './chat-behavior-search'
 import { getChatPermissionSearchEntry } from './chat-permission-search'
 import { matchesSettingsSearch } from '../search/settings-search'
 
@@ -143,7 +147,7 @@ export function ChatBehaviorSetting({
         >
           <SettingsSwitchRow
             label={entries.queueFollowUps.title}
-            description={entries.queueFollowUps.description}
+            description={getQueueFollowUpsDescription(sendWithModEnter)}
             checked={queueFollowUps}
             ariaLabel={entries.queueFollowUps.title}
             onChange={() => updateSettings({ nativeChatQueueFollowUps: !queueFollowUps })}

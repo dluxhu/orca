@@ -19169,7 +19169,6 @@
       "composer": {
         "planMode": "Planificar",
         "imageUnavailable": "Vista previa no disponible",
-        "placeholderSendWithModEnter": "Pregunta lo que quieras, @ para referenciar archivos, / para comandos, {{shortcut}} para enviar",
         "send": "Enviar",
         "alternateSteerHint": "{{shortcut}} para enviar ahora",
         "previewQueue": "Poner en cola",
@@ -20451,11 +20450,7 @@
         "turnDiffsTitle": "Diferencias de turnos",
         "turnDiffsCopy": "Muestra debajo de la respuesta los archivos modificados en cada turno, con el número de líneas.",
         "turnDiffsSearchChangedFiles": "archivos modificados",
-        "turnDiffsSearchEdits": "ediciones",
-        "sendWithModEnterTitle": "Enviar con {{shortcut}}",
-        "sendWithModEnterCopy": "Intro añade una línea nueva en lugar de enviar. La otra forma de enviar, poner en cola o enviar ahora, pasa a {{shortcut}}.",
-        "sendWithModEnterSearchNewLine": "línea nueva",
-        "sendWithModEnterSearchShortcut": "atajo de teclado"
+        "turnDiffsSearchEdits": "ediciones"
       },
       "TerminalInteraction": {
         "copyTrimsGutterDescription": "Elimina el margen izquierdo tras el que se dibuja la salida del agente, para que el texto copiado no quede indentado. Solo se quita la indentación que comparten todas las líneas seleccionadas.",

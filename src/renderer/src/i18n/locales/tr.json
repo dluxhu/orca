@@ -19591,7 +19591,6 @@
           "xhigh": "Çok yüksek"
         },
         "imageUnavailable": "Önizleme kullanılamıyor",
-        "placeholderSendWithModEnter": "Bir şey sorun; dosyalara başvurmak için @, komutlar için /, göndermek için {{shortcut}} kullanın",
         "exitPlanMode": "Plan modundan çık",
         "moreControls": "Diğer sohbet kontrolleri"
       },
@@ -20656,11 +20655,7 @@
         "turnDiffsTitle": "Tur farkları",
         "turnDiffsCopy": "Her turun değiştirdiği dosyaları satır sayılarıyla yanıtın altında gösterir.",
         "turnDiffsSearchChangedFiles": "değişen dosyalar",
-        "turnDiffsSearchEdits": "düzenlemeler",
-        "sendWithModEnterTitle": "{{shortcut}} ile gönder",
-        "sendWithModEnterCopy": "Enter göndermek yerine yeni satır ekler. Diğer gönderme yolu, sıraya alma veya yönlendirme, {{shortcut}} kısayoluna geçer.",
-        "sendWithModEnterSearchNewLine": "yeni satır",
-        "sendWithModEnterSearchShortcut": "klavye kısayolu"
+        "turnDiffsSearchEdits": "düzenlemeler"
       },
       "voice": {
         "dictationLanguage": {

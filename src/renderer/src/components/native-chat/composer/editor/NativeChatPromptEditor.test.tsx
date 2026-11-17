@@ -32,6 +32,23 @@ function setup(value = '') {
 }
 
 describe('native chat skill editor', () => {
+  it('names the text box after the current placeholder', () => {
+    const { rerender, container } = setup()
+    const textbox = within(container).getByRole('textbox')
+    expect(textbox.getAttribute('aria-label')).toBe('Message')
+    rerender(
+      <NativeChatPromptEditor
+        inputRef={createRef<NativeChatComposerInput>()}
+        initialValue=""
+        disabled={false}
+        placeholder="Message, ⌘ Enter to send"
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+    expect(textbox.getAttribute('aria-label')).toBe('Message, ⌘ Enter to send')
+  })
+
   it('continues replacing the selected text after a composer handoff', () => {
     const inputRef = createRef<NativeChatComposerInput>()
     const text = 'Hello\nworld'

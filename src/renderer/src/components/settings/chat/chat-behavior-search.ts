@@ -144,6 +144,17 @@ export const getChatBehaviorEntriesByKey = createLocalizedCatalog(() => ({
   }
 }))
 
+/** The queue row names the chord that sends the other way: Cmd/Ctrl+Alt+Enter while Cmd/Ctrl+Enter sends. */
+export function getQueueFollowUpsDescription(sendWithModEnter: boolean): string {
+  return sendWithModEnter
+    ? translate(
+        'components.settings.nativeChat.followUpBehaviorCopyModEnter',
+        'Messages sent while the agent works wait as cards until the turn ends, instead of going into the running turn. {{shortcut}} does the opposite for one message, and with nothing typed steers the first waiting card into the running turn. Messages with images wait as cards too.',
+        { shortcut: getScreenSubmitAltShortcutLabel() }
+      )
+    : getChatBehaviorEntriesByKey().queueFollowUps.description
+}
+
 export function getChatBehaviorSearchEntries(t?: Translate): SettingsSearchEntry[] {
   return [{ title: getChatBehaviorTitle(t) }, ...Object.values(getChatBehaviorEntriesByKey())]
 }

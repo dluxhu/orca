@@ -20804,7 +20804,6 @@
           "xhigh": "Extra alto"
         },
         "imageUnavailable": "Prévia indisponível",
-        "placeholderSendWithModEnter": "Enviar uma mensagem… {{shortcut}} para enviar",
         "exitPlanMode": "Sair do modo de planejamento",
         "moreControls": "Mais controles do chat"
       },
@@ -22208,10 +22207,6 @@
         "turnDiffsCopy": "Mostra os arquivos alterados em cada turno, com contagens de linhas, abaixo da resposta.",
         "turnDiffsSearchChangedFiles": "arquivos alterados",
         "turnDiffsSearchEdits": "edições",
-        "sendWithModEnterTitle": "Enviar com {{shortcut}}",
-        "sendWithModEnterCopy": "Enter adiciona uma nova linha em vez de enviar. A outra forma de enviar, colocar na fila ou orientar, passa para {{shortcut}}.",
-        "sendWithModEnterSearchNewLine": "nova linha",
-        "sendWithModEnterSearchShortcut": "atalho de teclado",
         "linkPreviewsToggleLabel": "Alternar visualizações de links",
         "linkPreviewsTitle": "Visualizações de links",
         "linkPreviewsCopy": "Ao passar o mouse sobre um link, aparece um cartão de prévia. O Orca busca a página para criá-lo, então o site pode ver a solicitação.",

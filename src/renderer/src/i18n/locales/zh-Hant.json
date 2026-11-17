@@ -19351,7 +19351,6 @@
           "xhigh": "極高"
         },
         "imageUnavailable": "無法預覽",
-        "placeholderSendWithModEnter": "隨心輸入，@ 引用檔案，/ 使用命令，{{shortcut}} 傳送",
         "moreControls": "更多聊天控制項",
         "exitPlanMode": "結束計畫模式"
       },
@@ -20364,11 +20363,7 @@
         "turnDiffsTitle": "回合差異",
         "turnDiffsCopy": "在回覆下方顯示每個回合變更的檔案及行數。",
         "turnDiffsSearchChangedFiles": "已變更檔案",
-        "turnDiffsSearchEdits": "編輯",
-        "sendWithModEnterTitle": "使用 {{shortcut}} 傳送",
-        "sendWithModEnterCopy": "Enter 會換行而不傳送。另一種傳送方式（排入佇列或引導）改用 {{shortcut}}。",
-        "sendWithModEnterSearchNewLine": "換行",
-        "sendWithModEnterSearchShortcut": "鍵盤快捷鍵"
+        "turnDiffsSearchEdits": "編輯"
       },
       "voice": {
         "dictationLanguage": {

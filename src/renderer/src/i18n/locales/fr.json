@@ -19442,7 +19442,6 @@
       "composer": {
         "planMode": "Planifier",
         "imageUnavailable": "Aperçu indisponible",
-        "placeholderSendWithModEnter": "Posez votre question, @ pour référencer des fichiers, / pour les commandes, {{shortcut}} pour envoyer",
         "send": "Envoyer",
         "alternateSteerHint": "{{shortcut}} pour envoyer maintenant",
         "previewQueue": "Mettre en file",
@@ -20830,11 +20829,7 @@
         "turnDiffsTitle": "Différences des tours",
         "turnDiffsCopy": "Affiche sous la réponse les fichiers modifiés à chaque tour, avec les nombres de lignes.",
         "turnDiffsSearchChangedFiles": "fichiers modifiés",
-        "turnDiffsSearchEdits": "modifications",
-        "sendWithModEnterTitle": "Envoyer avec {{shortcut}}",
-        "sendWithModEnterCopy": "Entrée ajoute une nouvelle ligne au lieu d’envoyer. L’autre façon d’envoyer, mettre en file ou envoyer maintenant, passe à {{shortcut}}.",
-        "sendWithModEnterSearchNewLine": "nouvelle ligne",
-        "sendWithModEnterSearchShortcut": "raccourci clavier"
+        "turnDiffsSearchEdits": "modifications"
       },
       "voice": {
         "dictationLanguage": {

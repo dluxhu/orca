@@ -18867,7 +18867,6 @@
           "xhigh": "最高"
         },
         "imageUnavailable": "プレビューを利用できません",
-        "placeholderSendWithModEnter": "何でも聞いてください。@ でファイルを参照、/ でコマンドを実行、{{shortcut}} で送信",
         "sessionAttachmentsStarting": "{{agent}} のチャットを起動中です。開くまで待ってから、ファイルを再度添付してください。",
         "sessionAttachmentsFailed": "{{agent}} チャットを開けませんでした。チャットで [再試行] を使用して、ファイルを再度添付してください。",
         "moreControls": "その他のチャット操作",
@@ -19976,11 +19975,7 @@
         "turnDiffsTitle": "ターンの差分",
         "turnDiffsCopy": "各ターンで変更したファイルを行数とともに応答の下に表示します。",
         "turnDiffsSearchChangedFiles": "変更されたファイル",
-        "turnDiffsSearchEdits": "編集",
-        "sendWithModEnterTitle": "{{shortcut}} で送信",
-        "sendWithModEnterCopy": "Enter は送信せずに改行します。もう一方の送信方法（キューに入れる、または今すぐ送信）は {{shortcut}} に移ります。",
-        "sendWithModEnterSearchNewLine": "改行",
-        "sendWithModEnterSearchShortcut": "キーボードショートカット"
+        "turnDiffsSearchEdits": "編集"
       },
       "voice": {
         "dictationLanguage": {
