@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 
-import { copyFile, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -22,17 +22,17 @@ const unixLauncherFixtures = [
     executable: ['orca-ide'],
     cli: ['resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   },
-  {
-    name: 'macOS',
+  // Two executable names, so a launcher that hardcodes one name fails.
+  ...['Example App', 'Other Name'].map((executableName) => ({
+    name: `macOS (${executableName})`,
     asset: darwinLauncherAsset,
     appDir: ['Example App.app'],
     launcher: ['Contents', 'Resources', 'bin', 'orca'],
     // The executable name follows productName; the launcher reads it from Info.plist.
-    executable: ['Contents', 'MacOS', 'Example App'],
+    executable: ['Contents', 'MacOS', executableName],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
-  }
-  // The macOS launcher needs PlistBuddy, so it runs only on macOS.
-].filter((fixture) => fixture.name !== 'macOS' || process.platform === 'darwin')
+  }))
+]
 
 function infoPlist(executable: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -58,12 +58,23 @@ describe('packaged CLI assets', () => {
         await mkdir(dirname(cliPath), { recursive: true })
         await copyFile(launcherFixture.asset, launcherPath)
         await writeFile(cliPath, '', 'utf8')
-        if (launcherFixture.name === 'macOS') {
-          await writeFile(
-            join(appDir, 'Contents', 'Info.plist'),
-            infoPlist(launcherFixture.executable.at(-1) ?? ''),
-            'utf8'
-          )
+        if (launcherFixture.asset === darwinLauncherAsset) {
+          const executableName = launcherFixture.executable.at(-1) ?? ''
+          await writeFile(join(appDir, 'Contents', 'Info.plist'), infoPlist(executableName), 'utf8')
+          if (process.platform !== 'darwin') {
+            // PlistBuddy exists only on macOS. A stub prints the executable name instead.
+            const plistBuddy = join(root, 'PlistBuddy')
+            await writeFile(plistBuddy, `#!/usr/bin/env bash\necho '${executableName}'\n`, {
+              encoding: 'utf8',
+              mode: 0o755
+            })
+            const launcher = await readFile(launcherPath, 'utf8')
+            await writeFile(
+              launcherPath,
+              launcher.replace('/usr/libexec/PlistBuddy', plistBuddy),
+              'utf8'
+            )
+          }
         }
         await writeFile(
           electronPath,
