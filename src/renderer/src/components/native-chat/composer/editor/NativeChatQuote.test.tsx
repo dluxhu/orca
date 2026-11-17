@@ -76,22 +76,22 @@ describe('quote chips in the composer', () => {
       editor.commands.setTextSelection(1)
       editor.commands.insertContent('above')
     })
-    expect(input.value).toBe('above\n> q\n\n')
+    expect(input.value).toBe('above\n\n> q\n\n')
     // The caret stays after the typed text, not on the chip's line.
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
     act(() => {
       editor.commands.insertContent('!')
     })
-    expect(input.value).toBe('above!\n> q\n\n')
+    expect(input.value).toBe('above!\n\n> q\n\n')
     act(() => {
-      input.setSelectionRange('above!\n> q'.length, 'above!\n> q'.length)
+      input.setSelectionRange('above!\n\n> q'.length, 'above!\n\n> q'.length)
       editor.commands.insertContent('below')
     })
-    expect(input.value).toBe('above!\n> q\n\nbelow\n\n')
+    expect(input.value).toBe('above!\n\n> q\n\nbelow\n\n')
     act(() => {
       editor.commands.insertContent('?')
     })
-    expect(input.value).toBe('above!\n> q\n\nbelow?\n\n')
+    expect(input.value).toBe('above!\n\n> q\n\nbelow?\n\n')
   })
 
   it('keeps a blank line between the chip and the text below it', () => {

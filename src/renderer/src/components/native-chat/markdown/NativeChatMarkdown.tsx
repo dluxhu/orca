@@ -28,6 +28,7 @@ import { NativeChatLinkPeek } from '../links/previews/NativeChatLinkPeek'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
 import { NativeChatSentQuote } from '../selection-quotes/NativeChatSentQuote'
+import { remarkNativeChatQuoteBlankLines } from './native-chat-quote-blank-lines'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -147,7 +148,11 @@ export function NativeChatMarkdown({
         ? createNativeChatImageExtension(visualExtension, onLinkClick)
         : withFileDestinations(visualExtension)
     return quoteChips
-      ? { ...base, components: { ...base.components, blockquote: NativeChatSentQuote } }
+      ? {
+          ...base,
+          remarkPlugins: [...base.remarkPlugins, remarkNativeChatQuoteBlankLines],
+          components: { ...base.components, blockquote: NativeChatSentQuote }
+        }
       : base
   }, [onLinkClick, quoteChips, variant, visualExtension])
   const fileLinkExists = useNativeChatFileLinkExists(
