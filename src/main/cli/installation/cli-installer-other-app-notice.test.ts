@@ -24,10 +24,10 @@ async function writeLauncher(
   return { resourcesPath, launcher }
 }
 
-// Fork patch: both apps own `orca`, so the fork says when it takes the link from the other app.
+// Two Orca apps can own `orca`. Register says when it takes the link from the other app.
 describe('CLI link owned by another Orca app', () => {
   it('finds the other .app bundle only when it differs from ours', () => {
-    const ours = '/Applications/Orca @dLux.app/Contents/Resources/bin/orca'
+    const ours = '/Applications/Orca Beta.app/Contents/Resources/bin/orca'
     expect(otherMacAppBundle('/Applications/Orca.app/Contents/Resources/bin/orca', ours)).toBe(
       '/Applications/Orca.app'
     )
@@ -40,20 +40,20 @@ describe('CLI link owned by another Orca app', () => {
     'warns before it replaces the link, and says what it replaced after',
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-cli-other-app-'))
-      const officialApp = join(root, 'Orca.app')
-      const official = await writeLauncher(officialApp)
-      const fork = await writeLauncher(join(root, 'Orca @dLux.app'))
+      const otherApp = join(root, 'Orca.app')
+      const other = await writeLauncher(otherApp)
+      const ours = await writeLauncher(join(root, 'Orca Beta.app'))
       const bin = join(root, 'usr', 'local', 'bin')
       await mkdir(bin, { recursive: true })
       const commandPath = join(bin, 'orca')
-      await symlink(official.launcher, commandPath)
+      await symlink(other.launcher, commandPath)
 
       const installer = new CliInstaller({
         platform: 'darwin',
         isPackaged: true,
-        resourcesPath: fork.resourcesPath,
+        resourcesPath: ours.resourcesPath,
         userDataPath: join(root, 'userData'),
-        execPath: join(root, 'Orca @dLux.app', 'Contents', 'MacOS', 'Orca'),
+        execPath: join(root, 'Orca Beta.app', 'Contents', 'MacOS', 'Orca'),
         appPath: join(root, 'app'),
         homePath: join(root, 'home'),
         defaultMacCommandPath: commandPath,
@@ -63,14 +63,14 @@ describe('CLI link owned by another Orca app', () => {
       const before = await installer.getStatus()
       expect(before.state).toBe('stale')
       expect(before.detail).toBe(
-        `${commandPath} belongs to another Orca app (${officialApp}). Register replaces it. To switch back, register the CLI again in that app.`
+        `${commandPath} belongs to another Orca app (${otherApp}). Register replaces it. To switch back, register the CLI again in that app.`
       )
 
       const after = await installer.install()
       expect(after.state).toBe('installed')
-      expect(await readlink(commandPath)).toBe(fork.launcher)
+      expect(await readlink(commandPath)).toBe(ours.launcher)
       expect(after.detail).toBe(
-        `Replaced the ${commandPath} link to ${officialApp}. To switch back, register the CLI again in that app.`
+        `Replaced the ${commandPath} link to ${otherApp}. To switch back, register the CLI again in that app.`
       )
     }
   )

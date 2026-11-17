@@ -70,7 +70,7 @@ export function useCliRegistrationActions({
           'Registered `{{value0}}` in PATH.',
           { value0: next.commandName }
         ),
-        // Fork patch: says which other Orca app lost the command. See docs/fork/PATCHES.md.
+        // Says which other Orca app lost the command.
         next.detail?.startsWith('Replaced ') ? { description: next.detail } : undefined
       )
     } catch (error) {

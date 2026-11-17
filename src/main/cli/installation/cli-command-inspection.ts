@@ -19,7 +19,7 @@ const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca', '/opt/orca-ide', '/opt
 
 const MAC_APP_LAUNCHER_RE = /^(.*?\.app)[/\\]Contents[/\\]Resources[/\\]bin[/\\][^/\\]+$/
 
-/** The other .app bundle that owns `target`, when it is not the bundle of `launcherPath`. Fork patch: see docs/fork/PATCHES.md. */
+/** The other .app bundle that owns `target`, when it is not the bundle of `launcherPath`. */
 export function otherMacAppBundle(target: string | null, launcherPath: string): string | null {
   const other = target?.match(MAC_APP_LAUNCHER_RE)?.[1] ?? null
   return other && other !== launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1] ? other : null
