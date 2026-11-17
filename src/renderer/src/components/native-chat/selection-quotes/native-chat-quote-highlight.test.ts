@@ -108,3 +108,14 @@ it('keeps the highlight of a second jump when the first one times out', () => {
   vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS)
   expect(highlights.has('native-chat-quote-jump')).toBe(false)
 })
+
+it('keeps the part of a selection that is in the reply when it starts before the reply', () => {
+  const page = element('<p>Your prompt</p><div data-reply="">The reply text.</div>')
+  const reply = page.querySelector<HTMLElement>('[data-reply]')!
+  const range = document.createRange()
+  range.setStart(page.querySelector('p')!.firstChild!, 5)
+  range.setEnd(reply.firstChild!, 'The reply'.length)
+  const place = quotePlace(reply, range)
+  expect(place.offset).toBe(0)
+  expect(placeRange(reply, place)?.toString()).toBe('The reply')
+})

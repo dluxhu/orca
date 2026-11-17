@@ -1,7 +1,7 @@
 // Where a quote came from. The app's windows on this computer share this list, and it stays after a
 // restart. It holds short hashes of the quoted text, not the text. The agent never gets it.
 const STORAGE_KEY = 'orca.nativeChat.quoteSources.v2'
-// The first version stored the quoted text itself; no copy of it may stay on disk.
+// Version 1 holds quoted text. Remove it, so that no copy stays on disk.
 const OLD_STORAGE_KEY = 'orca.nativeChat.quoteSources.v1'
 const LIMIT = 200
 
@@ -101,7 +101,7 @@ export function quotedFileLocation(
   if (lines) {
     return { pathText: lines[1], line: Number(lines[2]) }
   }
-  // shortcut: a terminal quote has a title and a fence too; a title with a folder or an extension opens as a file.
+  // shortcut: a terminal quote has a title and a fence too; a title with a folder or an extension opens as a file, keep the source kind of a quote if a terminal title must not open as a file.
   return !text.includes(':') && /\/|\.[A-Za-z0-9]+$/.test(text) ? { pathText: text, line: 1 } : null
 }
 

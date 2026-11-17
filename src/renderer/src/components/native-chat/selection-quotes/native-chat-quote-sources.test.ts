@@ -61,6 +61,7 @@ describe('quote sources', () => {
       line: 1
     })
     expect(quotedFileLocation('Terminal', true)).toBeNull()
+    expect(quotedFileLocation('user@host: ~/Src/orca', true)).toBeNull()
     for (const chat of ['v1.2', 'e.g', 'and/or', 'example.com', 'README.md:3']) {
       expect(quotedFileLocation(chat, false)).toBeNull()
     }
