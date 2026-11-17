@@ -17,6 +17,14 @@ import { extractLegacyAppImageCliWrapperTarget } from '../appimage/legacy-appima
 // Match after-install.sh's electron-builder name variants when reclaiming packaged launchers.
 const PACKAGED_LINUX_LAUNCHER_DIRECTORIES = ['/opt/Orca', '/opt/orca-ide', '/opt/orca']
 
+const MAC_APP_LAUNCHER_RE = /^(.*?\.app)[/\\]Contents[/\\]Resources[/\\]bin[/\\][^/\\]+$/
+
+/** The other .app bundle that owns `target`, when it is not the bundle of `launcherPath`. */
+export function otherMacAppBundle(target: string | null, launcherPath: string): string | null {
+  const other = target?.match(MAC_APP_LAUNCHER_RE)?.[1] ?? null
+  return other && other !== launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1] ? other : null
+}
+
 export class CliCommandInspection extends CliInstallLocation {
   protected async inspectSymlink(
     commandPath: string,
@@ -80,6 +88,7 @@ export class CliCommandInspection extends CliInstallLocation {
       }
       const resolvedCurrentTarget = resolve(dirname(commandPath), currentTarget)
       const resolvedLauncher = resolve(launcherPath)
+      const otherApp = otherMacAppBundle(resolvedCurrentTarget, resolvedLauncher)
       const isInstalled = resolvedCurrentTarget === resolvedLauncher && existsSync(resolvedLauncher)
       const isManagedStaleTarget =
         !isInstalled &&
@@ -94,9 +103,11 @@ export class CliCommandInspection extends CliInstallLocation {
         currentTarget: resolvedCurrentTarget,
         detail: isInstalled
           ? `Registered at ${commandPath}.`
-          : isManagedStaleTarget
-            ? `${commandPath} points to an older Orca launcher.`
-            : `${commandPath} points to a non-Orca launcher.`
+          : isManagedStaleTarget && otherApp
+            ? `${commandPath} belongs to another Orca app (${otherApp}). Register replaces it. To switch back, register the CLI again in that app.`
+            : isManagedStaleTarget
+              ? `${commandPath} points to an older Orca launcher.`
+              : `${commandPath} points to a non-Orca launcher.`
       })
     } catch (error) {
       if (isMissingError(error)) {
