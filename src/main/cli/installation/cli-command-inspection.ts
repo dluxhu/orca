@@ -27,8 +27,16 @@ export function otherMacAppBundle(target: string | null, launcherPath: string): 
     return null
   }
   const ours = launcherPath.match(MAC_APP_LAUNCHER_RE)?.[1]
-  // Another path to our own bundle is not another app.
-  return ours && existsSync(ours) && realpathSync(other) === realpathSync(ours) ? null : other
+  try {
+    // Another path to our own bundle is not another app. The native realpath gives the
+    // letter case on disk, so a case-insensitive disk compares the same bundle as equal.
+    return ours && existsSync(ours) && realpathSync.native(other) === realpathSync.native(ours)
+      ? null
+      : other
+  } catch {
+    // The app went away after the check: it cannot take the link back.
+    return null
+  }
 }
 
 export class CliCommandInspection extends CliInstallLocation {
