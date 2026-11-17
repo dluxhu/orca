@@ -8,6 +8,8 @@ import {
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'
+import { useAppStore } from '@/store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
 import {
   nativeChatMentionItems,
   type NativeChatMentionFiles
@@ -40,6 +42,8 @@ export type UseNativeChatComposerKeyDownArgs = {
   steerHead?: (() => boolean) | undefined
   /** Cmd/Ctrl+Enter on an empty composer sends the head card now: where its other way is a steer, or no turn runs (a stopped, paused queue). */
   chordSteersHead?: boolean
+  /** A launch prompt keeps Enter as the send: its panel takes Cmd/Ctrl+Enter for the other surface. */
+  launchPrompt?: boolean
   setActiveSuggestion: Dispatch<SetStateAction<number>>
   setDraft: Dispatch<SetStateAction<string>>
   setCaret: Dispatch<SetStateAction<number>>
@@ -61,6 +65,7 @@ export function useNativeChatComposerKeyDown({
   send,
   steerHead,
   chordSteersHead = false,
+  launchPrompt = false,
   setActiveSuggestion,
   setDraft,
   setCaret
@@ -68,6 +73,9 @@ export function useNativeChatComposerKeyDown({
   // Read through a ref: the transcript changes on every streamed frame.
   const recallRef = useRef(recall)
   recallRef.current = recall
+  // On: Enter adds a new line, Cmd/Ctrl+Enter sends, and Cmd/Ctrl+Alt+Enter sends the other way.
+  const sendWithModEnter =
+    useAppStore((state) => nativeChatSendsWithModEnter(state.settings)) && !launchPrompt
   return useCallback(
     (event) => {
       if (isComposing() || event.nativeEvent.isComposing || event.keyCode === 229) {
@@ -142,8 +150,12 @@ export function useNativeChatComposerKeyDown({
         return
       }
       if (event.key === 'Enter' && !event.shiftKey) {
+        if (sendWithModEnter && !modified) {
+          // The editor adds the new line.
+          return
+        }
         event.preventDefault()
-        if (!modified) {
+        if (!(sendWithModEnter ? event.altKey : modified)) {
           send()
         } else if (draft.trim() !== '' || hasAttachments) {
           // The other thing than the setting, for this one message.
@@ -199,6 +211,7 @@ export function useNativeChatComposerKeyDown({
       send,
       steerHead,
       chordSteersHead,
+      sendWithModEnter,
       setActiveSuggestion,
       setCaret,
       setDraft

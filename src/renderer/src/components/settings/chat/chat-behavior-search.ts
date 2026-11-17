@@ -2,6 +2,10 @@ import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
 import type { SettingsSearchEntry } from '../search/settings-search'
+import {
+  getScreenSubmitAltShortcutLabel,
+  getScreenSubmitShortcutLabel
+} from '@/lib/keyboard/screen-submit-shortcut'
 import { NATIVE_CHAT_RESUME_SETTING_SECTION_ID } from './native-chat-resume-setting-target'
 import { NATIVE_CHAT_USAGE_LIMIT_CONTINUE_SETTING_SECTION_ID } from './native-chat-usage-limit-continue-setting-target'
 
@@ -64,6 +68,26 @@ export const getChatBehaviorEntriesByKey = createLocalizedCatalog(() => ({
       translate('components.settings.nativeChat.queueSearchSteer', 'steer')
     ]
   },
+  sendWithModEnter: {
+    targetSectionId: 'chat-send-with-mod-enter',
+    title: translate(
+      'components.settings.nativeChat.sendWithModEnterTitle',
+      'Send with {{shortcut}}',
+      { shortcut: getScreenSubmitShortcutLabel() }
+    ),
+    description: translate(
+      'components.settings.nativeChat.sendWithModEnterCopy',
+      'Enter adds a new line instead of sending. The other way of sending, to queue or to steer, moves to {{shortcut}}.',
+      { shortcut: getScreenSubmitAltShortcutLabel() }
+    ),
+    keywords: [
+      translate('components.settings.nativeChat.sendWithModEnterSearchNewLine', 'new line'),
+      translate(
+        'components.settings.nativeChat.sendWithModEnterSearchShortcut',
+        'keyboard shortcut'
+      )
+    ]
+  },
   scrollToLatestOnSend: {
     targetSectionId: 'chat-scroll-to-latest-on-send',
     title: translate(
@@ -119,6 +143,17 @@ export const getChatBehaviorEntriesByKey = createLocalizedCatalog(() => ({
     ]
   }
 }))
+
+/** The queue row names the chord that sends the other way: Cmd/Ctrl+Alt+Enter while Cmd/Ctrl+Enter sends. */
+export function getQueueFollowUpsDescription(sendWithModEnter: boolean): string {
+  return sendWithModEnter
+    ? translate(
+        'components.settings.nativeChat.followUpBehaviorCopyModEnter',
+        'Messages sent while the agent works wait as cards until the turn ends, instead of going into the running turn. {{shortcut}} does the opposite for one message, and with nothing typed steers the first waiting card into the running turn. Messages with images wait as cards too.',
+        { shortcut: getScreenSubmitAltShortcutLabel() }
+      )
+    : getChatBehaviorEntriesByKey().queueFollowUps.description
+}
 
 export function getChatBehaviorSearchEntries(t?: Translate): SettingsSearchEntry[] {
   return [{ title: getChatBehaviorTitle(t) }, ...Object.values(getChatBehaviorEntriesByKey())]
