@@ -25,10 +25,10 @@ const unixLauncherFixtures = [
   {
     name: 'macOS',
     asset: darwinLauncherAsset,
-    appDir: ['Orca @dLux.app'],
+    appDir: ['Example App.app'],
     launcher: ['Contents', 'Resources', 'bin', 'orca'],
     // The executable name follows productName; the launcher reads it from Info.plist.
-    executable: ['Contents', 'MacOS', 'Orca @dLux'],
+    executable: ['Contents', 'MacOS', 'Example App'],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   }
   // The macOS launcher needs PlistBuddy, so it runs only on macOS.
