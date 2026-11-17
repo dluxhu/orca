@@ -27,6 +27,9 @@ describe('quote sources', () => {
     rememberNativeChatQuoteSource('C', source('m4'))
     expect(nativeChatQuoteSource('x & y')?.messageId).toBe('m1')
     expect(nativeChatQuoteSource('C++')?.messageId).toBe('m3')
+    rememberNativeChatQuoteSource('a <br> b', source('m5'))
+    rememberNativeChatQuoteSource('a  b', source('m6'))
+    expect(nativeChatQuoteSource('a <br> b')?.messageId).toBe('m5')
   })
 
   it('keeps the newest 200 sources and survives bad storage', () => {
