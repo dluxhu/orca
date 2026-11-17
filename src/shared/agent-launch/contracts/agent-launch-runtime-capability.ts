@@ -60,6 +60,15 @@ export const AGENT_LAUNCH_PERMISSION_CHOICE_CAPABILITY = 'settings.agent-permiss
 // explicit chat it cannot open before creating anything. Older hosts strip the field.
 export const AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY = 'agent.launch.surface.v1' as const
 
+// Host-advertised: reads `resumeFrom` and opens that provider conversation as a chat, or refuses.
+// Older hosts strip the field and would start a fresh chat.
+export const AGENT_LAUNCH_RESUME_RUNTIME_CAPABILITY = 'agent.launch.resume.v1' as const
+
+// Host-advertised: reads `remoteControl` and turns Claude Remote Control on when the launched chat
+// opens. Older hosts strip the field.
+export const AGENT_LAUNCH_REMOTE_CONTROL_RUNTIME_CAPABILITY =
+  'agent.launch.remote-control.v1' as const
+
 export const AGENT_LAUNCH_RUNTIME_CAPABILITIES = [
   AGENT_LAUNCH_CHAT_OPTIONS_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_SETTINGS_CAPABILITY,
@@ -75,5 +84,7 @@ export const AGENT_LAUNCH_RUNTIME_CAPABILITIES = [
   AGENT_LAUNCH_PLACEMENT_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_LOCAL_PRESENTATION_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_CREATE_FOLDER_WORKSPACE_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY
+  AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_RESUME_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_REMOTE_CONTROL_RUNTIME_CAPABILITY
 ] as const

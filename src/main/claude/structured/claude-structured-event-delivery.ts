@@ -1,5 +1,6 @@
 import { ClaudePluginInputError } from '../sdk-transport/claude-plugin-ui'
 import { claudePromptCardWritten } from '../child-work/claude-child-work-evidence'
+import { observeClaudeBridgeState } from './claude-structured-remote-control'
 import type {
   ClaudeAcquisitionAttempt,
   ClaudeSessionExit,
@@ -36,6 +37,9 @@ export function emitClaudeStructuredSessionEvent({
   } else if (event.type === 'message') {
     session?.childWork.observe(event.message, session.translator?.childToolOwner)
     session?.backgroundTasks.observe(event.message, event.startsTurn === true)
+    if (session) {
+      observeClaudeBridgeState(session, event.message)
+    }
   } else if (event.type === 'prompt-cancelled') {
     // Clear waiting before journaling cancellation so status cannot wait on a closed card.
     publishChildWork(event.sessionId, session)

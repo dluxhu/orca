@@ -24,6 +24,10 @@ export type AgentLaunchFingerprintInput = {
   sessionId?: string
   /** In: unlike the user's default surface, an explicit pick is what the call asks to run. */
   surface?: string
+  /** Another provider conversation names a different launch. */
+  resumeFrom?: { providerSessionId: string }
+  /** Remote Control changes what the chat does. */
+  remoteControl?: true
   /** Exclude launchSource, placement and presentation: they change attribution/view, not execution. Replays truthfully retain the first launch's attribution. */
 }
 
@@ -47,7 +51,9 @@ export function computeAgentLaunchFingerprint(input: AgentLaunchFingerprintInput
     // Absent keys are dropped by the canonical form, so every digest without one is unchanged.
     paneKey: input.paneKey,
     sessionId: input.sessionId,
-    surface: input.surface
+    surface: input.surface,
+    resumeFrom: input.resumeFrom,
+    remoteControl: input.remoteControl
   })
 }
 

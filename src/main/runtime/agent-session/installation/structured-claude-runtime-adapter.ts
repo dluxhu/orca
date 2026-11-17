@@ -42,6 +42,7 @@ export type StructuredClaudeRuntimeAdapterDeps = {
   onDispatchSettledLate?: ClaudeStructuredSessionAdapterDeps['onDispatchSettledLate']
   onChildWorkEvidence?: ClaudeStructuredSessionAdapterDeps['onChildWorkEvidence']
   logger?: ClaudeStructuredSessionAdapterDeps['logger']
+  remoteControlForNewChats?: ClaudeStructuredSessionAdapterDeps['remoteControlForNewChats']
 }
 
 /** The adapter events the host's lifecycle handler consumes, in the host's vocabulary. */
@@ -140,6 +141,9 @@ export function createStructuredClaudeRuntimeAdapter(
     ...(deps.onDispatchSettledLate ? { onDispatchSettledLate: deps.onDispatchSettledLate } : {}),
     ...(deps.onChildWorkEvidence ? { onChildWorkEvidence: deps.onChildWorkEvidence } : {}),
     ...(deps.logger ? { logger: deps.logger } : {}),
+    ...(deps.remoteControlForNewChats
+      ? { remoteControlForNewChats: deps.remoteControlForNewChats }
+      : {}),
     ...openClaudeConnectionOf(deps),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {})
   })

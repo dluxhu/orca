@@ -21529,6 +21529,13 @@
         "questionNotSentDetail": "Your question is still in this chat. Send /btw again to retry.",
         "questionUnconfirmed": "{{agent}} couldn't confirm the side chat got your question",
         "questionUnconfirmedDetail": "Check the side chat before asking again. Your question is still in this chat."
+      },
+      "remoteControl": {
+        "on": "Remote Control is on",
+        "failed": "Couldn't change Remote Control",
+        "turnOff": "Turn Off Remote Control",
+        "turnOn": "Turn On Remote Control",
+        "open": "Open in Claude"
       }
     },
     "tab": {
@@ -22389,6 +22396,12 @@
           "keywordCleanup": "cleanup",
           "keywordDelete": "delete",
           "keywordMerged": "merged"
+        }
+      },
+      "agents": {
+        "claudeRemoteControl": {
+          "title": "Remote Control for new Claude chats",
+          "description": "Connect each new Claude chat to claude.ai and the Claude app, so you can follow and answer it from there."
         }
       }
     },
