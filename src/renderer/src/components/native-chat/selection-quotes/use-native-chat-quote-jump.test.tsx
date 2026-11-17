@@ -7,7 +7,6 @@ vi.mock('./native-chat-quote-highlight', () => ({ showQuotedText: shown }))
 
 import { useNativeChatQuoteJump } from './use-native-chat-quote-jump'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
-import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -22,6 +21,7 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
   const issue = vi.fn()
   const beginNavigation = vi.fn()
   const readerLeavesEnd = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
   const slots = [
     { kind: 'message', message: { id: 'prompt' } },
     { kind: 'message', message: { id: 'reply-1' } }
@@ -30,7 +30,7 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
     useNativeChatQuoteJump({
       slots,
       scrollRef: { current: scroller },
-      request: { issue, nextRequestId: () => 7 } as unknown as NativeChatNavigationRequest,
+      request: { issue, nextRequestId: () => 7 },
       beginNavigation,
       readerLeavesEnd
     })

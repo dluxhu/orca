@@ -29,6 +29,7 @@ import { openLinkedFileInEditor } from './terminal-file-link-editor-open'
 
 afterEach(() => fake.schedule.mockReset())
 
+// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the open reads only these fields; the store is a fake.
 const file = { filePath: '/repo/a.ts', relativePath: 'a.ts', worktreeId: 'w1' } as never
 
 it('asks the editor to highlight the given length at the revealed line', () => {

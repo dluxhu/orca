@@ -19,7 +19,7 @@ export function useNativeChatQuoteJump({
 }: {
   slots: readonly NativeChatTranscriptSlot[]
   scrollRef: RefObject<HTMLDivElement | null>
-  request: NativeChatNavigationRequest
+  request: Pick<NativeChatNavigationRequest, 'issue' | 'nextRequestId'>
   beginNavigation: () => void
   readerLeavesEnd: () => void
 }): NativeChatQuoteJump {

@@ -10,10 +10,12 @@ export function quotedTextRange(root: HTMLElement, text: string): Range | null {
   const chars: { node: Text; offset: number }[] = []
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const { data } = node as Text
-    for (let offset = 0; offset < data.length; offset++) {
-      if (!/\s/.test(data[offset])) {
-        chars.push({ node: node as Text, offset })
+    if (!(node instanceof Text)) {
+      continue
+    }
+    for (let offset = 0; offset < node.data.length; offset++) {
+      if (!/\s/.test(node.data[offset])) {
+        chars.push({ node, offset })
       }
     }
   }

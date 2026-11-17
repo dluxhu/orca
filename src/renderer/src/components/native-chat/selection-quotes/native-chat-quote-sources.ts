@@ -32,7 +32,8 @@ export function rememberNativeChatQuoteSource(text: string, messageId: string): 
   if (!key) {
     return
   }
-  entries = [...load().filter(([known]) => known !== key), [key, messageId] as Entry].slice(-LIMIT)
+  const entry: Entry = [key, messageId]
+  entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {

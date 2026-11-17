@@ -22,7 +22,7 @@ it('finds quoted text across elements and line breaks', () => {
 
 it('moves focus to the source and highlights the quoted text for a short time', () => {
   vi.useFakeTimers()
-  const highlights = new Map<string, unknown>()
+  const highlights = new Map<string, { range: Range }>()
   vi.stubGlobal('CSS', { highlights })
   vi.stubGlobal(
     'Highlight',
@@ -33,12 +33,13 @@ it('moves focus to the source and highlights the quoted text for a short time', 
   const element = source()
   element.scrollIntoView = vi.fn()
   for (const child of element.querySelectorAll('*')) {
-    ;(child as HTMLElement).scrollIntoView = vi.fn()
+    if (child instanceof HTMLElement) {
+      child.scrollIntoView = vi.fn()
+    }
   }
   showQuotedText(element, 'quoted text')
   expect(document.activeElement).toBe(element)
-  const highlight = highlights.get('native-chat-quote-jump') as { range: Range }
-  expect(highlight.range.toString()).toBe('quoted\ntext')
+  expect(highlights.get('native-chat-quote-jump')?.range.toString()).toBe('quoted\ntext')
   vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS)
   expect(highlights.has('native-chat-quote-jump')).toBe(false)
 })

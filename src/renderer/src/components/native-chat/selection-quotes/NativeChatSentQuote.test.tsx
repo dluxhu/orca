@@ -32,7 +32,7 @@ afterEach(() => {
 
 const OWNER = {
   fileLinkContext: { worktreeId: 'w1', worktreePath: '/repo', runtimeEnvironmentId: null },
-  runtimeContext: null as never,
+  runtimeContext: null,
   isVisible: true
 }
 
