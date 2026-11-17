@@ -57,7 +57,7 @@ import { main } from './index'
 import { RuntimeClientError, RuntimeRpcFailureError } from './runtime/types'
 import { queueFixtures } from './runtime/fixtures/runtime-rpc-fixtures'
 import { useWorktreeAwarenessEnvironment } from './index-test-harness'
-import { agentLaunchHostFixture } from './agents/agent-launch-test-fixtures'
+import { agentLaunchFixture, agentLaunchHostFixture } from './agents/agent-launch-test-fixtures'
 
 const WORKTREE_ID = 'repo-1::/tmp/repo'
 const ORIGINAL_EXIT_CODE = process.exitCode
@@ -89,6 +89,70 @@ describe('orca cli agent launch', () => {
     addEnvironmentFromPairingCodeMock,
     listEnvironmentsMock,
     spawnMock
+  })
+
+  it('sends --resume through the command spec as the launch resumeFrom', async () => {
+    queueFixtures(callMock, agentLaunchHostFixture(), agentLaunchFixture(WORKTREE_ID))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await main(
+      [
+        'agent',
+        'launch',
+        '--agent',
+        'claude',
+        '--worktree',
+        `id:${WORKTREE_ID}`,
+        '--surface',
+        'chat',
+        '--resume',
+        'x',
+        '--remote-control',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(launchCalls()).toEqual([
+      [
+        'agent.launchReplay',
+        expect.objectContaining({
+          surface: 'chat',
+          resumeFrom: { providerSessionId: 'x' },
+          remoteControl: true
+        })
+      ]
+    ])
+  })
+
+  it('keeps --resume after a valueless --remote-control', async () => {
+    queueFixtures(callMock, agentLaunchHostFixture(), agentLaunchFixture(WORKTREE_ID))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await main(
+      [
+        'agent',
+        'launch',
+        '--agent',
+        'claude',
+        '--worktree',
+        `id:${WORKTREE_ID}`,
+        '--surface',
+        'chat',
+        '--remote-control',
+        '--resume',
+        'x',
+        '--json'
+      ],
+      '/tmp/repo'
+    )
+    expect(launchCalls()).toEqual([
+      [
+        'agent.launchReplay',
+        expect.objectContaining({
+          surface: 'chat',
+          resumeFrom: { providerSessionId: 'x' },
+          remoteControl: true
+        })
+      ]
+    ])
   })
 
   it('returns an exact recovery command and removes blind retry advice after a lost reply', async () => {

@@ -298,6 +298,7 @@ export async function createStructuredAgentSessionForWorktree(args: {
   /** Create without starting the agent; its first message starts it. */
   atRest?: true
   firstMessage?: StructuredAgentSessionFirstMessage
+  resumeFrom?: StructuredAgentSessionResumeSource
   signal?: AbortSignal
 }): Promise<AgentSessionMutationResult<AgentSessionAttachResult> & { beforeCommit?: true }> {
   // An at-rest create's ledger row is keyed by its intent, as a client's create is.
