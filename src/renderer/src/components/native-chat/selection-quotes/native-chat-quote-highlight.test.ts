@@ -43,3 +43,37 @@ it('moves focus to the source and highlights the quoted text for a short time', 
   vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS)
   expect(highlights.has('native-chat-quote-jump')).toBe(false)
 })
+
+it('finds quoted text whose Markdown marks the page does not show', () => {
+  const element = document.createElement('div')
+  element.innerHTML = '<h1>a comment</h1><ul><li>removed line</li></ul>'
+  document.body.append(element)
+  expect(quotedTextRange(element, '# a comment\n- removed line')?.toString()).toBe(
+    'a commentremoved line'
+  )
+})
+
+it('keeps the highlight of a second jump when the first one times out', () => {
+  vi.useFakeTimers()
+  const highlights = new Map<string, { range: Range }>()
+  vi.stubGlobal('CSS', { highlights })
+  vi.stubGlobal(
+    'Highlight',
+    class {
+      constructor(readonly range: Range) {}
+    }
+  )
+  const element = source()
+  for (const child of element.querySelectorAll('*')) {
+    if (child instanceof HTMLElement) {
+      child.scrollIntoView = vi.fn()
+    }
+  }
+  showQuotedText(element, 'quoted text')
+  vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS - 500)
+  showQuotedText(element, 'Before')
+  vi.advanceTimersByTime(600)
+  expect(highlights.get('native-chat-quote-jump')?.range.toString()).toBe('Before')
+  vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS)
+  expect(highlights.has('native-chat-quote-jump')).toBe(false)
+})

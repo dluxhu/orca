@@ -1,9 +1,12 @@
 const HIGHLIGHT = 'native-chat-quote-jump'
 export const QUOTE_HIGHLIGHT_MS = 1500
 
-/** The range of `text` in `root`, matched without whitespace, as a selection reads it. */
+// Letters only: the sent quote is Markdown, so it can lose marks and list numbers that its source shows.
+const KEPT = /\p{L}/u
+
+/** The range of `text` in `root`, matched on letters only. */
 export function quotedTextRange(root: HTMLElement, text: string): Range | null {
-  const needle = text.replace(/\s+/g, '')
+  const needle = text.replace(/\P{L}/gu, '')
   if (!needle) {
     return null
   }
@@ -14,7 +17,7 @@ export function quotedTextRange(root: HTMLElement, text: string): Range | null {
       continue
     }
     for (let offset = 0; offset < node.data.length; offset++) {
-      if (!/\s/.test(node.data[offset])) {
+      if (KEPT.test(node.data[offset])) {
         chars.push({ node, offset })
       }
     }
@@ -45,7 +48,13 @@ export function showQuotedText(source: HTMLElement, text: string): void {
   range?.startContainer.parentElement?.scrollIntoView({ block: 'center' })
   const highlights = globalThis.CSS?.highlights
   if (range && highlights && typeof Highlight !== 'undefined') {
-    highlights.set(HIGHLIGHT, new Highlight(range))
-    window.setTimeout(() => highlights.delete(HIGHLIGHT), QUOTE_HIGHLIGHT_MS)
+    const highlight = new Highlight(range)
+    highlights.set(HIGHLIGHT, highlight)
+    // A later jump keeps its own highlight for its whole time.
+    window.setTimeout(() => {
+      if (highlights.get(HIGHLIGHT) === highlight) {
+        highlights.delete(HIGHLIGHT)
+      }
+    }, QUOTE_HIGHLIGHT_MS)
   }
 }

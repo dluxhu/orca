@@ -36,11 +36,10 @@ export function useNativeChatQuoteJump({
       // The landing scrolls in a layout effect; the row is drawn two frames later.
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          const row = scrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`)
-          const source =
-            row?.querySelector<HTMLElement>(
-              `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
-            ) ?? row
+          // By the message id: a tool run's member rows use data-index too.
+          const source = scrollRef.current?.querySelector<HTMLElement>(
+            `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
+          )
           if (source) {
             showQuotedText(source, text)
           }

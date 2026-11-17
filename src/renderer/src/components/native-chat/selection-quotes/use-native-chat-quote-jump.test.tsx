@@ -16,7 +16,9 @@ afterEach(() => {
 it('scrolls to the quoted message as a rail jump does, then shows the text in it', () => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })
   const scroller = document.createElement('div')
+  // A tool run's member rows also number themselves with data-index.
   scroller.innerHTML =
+    '<div data-index="0"><div data-index="1">a tool step</div></div>' +
     '<div data-index="1"><div data-native-chat-quote-source="reply-1">The quoted text.</div></div>'
   const issue = vi.fn()
   const beginNavigation = vi.fn()
