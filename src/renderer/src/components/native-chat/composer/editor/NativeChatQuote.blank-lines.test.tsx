@@ -123,3 +123,22 @@ it('keeps the user empty lines of a draft when it loads again', async () => {
     'below'
   ])
 })
+
+it('shows the separator line while the caret is on it', async () => {
+  const inputRef = createRef<NativeChatComposerInput>()
+  const view = render(
+    <NativeChatPromptEditor
+      inputRef={inputRef}
+      initialValue={'above\n\n> q\n\nbelow'}
+      disabled={false}
+      placeholder="Message"
+      onChange={vi.fn()}
+      onSelect={vi.fn()}
+    />
+  )
+  await waitFor(() => expect(view.container.textContent).toContain('Quote: '))
+  const separators = () => view.container.querySelectorAll('[data-quote-separator]').length
+  expect(separators()).toBe(2)
+  act(() => inputRef.current!.setSelectionRange(6, 6))
+  expect(separators()).toBe(1)
+})

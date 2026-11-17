@@ -56,7 +56,7 @@ type NativeChatMarkdownProps = Omit<
   streaming?: boolean
   /** The transcript row's identity, so reader choices inside the text outlive the row's mount. */
   rowKey?: string
-  /** Show each blockquote as a quote chip that opens on click, as a sent "Add to chat" quote. */
+  /** Show each blockquote as a quote chip that jumps to the quoted source on click. */
   quoteChips?: boolean
 }
 
