@@ -20755,7 +20755,9 @@
           "medium": "Med",
           "xhigh": "XHigh"
         },
-        "imageUnavailable": "Preview unavailable"
+        "imageUnavailable": "Preview unavailable",
+        "mentionChat": "Chat",
+        "mentionTerminal": "Terminal"
       },
       "tool": {
         "exitCode": "exit {{value0}}",

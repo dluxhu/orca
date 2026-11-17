@@ -18,7 +18,6 @@ import type { AgentType } from '../../../../../../shared/agent-status/contracts/
 import { getNativeChatAgentProfile } from '../../../../../../shared/native-chat/native-chat-agent-profiles'
 
 import {
-  applyMentionSuggestion,
   deriveComposerAutocomplete,
   editReplacesTriggerToken,
   isSkillPickerTriggered,
@@ -34,6 +33,7 @@ import {
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
 import { nativeChatPickerCommands } from '../../../../../../shared/native-chat/input/native-chat-skill-visibility'
 import { useNativeChatSkills } from './use-native-chat-skills'
+import { completeNativeChatMention, type NativeChatMentionItem } from './native-chat-mentions'
 import { useNativeChatPreferredSuggestion } from './use-native-chat-preferred-suggestion'
 import {
   emitNativeChatPickerItemAccepted,
@@ -50,7 +50,7 @@ export type NativeChatPickerState = {
   /** The draft still leads with the skill the user picked from the menu. */
   isPickedSkill: (draft: string) => boolean
   completeItem: (item: NativeChatPickerItem) => void
-  completeMention: (path: string) => void
+  completeMention: (item: NativeChatMentionItem) => void
   dismiss: (triggerKey: string) => void
   handleDraftOrCaretChange: (value: string, caret: number) => void
   /** Arrow-key highlight moves; a catalog refresh keeps the row they land on until the next edit. */
@@ -233,13 +233,13 @@ export function useNativeChatPickerState(args: {
   )
 
   const completeMention = useCallback(
-    (path: string) => {
+    (item: NativeChatMentionItem) => {
       if (disabledRef.current || autocomplete.mode !== 'mention') {
         return
       }
-      commitCompletion(applyMentionSuggestion(...liveDraft(), path))
+      completeNativeChatMention(textareaRef.current, item, liveDraft(), commitCompletion)
     },
-    [autocomplete, commitCompletion, liveDraft]
+    [autocomplete, commitCompletion, liveDraft, textareaRef]
   )
 
   const handleDraftOrCaretChange = useCallback(
