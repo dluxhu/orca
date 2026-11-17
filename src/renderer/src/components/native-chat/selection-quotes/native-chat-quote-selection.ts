@@ -1,7 +1,9 @@
 import { markdownMathSelectionText } from '../../../../../shared/markdown-math-selection'
 
-/** Only agent-reply prose marked with this attribute may be quoted. */
-export const NATIVE_CHAT_QUOTE_SOURCE_PROPS = { 'data-native-chat-quote-source': '' } as const
+/** Only agent-reply prose marked with this attribute may be quoted; its value is the message id. */
+export function nativeChatQuoteSourceProps(messageId: string): Record<string, string> {
+  return { 'data-native-chat-quote-source': messageId }
+}
 
 const QUOTE_SOURCE_SELECTOR = '[data-native-chat-quote-source]'
 const TRANSCRIPT_SELECTOR = '[data-native-chat-scroll]'
@@ -22,7 +24,7 @@ export function readNativeChatTranscriptSelection(root: HTMLElement): string {
 
 export function readNativeChatQuotableSelection(
   root: HTMLElement
-): { text: string; range: Range } | null {
+): { text: string; range: Range; messageId: string | null } | null {
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount !== 1) {
     return null
@@ -37,7 +39,7 @@ export function readNativeChatQuotableSelection(
   if (!edges || !source || !source.contains(edges.last) || text === '') {
     return null
   }
-  return { text, range }
+  return { text, range, messageId: source.getAttribute('data-native-chat-quote-source') || null }
 }
 
 // Triple-click ranges can end outside the reply; check selected text edges instead of range endpoints.

@@ -25,6 +25,6 @@ it('shows the quote in a sent user message as a quote chip', () => {
     </TooltipProvider>,
     { wrapper: TranslationScopeProvider }
   )
-  expect(screen.getByRole('button', { name: 'Quote: q' })).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('button', { name: 'Quote: q' })).not.toHaveAttribute('aria-expanded')
   expect(screen.getByText('reply')).toBeInTheDocument()
 })

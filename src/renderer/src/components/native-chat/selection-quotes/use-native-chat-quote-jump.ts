@@ -1,0 +1,53 @@
+import { createContext, useCallback, type RefObject } from 'react'
+import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcript-slot-selection'
+import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
+import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
+import { showQuotedText } from './native-chat-quote-highlight'
+
+export type NativeChatQuoteJump = (messageId: string, text: string) => boolean
+
+/** The transcript's jump to a quoted message; null outside a transcript. */
+export const NativeChatQuoteJumpContext = createContext<NativeChatQuoteJump | null>(null)
+
+/** Scrolls to a loaded message as a rail jump does, then shows the quoted text in it. */
+export function useNativeChatQuoteJump({
+  slots,
+  scrollRef,
+  request,
+  beginNavigation,
+  readerLeavesEnd
+}: {
+  slots: readonly NativeChatTranscriptSlot[]
+  scrollRef: RefObject<HTMLDivElement | null>
+  request: NativeChatNavigationRequest
+  beginNavigation: () => void
+  readerLeavesEnd: () => void
+}): NativeChatQuoteJump {
+  const { issue, nextRequestId } = request
+  return useCallback(
+    (messageId, text) => {
+      const index = nativeChatSlotIndexOf(slots, messageId)
+      if (index === -1) {
+        return false
+      }
+      beginNavigation()
+      readerLeavesEnd()
+      issue({ kind: 'rail', messageId, requestId: nextRequestId() })
+      // The landing scrolls in a layout effect; the row is drawn two frames later.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const row = scrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`)
+          const source =
+            row?.querySelector<HTMLElement>(
+              `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
+            ) ?? row
+          if (source) {
+            showQuotedText(source, text)
+          }
+        })
+      )
+      return true
+    },
+    [beginNavigation, issue, nextRequestId, readerLeavesEnd, scrollRef, slots]
+  )
+}

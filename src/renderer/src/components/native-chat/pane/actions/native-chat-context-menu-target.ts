@@ -8,6 +8,8 @@ import type { NativeChatMessageListHandle } from '../../messages/actions/use-nat
 export type NativeChatContextMenuTarget = {
   /** The selection the "Add to chat" offer would quote. */
   quoteText: string | null
+  /** The message the quote comes from, for the sent quote's jump. */
+  quoteMessageId: string | null
   link: FileLinkActions | null
   codeText: string | null
   messageText: string | null
@@ -16,6 +18,7 @@ export type NativeChatContextMenuTarget = {
 
 export const noNativeChatContextMenuTarget: NativeChatContextMenuTarget = {
   quoteText: null,
+  quoteMessageId: null,
   link: null,
   codeText: null,
   messageText: null,
@@ -44,6 +47,7 @@ export function readNativeChatContextMenuTarget(
     ?.getAttribute('data-native-chat-message-id')
   return {
     quoteText: quotable?.text ?? null,
+    quoteMessageId: quotable?.messageId ?? null,
     link: href ? nativeChatLinkActions(href, linkContext) : null,
     codeText:
       element
