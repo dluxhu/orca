@@ -1,29 +1,40 @@
-// Where a quote came from. Only this window keeps it; the agent never gets it.
+// Where a quote came from. The app's windows on this computer share this list, and it stays after a
+// restart. It holds a short hash of each quote, not its text. The agent never gets it.
 const STORAGE_KEY = 'orca.nativeChat.quoteSources.v1'
 const LIMIT = 200
 
 type Entry = [key: string, messageId: string]
-let entries: Entry[] | null = null
 
-// Whitespace differs between a selection and the same text in the sent bubble; the characters do not.
-const quoteKey = (text: string): string => text.replace(/\s+/g, '')
-
-function load(): Entry[] {
-  if (entries) {
-    return entries
+/**
+ * The letters and digits of a quote, as a short hash and their count. Why: the sent bubble shows
+ * the quote as Markdown, which drops whitespace, marks such as `#` and `-`, and list numbers.
+ */
+function quoteKey(text: string): string {
+  const letters = text.replace(/^[ \t]*\d+[.)][ \t]/gm, '').replace(/[^\p{L}\p{N}]/gu, '')
+  if (!letters) {
+    return ''
   }
+  // FNV-1a over UTF-16 code units: short, and stable between windows.
+  let hash = 0x811c9dc5
+  for (let index = 0; index < letters.length; index++) {
+    hash = Math.imul(hash ^ letters.charCodeAt(index), 0x01000193)
+  }
+  return `${(hash >>> 0).toString(36)}:${letters.length}`
+}
+
+// Read on each use: another window can write between two calls.
+function load(): Entry[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-    entries = Array.isArray(parsed)
+    return Array.isArray(parsed)
       ? parsed.filter(
           (entry): entry is Entry =>
             Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'string'
         )
       : []
   } catch {
-    entries = []
+    return []
   }
-  return entries
 }
 
 /** Remembers the chat message that "Add to chat" quoted `text` from. */
@@ -33,29 +44,33 @@ export function rememberNativeChatQuoteSource(text: string, messageId: string): 
     return
   }
   const entry: Entry = [key, messageId]
-  entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
+  const entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
-    // Without storage the source holds until the window reloads.
+    // Without storage, the quote has no message source; its file header can still jump.
   }
 }
 
 export function nativeChatQuoteMessageId(text: string): string | null {
   const key = quoteKey(text)
-  return load().find(([known]) => known === key)?.[1] ?? null
-}
-
-export function forgetNativeChatQuoteSourcesForTests(): void {
-  entries = null
+  return key ? (load().find(([known]) => known === key)?.[1] ?? null) : null
 }
 
 export type QuotedFileLocation = { pathText: string; line: number }
 
-/** `path:12` or `path:12-20`: the first line of an editor or Markdown preview quote. */
+/**
+ * `path:12` or `path:12-20`: the first line of an editor or Markdown preview quote. A preview quote
+ * with no source lines has only the path; it opens at line 1.
+ */
 export function quotedFileLocation(firstLine: string): QuotedFileLocation | null {
-  const match = /^(\S.*):(\d+)(?:-\d+)?$/.exec(firstLine.trim())
-  return match ? { pathText: match[1], line: Number(match[2]) } : null
+  const text = firstLine.trim()
+  const lines = /^(\S.*):(\d+)(?:-\d+)?$/.exec(text)
+  if (lines) {
+    return { pathText: lines[1], line: Number(lines[2]) }
+  }
+  // shortcut: a terminal title that looks like a path opens as a file; keep the source kind if that matters.
+  return /^[^\s:]*(?:\/|\.[A-Za-z0-9]+$)[^\s:]*$/.test(text) ? { pathText: text, line: 1 } : null
 }
 
 export type NativeChatQuoteJumpDeps = {

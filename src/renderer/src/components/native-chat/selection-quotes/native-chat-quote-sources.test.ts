@@ -1,22 +1,17 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  forgetNativeChatQuoteSourcesForTests,
   jumpToQuoteSource,
   nativeChatQuoteMessageId,
   quotedFileLocation,
   rememberNativeChatQuoteSource
 } from './native-chat-quote-sources'
 
-afterEach(() => {
-  localStorage.clear()
-  forgetNativeChatQuoteSourcesForTests()
-})
+afterEach(() => localStorage.clear())
 
 describe('quote sources', () => {
-  it('finds the message of a quote by its text, whitespace aside, after a reload', () => {
+  it('finds the message of a quote by its text, whitespace aside', () => {
     rememberNativeChatQuoteSource('first line\nsecond  line', 'reply-1')
-    forgetNativeChatQuoteSourcesForTests()
     expect(nativeChatQuoteMessageId('first line second line')).toBe('reply-1')
     expect(nativeChatQuoteMessageId('other text')).toBeNull()
   })
@@ -28,7 +23,6 @@ describe('quote sources', () => {
     expect(nativeChatQuoteMessageId('quote 0')).toBeNull()
     expect(nativeChatQuoteMessageId('quote 200')).toBe('m200')
     localStorage.setItem('orca.nativeChat.quoteSources.v1', '{bad')
-    forgetNativeChatQuoteSourcesForTests()
     expect(nativeChatQuoteMessageId('quote 200')).toBeNull()
   })
 

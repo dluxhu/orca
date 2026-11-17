@@ -17,15 +17,11 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
-import {
-  forgetNativeChatQuoteSourcesForTests,
-  rememberNativeChatQuoteSource
-} from './native-chat-quote-sources'
+import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 
 afterEach(() => {
   cleanup()
   localStorage.clear()
-  forgetNativeChatQuoteSourcesForTests()
   opened.open.mockReset()
   opened.toast.mockReset()
 })
@@ -58,6 +54,14 @@ it('shows a sent quote as a button that jumps to its message, with no open or cl
   fireEvent.click(chip)
   expect(jump).toHaveBeenCalledWith('reply-1', 'quoted\nwords')
   expect(document.querySelector('blockquote')).toBeNull()
+})
+
+it('jumps from a quote of code comment and diff lines to its message', () => {
+  rememberNativeChatQuoteSource('# a comment\n- removed line', 'reply-2')
+  const jump = vi.fn(() => true)
+  sent('> # a comment\n> - removed line\n\nreply', jump)
+  fireEvent.click(screen.getByRole('button', { name: /^Quote: a comment/ }))
+  expect(jump).toHaveBeenCalledWith('reply-2', expect.stringContaining('removed line'))
 })
 
 it('shows the full quoted text when the chip has keyboard focus', async () => {
