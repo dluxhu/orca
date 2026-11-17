@@ -26,26 +26,26 @@ script reads its "Release order" list.
 The release build adds these branches onto the upstream stable tag, in this order.
 
 1. `dlux/chat-cli` - upstream candidate: `orca chat list/read/send`.
-2. `dlux/remote-control` - upstream candidate: Claude Remote Control in chat tabs.
+2. `dlux/launch-refusal-cause` - upstream candidate: a chat create refused before attach reports its reason, not an unknown outcome (#13).
 3. `dlux/claude-adopt-cwd` - upstream candidate: adopt a Claude conversation that ran in the workspace after it started elsewhere (#13).
-4. `dlux/launch-refusal-cause` - upstream candidate: a chat create refused before attach reports its reason, not an unknown outcome (#13).
-5. `dlux/chat-resume` - upstream candidate: `orca agent launch --surface chat --resume <session-id>` (#4). Stacked on `dlux/launch-refusal-cause`.
-6. `dlux/chat-resume-remote-control` - upstream candidate: `orca agent launch --remote-control` (#4). Stacked on `dlux/chat-resume`, with `dlux/remote-control` merged in.
-7. `dlux/session-mention` - upstream candidate: `@` lists other chats and terminals (#7).
+4. `dlux/cli-wrapper-exec` - upstream candidate: the macOS `orca` launcher starts the executable that `Info.plist` names.
+5. `dlux/cli-link-notice` - upstream candidate: Settings > Command line says when Register replaces the `orca` link of another `.app`.
+6. `dlux/remote-control` - upstream candidate: Claude Code chat mode: Remote Control in chat tabs, `orca agent launch --resume <session-id>` and `--remote-control` (#4). Stacked on `dlux/launch-refusal-cause`.
+7. `dlux/session-mention` - upstream candidate: `@` lists other chats and terminals (#7). Its note tells the agent to use `orca chat send/read`, so it comes after `dlux/chat-cli`.
 8. `dlux/quote-chip` - upstream candidate: "Add to chat" quotes show as chips (#5).
-9. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, CLI link notice, this file. Always last.
+9. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, headless orcad fallback, this file. Stacked on `dlux/cli-wrapper-exec` and `dlux/cli-link-notice`. Always last.
 
-| Branch                            | Base                                         | Kind               | Upstream PR                                                                                                                                  | Files                                                 | Check                                                                                                                                                                                                                                          |
-| --------------------------------- | -------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dlux/chat-cli`                   | `upstream-stable`                            | upstream candidate | none yet (shape of [#40836](https://github.com/stablyai/orca/pull/40836), reverted by [#41241](https://github.com/stablyai/orca/pull/41241)) | see "Branch dlux/chat-cli"                            | `pnpm exec vitest run src/cli/agents/chat.test.ts src/main/runtime/rpc/methods/structured-sessions/creation/structured-agent-session-gate.test.ts`                                                                                             |
-| `dlux/remote-control`             | `upstream-stable`                            | upstream candidate | none yet (includes the auto-enable part of [#40020](https://github.com/stablyai/orca/pull/40020))                                            | see "Branch dlux/remote-control"                      | `pnpm exec vitest run src/main/claude/structured/claude-structured-remote-control.test.ts`                                                                                                                                                     |
-| `dlux/claude-adopt-cwd`           | `upstream-stable`                            | upstream candidate | none yet                                                                                                                                     | fork PR [#17](https://github.com/dluxhu/orca/pull/17) | `pnpm exec vitest run src/main/native-chat/agent-session-journal/history-import/adopted-transcript-source.test.ts`                                                                                                                             |
-| `dlux/launch-refusal-cause`       | `upstream-stable`                            | upstream candidate | none yet                                                                                                                                     | fork PR [#14](https://github.com/dluxhu/orca/pull/14) | `pnpm exec vitest run src/main/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-refusal.test.ts` |
-| `dlux/chat-resume`                | `dlux/launch-refusal-cause`                  | upstream candidate | none yet                                                                                                                                     | fork PR [#9](https://github.com/dluxhu/orca/pull/9)   | `pnpm exec vitest run src/main/agent-launch/agent-launch-resume.test.ts src/cli/agents/agent-launch-request.test.ts`                                                                                                                           |
-| `dlux/chat-resume-remote-control` | `dlux/chat-resume` (+ `dlux/remote-control`) | upstream candidate | none yet                                                                                                                                     | fork PR [#15](https://github.com/dluxhu/orca/pull/15) | `pnpm exec vitest run src/main/claude/structured/claude-structured-remote-control.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-remote-control.test.ts`                                                              |
-| `dlux/session-mention`            | `upstream-stable`                            | upstream candidate | none yet                                                                                                                                     | fork PR [#10](https://github.com/dluxhu/orca/pull/10) | `pnpm exec vitest run src/renderer/src/components/native-chat/composer src/shared/orchestration/mailbox`                                                                                                                                       |
-| `dlux/quote-chip`                 | `upstream-stable`                            | upstream candidate | none yet                                                                                                                                     | fork PR [#12](https://github.com/dluxhu/orca/pull/12) | `pnpm exec vitest run src/renderer/src/components/native-chat/composer/editor src/renderer/src/components/native-chat/selection-quotes`                                                                                                        |
-| `dlux/fork-setup`                 | `upstream-stable`                            | fork-only          | none                                                                                                                                         | see "Branch dlux/fork-setup: Files"                   | see "Branch dlux/fork-setup: Check"                                                                                                                                                                                                            |
+| Branch                      | Base                                                                  | Kind               | Upstream PR                                                                                                                                  | Files                                                 | Check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------- | --------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dlux/chat-cli`             | `upstream-stable`                                                     | upstream candidate | none yet (shape of [#40836](https://github.com/stablyai/orca/pull/40836), reverted by [#41241](https://github.com/stablyai/orca/pull/41241)) | see "Branch dlux/chat-cli"                            | `pnpm exec vitest run src/cli/agents/chat.test.ts src/main/runtime/rpc/methods/structured-sessions/creation/structured-agent-session-gate.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `dlux/launch-refusal-cause` | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#14](https://github.com/dluxhu/orca/pull/14) | `pnpm exec vitest run src/main/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-refusal.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `dlux/claude-adopt-cwd`     | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#17](https://github.com/dluxhu/orca/pull/17) | `pnpm exec vitest run src/main/native-chat/agent-session-journal/history-import/adopted-transcript-source.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `dlux/cli-wrapper-exec`     | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#18](https://github.com/dluxhu/orca/pull/18) | `pnpm exec vitest run src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (the macOS case runs on macOS only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `dlux/cli-link-notice`      | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#19](https://github.com/dluxhu/orca/pull/19) | `pnpm exec vitest run src/main/cli/installation/cli-installer-other-app-notice.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `dlux/remote-control`       | `dlux/launch-refusal-cause`                                           | upstream candidate | none yet (includes the auto-enable part of [#40020](https://github.com/stablyai/orca/pull/40020))                                            | fork PR [#3](https://github.com/dluxhu/orca/pull/3)   | `pnpm exec vitest run src/main/claude/structured/claude-structured-remote-control.test.ts src/main/native-chat/agent-session-wire/providers/structured-agent-session-adapter-router-remote-control.test.ts src/main/agent-launch/agent-launch-resume.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-resume.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-resume-unknown-cause.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-remote-control.test.ts src/shared/rpc-contract/agent-launch/agent-launch-params.test.ts src/cli/agents/agent-launch-request.test.ts src/cli/index-agent-launch.test.ts` |
+| `dlux/session-mention`      | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#10](https://github.com/dluxhu/orca/pull/10) | `pnpm exec vitest run src/renderer/src/components/native-chat/composer src/shared/orchestration/mailbox`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `dlux/quote-chip`           | `upstream-stable`                                                     | upstream candidate | none yet                                                                                                                                     | fork PR [#12](https://github.com/dluxhu/orca/pull/12) | `pnpm exec vitest run src/renderer/src/components/native-chat/composer/editor src/renderer/src/components/native-chat/selection-quotes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `dlux/fork-setup`           | `upstream-stable` (+ `dlux/cli-wrapper-exec`, `dlux/cli-link-notice`) | fork-only          | none                                                                                                                                         | see "Branch dlux/fork-setup: Files"                   | see "Branch dlux/fork-setup: Check"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 To add a branch: base it on `upstream-stable`, add it to the numbered list above (upstream candidates
 before fork-only ones), add a row, and add a "Branch" section below.
@@ -152,8 +152,13 @@ notes. Its check is in the table above.
 
 ## Branch dlux/remote-control
 
-Upstream candidate. Its PR on the fork holds the description, the files and the re-apply
-notes. Its check is in the table above.
+Upstream candidate: the Claude Code chat mode, one unit. It has Remote Control in chat tabs,
+`orca agent launch --resume <session-id>` and `orca agent launch --remote-control`. The
+last two parts were the branches `dlux/chat-resume` (fork PR #9) and
+`dlux/chat-resume-remote-control` (fork PR #15). They are merged into this branch, and the
+release order does not list them. The branch is stacked on `dlux/launch-refusal-cause`.
+Its PR on the fork holds the description, the files and the re-apply notes. Its check is in
+the table above.
 
 ## Branch dlux/fork-setup
 
@@ -217,7 +222,8 @@ the fork stays on `~/.config/orca`.
 - The `orca://` URL scheme. Pairing codes, plugin links and skill links use `orca://`, and the
   parsers check for it. Both apps register it, and macOS opens the links in one of them.
 - The `orca` command, on the user PATH and inside the app terminals. Both apps register
-  `orca`; the last one to register owns the link (see Part 3).
+  `orca`; the last one to register owns the link. Settings > Command line says when
+  Register replaces the link of the other app (branch `dlux/cli-link-notice`).
 - Helper bundle ids (`com.stablyai.orca.computer-use`), dev-build names (`orca-dev`,
   `Orca Dev`) and the headless `orcad` paths.
 - The press-and-hold check already accepts `com.stablyai.orca.*` ids.
@@ -257,26 +263,7 @@ git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' src/ren
   | xargs sed -i '' 's#github.com/stablyai/orca/releases#github.com/dluxhu/orca/releases#g'
 ```
 
-### Part 3: CLI link notice
-
-**What.** On macOS, when `orca` on the PATH links to the launcher of another `.app` (for
-example official Orca), Settings > Command line says so before you register: the link
-belongs to the other app, Register replaces it, and how to switch back. After Register
-replaces it, the success toast names the app it replaced and how to switch back.
-
-**Why.** Both apps use the command name `orca` (owner decision). Upstream already treats a
-link to any `.app` launcher as "stale" and replaces it without a word.
-
-**Files.**
-
-- `src/main/cli/installation/cli-command-inspection.ts` (`otherMacAppBundle`, the stale detail)
-- `src/main/cli/cli-installer.ts` (the detail after install)
-- `src/renderer/src/components/settings/cli/install/use-cli-registration-actions.ts` (toast description)
-
-**Re-apply.** Keep the three hunks marked "Fork patch". The test is
-`src/main/cli/installation/cli-installer-other-app-notice.test.ts`.
-
-### Part 4: fork documents and release script
+### Part 3: fork documents and release script
 
 **What.** The fork front page `.github/README.md`, this file,
 `config/scripts/fork/build-release.sh` and `config/scripts/fork/graft-orcad-template-targets.mjs`
@@ -284,18 +271,7 @@ link to any `.app` launcher as "stale" and replaces it without a word.
 file that does not match upstream's manifest. Its test is
 `config/scripts/fork/graft-orcad-template-targets.test.mjs`.
 
-### Part 5: macOS CLI launcher
-
-**What.** `resources/darwin/bin/orca` starts the executable that `CFBundleExecutable` in
-`Info.plist` names, not `Contents/MacOS/Orca`.
-
-**Why.** The executable name follows `productName` (`Orca @dLux`). Upstream hardcodes `Orca`.
-
-**Re-apply.** Keep the `ELECTRON=` line. The test is
-`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (its macOS fixture is
-`Orca @dLux.app` with an `Info.plist`; it runs on macOS only).
-
-### Part 6: headless orcad Electron fallback
+### Part 4: headless orcad Electron fallback
 
 **What.** On macOS, `installedElectronCandidates` in
 `src/main/orcad/browser-providers/orcad-browser-provider.ts` lists only the fork's bundle:
@@ -348,8 +324,8 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (25): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
-`config/scripts/fork/graft-orcad-template-targets.mjs` (new), `resources/darwin/bin/orca`,
+Source and config (21): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+`config/scripts/fork/graft-orcad-template-targets.mjs` (new),
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
 `src/main/startup/profile-startup/dev-instance-identity.ts`, `src/main/menu/register-app-menu.ts`,
@@ -359,19 +335,20 @@ Source and config (25): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/shared/local-build-compatibility-contract.json`,
 `src/shared/local-build-compatibility-contract.ts`,
 `src/main/ipc/notification-system-settings-link.ts`,
-`src/main/cli/installation/cli-command-inspection.ts`, `src/main/cli/cli-installer.ts`,
-`src/renderer/src/components/settings/cli/install/use-cli-registration-actions.ts`,
 `src/shared/release-channel.ts`, `src/main/updater/lifecycle/updater-setup.ts`,
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`,
 `src/main/orcad/browser-providers/orcad-browser-provider.ts`.
 
-Tests (20): `src/main/startup/fork-identity.test.ts` (new),
+Tests (19): `src/main/startup/fork-identity.test.ts` (new),
 `config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
+`config/scripts/fork/build-release.test.sh` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
-`src/main/cli/installation/cli-installer-other-app-notice.test.ts` (new),
-`src/main/cli/packaged-assets/packaged-cli-assets.test.ts` (Part 5),
-`src/main/orcad/browser-providers/orcad-browser-provider.test.ts` (Part 6) and the 14 files in
+`src/main/orcad/browser-providers/orcad-browser-provider.test.ts` (Part 4) and the 14 files in
 "Test changes".
+
+The macOS CLI launcher and the CLI link notice are their own branches:
+`dlux/cli-wrapper-exec` and `dlux/cli-link-notice`. This branch is stacked on both. It has no
+change of its own in their files.
 
 Documents (2): `.github/README.md` (new), `docs/fork/PATCHES.md` (new).
