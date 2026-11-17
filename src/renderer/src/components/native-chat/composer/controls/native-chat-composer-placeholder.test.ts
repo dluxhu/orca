@@ -41,7 +41,10 @@ describe('nativeChatComposerPlaceholder', () => {
     const placeholder = (args: Partial<typeof base> & { unavailableHint?: string }) =>
       renderHook(() => useNativeChatComposerPlaceholder({ ...base, ...args })).result.current
     expect(placeholder({ editing: true })).toBe(`Edit message, ${shortcut} to save`)
-    expect(placeholder({ goal: true })).toContain(`${shortcut} to send`)
+    const goal = 'Describe your goal, define measurable outcomes for best results'
+    expect(placeholder({ goal: true })).toBe(`${goal}, ${shortcut} to send`)
     expect(placeholder({ unavailableHint: 'Install the agent' })).toBe('Install the agent')
+    useAppStore.setState({ settings: getDefaultSettings('/tmp') })
+    expect(placeholder({ goal: true })).toBe(goal)
   })
 })
