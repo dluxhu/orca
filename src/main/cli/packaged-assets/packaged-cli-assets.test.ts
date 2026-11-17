@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -25,18 +25,28 @@ const unixLauncherFixtures = [
   {
     name: 'macOS',
     asset: darwinLauncherAsset,
-    appDir: ['Orca.app'],
+    appDir: ['Example App.app'],
     launcher: ['Contents', 'Resources', 'bin', 'orca'],
-    executable: ['Contents', 'MacOS', 'Orca'],
+    // The executable name follows productName; the launcher reads it from Info.plist.
+    executable: ['Contents', 'MacOS', 'Example App'],
     cli: ['Contents', 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js']
   }
-] as const
+  // The macOS launcher needs PlistBuddy, so it runs only on macOS.
+].filter((fixture) => fixture.name !== 'macOS' || process.platform === 'darwin')
+
+function infoPlist(executable: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>CFBundleExecutable</key><string>${executable}</string></dict></plist>
+`
+}
 
 describe('packaged CLI assets', () => {
   itRunsUnixShell.each(unixLauncherFixtures)(
     'sanitizes node env and forwards argv verbatim through the $name launcher',
     async (launcherFixture) => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-unix-cli-env-'))
+      // The launcher resolves symlinks, and the macOS tmpdir is one (/var -> /private/var).
+      const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-unix-cli-env-')))
       try {
         const appDir = join(root, ...launcherFixture.appDir)
         const launcherPath = join(appDir, ...launcherFixture.launcher)
@@ -48,6 +58,13 @@ describe('packaged CLI assets', () => {
         await mkdir(dirname(cliPath), { recursive: true })
         await copyFile(launcherFixture.asset, launcherPath)
         await writeFile(cliPath, '', 'utf8')
+        if (launcherFixture.name === 'macOS') {
+          await writeFile(
+            join(appDir, 'Contents', 'Info.plist'),
+            infoPlist(launcherFixture.executable.at(-1) ?? ''),
+            'utf8'
+          )
+        }
         await writeFile(
           electronPath,
           `#!/usr/bin/env bash
