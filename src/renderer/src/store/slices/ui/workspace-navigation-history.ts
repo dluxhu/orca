@@ -84,7 +84,8 @@ export type WorktreeNavHistorySlice = {
 }
 
 type ActivateFn = (worktreeId: string) => unknown
-type ViewActivateFn = (entry: WorktreeNavHistoryViewEntry) => void
+// False means the activation was refused; the history index then stays.
+type ViewActivateFn = (entry: WorktreeNavHistoryViewEntry) => boolean | void
 
 // Why: injected via setWorktreeNavActivator to avoid an import cycle (activation imports the store).
 let activator: ActivateFn | null = null
@@ -160,15 +161,25 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
   return `view:task-detail:linear:${sourceScope}:${entry.issue.workspaceId ?? 'selected'}:${entry.issue.id}`
 }
 
+function hasChatTab(entry: WorktreeNavHistoryChatQuoteEntry, state: AppState): boolean {
+  return (
+    state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ?? false
+  )
+}
+
+/** What an entry shows now. A chat place whose tab is closed shows only its workspace. */
+function shownViewKey(entry: WorktreeNavHistoryEntry, state: AppState): string {
+  return typeof entry === 'object' &&
+    entry.kind === 'native-chat-quote' &&
+    !hasChatTab(entry, state)
+    ? getHistoryEntryKey(entry.worktreeId)
+    : getHistoryEntryKey(entry)
+}
+
 function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
   if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
     // A chip's place stands for its workspace too, so it stays live when its chat closes.
-    return (
-      isLiveEntry(entry.worktreeId, state) &&
-      (entry.at === 'chip' ||
-        (state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ??
-          false))
-    )
+    return isLiveEntry(entry.worktreeId, state) && (entry.at === 'chip' || hasChatTab(entry, state))
   }
   if (isViewEntry(entry)) {
     return true
@@ -191,19 +202,27 @@ export function appendHistoryEntry(
   if (current !== undefined && getHistoryEntryKey(current) === getHistoryEntryKey(entry)) {
     return s
   }
-  // A chat place is in its workspace already, so a visit to that workspace adds no step.
+  let start = s.worktreeNavHistoryIndex + 1
   if (
-    current !== undefined &&
     typeof current === 'object' &&
-    historyEntryWorkspaceId(current) === entry
+    current.kind === 'native-chat-quote' &&
+    typeof entry === 'string' &&
+    !isSimpleViewEntry(entry)
   ) {
-    return s
+    // A chat place is in its workspace already, so a visit to that workspace adds no step.
+    if (current.worktreeId === entry) {
+      return s
+    }
+    // A jump's source is where the jump landed: a workspace visit there takes its step.
+    if (current.at === 'source') {
+      start -= 1
+    }
   }
 
   // Truncate forward entries so appending starts a new branch.
-  const truncated = s.worktreeNavHistory.slice(0, s.worktreeNavHistoryIndex + 1)
+  const truncated = s.worktreeNavHistory.slice(0, start)
   truncated.push(entry)
-  let nextIndex = s.worktreeNavHistoryIndex + 1
+  let nextIndex = start
 
   // Why: shift index left by the eviction count so it still points at the just-appended entry.
   if (truncated.length > MAX_HISTORY) {
@@ -218,9 +237,18 @@ export function appendHistoryEntry(
   }
 }
 
+// A step to an entry that shows the current view changes nothing, so Back and Forward skip it.
+function isStepFromCurrent(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
+  const current = state.worktreeNavHistory[state.worktreeNavHistoryIndex]
+  return (
+    isLiveEntry(entry, state) &&
+    (current === undefined || shownViewKey(entry, state) !== shownViewKey(current, state))
+  )
+}
+
 export function findPrevLiveWorktreeHistoryIndex(state: AppState): number | null {
   for (let i = state.worktreeNavHistoryIndex - 1; i >= 0; i--) {
-    if (isLiveEntry(state.worktreeNavHistory[i], state)) {
+    if (isStepFromCurrent(state.worktreeNavHistory[i], state)) {
       return i
     }
   }
@@ -239,7 +267,7 @@ export function findPrevLiveNonTaskStackHistoryIndex(state: AppState): number | 
 
 export function findNextLiveWorktreeHistoryIndex(state: AppState): number | null {
   for (let i = state.worktreeNavHistoryIndex + 1; i < state.worktreeNavHistory.length; i++) {
-    if (isLiveEntry(state.worktreeNavHistory[i], state)) {
+    if (isStepFromCurrent(state.worktreeNavHistory[i], state)) {
       return i
     }
   }
@@ -329,8 +357,9 @@ function navigateToIndex(
         return
       }
       // Why: use setActiveView (not open*Page) so replay doesn't mutate previousViewBefore* or fire page-open side effects.
-      viewActivator(targetEntry)
-      set({ worktreeNavHistoryIndex: targetIndex } as Partial<AppState>)
+      if (viewActivator(targetEntry) !== false) {
+        set({ worktreeNavHistoryIndex: targetIndex } as Partial<AppState>)
+      }
     } else {
       if (!activator) {
         // Why: warn (not a silent no-op) so a missing activator is diagnosable.

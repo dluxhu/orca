@@ -21,10 +21,13 @@ export function registerWorktreeActivation(
   setWorktreeNavActivator((worktreeId) => activate(worktreeId, { navigationIntent: 'user-open' }))
   setWorktreeNavViewActivator((entry) => {
     if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
-      activate(entry.worktreeId, { navigationIntent: 'user-open' })
+      if (activate(entry.worktreeId, { navigationIntent: 'user-open' }) === false) {
+        return false
+      }
       showNativeChatQuotePlace(entry)
-      return
+      return true
     }
     activateView(entry)
+    return true
   })
 }

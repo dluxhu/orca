@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   toast: vi.fn(),
   activateTab: vi.fn(),
-  activate: vi.fn(() => true),
+  activate: vi.fn((_id: string, _opts?: unknown): unknown => true),
   activateView: vi.fn()
 }))
 vi.mock('@/store/index', async () => {
@@ -125,6 +125,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })
   registerWorktreeActivation(mocks.activate, mocks.activateView)
   useAppStore.setState({
+    worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w1' }] },
     worktreeNavHistory: ['w0', 'w1'],
     worktreeNavHistoryIndex: 1,
     unifiedTabsByWorktree: {
@@ -299,4 +300,122 @@ it('reopens a closed tab in the workspace of a chat place', () => {
   })
   reopenClosedWorkspaceTab(null)
   expect(reopenClosedTab).toHaveBeenCalledWith('w1')
+})
+
+const FILE_QUOTE = '> src/a.ts:12-14\n> ```ts\n> const a = 1\n> ```\n\nmy words'
+const FILE_PLACE = { ...PLACE, chip: 0 }
+
+it('lets a file open in another workspace take the source step, so Back reaches the chip', async () => {
+  useAppStore.setState({ worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w1' }, { id: 'w2' }] } })
+  // The host maps the file to workspace w2; its editor open records w2 later.
+  mocks.open.mockImplementation(() => {
+    void Promise.resolve().then(() => useAppStore.getState().recordWorktreeVisit('w2'))
+  })
+  render(<Chat content={FILE_QUOTE} />)
+  const chip = screen.getByRole('button', { name: /^Quote: src\/a\.ts:12-14/ })
+  const entries = ['w0', { ...FILE_PLACE, at: 'chip' }, 'w2']
+
+  fireEvent.click(chip)
+  await act(async () => {})
+  expect(history()).toEqual({ entries, index: 2 })
+
+  act(() => useAppStore.getState().goBackWorktree())
+  frames(3)
+  await act(async () => {})
+  expect(history()).toEqual({ entries, index: 1 })
+  expect(document.activeElement).toBe(chip)
+
+  act(() => useAppStore.getState().goForwardWorktree())
+  expect(mocks.activate).toHaveBeenLastCalledWith('w2', { navigationIntent: 'user-open' })
+  expect(history()).toEqual({ entries, index: 2 })
+})
+
+it('adds later workspace visits after a jump, and a page visit at the chip', () => {
+  render(<Chat content={FILE_QUOTE} />)
+  fireEvent.click(screen.getByRole('button', { name: /^Quote: src\/a\.ts:12-14/ }))
+  act(() => useAppStore.getState().recordWorktreeVisit('w2'))
+  act(() => useAppStore.getState().recordWorktreeVisit('w1'))
+  expect(history()).toEqual({
+    entries: ['w0', { ...FILE_PLACE, at: 'chip' }, 'w2', 'w1'],
+    index: 3
+  })
+
+  useAppStore.setState({
+    worktreeNavHistory: ['w0', { ...FILE_PLACE, at: 'chip' }, { ...FILE_PLACE, at: 'source' }],
+    worktreeNavHistoryIndex: 1
+  })
+  act(() => useAppStore.getState().recordViewVisit('tasks'))
+  act(() => useAppStore.getState().recordWorktreeVisit('w1'))
+  expect(history()).toEqual({
+    entries: ['w0', { ...FILE_PLACE, at: 'chip' }, 'tasks', 'w1'],
+    index: 3
+  })
+})
+
+it('keeps the index when the workspace of a chat place refuses to open', () => {
+  useAppStore.setState({
+    worktreeNavHistory: [
+      'w0',
+      { ...FILE_PLACE, at: 'chip' },
+      { ...FILE_PLACE, at: 'source' },
+      'w0'
+    ],
+    worktreeNavHistoryIndex: 3
+  })
+  mocks.activate.mockImplementation((id: string) => id !== 'w1')
+  act(() => useAppStore.getState().goBackWorktree())
+  frames(3)
+  expect(mocks.activate).toHaveBeenLastCalledWith('w1', { navigationIntent: 'user-open' })
+  expect(mocks.activateTab).not.toHaveBeenCalled()
+  expect(history().index).toBe(3)
+  mocks.activate.mockImplementation(() => true)
+})
+
+it('skips a step that shows the current view after the chat closes at its source', () => {
+  useAppStore.setState({
+    worktreeNavHistory: ['w0', { ...FILE_PLACE, at: 'chip' }, { ...FILE_PLACE, at: 'source' }],
+    worktreeNavHistoryIndex: 2,
+    unifiedTabsByWorktree: { w1: [] }
+  })
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(mocks.activate).toHaveBeenLastCalledWith('w0', { navigationIntent: 'user-open' })
+  expect(history().index).toBe(0)
+  act(() => useAppStore.getState().goForwardWorktree())
+  act(() => useAppStore.getState().goForwardWorktree())
+  expect(history().index).toBe(1)
+})
+
+it('does not walk between two chip places of a closed chat', () => {
+  const other = { ...PLACE, chip: 0 }
+  useAppStore.setState({
+    worktreeNavHistory: [
+      'w0',
+      { ...other, at: 'chip' },
+      { ...other, at: 'source' },
+      { ...PLACE, at: 'chip' },
+      { ...PLACE, at: 'source' }
+    ],
+    worktreeNavHistoryIndex: 3,
+    unifiedTabsByWorktree: { w1: [] }
+  })
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(history().index).toBe(0)
+  act(() => useAppStore.getState().goForwardWorktree())
+  expect(history().index).toBe(1)
+  act(() => useAppStore.getState().goForwardWorktree())
+  expect(history().index).toBe(1)
+  expect(mocks.activate).toHaveBeenCalledTimes(2)
+})
+
+it('skips the chat places of a removed workspace', () => {
+  useAppStore.setState({
+    worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w2' }] },
+    worktreeNavHistory: ['w0', { ...PLACE, at: 'chip' }, { ...PLACE, at: 'source' }, 'w2'],
+    worktreeNavHistoryIndex: 3
+  })
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(history().index).toBe(0)
+  act(() => useAppStore.getState().goForwardWorktree())
+  expect(history().index).toBe(3)
+  expect(mocks.activateTab).not.toHaveBeenCalled()
 })
