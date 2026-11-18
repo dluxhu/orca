@@ -178,8 +178,8 @@ function shownViewKey(entry: WorktreeNavHistoryEntry, state: AppState): string {
 
 function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
   if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
-    // A chip's place stands for its workspace too, so it stays live when its chat closes.
-    return isLiveEntry(entry.worktreeId, state) && (entry.at === 'chip' || hasChatTab(entry, state))
+    // A chat place whose tab is closed still shows its workspace.
+    return isLiveEntry(entry.worktreeId, state)
   }
   if (isViewEntry(entry)) {
     return true
