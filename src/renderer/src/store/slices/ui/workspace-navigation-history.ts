@@ -14,6 +14,8 @@ import {
   selectFolderWorkspaces,
   selectWorktreesByRepo
 } from '../../workspaces/catalog/workspace-record-fields'
+import { isChatPlace, shownEntry } from './workspace-navigation-history-chat-place'
+import type { WorktreeNavHistoryChatQuoteEntry } from './workspace-navigation-history-chat-place'
 
 // Why: bound per-session history growth; 50 keeps goBack/goForward's linear scans cheap yet is never hit in normal use.
 const MAX_HISTORY = 50
@@ -52,17 +54,6 @@ export type WorktreeNavHistoryTaskDetailEntry =
       issue: JiraIssue
       sourceContext?: TaskSourceContext | null
     }
-/** A place in an agent chat: a sent quote chip, or the source that the chip jumps to. */
-export type WorktreeNavHistoryChatQuoteEntry = {
-  kind: 'native-chat-quote'
-  worktreeId: string
-  tabId: string
-  /** The message that holds the chip. */
-  messageId: string
-  /** The chip's index among the quote chips of its message. */
-  chip: number
-  at: 'chip' | 'source'
-}
 export type WorktreeNavHistoryViewEntry =
   | WorktreeNavHistorySimpleViewEntry
   | WorktreeNavHistoryTaskDetailEntry
@@ -116,10 +107,10 @@ export function isViewEntry(entry: WorktreeNavHistoryEntry): entry is WorktreeNa
 
 /** The workspace of an entry: the workspace itself, or the workspace of a chat place. Null for a page. */
 export function historyEntryWorkspaceId(entry: WorktreeNavHistoryEntry): string | null {
-  if (typeof entry === 'object') {
-    return entry.kind === 'native-chat-quote' ? entry.worktreeId : null
+  if (isChatPlace(entry)) {
+    return entry.worktreeId
   }
-  return isSimpleViewEntry(entry) ? null : entry
+  return typeof entry === 'string' && !isSimpleViewEntry(entry) ? entry : null
 }
 
 function isTaskStackEntry(entry: WorktreeNavHistoryEntry): boolean {
@@ -161,23 +152,8 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
   return `view:task-detail:linear:${sourceScope}:${entry.issue.workspaceId ?? 'selected'}:${entry.issue.id}`
 }
 
-function hasChatTab(entry: WorktreeNavHistoryChatQuoteEntry, state: AppState): boolean {
-  return (
-    state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ?? false
-  )
-}
-
-/** What an entry shows now. A chat place whose tab is closed shows only its workspace. */
-function shownViewKey(entry: WorktreeNavHistoryEntry, state: AppState): string {
-  return typeof entry === 'object' &&
-    entry.kind === 'native-chat-quote' &&
-    !hasChatTab(entry, state)
-    ? getHistoryEntryKey(entry.worktreeId)
-    : getHistoryEntryKey(entry)
-}
-
 function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
-  if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
+  if (isChatPlace(entry)) {
     // A chat place whose tab is closed still shows its workspace.
     return isLiveEntry(entry.worktreeId, state)
   }
@@ -203,12 +179,7 @@ export function appendHistoryEntry(
     return s
   }
   let start = s.worktreeNavHistoryIndex + 1
-  if (
-    typeof current === 'object' &&
-    current.kind === 'native-chat-quote' &&
-    typeof entry === 'string' &&
-    !isSimpleViewEntry(entry)
-  ) {
+  if (isChatPlace(current) && typeof entry === 'string' && !isSimpleViewEntry(entry)) {
     // A chat place is in its workspace already, so a visit to that workspace adds no step.
     if (current.worktreeId === entry) {
       return s
@@ -240,10 +211,8 @@ export function appendHistoryEntry(
 // A step to an entry that shows the current view changes nothing, so Back and Forward skip it.
 function isStepFromCurrent(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
   const current = state.worktreeNavHistory[state.worktreeNavHistoryIndex]
-  return (
-    isLiveEntry(entry, state) &&
-    (current === undefined || shownViewKey(entry, state) !== shownViewKey(current, state))
-  )
+  const shown = (e: WorktreeNavHistoryEntry): string => getHistoryEntryKey(shownEntry(e, state))
+  return isLiveEntry(entry, state) && (current === undefined || shown(entry) !== shown(current))
 }
 
 export function findPrevLiveWorktreeHistoryIndex(state: AppState): number | null {

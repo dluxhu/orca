@@ -2,10 +2,8 @@ import {
   setWorktreeNavActivator,
   setWorktreeNavViewActivator
 } from '@/store/slices/ui/workspace-navigation-history'
-import type {
-  WorktreeNavHistoryChatQuoteEntry,
-  WorktreeNavHistoryViewEntry
-} from '@/store/slices/ui/workspace-navigation-history'
+import type { WorktreeNavHistoryViewEntry } from '@/store/slices/ui/workspace-navigation-history'
+import type { WorktreeNavHistoryChatQuoteEntry } from '@/store/slices/ui/workspace-navigation-history-chat-place'
 import { showNativeChatQuotePlace } from '@/components/native-chat/selection-quotes/native-chat-quote-history'
 
 type ActivateFn = (worktreeId: string, opts: { navigationIntent: 'user-open' }) => unknown

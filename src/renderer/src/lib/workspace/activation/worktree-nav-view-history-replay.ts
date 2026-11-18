@@ -1,8 +1,6 @@
 import { useAppStore } from '@/store/index'
-import type {
-  WorktreeNavHistoryChatQuoteEntry,
-  WorktreeNavHistoryViewEntry
-} from '@/store/slices/ui/workspace-navigation-history'
+import type { WorktreeNavHistoryViewEntry } from '@/store/slices/ui/workspace-navigation-history'
+import type { WorktreeNavHistoryChatQuoteEntry } from '@/store/slices/ui/workspace-navigation-history-chat-place'
 
 // Replay via setActiveView: open*Page would mutate previousViewBefore* or duplicate history (navigateToIndex).
 export function applyWorktreeNavViewEntry(

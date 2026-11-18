@@ -1,11 +1,12 @@
 import { useAppStore } from '@/store'
 import { findLinkSourceTab } from '@/lib/links/placement/link-open-intent'
-import {
-  appendHistoryEntry,
-  type WorktreeNavHistoryChatQuoteEntry
-} from '@/store/slices/ui/workspace-navigation-history'
+import { appendHistoryEntry } from '@/store/slices/ui/workspace-navigation-history'
 import type { NativeChatFileLinkContext } from '../links/actions/native-chat-file-link-context'
 import { nativeChatMessageReveals } from './use-native-chat-quote-jump'
+import {
+  hasChatTab,
+  type WorktreeNavHistoryChatQuoteEntry
+} from '@/store/slices/ui/workspace-navigation-history-chat-place'
 
 const MESSAGE = '[data-native-chat-message-id]'
 const CHIP = '[data-native-chat-sent-quote]'
@@ -69,7 +70,7 @@ function showChip(scroller: HTMLElement, place: WorktreeNavHistoryChatQuoteEntry
 export function showNativeChatQuotePlace(place: WorktreeNavHistoryChatQuoteEntry): void {
   const state = useAppStore.getState()
   // A closed chat leaves only its workspace, which the caller opened.
-  if (!state.unifiedTabsByWorktree[place.worktreeId]?.some((tab) => tab.id === place.tabId)) {
+  if (!hasChatTab(place, state)) {
     return
   }
   state.activateTab(place.tabId, { worktreeId: place.worktreeId })
