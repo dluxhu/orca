@@ -54,6 +54,42 @@ const isChipLine = (block: ProseMirrorNode | null): boolean =>
   block?.childCount === 1 && block.firstChild?.type.name === QUOTE_NODE
 
 /**
+ * The position of the chip that Backspace (-1) or Delete (1) at the caret would leave in place: the
+ * join removes the hidden line next to the chip, and the layout puts it back. Null in other cases.
+ */
+export function chipPastSeparator(
+  { doc, selection }: EditorState,
+  direction: -1 | 1
+): number | null {
+  const { $head } = selection
+  const edge = direction < 0 ? 0 : $head.parent.content.size
+  if (!selection.empty || $head.depth !== 1 || $head.parentOffset !== edge) {
+    return null
+  }
+  const index = $head.index(0)
+  const block = (at: number): ProseMirrorNode | null =>
+    at >= 0 && at < doc.childCount ? doc.child(at) : null
+  const chip =
+    $head.parent.content.size > 0
+      ? // Text next to the hidden line.
+        block(index + direction)?.content.size === 0 && isChipLine(block(index + 2 * direction))
+        ? index + 2 * direction
+        : null
+      : // The hidden line, while the caret shows it.
+        isChipLine(block(index + direction)) && (block(index - direction)?.content.size ?? 0) > 0
+        ? index + direction
+        : null
+  if (chip === null) {
+    return null
+  }
+  let position = 0
+  for (let at = 0; at < chip; at++) {
+    position += doc.child(at).nodeSize
+  }
+  return position + 1
+}
+
+/**
  * Hides the one blank line that keeps a chip apart from the text next to it; the text keeps it.
  * More empty lines are the user's, and show. The last line stays: the user types in it.
  */
