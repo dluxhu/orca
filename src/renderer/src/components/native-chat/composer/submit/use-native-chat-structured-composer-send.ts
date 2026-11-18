@@ -30,6 +30,8 @@ import { nativeChatAttachImagesAgainReason } from '../../attachments/chips/nativ
 import { nativeChatNoticeFromError } from '../controls/native-chat-composer-notice'
 import { agentSessionWriteNoticeText } from '../../messages/notices/agent-session-write-notice-text'
 import { translate } from '@/i18n/i18n'
+import type { NativeChatMessage } from '../../../../../../shared/native-chat/native-chat-types'
+import { shortenSameChatQuotes } from '../../selection-quotes/native-chat-quote-shortening'
 import {
   captureNativeChatComposerSubmission,
   subscribeToNativeChatComposerDraftAppend
@@ -54,6 +56,8 @@ export type UseNativeChatStructuredComposerSendArgs = {
   clearSkillOrigin: () => void
   setDraft: (value: string) => void
   setCaret: (caret: number) => void
+  /** This chat's transcript; long quotes of its replies go to the agent shortened. */
+  chatMessages?: readonly NativeChatMessage[]
 }
 
 export type NativeChatStructuredComposerSend = (
@@ -71,7 +75,8 @@ export function useNativeChatStructuredComposerSend({
   isComposing,
   clearSkillOrigin,
   setDraft,
-  setCaret
+  setCaret,
+  chatMessages
 }: UseNativeChatStructuredComposerSendArgs): NativeChatStructuredComposerSend {
   return useCallback<NativeChatStructuredComposerSend>(
     async (text, attachments = imageAttachments, intent): Promise<boolean> => {
@@ -134,6 +139,9 @@ export function useNativeChatStructuredComposerSend({
           submitted.pastedTextFiles,
           hostCommand ? 'goal' : 'message'
         )
+      }
+      if (!hostCommand && chatMessages) {
+        text = shortenSameChatQuotes(text, chatMessages)
       }
       const submission = captureNativeChatComposerSubmission(draftScopeKey)
       let consumed = false
@@ -265,6 +273,7 @@ export function useNativeChatStructuredComposerSend({
       draftScopeKey,
       imageAttachments,
       isComposing,
+      chatMessages,
       setCaret,
       setDraft,
       structuredTransport

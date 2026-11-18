@@ -24,7 +24,7 @@ export function textHash(text: string): string {
  * The quote as "Add to chat" writes it: the text with no trailing whitespace on a line, and no
  * whitespace at its two ends. Both sides hash this source text, never the rendered quote.
  */
-function quoteKey(text: string): string {
+export function quoteKey(text: string): string {
   const normalized = text
     .replace(/\r\n?/g, '\n')
     .split('\n')
