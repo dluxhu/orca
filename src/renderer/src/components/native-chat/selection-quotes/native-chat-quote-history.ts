@@ -67,7 +67,12 @@ function showChip(scroller: HTMLElement, place: WorktreeNavHistoryChatQuoteEntry
 
 /** Shows a chat place from Back or Forward: focuses the chip, or jumps from the chip to its source again. */
 export function showNativeChatQuotePlace(place: WorktreeNavHistoryChatQuoteEntry): void {
-  useAppStore.getState().activateTab(place.tabId, { worktreeId: place.worktreeId })
+  const state = useAppStore.getState()
+  // A closed chat leaves only its workspace, which the caller opened.
+  if (!state.unifiedTabsByWorktree[place.worktreeId]?.some((tab) => tab.id === place.tabId)) {
+    return
+  }
+  state.activateTab(place.tabId, { worktreeId: place.worktreeId })
   // shortcut: a transcript that is not drawn on the next frame does not scroll; wait for its rows if a chat in another workspace needs it.
   requestAnimationFrame(() => {
     for (const reveal of nativeChatMessageReveals) {

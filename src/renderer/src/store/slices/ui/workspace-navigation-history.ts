@@ -113,6 +113,14 @@ export function isViewEntry(entry: WorktreeNavHistoryEntry): entry is WorktreeNa
   return isSimpleViewEntry(entry) || typeof entry === 'object'
 }
 
+/** The workspace of an entry: the workspace itself, or the workspace of a chat place. Null for a page. */
+export function historyEntryWorkspaceId(entry: WorktreeNavHistoryEntry): string | null {
+  if (typeof entry === 'object') {
+    return entry.kind === 'native-chat-quote' ? entry.worktreeId : null
+  }
+  return isSimpleViewEntry(entry) ? null : entry
+}
+
 function isTaskStackEntry(entry: WorktreeNavHistoryEntry): boolean {
   return entry === 'tasks' || (typeof entry === 'object' && entry.kind === 'task-detail')
 }
@@ -154,8 +162,12 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
 
 function isLiveEntry(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
   if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
+    // A chip's place stands for its workspace too, so it stays live when its chat closes.
     return (
-      state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ?? false
+      isLiveEntry(entry.worktreeId, state) &&
+      (entry.at === 'chip' ||
+        (state.unifiedTabsByWorktree[entry.worktreeId]?.some((tab) => tab.id === entry.tabId) ??
+          false))
     )
   }
   if (isViewEntry(entry)) {
@@ -177,6 +189,14 @@ export function appendHistoryEntry(
   // Why: de-dup only against the current entry so A -> B -> A stays a valid stack.
   const current = s.worktreeNavHistory[s.worktreeNavHistoryIndex]
   if (current !== undefined && getHistoryEntryKey(current) === getHistoryEntryKey(entry)) {
+    return s
+  }
+  // A chat place is in its workspace already, so a visit to that workspace adds no step.
+  if (
+    current !== undefined &&
+    typeof current === 'object' &&
+    historyEntryWorkspaceId(current) === entry
+  ) {
     return s
   }
 
