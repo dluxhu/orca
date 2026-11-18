@@ -90,18 +90,98 @@ describe('quote chips in the composer', () => {
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
 
-  // A quote line directly above a chip would join the chip's blockquote.
-  it.each([
-    ['between two chips', '> a\n\n> b\n\n', 2, '> a\n\n> x\n\n> b\n\n'],
-    ['before a chip', '> q\n\n', 1, '> x\n\n> q\n\n']
-  ])('keeps a quote line typed %s apart from the next chip', (_name, text, at, sent) => {
-    const { input, editor } = setup(text)
-    act(() => {
+  type Editor = ReturnType<typeof promptEditor>
+  const typeAt =
+    (at: number, text: string) =>
+    ({ editor }: { editor: Editor }): void => {
       editor.commands.setTextSelection(at)
-      editor.commands.insertContent('> x')
-    })
-    expect(input.value).toBe(sent)
-  })
+      editor.commands.insertContent(text)
+    }
+  const QUOTE_LINE_CASES: [
+    name: string,
+    text: string,
+    act: (setup: { editor: Editor; input: NativeChatComposerInput }) => void,
+    sent: string,
+    tokens: string[]
+  ][] = [
+    [
+      '> x typed between two chips',
+      '> a\n\n> b\n\n',
+      typeAt(2, '> x'),
+      '> a\n\n> x\n\n> b\n\n',
+      ['> a\n\n', '> b\n\n']
+    ],
+    ['> x typed before a chip', '> q\n\n', typeAt(1, '> x'), '> x\n\n> q\n\n', ['> q\n\n']],
+    ['>x typed before a chip', '> q\n\n', typeAt(1, '>x'), '>x\n\n> q\n\n', ['> q\n\n']],
+    [
+      'an indented > x typed before a chip',
+      '> q\n\n',
+      typeAt(1, '   > x'),
+      '   > x\n\n> q\n\n',
+      ['> q\n\n']
+    ],
+    [
+      'a Backspace that joins a chip line to the empty line under a typed quote line',
+      '',
+      ({ editor }) => {
+        editor.commands.setContent({
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: '> typed' }] },
+            { type: 'paragraph' },
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'nativeChatQuote', attrs: { token: '> q\n\n' } },
+                { type: 'text', text: 'c' }
+              ]
+            }
+          ]
+        })
+        editor.commands.setTextSelection(12)
+        fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Backspace', keyCode: 8 })
+      },
+      '> typed\n\n> q\n\nc',
+      ['> q\n\n']
+    ],
+    [
+      'a paste of >x before a chip',
+      '> q\n\n',
+      ({ editor }) => {
+        editor.commands.setTextSelection(1)
+        fireEvent.paste(screen.getByRole('textbox'), {
+          clipboardData: { getData: (format: string) => (format === 'text/plain' ? '>x' : '') }
+        })
+      },
+      '>x\n\n> q\n\n',
+      ['> q\n\n']
+    ],
+    [
+      'an API write of >x directly above a chip',
+      '> q\n\n',
+      ({ input }) => writeNativeChatComposerText(input, '>x\n> q\n\n', 0),
+      '>x\n> q\n\n',
+      ['>x\n> q\n\n']
+    ],
+    ['a text line typed before a chip', '> q\n\n', typeAt(1, 'x'), 'x\n> q\n\n', ['> q\n\n']]
+  ]
+
+  // The agent reads Markdown: a quote line directly above a chip joins the chip's blockquote.
+  it.each(QUOTE_LINE_CASES)(
+    'shows and sends the blockquotes the agent reads after %s',
+    (_name, text, change, sent, tokens) => {
+      const { input, editor } = setup(text)
+      act(() => change({ editor, input }))
+      expect(input.value).toBe(sent)
+      const shown: string[] = []
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === 'nativeChatQuote') {
+          shown.push(String(node.attrs.token))
+        }
+      })
+      expect(shown).toEqual(tokens)
+    }
+  )
 
   it('shows text written after a chip through the composer API on the chip line', () => {
     const { input, editor } = setup('> q\n\n')

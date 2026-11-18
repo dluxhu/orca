@@ -29,7 +29,8 @@ export function promptLeafString(
 }
 
 export const QUOTE_NODE = 'nativeChatQuote'
-export const QUOTE_LINE = /^>( |$)/
+// A line that Markdown reads as a blockquote line.
+export const QUOTE_LINE = /^ {0,3}>/
 
 function promptLineContent(line: string): JSONContent[] {
   return splitImageReferences(line).flatMap((part) =>

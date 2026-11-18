@@ -2,39 +2,46 @@ import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { promptLeafString, QUOTE_LINE, QUOTE_NODE } from './native-chat-prompt-document-text'
 
+const lastLine = (nodes: readonly ProseMirrorNode[]): string =>
+  nodes
+    .map(({ type, attrs, text }) => promptLeafString(type.name, attrs, text))
+    .join('')
+    .split('\n')
+    .at(-1)!
+
 /**
- * Starts a new line at each quote chip that has text or a pill before it on its line.
- * Why: the agent reads the chip as a Markdown blockquote, which must start a line. A chip after a
- * chip is correct: the chip before it ends in a blank line. A quote line before the chip gets a
- * blank line after it, or it joins the chip's blockquote.
+ * Keeps each quote chip a blockquote of its own in the text the agent gets.
+ * A chip with text or a pill before it on its line starts a new line: a blockquote starts a line.
+ * A chip whose line comes after a quote line gets a blank line between: Markdown otherwise joins
+ * that quote line to the chip's blockquote. A chip after a chip ends in a blank line already.
  */
 export function layoutQuoteChips(state: { doc: ProseMirrorNode; tr: Transaction }): Transaction {
   const { doc, tr } = state
-  const splits: { position: number; afterQuoteLine: boolean }[] = []
-  doc.descendants((node, position, parent, index) => {
-    if (
-      node.type.name !== QUOTE_NODE ||
-      index === 0 ||
-      parent?.child(index - 1).type.name === QUOTE_NODE
-    ) {
-      return
-    }
-    // The text line before the chip: the nodes after the previous chip, from the last line break.
-    let start = index
-    while (start > 0 && parent!.child(start - 1).type.name !== QUOTE_NODE) {
-      start--
-    }
-    const before = Array.from({ length: index - start }, (_, at) => {
-      const { type, attrs, text } = parent!.child(start + at)
-      return promptLeafString(type.name, attrs, text)
-    }).join('')
-    splits.push({ position, afterQuoteLine: QUOTE_LINE.test(before.split('\n').at(-1)!) })
+  const edits: { position: number; split: boolean; blankLine: boolean }[] = []
+  doc.forEach((block, blockOffset, blockIndex) => {
+    const children = block.content.content
+    block.forEach((node, offset, index) => {
+      if (node.type.name !== QUOTE_NODE || children[index - 1]?.type.name === QUOTE_NODE) {
+        return
+      }
+      const before =
+        index > 0
+          ? children.slice(0, index)
+          : (doc.maybeChild(blockIndex - 1)?.content.content ?? [])
+      const blankLine = QUOTE_LINE.test(lastLine(before))
+      if (index > 0 || blankLine) {
+        edits.push({ position: blockOffset + 1 + offset, split: index > 0, blankLine })
+      }
+    })
   })
-  // From the end, so the positions still to split stay valid.
-  for (const { position, afterQuoteLine } of splits.toReversed()) {
-    tr.split(position)
-    if (afterQuoteLine) {
-      tr.insert(position + 1, doc.type.schema.nodes.paragraph.create())
+  // From the end, so the positions still to change stay valid.
+  for (const { position, split, blankLine } of edits.toReversed()) {
+    if (split) {
+      tr.split(position)
+    }
+    if (blankLine) {
+      // Between the line before and the chip's line.
+      tr.insert(split ? position + 1 : position - 1, doc.type.schema.nodes.paragraph.create())
     }
   }
   return tr
