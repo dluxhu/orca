@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { createRef } from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 vi.mock('@/store/index', async (importOriginal) => importOriginal())
@@ -91,12 +91,92 @@ it('shows the line to type in below a quote that Add to chat put at the end', as
   expect(await visibleComposerLines('> q\n')).toEqual([CHIP, ''])
 })
 
-it('keeps the blank line above a chip when Backspace would join the chip to the text above', () => {
+/**
+ * Backspace at the start and Delete at the end of each line. A number: the key selects that chip
+ * (0 is the first), and the next press deletes it. A string: the text after the key.
+ */
+const KEY_TABLE: [text: string, backspace: (number | string)[], del: (number | string)[]][] = [
+  ['> q\n\n', ['> q\n\n', 0, 0], ['> q\n', '> q\n', '> q\n']],
+  [
+    'above\n\n> q\n\n',
+    ['above\n\n> q\n\n', 'above\n\n> q\n\n', 'above\n\n> q\n\n', 0, 0],
+    [0, 0, 'above\n\n> q\n', 'above\n\n> q\n', 'above\n\n> q\n']
+  ],
+  [
+    'above\n\n> q\n\n\nbelow',
+    [
+      'above\n\n> q\n\n\nbelow',
+      'above\n\n> q\n\n\nbelow',
+      'above\n\n> q\n\n\nbelow',
+      0,
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow'
+    ],
+    [
+      0,
+      0,
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\n\nbelow'
+    ]
+  ],
+  [
+    'above\n\n\n> q\n\nbelow',
+    [
+      'above\n\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      0,
+      0
+    ],
+    [
+      'above\n\n> q\n\nbelow',
+      'above\n\n> q\n\nbelow',
+      0,
+      'above\n\n\n> q\n\nbelow',
+      'above\n\n\n> q\n\nbelow',
+      'above\n\n\n> q\n\nbelow'
+    ]
+  ],
+  [
+    '> a\n\n\n\n> b\n\n',
+    ['> a\n\n\n\n> b\n\n', 0, '> a\n\n\n> b\n\n', '> a\n\n\n> b\n\n', '> a\n\n\n> b\n\n', 1, 1],
+    [
+      '> a\n\n\n> b\n\n',
+      '> a\n\n\n> b\n\n',
+      '> a\n\n\n> b\n\n',
+      '> a\n\n\n> b\n\n',
+      '> a\n\n\n\n> b\n',
+      '> a\n\n\n\n> b\n',
+      '> a\n\n\n\n> b\n'
+    ]
+  ],
+  [
+    'a\n\n\n\nb',
+    ['a\n\n\n\nb', 'a\n\n\nb', 'a\n\n\nb', 'a\n\n\nb', 'a\n\n\nb'],
+    ['a\n\n\nb', 'a\n\n\nb', 'a\n\n\nb', 'a\n\n\nb', 'a\n\n\n\nb']
+  ]
+]
+
+const KEY_CASES = KEY_TABLE.flatMap(([text, backspace, del]) => {
+  const lines = text.split('\n')
+  const start = (line: number) => lines.slice(0, line).join('\n').length + (line > 0 ? 1 : 0)
+  return [
+    ...backspace.map((outcome, line) => ['Backspace', text, line, start(line), outcome] as const),
+    ...del.map(
+      (outcome, line) => ['Delete', text, line, start(line) + lines[line].length, outcome] as const
+    )
+  ]
+})
+
+it.each(KEY_CASES)('%s on %j line %i', (key, text, _line, caret, outcome) => {
   const inputRef = createRef<NativeChatComposerInput>()
   render(
     <NativeChatPromptEditor
       inputRef={inputRef}
-      initialValue={'above\n\n> q\n\n'}
+      initialValue={text}
       disabled={false}
       placeholder="Message"
       onChange={vi.fn()}
@@ -104,11 +184,31 @@ it('keeps the blank line above a chip when Backspace would join the chip to the 
     />
   )
   const input = inputRef.current!
-  act(() => {
-    input.setSelectionRange(7, 7)
-    promptEditor(screen.getByRole('textbox')).commands.joinBackward()
+  const editor = promptEditor(screen.getByRole('textbox'))
+  const chipPositions: number[] = []
+  editor.state.doc.descendants((node, position) => {
+    if (node.type.name === 'nativeChatQuote') {
+      chipPositions.push(position)
+    }
   })
-  expect(input.value).toBe('above\n\n> q\n\n')
+  act(() => {
+    input.setSelectionRange(caret, caret)
+    fireEvent.keyDown(screen.getByRole('textbox'), { key })
+  })
+  if (typeof outcome === 'string') {
+    expect(input.value).toBe(outcome)
+    expect(editor.state.selection.toJSON().type).toBe('text')
+    return
+  }
+  expect(input.value).toBe(text)
+  expect(editor.state.selection.toJSON()).toEqual({
+    type: 'node',
+    anchor: chipPositions[outcome]
+  })
+  act(() => {
+    fireEvent.keyDown(screen.getByRole('textbox'), { key })
+  })
+  expect(input.value.split('> ').length).toBe(text.split('> ').length - 1)
 })
 
 it('keeps the user empty lines of a draft when it loads again', async () => {
