@@ -90,6 +90,19 @@ describe('quote chips in the composer', () => {
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
   })
 
+  // A quote line directly above a chip would join the chip's blockquote.
+  it.each([
+    ['between two chips', '> a\n\n> b\n\n', 2, '> a\n\n> x\n\n> b\n\n'],
+    ['before a chip', '> q\n\n', 1, '> x\n\n> q\n\n']
+  ])('keeps a quote line typed %s apart from the next chip', (_name, text, at, sent) => {
+    const { input, editor } = setup(text)
+    act(() => {
+      editor.commands.setTextSelection(at)
+      editor.commands.insertContent('> x')
+    })
+    expect(input.value).toBe(sent)
+  })
+
   it('shows text written after a chip through the composer API on the chip line', () => {
     const { input, editor } = setup('> q\n\n')
     act(() => writeNativeChatComposerText(input, '> q\n\nhello', '> q\n\nhello'.length))

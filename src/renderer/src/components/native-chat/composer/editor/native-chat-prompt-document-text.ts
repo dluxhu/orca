@@ -29,7 +29,7 @@ export function promptLeafString(
 }
 
 export const QUOTE_NODE = 'nativeChatQuote'
-const QUOTE_LINE = /^>( |$)/
+export const QUOTE_LINE = /^>( |$)/
 
 function promptLineContent(line: string): JSONContent[] {
   return splitImageReferences(line).flatMap((part) =>

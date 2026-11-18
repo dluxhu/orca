@@ -1,27 +1,41 @@
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
-import { QUOTE_NODE } from './native-chat-prompt-document-text'
+import { promptLeafString, QUOTE_LINE, QUOTE_NODE } from './native-chat-prompt-document-text'
 
 /**
  * Starts a new line at each quote chip that has text or a pill before it on its line.
  * Why: the agent reads the chip as a Markdown blockquote, which must start a line. A chip after a
- * chip is correct: the chip before it ends in a blank line.
+ * chip is correct: the chip before it ends in a blank line. A quote line before the chip gets a
+ * blank line after it, or it joins the chip's blockquote.
  */
 export function layoutQuoteChips(state: { doc: ProseMirrorNode; tr: Transaction }): Transaction {
   const { doc, tr } = state
-  const splits: number[] = []
+  const splits: { position: number; afterQuoteLine: boolean }[] = []
   doc.descendants((node, position, parent, index) => {
     if (
-      node.type.name === QUOTE_NODE &&
-      index > 0 &&
-      parent?.child(index - 1).type.name !== QUOTE_NODE
+      node.type.name !== QUOTE_NODE ||
+      index === 0 ||
+      parent?.child(index - 1).type.name === QUOTE_NODE
     ) {
-      splits.push(position)
+      return
     }
+    // The text line before the chip: the nodes after the previous chip, from the last line break.
+    let start = index
+    while (start > 0 && parent!.child(start - 1).type.name !== QUOTE_NODE) {
+      start--
+    }
+    const before = Array.from({ length: index - start }, (_, at) => {
+      const { type, attrs, text } = parent!.child(start + at)
+      return promptLeafString(type.name, attrs, text)
+    }).join('')
+    splits.push({ position, afterQuoteLine: QUOTE_LINE.test(before.split('\n').at(-1)!) })
   })
   // From the end, so the positions still to split stay valid.
-  for (const position of splits.toReversed()) {
+  for (const { position, afterQuoteLine } of splits.toReversed()) {
     tr.split(position)
+    if (afterQuoteLine) {
+      tr.insert(position + 1, doc.type.schema.nodes.paragraph.create())
+    }
   }
   return tr
 }

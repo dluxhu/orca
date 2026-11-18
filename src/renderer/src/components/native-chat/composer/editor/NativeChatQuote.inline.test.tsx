@@ -72,7 +72,6 @@ function sentLines(text: string): string[] {
 
 // The sent text keeps the quote, a blank line, then the comment; the comment shows on the chip's line.
 const TABLE: [string, string, string[]][] = [
-  ['a quote alone', '> q\n\n', [CHIP]],
   ['a comment after a quote', '> q\n\nc', [`${CHIP} c`]],
   ['a comment after each quote', '> a\n\nc1\n> b\n\nc2', [`${CHIP} c1`, `${CHIP} c2`]],
   ['two quotes, then a comment', '> a\n\n> b\n\nc', [`${CHIP} ${CHIP} c`]],
