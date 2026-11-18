@@ -24,8 +24,7 @@ export function NativeChatMentionLabel({
   }
   const Icon = item.kind === 'chat' ? MessageSquare : SquareTerminal
   const host =
-    item.environment ??
-    translate('components.native-chat.composer.mentionThisHost', 'This host')
+    item.environment ?? translate('components.native-chat.composer.mentionThisHost', 'This host')
   // The spaces between the spans keep the row's accessible name "<name> <kind> <host> <workspace>".
   return (
     <>

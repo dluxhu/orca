@@ -13,7 +13,10 @@ import {
   type NativeChatMentionSessionRow,
   type NativeChatMentionSessionsResult
 } from '../../../../../../shared/native-chat/native-chat-mention-sessions'
-import { filterNativeChatMentionSessions, type NativeChatMentionSession } from './native-chat-mentions'
+import {
+  filterNativeChatMentionSessions,
+  type NativeChatMentionSession
+} from './native-chat-mentions'
 
 // The host gives up on a silent saved environment first, so this is a backstop.
 const LIST_TIMEOUT_MS = 5_000
@@ -41,7 +44,12 @@ async function readMentionRows(
   }
   // An older host lists only its own sessions. A failed list leaves its kind out.
   const [ps, terminals] = await Promise.allSettled([
-    callRuntimeRpc<RuntimeWorktreePsResult>(target, 'worktree.ps', {}, { timeoutMs: LIST_TIMEOUT_MS }),
+    callRuntimeRpc<RuntimeWorktreePsResult>(
+      target,
+      'worktree.ps',
+      {},
+      { timeoutMs: LIST_TIMEOUT_MS }
+    ),
     callRuntimeRpc<RuntimeTerminalListResult>(
       target,
       'terminal.list',

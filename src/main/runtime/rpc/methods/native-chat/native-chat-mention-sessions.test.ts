@@ -20,29 +20,31 @@ vi.mock('../../../../wsl/host-lifecycle/wsl-host-gate', () => ({
     environment.orcadDeployment?.kind === 'wsl'
 }))
 // Fake remote runtimes: no network.
-vi.mock('../../../../ipc/runtime-environments/requests/runtime-environment-transport-routing', () => ({
-  callRuntimeEnvironment: async (
-    _userDataPath: string,
-    environmentId: string,
-    method: string,
-    params: unknown,
-    _timeoutMs: number,
-    _revision: unknown,
-    _envelope: unknown,
-    options: { signal: AbortSignal }
-  ) => {
-    calls.push({ environmentId, method, options })
-    const remote = remotes.get(environmentId)
-    if (!remote) {
-      throw new Error(`no fake for ${environmentId}`)
+vi.mock(
+  '../../../../ipc/runtime-environments/requests/runtime-environment-transport-routing',
+  () => ({
+    callRuntimeEnvironment: async (
+      _userDataPath: string,
+      environmentId: string,
+      method: string,
+      params: unknown,
+      _timeoutMs: number,
+      _revision: unknown,
+      _envelope: unknown,
+      options: { signal: AbortSignal }
+    ) => {
+      calls.push({ environmentId, method, options })
+      const remote = remotes.get(environmentId)
+      if (!remote) {
+        throw new Error(`no fake for ${environmentId}`)
+      }
+      return { ok: true, result: await remote(method, params, options.signal) }
     }
-    return { ok: true, result: await remote(method, params, options.signal) }
-  }
-}))
-
-const { NATIVE_CHAT_MENTION_SESSION_METHODS, collectNativeChatMentionSessions } = await import(
-  './native-chat-mention-sessions'
+  })
 )
+
+const { NATIVE_CHAT_MENTION_SESSION_METHODS, collectNativeChatMentionSessions } =
+  await import('./native-chat-mention-sessions')
 
 const chatPs = (id: string, name: string, workspace: string) => ({
   worktrees: [
@@ -132,6 +134,31 @@ describe('nativeChat.mentionSessions', () => {
     const result = await collectNativeChatMentionSessions([silent, live], {}, 20)
     expect(result.sessions.map((session) => session.label)).toEqual(['Live chat'])
     expect(aborted?.aborted).toBe(true)
+  })
+
+  it('asks every host at once, so two silent hosts cost one deadline', async () => {
+    const asked: string[] = []
+    const silent = (environment: string) => ({
+      environment,
+      ps: () => {
+        asked.push(environment)
+        return new Promise<never>(() => {})
+      },
+      terminals: () => new Promise<never>(() => {})
+    })
+    const pending = collectNativeChatMentionSessions([silent('one'), silent('two')], {}, 20)
+    expect(asked).toEqual(['one', 'two'])
+    expect((await pending).sessions).toEqual([])
+  })
+
+  it('leaves out a terminal list that is malformed', async () => {
+    const broken = {
+      environment: 'broken',
+      ps: async () => ({ worktrees: [] }),
+      terminals: async () => ({ terminals: [{ handle: 'term_x' }] })
+    }
+    const result = await collectNativeChatMentionSessions([broken], {})
+    expect(result.sessions).toEqual([])
   })
 
   it('leaves out only the host whose list is malformed', async () => {

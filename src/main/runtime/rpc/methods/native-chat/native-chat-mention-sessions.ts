@@ -77,8 +77,8 @@ export const NATIVE_CHAT_MENTION_SESSION_METHODS = [
     params: NativeChatMentionSessionsParams,
     handler: async (params, { runtime }) => {
       const userDataPath = getAppEnvironment().getPath('userData')
-      const call = (environmentId: string, method: string, methodParams: unknown) =>
-        (signal: AbortSignal) =>
+      const call =
+        (environmentId: string, method: string, methodParams: unknown) => (signal: AbortSignal) =>
           unwrap(
             callRuntimeEnvironment(
               userDataPath,
@@ -94,17 +94,16 @@ export const NATIVE_CHAT_MENTION_SESSION_METHODS = [
           )
       const own: NativeChatMentionHost = {
         ps: () => runtime.getWorktreePs(),
-        terminals: () => runtime.listTerminals(undefined, undefined, { includeVisualLayouts: false })
+        terminals: () =>
+          runtime.listTerminals(undefined, undefined, { includeVisualLayouts: false })
       }
       const saved = listEnvironments(userDataPath)
         .filter((environment) => !isGatedOffWslHost(environment))
-        .map(
-          (environment): NativeChatMentionHost => ({
-            environment: environment.name,
-            ps: call(environment.id, 'worktree.ps', {}),
-            terminals: call(environment.id, 'terminal.list', TERMINAL_LIST_PARAMS)
-          })
-        )
+        .map((environment): NativeChatMentionHost => ({
+          environment: environment.name,
+          ps: call(environment.id, 'worktree.ps', {}),
+          terminals: call(environment.id, 'terminal.list', TERMINAL_LIST_PARAMS)
+        }))
       return collectNativeChatMentionSessions([own, ...saved], params)
     }
   })

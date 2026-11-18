@@ -52,7 +52,9 @@ export function agentReferenceNote(
   kind?: AgentReferenceKind | null,
   environment?: string | null
 ): string {
-  const host = environment ? ` --environment ${shellWord(printableAgentLabel(environment))}` : ''
+  const name = environment ? printableAgentLabel(environment) : ''
+  // Shell quotes do not stop the CLI from reading a leading `-` as a flag; `--flag=value` does.
+  const host = name ? ` --environment${name.startsWith('-') ? '=' : ' '}${shellWord(name)}` : ''
   const session = kind === 'chat' ? parseOrcaSessionAddress(address) : null
   if (session) {
     return `[Orca chat "${label}": session ${session} — send it a message with orca chat send${host} --session ${session} --text <message>, and read its replies with orca chat read${host} --session ${session}]`

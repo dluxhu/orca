@@ -60,9 +60,10 @@ describe('listNativeChatMentionSessionRows', () => {
   })
 
   it('keeps the other kind when one list failed', () => {
-    expect(
-      listNativeChatMentionSessionRows(null, terminals, {}).map((s) => s.address)
-    ).toEqual(['term_one', 'term_two'])
+    expect(listNativeChatMentionSessionRows(null, terminals, {}).map((s) => s.address)).toEqual([
+      'term_one',
+      'term_two'
+    ])
   })
 
   it('filters by name, ignoring case', () => {
@@ -155,6 +156,23 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
         "[Orca terminal \"Runner (my box)\": term_one — send it input with orca terminal send --environment 'my box' --terminal term_one --text <text> --enter, and read its output with orca terminal read --environment 'my box' --terminal term_one]"
       ].join('\n')
     )
+  })
+
+  it('passes an environment name that starts with a dash as --environment=<name>', () => {
+    const chat = {
+      label: 'Notes (-x)',
+      address: 'orca_session_id:chat_aaaaaaaa',
+      hostKey: 'local:-x',
+      kind: 'chat' as const,
+      environment: '-x'
+    }
+    const document: JSONContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'nativeChatAgentReference', attrs: chat }] }]
+    }
+    const sent = serializeNativeChatAgentReferences(agentReferenceToken(chat), document)
+    expect(sent).toContain('orca chat send --environment=-x --session chat_aaaaaaaa')
+    expect(sent).toContain('orca chat read --environment=-x --session chat_aaaaaaaa')
   })
 
   it('keeps the orchestration note for a reference without a kind', () => {
