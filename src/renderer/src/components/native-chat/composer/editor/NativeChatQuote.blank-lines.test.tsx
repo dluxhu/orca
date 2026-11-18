@@ -97,18 +97,21 @@ it.each([
     'at the start of the line below a chip',
     'above\n\n> q\n\nbelow',
     12,
+    10,
     'above\n\n\n\nbelow'
   ],
+  ['Backspace', 'on the line Add to chat leaves below a chip', '> q\n\n', 5, 1, '\n\n'],
   [
     'Delete',
     'at the end of the line above a chip',
     'above\n\n> q\n\nbelow',
     5,
+    10,
     'above\n\n\n\nbelow'
   ]
 ])(
   'selects the chip on %s %s, and deletes it on the next press',
-  (key, _where, text, caret, after) => {
+  (key, _where, text, caret, anchor, after) => {
     const inputRef = createRef<NativeChatComposerInput>()
     render(
       <NativeChatPromptEditor
@@ -127,7 +130,7 @@ it.each([
       fireEvent.keyDown(screen.getByRole('textbox'), { key })
     })
     expect(input.value).toBe(text)
-    expect(editor.state.selection.toJSON()).toEqual({ type: 'node', anchor: 10 })
+    expect(editor.state.selection.toJSON()).toEqual({ type: 'node', anchor })
     act(() => {
       fireEvent.keyDown(screen.getByRole('textbox'), { key })
     })
