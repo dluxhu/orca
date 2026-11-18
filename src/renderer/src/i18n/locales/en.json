@@ -20753,6 +20753,7 @@
           "medium": "Med",
           "xhigh": "XHigh"
         },
+        "mentionThisHost": "This host",
         "imageUnavailable": "Preview unavailable",
         "mentionChat": "Chat",
         "mentionTerminal": "Terminal"

@@ -77,6 +77,19 @@ describe('picking a session from the @ menu', () => {
     )
   })
 
+  it('names the host on a chip from another host, and the send note names its environment', () => {
+    const { editor, input } = composer('ask @rel')
+    pick(input, { ...session, hostKey: 'local:laptop', environment: 'laptop' })
+    expect(chips(editor)).toEqual([
+      expect.objectContaining({
+        attrs: expect.objectContaining({ label: 'Release notes (laptop)', environment: 'laptop' })
+      })
+    ])
+    expect(serializeNativeChatAgentReferences(input.value, editor.getJSON())).toContain(
+      'orca chat send --environment laptop --session chat_aaaaaaaa --text <message>'
+    )
+  })
+
   it('turns a file pick into its @path text, with no chip', () => {
     const { editor, input } = composer('ask @rel')
     const commit = pick(input, 'docs/release.md')
@@ -120,14 +133,20 @@ describe('mention rows that arrive with no edit', () => {
 })
 
 describe('what a screen reader hears', () => {
-  it('names a session row by name, kind and workspace', () => {
+  it('names a session row by name, kind, host and workspace', () => {
     const row = render(
       <button type="button">
         <NativeChatMentionLabel item={session} />
       </button>
     )
-    expect(row.getByRole('button').textContent).toBe('Release notes Chat · repo/main')
-    expect(row.getByRole('button', { name: 'Release notes Chat repo/main' })).toBeTruthy()
+    expect(row.getByRole('button').textContent).toBe('Release notes Chat · This host · repo/main')
+    expect(row.getByRole('button', { name: 'Release notes Chat This host repo/main' })).toBeTruthy()
+    const remote = render(
+      <button type="button">
+        <NativeChatMentionLabel item={{ ...session, environment: 'laptop' }} />
+      </button>
+    )
+    expect(remote.getByRole('button', { name: 'Release notes Chat laptop repo/main' })).toBeTruthy()
   })
 
   it('says the kind of a chat or terminal chip', () => {

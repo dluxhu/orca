@@ -7,6 +7,8 @@ export type OrchestrationAgentReference = {
   address: string
   hostKey: string
   kind?: AgentReferenceKind
+  /** The saved environment that reaches a mentioned chat or terminal on another host. */
+  environment?: string
 }
 
 export type AgentReferenceKind = 'chat' | 'terminal'
@@ -38,18 +40,25 @@ export function agentReferenceToken(reference: OrchestrationAgentReference): str
   return `@${reference.label}${AGENT_REFERENCE_MARK}${reference.address})`
 }
 
+// A plain name stays bare; any other name is one single-quoted shell word.
+function shellWord(value: string): string {
+  return /^[\w.@:+-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`
+}
+
 /** The routing line a sent message ends with, one per mentioned agent. */
 export function agentReferenceNote(
   label: string,
   address: string,
-  kind?: AgentReferenceKind | null
+  kind?: AgentReferenceKind | null,
+  environment?: string | null
 ): string {
+  const host = environment ? ` --environment ${shellWord(printableAgentLabel(environment))}` : ''
   const session = kind === 'chat' ? parseOrcaSessionAddress(address) : null
   if (session) {
-    return `[Orca chat "${label}": session ${session} — send it a message with orca chat send --session ${session} --text <message>, and read its replies with orca chat read --session ${session}]`
+    return `[Orca chat "${label}": session ${session} — send it a message with orca chat send${host} --session ${session} --text <message>, and read its replies with orca chat read${host} --session ${session}]`
   }
   if (kind === 'terminal' && isTerminalHandle(address)) {
-    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send --terminal ${address} --text <text> --enter, and read its output with orca terminal read --terminal ${address}]`
+    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send${host} --terminal ${address} --text <text> --enter, and read its output with orca terminal read${host} --terminal ${address}]`
   }
   return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address}]`
 }

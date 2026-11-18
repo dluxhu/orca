@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { JSONContent } from '@tiptap/react'
 import { agentReferenceToken } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
-import {
-  filterNativeChatMentionSessions,
-  listNativeChatMentionSessions
-} from './native-chat-mentions'
+import { listNativeChatMentionSessionRows } from '../../../../../../shared/native-chat/native-chat-mention-sessions'
+import { filterNativeChatMentionSessions } from './native-chat-mentions'
 import { serializeNativeChatAgentReferences } from './native-chat-agent-reference-send'
 
 const agent = (paneKey: string, name: string, parentPaneKey: string | null = null) => ({
@@ -41,9 +39,12 @@ const terminals = {
   ]
 }
 
-describe('listNativeChatMentionSessions', () => {
+const local = (rows: ReturnType<typeof listNativeChatMentionSessionRows>) =>
+  rows.map((row) => ({ ...row, hostKey: 'local' }))
+
+describe('listNativeChatMentionSessionRows', () => {
   it('lists top-level chats and live terminals, without the composer itself', () => {
-    const sessions = listNativeChatMentionSessions(ps, terminals, 'local', {
+    const sessions = listNativeChatMentionSessionRows(ps, terminals, {
       sessionId: 'chat_bbbbbbbb',
       ptyId: 'pty-2'
     })
@@ -52,22 +53,29 @@ describe('listNativeChatMentionSessions', () => {
         kind: 'chat',
         label: 'Release notes',
         address: 'orca_session_id:chat_aaaaaaaa',
-        hostKey: 'local',
         detail: 'repo/main'
       },
-      { kind: 'terminal', label: 'Runner', address: 'term_one', hostKey: 'local', detail: 'main' }
+      { kind: 'terminal', label: 'Runner', address: 'term_one', detail: 'main' }
     ])
   })
 
   it('keeps the other kind when one list failed', () => {
     expect(
-      listNativeChatMentionSessions(null, terminals, 'local', {}).map((s) => s.address)
+      listNativeChatMentionSessionRows(null, terminals, {}).map((s) => s.address)
     ).toEqual(['term_one', 'term_two'])
   })
 
   it('filters by name, ignoring case', () => {
-    const sessions = listNativeChatMentionSessions(ps, terminals, 'local', {})
+    const sessions = local(listNativeChatMentionSessionRows(ps, terminals, {}))
     expect(filterNativeChatMentionSessions(sessions, 'RUN').map((s) => s.label)).toEqual(['Runner'])
+  })
+
+  it('filters by workspace name too', () => {
+    const sessions = local(listNativeChatMentionSessionRows(ps, terminals, {}))
+    expect(filterNativeChatMentionSessions(sessions, 'REPO/').map((s) => s.label)).toEqual([
+      'Release notes',
+      'This chat'
+    ])
   })
 })
 
@@ -106,6 +114,45 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
         '',
         '[Orca chat "Release notes": session chat_aaaaaaaa — send it a message with orca chat send --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --session chat_aaaaaaaa]',
         '[Orca terminal "Runner": term_one — send it input with orca terminal send --terminal term_one --text <text> --enter, and read its output with orca terminal read --terminal term_one]'
+      ].join('\n')
+    )
+  })
+
+  it('names the environment of a chat or terminal on another host', () => {
+    const chat = {
+      label: 'Notes (laptop)',
+      address: 'orca_session_id:chat_aaaaaaaa',
+      hostKey: 'local:laptop',
+      kind: 'chat' as const,
+      environment: 'laptop'
+    }
+    const terminal = {
+      label: 'Runner (my box)',
+      address: 'term_one',
+      hostKey: 'local:my box',
+      kind: 'terminal' as const,
+      environment: 'my box'
+    }
+    const document: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'nativeChatAgentReference', attrs: chat },
+            { type: 'text', text: ' ' },
+            { type: 'nativeChatAgentReference', attrs: terminal }
+          ]
+        }
+      ]
+    }
+    const text = `${agentReferenceToken(chat)} ${agentReferenceToken(terminal)}`
+    expect(serializeNativeChatAgentReferences(text, document)).toBe(
+      [
+        '@Notes (laptop) @Runner (my box)',
+        '',
+        '[Orca chat "Notes (laptop)": session chat_aaaaaaaa — send it a message with orca chat send --environment laptop --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --environment laptop --session chat_aaaaaaaa]',
+        "[Orca terminal \"Runner (my box)\": term_one — send it input with orca terminal send --environment 'my box' --terminal term_one --text <text> --enter, and read its output with orca terminal read --environment 'my box' --terminal term_one]"
       ].join('\n')
     )
   })
