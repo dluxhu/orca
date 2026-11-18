@@ -54,7 +54,12 @@ it.each(['use <div className="x">hello</div> there', '- removed', '```ts\nconst 
     const jump = vi.fn(() => true)
     sent(`my words\n\n${formatNativeChatQuote(quote)}reply`, jump)
     fireEvent.click(screen.getByRole('button', { name: /^Quote: / }))
-    expect(jump).toHaveBeenCalledWith({ messageId: 'reply-2', place }, quote, expect.any(Function))
+    expect(jump).toHaveBeenCalledWith(
+      { messageId: 'reply-2', place },
+      quote,
+      expect.any(Function),
+      expect.any(Function)
+    )
     expect(opened.toast).not.toHaveBeenCalled()
   }
 )

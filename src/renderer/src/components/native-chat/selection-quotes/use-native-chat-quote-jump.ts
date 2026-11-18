@@ -1,15 +1,11 @@
-import { createContext, useCallback, useRef, type RefObject } from 'react'
+import { createContext, useCallback, type RefObject } from 'react'
 import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcript-slot-selection'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
 import { showQuotedText } from './native-chat-quote-highlight'
-import type { QuoteSource } from './native-chat-quote-sources'
+import type { NativeChatQuoteJumpDeps } from './native-chat-quote-sources'
 
-export type NativeChatQuoteJump = (
-  source: QuoteSource,
-  text: string,
-  notifyMissing: () => void
-) => boolean
+export type NativeChatQuoteJump = NonNullable<NativeChatQuoteJumpDeps['jumpToMessage']>
 
 // About half a second: the landing draws a loaded row well before this.
 const SOURCE_FRAMES = 30
@@ -32,9 +28,8 @@ export function useNativeChatQuoteJump({
   readerLeavesEnd: () => void
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
-  const latest = useRef(0)
   return useCallback(
-    ({ messageId, place }, text, notifyMissing) => {
+    ({ messageId, place }, text, notifyMissing, isCurrent) => {
       const index = nativeChatSlotIndexOf(slots, messageId)
       if (index === -1) {
         return false
@@ -43,11 +38,9 @@ export function useNativeChatQuoteJump({
       readerLeavesEnd()
       issue({ kind: 'rail', messageId, requestId: nextRequestId() })
       // The landing scrolls in a layout effect; the row is drawn two frames later or more.
-      const id = ++latest.current
       let frame = 0
       const showWhenDrawn = (): void => {
-        // A newer jump replaces this one.
-        if (id !== latest.current) {
+        if (!isCurrent()) {
           return
         }
         frame++

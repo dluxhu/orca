@@ -66,7 +66,8 @@ describe('jumpToQuoteSource', () => {
     expect(fake.jumpToMessage).toHaveBeenCalledWith(
       source('reply-1'),
       fileQuote,
-      fake.notifyMissing
+      fake.notifyMissing,
+      expect.any(Function)
     )
     expect(fake.openFile).not.toHaveBeenCalled()
   })
