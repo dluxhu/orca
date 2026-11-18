@@ -8,14 +8,14 @@ import {
   setPlatform
 } from './terminal-link-handlers-test-harness'
 
+const history = vi.hoisted(() => ({ isNavigatingHistory: false }))
 const doubles = createTerminalLinkTestDoubles()
 const { storeState, deps } = doubles
-const state = storeState as typeof storeState & { isNavigatingHistory?: boolean }
 
 vi.mock('@/store/index', () => ({
   useAppStore: {
-    getState: () => storeState,
-    setState: (patch: object) => Object.assign(storeState, patch)
+    getState: () => Object.assign(storeState, history),
+    setState: (patch: Partial<typeof history>) => Object.assign(history, patch)
   }
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
@@ -35,13 +35,13 @@ installTerminalLinkTestEnvironment(doubles)
 // The activation records a history visit unless a history navigation is in progress.
 const navigatingAtActivation = vi.fn()
 vi.mocked(activateAndRevealWorkspace).mockImplementation(() => {
-  navigatingAtActivation(state.isNavigatingHistory === true)
-  return true
+  navigatingAtActivation(history.isNavigatingHistory)
+  return false
 })
 
 beforeEach(() => {
   navigatingAtActivation.mockClear()
-  state.isNavigatingHistory = false
+  history.isNavigatingHistory = false
 })
 
 it('activates the workspace with no history visit when the caller records the history', async () => {
@@ -49,7 +49,7 @@ it('activates the workspace with no history visit when the caller records the hi
   openDetectedFilePath('/tmp/src/a.ts', null, null, { ...deps, recordsHistory: false })
   await flushAsyncWork()
   expect(navigatingAtActivation).toHaveBeenCalledExactlyOnceWith(true)
-  expect(state.isNavigatingHistory).toBe(false)
+  expect(history.isNavigatingHistory).toBe(false)
 })
 
 it('records the history visit of a plain file open', async () => {
