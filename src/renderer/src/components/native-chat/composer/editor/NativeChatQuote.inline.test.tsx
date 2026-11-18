@@ -108,13 +108,13 @@ it('keeps the file pill of an old draft on the chip line', async () => {
   const { text, document } = oldDrafts.fileInComment
   updateNativeChatComposerDraft('file', { text, document }, 'immediate')
   const { editor } = mount(text, 'file')
-  const line = editor.getJSON().content?.[0]
-  expect(line?.content?.map((node) => node.type)).toEqual([
+  const line = editor.state.doc.child(0)
+  expect(line.content.content.map((node) => node.type.name)).toEqual([
     'nativeChatQuote',
     'nativeChatFileReference',
     'text'
   ])
-  expect(line?.content?.[1]?.attrs?.path).toBe('/x/f.txt')
+  expect(line.child(1).attrs.path).toBe('/x/f.txt')
 })
 
 it('loads an old draft with no blank line after its quote as text', () => {
@@ -131,7 +131,12 @@ it('loads an old draft with no blank line after its quote as text', () => {
 const NATIVE = 'native'
 
 // ProseMirror reads keyCode for the keys it handles itself: caret moves and deletes next to a pill.
-const KEY_CODES: Record<string, number> = { Backspace: 8, Delete: 46, ArrowLeft: 37, ArrowRight: 39 }
+const KEY_CODES: Record<string, number> = {
+  Backspace: 8,
+  Delete: 46,
+  ArrowLeft: 37,
+  ArrowRight: 39
+}
 const press = (key: string): boolean =>
   fireEvent.keyDown(screen.getByRole('textbox'), { key, keyCode: KEY_CODES[key] })
 
@@ -217,7 +222,7 @@ const KEY_CASES = KEY_TABLE.flatMap(([text, cases]) =>
   ])
 )
 
-it.each(KEY_CASES)('%s on %j at %s', (key, text, caret, place, outcome) => {
+it.each(KEY_CASES)('%s on %j at %s', (key, text, _caret, place, outcome) => {
   const { input, editor } = mount(text)
   const places = caretPlaces(editor)
   expect(places.map(([label]) => label)).toEqual(

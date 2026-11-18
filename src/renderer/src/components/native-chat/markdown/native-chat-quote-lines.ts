@@ -21,7 +21,7 @@ export function remarkNativeChatQuoteLines() {
       ) {
         // A quote renders as a chip, which is inline content.
         const inline = (quote: RootContent) => quote as unknown as PhrasingContent
-        const last = children[children.length - 1]
+        const last = children.at(-1)!
         // A div, not a p: HTML closes a p at the blockquote of the quote.
         const line: Paragraph =
           last.type === 'paragraph'
