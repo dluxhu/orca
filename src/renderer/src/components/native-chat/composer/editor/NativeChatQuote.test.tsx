@@ -97,6 +97,28 @@ describe('quote chips in the composer', () => {
       editor.commands.setTextSelection(at)
       editor.commands.insertContent(text)
     }
+  /** Typed lines, an empty line and a chip line; then Backspace at the start of the chip line. */
+  const joinChipLineUnder =
+    (lines: string[]) =>
+    ({ editor }: { editor: Editor }): void => {
+      editor.commands.setContent({
+        type: 'doc',
+        content: [
+          ...lines.map((text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })),
+          { type: 'paragraph' },
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'nativeChatQuote', attrs: { token: '> q\n\n' } },
+              { type: 'text', text: 'c' }
+            ]
+          }
+        ]
+      })
+      const chipLine = lines.reduce((size, text) => size + text.length + 2, 2)
+      editor.commands.setTextSelection(chipLine + 1)
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Backspace', keyCode: 8 })
+    }
   const QUOTE_LINE_CASES: [
     name: string,
     text: string,
@@ -123,25 +145,22 @@ describe('quote chips in the composer', () => {
     [
       'a Backspace that joins a chip line to the empty line under a typed quote line',
       '',
-      ({ editor }) => {
-        editor.commands.setContent({
-          type: 'doc',
-          content: [
-            { type: 'paragraph', content: [{ type: 'text', text: '> typed' }] },
-            { type: 'paragraph' },
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'nativeChatQuote', attrs: { token: '> q\n\n' } },
-                { type: 'text', text: 'c' }
-              ]
-            }
-          ]
-        })
-        editor.commands.setTextSelection(12)
-        fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Backspace', keyCode: 8 })
-      },
+      joinChipLineUnder(['> typed']),
       '> typed\n\n> q\n\nc',
+      ['> q\n\n']
+    ],
+    [
+      'a Backspace that joins a chip line under a quote line and a lazy line',
+      '',
+      joinChipLineUnder(['> x', 'foo']),
+      '> x\nfoo\n\n> q\n\nc',
+      ['> q\n\n']
+    ],
+    [
+      'a Backspace that joins a chip line under two text lines',
+      '',
+      joinChipLineUnder(['foo', 'bar']),
+      'foo\nbar\n> q\n\nc',
       ['> q\n\n']
     ],
     [

@@ -2,35 +2,49 @@ import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { promptLeafString, QUOTE_LINE, QUOTE_NODE } from './native-chat-prompt-document-text'
 
-const lastLine = (nodes: readonly ProseMirrorNode[]): string =>
-  nodes
-    .map(({ type, attrs, text }) => promptLeafString(type.name, attrs, text))
-    .join('')
+/**
+ * True when Markdown continues an earlier blockquote into the chip at `position`: a line in the
+ * run of non-blank lines directly above the chip's line is a quote line.
+ */
+function continuesBlockquote(
+  doc: ProseMirrorNode,
+  position: number,
+  startsBlock: boolean
+): boolean {
+  const lines = doc
+    .textBetween(0, position, '\n', ({ type, attrs, text }) =>
+      promptLeafString(type.name, attrs, text)
+    )
     .split('\n')
-    .at(-1)!
+  // A chip that starts its block: the text before it ends at the block's own empty start.
+  let line = lines.length - (startsBlock ? 2 : 1)
+  for (; line >= 0 && lines[line].trim() !== ''; line--) {
+    if (QUOTE_LINE.test(lines[line])) {
+      return true
+    }
+  }
+  return false
+}
 
 /**
  * Keeps each quote chip a blockquote of its own in the text the agent gets.
  * A chip with text or a pill before it on its line starts a new line: a blockquote starts a line.
- * A chip whose line comes after a quote line gets a blank line between: Markdown otherwise joins
- * that quote line to the chip's blockquote. A chip after a chip ends in a blank line already.
+ * A chip line directly under a run of lines with a quote line gets a blank line above it:
+ * Markdown otherwise continues that blockquote into the chip's. A chip after a chip ends in a
+ * blank line already.
  */
 export function layoutQuoteChips(state: { doc: ProseMirrorNode; tr: Transaction }): Transaction {
   const { doc, tr } = state
   const edits: { position: number; split: boolean; blankLine: boolean }[] = []
-  doc.forEach((block, blockOffset, blockIndex) => {
-    const children = block.content.content
+  doc.forEach((block, blockOffset) => {
     block.forEach((node, offset, index) => {
-      if (node.type.name !== QUOTE_NODE || children[index - 1]?.type.name === QUOTE_NODE) {
+      if (node.type.name !== QUOTE_NODE || block.maybeChild(index - 1)?.type.name === QUOTE_NODE) {
         return
       }
-      const before =
-        index > 0
-          ? children.slice(0, index)
-          : (doc.maybeChild(blockIndex - 1)?.content.content ?? [])
-      const blankLine = QUOTE_LINE.test(lastLine(before))
+      const position = blockOffset + 1 + offset
+      const blankLine = continuesBlockquote(doc, position, index === 0)
       if (index > 0 || blankLine) {
-        edits.push({ position: blockOffset + 1 + offset, split: index > 0, blankLine })
+        edits.push({ position, split: index > 0, blankLine })
       }
     })
   })
