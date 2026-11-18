@@ -304,7 +304,7 @@ function NativePromptEditor({
               )
               editor.commands.command(({ tr }) => {
                 tr.replaceRange(from, to, new Slice(content.content, 1, 1))
-                reparseQuoteChips(tr, from, tr.mapping.map(to))
+                reparseQuoteChips(tr)
                 tr.setMeta('preventUpdate', true)
                 return true
               })

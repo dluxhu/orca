@@ -38,15 +38,13 @@ const chips = (editor: ReturnType<typeof promptEditor>) => {
 }
 
 describe('quote chips in the composer', () => {
-  it('reads quoted lines closed by a blank line as one chip on its own line', () => {
+  it('reads quoted lines, a blank line and the next line as one chip line', () => {
     const doc = promptTextContent('above\n> one\n>\n> two\n\nbelow')
-    expect(doc.content?.map((block) => block.content?.[0]?.type)).toEqual([
-      'text',
-      'nativeChatQuote',
-      undefined,
-      'text'
+    expect(doc.content?.map((block) => block.content?.map((node) => node.type))).toEqual([
+      ['text'],
+      ['nativeChatQuote', 'text']
     ])
-    expect(doc.content?.[1]?.content?.[0]?.attrs?.token).toBe('> one\n>\n> two')
+    expect(doc.content?.[1]?.content?.[0]?.attrs?.token).toBe('> one\n>\n> two\n\n')
     // Quoted lines with text directly below are a lazy blockquote, not a chip; pastes stay literal.
     expect(promptTextContent('> one\nbelow').content?.[0]?.content?.[0]?.type).toBe('text')
     expect(promptTextContent('> one\n\n', { literal: true }).content?.[0]?.content?.[0]?.type).toBe(
@@ -69,47 +67,37 @@ describe('quote chips in the composer', () => {
     expect(container.textContent).not.toContain('>')
   })
 
-  it('keeps text typed before or after the chip on its own line', () => {
-    const { input, editor } = setup('> q\n\n')
+  it('keeps text typed after the chip on its line, and text typed before it on the line above', async () => {
+    const { input, editor, container } = setup('> q\n\n')
     expect(chips(editor)).toBe(1)
+    // Add to chat leaves the caret right after the chip.
+    act(() => {
+      input.setSelectionRange(input.value.length, input.value.length)
+      editor.commands.insertContent('hello')
+    })
+    expect(input.value).toBe('> q\n\nhello')
+    expect(editor.state.doc.childCount).toBe(1)
+    // The chip keeps its name; the comment is plain text after it.
+    await waitFor(() =>
+      expect(container.querySelector('.ProseMirror > p')?.textContent).toBe('Quote: qhello')
+    )
     act(() => {
       editor.commands.setTextSelection(1)
       editor.commands.insertContent('above')
     })
-    expect(input.value).toBe('above\n\n> q\n\n')
-    // The caret stays after the typed text, not on the chip's line.
+    expect(input.value).toBe('above\n> q\n\nhello')
+    // The caret stays after the typed text.
     expect([input.selectionStart, input.selectionEnd]).toEqual([5, 5])
-    act(() => {
-      editor.commands.insertContent('!')
-    })
-    expect(input.value).toBe('above!\n\n> q\n\n')
-    act(() => {
-      input.setSelectionRange('above!\n\n> q'.length, 'above!\n\n> q'.length)
-      editor.commands.insertContent('below')
-    })
-    expect(input.value).toBe('above!\n\n> q\n\nbelow\n\n')
-    act(() => {
-      editor.commands.insertContent('?')
-    })
-    expect(input.value).toBe('above!\n\n> q\n\nbelow?\n\n')
   })
 
-  it('keeps a blank line between the chip and the text below it', () => {
-    const { input, editor } = setup('> q\n\nbelow')
-    act(() => {
-      input.setSelectionRange(4, 4)
-      editor.commands.joinBackward()
-    })
-    expect(input.value).toBe('> q\n\nbelow')
-  })
-
-  it('shows text written after a chip through the composer API inside the chip it is sent in', () => {
+  it('shows text written after a chip through the composer API on the chip line', () => {
     const { input, editor } = setup('> q\n\n')
-    act(() => writeNativeChatComposerText(input, '> q hello\n\n', '> q hello'.length))
-    expect(input.value).toBe('> q hello\n\n')
+    act(() => writeNativeChatComposerText(input, '> q\n\nhello', '> q\n\nhello'.length))
+    expect(input.value).toBe('> q\n\nhello')
     const first = editor.state.doc.child(0)
-    expect(first.childCount).toBe(1)
-    expect(first.child(0).attrs.token).toBe('> q hello')
+    expect(first.childCount).toBe(2)
+    expect(first.child(0).attrs.token).toBe('> q\n\n')
+    expect(first.child(1).text).toBe('hello')
   })
 
   it('pastes quoted text literally', () => {

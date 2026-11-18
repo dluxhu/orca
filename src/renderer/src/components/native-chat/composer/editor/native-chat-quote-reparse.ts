@@ -2,34 +2,21 @@ import type { Transaction } from '@tiptap/pm/state'
 import { reparseQuoteBlocks } from './native-chat-prompt-document-text'
 
 /**
- * Makes the quote chips of the blocks that `from`..`to` touches equal to what the composer parser
- * reads from their text. The text stays the same, so text offsets stay valid.
+ * Makes the quote chips of the document equal to what the composer parser reads from its text.
+ * The text stays the same, so text offsets stay valid. Only the changed blocks are replaced.
  * Why: a programmatic write changes the text a chip sends; the chip must show that text.
  */
-export function reparseQuoteChips(tr: Transaction, from: number, to: number): void {
+export function reparseQuoteChips(tr: Transaction): void {
   const { doc } = tr
-  if (doc.childCount === 0) {
-    return
-  }
-  const blockAt = (position: number): number =>
-    Math.min(doc.resolve(Math.min(position, doc.content.size)).index(0), doc.childCount - 1)
-  const result = reparseQuoteBlocks(
-    doc.childCount,
-    (index) => doc.child(index).toJSON(),
-    Math.max(0, blockAt(from) - 1),
-    blockAt(to)
-  )
+  const blocks = Array.from({ length: doc.childCount }, (_, index) => doc.child(index))
+  const result = reparseQuoteBlocks(blocks.map((block) => block.toJSON()))
   if (!result) {
     return
   }
-  let start = 0
-  for (let index = 0; index < result.first; index++) {
-    start += doc.child(index).nodeSize
-  }
-  let end = start
-  for (let index = result.first; index <= result.last; index++) {
-    end += doc.child(index).nodeSize
-  }
+  const start = blocks.slice(0, result.first).reduce((size, block) => size + block.nodeSize, 0)
+  const end = blocks
+    .slice(result.first, result.last + 1)
+    .reduce((size, block) => size + block.nodeSize, start)
   tr.replaceWith(
     start,
     end,

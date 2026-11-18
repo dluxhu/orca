@@ -31,7 +31,7 @@ import {
   NativeChatQuoteContentContext,
   NativeChatSentQuote
 } from '../selection-quotes/NativeChatSentQuote'
-import { remarkNativeChatQuoteBlankLines } from './native-chat-quote-blank-lines'
+import { remarkNativeChatQuoteLines } from './native-chat-quote-lines'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -153,7 +153,7 @@ export function NativeChatMarkdown({
     return quoteChips
       ? {
           ...base,
-          remarkPlugins: [...base.remarkPlugins, remarkNativeChatQuoteBlankLines],
+          remarkPlugins: [...base.remarkPlugins, remarkNativeChatQuoteLines],
           components: { ...base.components, blockquote: NativeChatSentQuote }
         }
       : base
