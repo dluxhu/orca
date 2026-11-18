@@ -178,22 +178,10 @@ export function appendHistoryEntry(
   if (current !== undefined && getHistoryEntryKey(current) === getHistoryEntryKey(entry)) {
     return s
   }
-  let start = s.worktreeNavHistoryIndex + 1
-  if (isChatPlace(current) && typeof entry === 'string' && !isSimpleViewEntry(entry)) {
-    // A chat place is in its workspace already, so a visit to that workspace adds no step.
-    if (current.worktreeId === entry) {
-      return s
-    }
-    // A jump's source is where the jump landed: a workspace visit there takes its step.
-    if (current.at === 'source') {
-      start -= 1
-    }
-  }
-
   // Truncate forward entries so appending starts a new branch.
-  const truncated = s.worktreeNavHistory.slice(0, start)
+  const truncated = s.worktreeNavHistory.slice(0, s.worktreeNavHistoryIndex + 1)
   truncated.push(entry)
-  let nextIndex = start
+  let nextIndex = s.worktreeNavHistoryIndex + 1
 
   // Why: shift index left by the eviction count so it still points at the just-appended entry.
   if (truncated.length > MAX_HISTORY) {
@@ -208,11 +196,16 @@ export function appendHistoryEntry(
   }
 }
 
-// A step to an entry that shows the current view changes nothing, so Back and Forward skip it.
+// A step between a chat place and an entry that shows the same view changes nothing, so Back and Forward skip it.
 function isStepFromCurrent(entry: WorktreeNavHistoryEntry, state: AppState): boolean {
   const current = state.worktreeNavHistory[state.worktreeNavHistoryIndex]
   const shown = (e: WorktreeNavHistoryEntry): string => getHistoryEntryKey(shownEntry(e, state))
-  return isLiveEntry(entry, state) && (current === undefined || shown(entry) !== shown(current))
+  return (
+    isLiveEntry(entry, state) &&
+    (current === undefined ||
+      (!isChatPlace(entry) && !isChatPlace(current)) ||
+      shown(entry) !== shown(current))
+  )
 }
 
 export function findPrevLiveWorktreeHistoryIndex(state: AppState): number | null {

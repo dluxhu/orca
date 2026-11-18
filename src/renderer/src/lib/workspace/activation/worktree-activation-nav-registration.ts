@@ -4,7 +4,10 @@ import {
 } from '@/store/slices/ui/workspace-navigation-history'
 import type { WorktreeNavHistoryViewEntry } from '@/store/slices/ui/workspace-navigation-history'
 import type { WorktreeNavHistoryChatQuoteEntry } from '@/store/slices/ui/workspace-navigation-history-chat-place'
-import { showNativeChatQuotePlace } from '@/components/native-chat/selection-quotes/native-chat-quote-history'
+import {
+  leaveNativeChatQuotePlace,
+  showNativeChatQuotePlace
+} from '@/components/native-chat/selection-quotes/native-chat-quote-history'
 
 type ActivateFn = (worktreeId: string, opts: { navigationIntent: 'user-open' }) => unknown
 type ViewActivateFn = (
@@ -16,8 +19,12 @@ export function registerWorktreeActivation(
   activateView: ViewActivateFn
 ): void {
   // Why: back/forward is the user reopening a workspace they chose, like a sidebar click.
-  setWorktreeNavActivator((worktreeId) => activate(worktreeId, { navigationIntent: 'user-open' }))
+  setWorktreeNavActivator((worktreeId) => {
+    leaveNativeChatQuotePlace()
+    return activate(worktreeId, { navigationIntent: 'user-open' })
+  })
   setWorktreeNavViewActivator((entry) => {
+    leaveNativeChatQuotePlace()
     if (typeof entry === 'object' && entry.kind === 'native-chat-quote') {
       if (activate(entry.worktreeId, { navigationIntent: 'user-open' }) === false) {
         return false

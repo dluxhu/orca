@@ -5,13 +5,21 @@ import type { NativeChatNavigationRequest } from '../viewport/navigation/use-nat
 import { showQuotedText } from './native-chat-quote-highlight'
 import type { QuoteSource } from './native-chat-quote-sources'
 
-export type NativeChatQuoteJump = (source: QuoteSource, text: string) => boolean
+/** `isCurrent` is false once a newer chat navigation starts; the deferred scroll and highlight then do nothing. */
+export type NativeChatQuoteJump = (
+  source: QuoteSource,
+  text: string,
+  isCurrent?: () => boolean
+) => boolean
 
 /** Scrolls to a loaded message, then gives the scroller to `show`; false when the message is not here. */
 export type NativeChatMessageReveal = (
   messageId: string,
-  show: (scroller: HTMLElement) => void
+  show: (scroller: HTMLElement) => void,
+  isCurrent?: () => boolean
 ) => boolean
+
+const ALWAYS_CURRENT = (): boolean => true
 
 /** The message reveal of each mounted transcript. Back and Forward use it to show a chat place. */
 export const nativeChatMessageReveals = new Set<NativeChatMessageReveal>()
@@ -35,7 +43,7 @@ export function useNativeChatQuoteJump({
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
   const reveal = useCallback<NativeChatMessageReveal>(
-    (messageId, show) => {
+    (messageId, show, isCurrent = ALWAYS_CURRENT) => {
       if (nativeChatSlotIndexOf(slots, messageId) === -1) {
         return false
       }
@@ -45,7 +53,7 @@ export function useNativeChatQuoteJump({
       // The landing scrolls in a layout effect; the row is drawn two frames later.
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          if (scrollRef.current) {
+          if (scrollRef.current && isCurrent()) {
             show(scrollRef.current)
           }
         })
@@ -61,16 +69,20 @@ export function useNativeChatQuoteJump({
     }
   }, [reveal])
   return useCallback(
-    ({ messageId, place }, text) =>
-      reveal(messageId, (scroller) => {
-        // By the message id: a tool run's member rows use data-index too.
-        const source = scroller.querySelector<HTMLElement>(
-          `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
-        )
-        if (source) {
-          showQuotedText(source, text, place)
-        }
-      }),
+    ({ messageId, place }, text, isCurrent) =>
+      reveal(
+        messageId,
+        (scroller) => {
+          // By the message id: a tool run's member rows use data-index too.
+          const source = scroller.querySelector<HTMLElement>(
+            `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
+          )
+          if (source) {
+            showQuotedText(source, text, place)
+          }
+        },
+        isCurrent
+      ),
     [reveal]
   )
 }

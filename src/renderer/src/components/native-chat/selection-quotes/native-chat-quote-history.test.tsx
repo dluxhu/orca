@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   activateTab: vi.fn(),
   activate: vi.fn((_id: string, _opts?: unknown): unknown => true),
-  activateView: vi.fn()
+  activateView: vi.fn(),
+  landed: vi.fn()
 }))
 vi.mock('@/store/index', async () => {
   const { createWorktreeNavHistorySlice } =
@@ -42,6 +43,7 @@ import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { NativeChatQuoteJumpContext, useNativeChatQuoteJump } from './use-native-chat-quote-jump'
 import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
+import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { Tab } from '../../../../../shared/tab-types'
 import type { AppState } from '@/store/types'
@@ -94,6 +96,28 @@ function Chat({ content }: { content: string }): React.JSX.Element {
 function workspaces(...ids: string[]): AppState['worktreesByRepo'] {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the history reads only each worktree's id.
   return { repo: ids.map((id) => ({ id })) } as unknown as AppState['worktreesByRepo']
+}
+
+/**
+ * The file open as the real one does it: it takes a link-open turn, and later activates the file's
+ * workspace while that turn is current. The activation records a visit unless the caller records
+ * its own history.
+ */
+function fileOpensIn(workspaceId: string): void {
+  mocks.open.mockImplementation(
+    (_path: string, _line: number, _column: number, deps: { recordsHistory?: false }) => {
+      const isCurrent = beginLinkOpenRequest()
+      void Promise.resolve().then(() => {
+        if (!isCurrent()) {
+          return
+        }
+        mocks.landed(workspaceId)
+        if (deps.recordsHistory !== false) {
+          useAppStore.getState().recordWorktreeVisit(workspaceId)
+        }
+      })
+    }
+  )
 }
 
 function frames(count: number): void {
@@ -236,10 +260,7 @@ it('keeps Back and Forward between workspaces, and skips the source of a closed 
 })
 
 it('goes Back to the chip when the file open records its workspace', async () => {
-  // The file open activates its workspace later; that activation records a workspace visit.
-  mocks.open.mockImplementation(() => {
-    void Promise.resolve().then(() => useAppStore.getState().recordWorktreeVisit('w1'))
-  })
+  fileOpensIn('w1')
   render(<Chat content={'> src/a.ts:12-14\n> ```ts\n> const a = 1\n> ```\n\nmy words'} />)
   const chip = screen.getByRole('button', { name: /^Quote: src\/a\.ts:12-14/ })
   const place = { ...PLACE, chip: 0 }
@@ -311,18 +332,17 @@ it('reopens a closed tab in the workspace of a chat place', () => {
 const FILE_QUOTE = '> src/a.ts:12-14\n> ```ts\n> const a = 1\n> ```\n\nmy words'
 const FILE_PLACE = { ...PLACE, chip: 0 }
 
-it('lets a file open in another workspace take the source step, so Back reaches the chip', async () => {
+it('keeps the jump source when the file opens in another workspace, so Back reaches the chip', async () => {
   useAppStore.setState({ worktreesByRepo: workspaces('w0', 'w1', 'w2') })
-  // The host maps the file to workspace w2; its editor open records w2 later.
-  mocks.open.mockImplementation(() => {
-    void Promise.resolve().then(() => useAppStore.getState().recordWorktreeVisit('w2'))
-  })
+  // The host maps the file to workspace w2.
+  fileOpensIn('w2')
   render(<Chat content={FILE_QUOTE} />)
   const chip = screen.getByRole('button', { name: /^Quote: src\/a\.ts:12-14/ })
-  const entries = ['w0', { ...FILE_PLACE, at: 'chip' }, 'w2']
+  const entries = ['w0', { ...FILE_PLACE, at: 'chip' }, { ...FILE_PLACE, at: 'source' }]
 
   fireEvent.click(chip)
   await act(async () => {})
+  expect(mocks.landed).toHaveBeenCalledWith('w2')
   expect(history()).toEqual({ entries, index: 2 })
 
   act(() => useAppStore.getState().goBackWorktree())
@@ -332,8 +352,48 @@ it('lets a file open in another workspace take the source step, so Back reaches 
   expect(document.activeElement).toBe(chip)
 
   act(() => useAppStore.getState().goForwardWorktree())
-  expect(mocks.activate).toHaveBeenLastCalledWith('w2', { navigationIntent: 'user-open' })
+  frames(3)
+  await act(async () => {})
+  expect(mocks.landed).toHaveBeenCalledTimes(2)
   expect(history()).toEqual({ entries, index: 2 })
+})
+
+it('ignores the late landing of a jump after a newer Back', async () => {
+  fileOpensIn('w2')
+  render(<Chat content={FILE_QUOTE} />)
+  const chip = screen.getByRole('button', { name: /^Quote: src\/a\.ts:12-14/ })
+  const entries = ['w0', { ...FILE_PLACE, at: 'chip' }, { ...FILE_PLACE, at: 'source' }]
+
+  fireEvent.click(chip)
+  // Back comes before the file open lands.
+  act(() => useAppStore.getState().goBackWorktree())
+  await act(async () => {})
+  frames(3)
+  expect(mocks.landed).not.toHaveBeenCalled()
+  expect(history()).toEqual({ entries, index: 1 })
+  expect(document.activeElement).toBe(chip)
+})
+
+it('ignores the late highlight of a jump after a newer Back', () => {
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)
+  const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
+  const source = screen.getByText('The quoted text.', { selector: 'p' })
+
+  fireEvent.click(chip)
+  act(() => useAppStore.getState().goBackWorktree())
+  frames(2)
+  expect(document.activeElement).not.toBe(source)
+  frames(1)
+  expect(document.activeElement).toBe(chip)
+})
+
+it('keeps the Back of a workspace that shows the current workspace', () => {
+  // A removed workspace between two visits of w1: Back still steps to the first one.
+  useAppStore.setState({ worktreeNavHistory: ['w1', 'gone', 'w1'], worktreeNavHistoryIndex: 2 })
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(mocks.activate).toHaveBeenLastCalledWith('w1', { navigationIntent: 'user-open' })
+  expect(history().index).toBe(0)
 })
 
 it('adds later workspace visits after a jump, and a page visit at the chip', () => {
@@ -342,8 +402,8 @@ it('adds later workspace visits after a jump, and a page visit at the chip', () 
   act(() => useAppStore.getState().recordWorktreeVisit('w2'))
   act(() => useAppStore.getState().recordWorktreeVisit('w1'))
   expect(history()).toEqual({
-    entries: ['w0', { ...FILE_PLACE, at: 'chip' }, 'w2', 'w1'],
-    index: 3
+    entries: ['w0', { ...FILE_PLACE, at: 'chip' }, { ...FILE_PLACE, at: 'source' }, 'w2', 'w1'],
+    index: 4
   })
 
   useAppStore.setState({
