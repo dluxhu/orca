@@ -9,6 +9,10 @@ import {
 import { isNativeChatContextClear } from '../../../../../shared/agent-session/agent-session-context-clear'
 import { orderNativeChatDisplayMessages } from '../../../../../shared/native-chat/transcript/native-chat-message-order'
 import type { NativeChatMessage } from '../../../../../shared/native-chat/native-chat-types'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import remarkGfm from 'remark-gfm'
+import { getCodeFenceLanguageLabel } from '../markdown/code/code-fence-language-label'
 
 /** A quote of an earlier reply goes to the agent shortened only when it is longer than this. */
 export const QUOTE_SHORTEN_THRESHOLD = 400
@@ -70,8 +74,28 @@ const isContextBoundary = (message: NativeChatMessage): boolean =>
       (block.presentation === 'compaction' || block.presentation === 'context-cleared')
   )
 
-// Rendered text and Markdown differ in marks and spaces; compare without them.
-const bare = (text: string): string => text.replace(/[\s*_`~#>|[\]()-]/g, '')
+type MarkdownNode = {
+  type: string
+  value?: string
+  lang?: string | null
+  children?: MarkdownNode[]
+}
+
+const markdown = unified().use(remarkParse).use(remarkGfm)
+
+/**
+ * The text of a reply as the chat draws it, which is the text a quote of it has: no Markdown
+ * marks, list numbers or link targets, and each code block after its language label.
+ */
+function drawnText(node: MarkdownNode): string {
+  if (node.type === 'code') {
+    return `${node.lang ? getCodeFenceLanguageLabel(node.lang) : ''}${node.value ?? ''}`
+  }
+  return node.value ?? (node.children ?? []).map(drawnText).join('')
+}
+
+// A selection has line breaks between blocks that the drawn text has not.
+const bare = (text: string): string => text.replace(/\s/g, '')
 
 /**
  * True when the agent still has the reply `messageId` with the quote in it: a reply of this
@@ -96,7 +120,7 @@ function agentHasQuote(
     replies++
     if (message.id === messageId) {
       const text = message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
-      return bare(text).includes(bare(quote))
+      return bare(drawnText(markdown.parse(text) as MarkdownNode)).includes(bare(quote))
     }
   }
   return false

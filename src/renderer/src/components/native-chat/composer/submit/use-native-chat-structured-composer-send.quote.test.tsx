@@ -6,12 +6,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 vi.mock('@/components/native-chat/telemetry/native-chat-telemetry', () => ({
   emitNativeChatMessageSent: vi.fn()
 }))
+vi.mock('@/lib/syntax-highlighting/oniguruma', async () => ({
+  loadOniguruma: (await import('@/lib/syntax-highlighting/oniguruma-test-harness'))
+    .loadNodeOniguruma
+}))
 vi.mock('@/store/index', () => ({
   useAppStore: (selector: (state: { settings: { theme: string } }) => unknown) =>
     selector({ settings: { theme: 'light' } })
 }))
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
+import { MessageRow } from '../../messages/rows/NativeChatMessageRow'
+import { readNativeChatQuotableSelection } from '../../selection-quotes/native-chat-quote-selection'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
 import { clearNativeChatComposerDraftsForTests } from '../../drafts/native-chat-draft-reset'
 import {
@@ -25,7 +32,6 @@ import {
 } from '../../selection-quotes/native-chat-quote-sources'
 import {
   nativeChatFullQuote,
-  RECENT_REPLIES,
   shortenSameChatQuotes
 } from '../../selection-quotes/native-chat-quote-shortening'
 import { NativeChatQuoteJumpContext } from '../../selection-quotes/use-native-chat-quote-jump'
@@ -181,10 +187,11 @@ const IN_FULL: [string, string, typeof IN_CHAT | null, NativeChatMessage[] | und
     [reply(LONG), system('context-cleared')]
   ],
   [
-    `a quote of a reply older than the last ${RECENT_REPLIES} replies (an automatic compaction leaves no row)`,
+    // Literal counts: a test that reads the constant moves with a changed constant.
+    'a quote of the reply 6 back, older than the last 5 replies (an automatic compaction leaves no row)',
     LONG,
     IN_CHAT,
-    [reply(LONG), ...replies(RECENT_REPLIES)]
+    [reply(LONG), ...replies(5)]
   ],
   [
     'a quote whose reply id names a reply without the quote',
@@ -200,8 +207,8 @@ it.each(IN_FULL)('sends %s in full', async (_name, quote, source, chat) => {
   expect(await send(quote, source, chat)).toBe(`${formatNativeChatQuote(quote)}my comment`)
 })
 
-it(`sends a quote of one of the last ${RECENT_REPLIES} replies shortened`, async () => {
-  expect(await send(LONG, IN_CHAT, [reply(LONG), ...replies(RECENT_REPLIES - 1)])).toBe(
+it('sends a quote of the reply 5 back shortened', async () => {
+  expect(await send(LONG, IN_CHAT, [reply(LONG), ...replies(4)])).toBe(
     `${LONG_SHORT}\n\nmy comment`
   )
 })
@@ -221,6 +228,44 @@ it(`keeps the full text of the last ${QUOTE_SOURCE_LIMIT} shortened quotes only`
   const last = shortText(QUOTE_SOURCE_LIMIT + 1)
   expect(nativeChatFullQuote(last)).toBe(quote(QUOTE_SOURCE_LIMIT + 1))
   expect(nativeChatFullQuote(first)).toBe(first)
+})
+
+const FILLER = `${words(70)}.`
+
+/** The quote "Add to chat" takes when the whole drawn reply is selected. */
+function drawnQuote(markdown: string): string {
+  const view = render(
+    <TooltipProvider>
+      <MessageRow
+        message={message({ id: IN_CHAT.messageId, blocks: [{ type: 'text', text: markdown }] })}
+        expandSignal={false}
+        onScrollMessageToTop={vi.fn()}
+      />
+    </TooltipProvider>,
+    { wrapper: TranslationScopeProvider }
+  )
+  const source = view.container.querySelector('[data-native-chat-quote-source]')!
+  const range = document.createRange()
+  range.selectNodeContents(source)
+  window.getSelection()!.removeAllRanges()
+  window.getSelection()!.addRange(range)
+  const quote = readNativeChatQuotableSelection(view.container)!.text
+  cleanup()
+  return quote
+}
+
+it.each([
+  ['a code block', `Run this:\n\n\`\`\`ts\nconst answer = 42\n\`\`\`\n\n${FILLER}`, 'TypeScript'],
+  ['a numbered list', `Steps:\n\n1. Open the file.\n2. Save it.\n\n${FILLER}`, 'Save it.'],
+  ['a link', `Read [the guide](https://example.com/guide) first.\n\n${FILLER}`, 'the guide']
+])('sends a drawn quote of a recent reply with %s shortened', async (_name, markdown, part) => {
+  const quote = drawnQuote(markdown)
+  expect(quote).toContain(part)
+  expect(quote.length).toBeGreaterThan(400)
+  const sent = await send(quote, IN_CHAT, [
+    message({ id: IN_CHAT.messageId, blocks: [{ type: 'text', text: markdown }] })
+  ])
+  expect(sent).toMatch(/\(\d+ quoted words left out; the full text is in your earlier reply\)/)
 })
 
 it('shows the full quote in the sent chip and jumps to its reply', async () => {
