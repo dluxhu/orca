@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { renderHook } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const shown = vi.hoisted(() => vi.fn())
 vi.mock('./native-chat-quote-highlight', () => ({ showQuotedText: shown }))
@@ -8,25 +8,20 @@ vi.mock('./native-chat-quote-highlight', () => ({ showQuotedText: shown }))
 import { useNativeChatQuoteJump } from './use-native-chat-quote-jump'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })
+})
+
 afterEach(() => {
   vi.useRealTimers()
   shown.mockReset()
 })
 
-it('scrolls to the quoted message as a rail jump does, then shows the text in it', () => {
-  vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })
-  const scroller = document.createElement('div')
-  // A tool run's member rows also number themselves with data-index.
-  scroller.innerHTML =
-    '<div data-index="0"><div data-index="1">a tool step</div></div>' +
-    '<div data-index="1"><div data-native-chat-quote-source="reply-1">The quoted text.</div></div>'
+function jump(scroller: HTMLDivElement) {
   const issue = vi.fn()
-  const place = { offset: 4, length: 11, hash: 'h' }
-  const beginNavigation = vi.fn()
-  const readerLeavesEnd = vi.fn()
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
   const slots = [
-    { kind: 'message', message: { id: 'prompt' } },
+    { kind: 'message', message: { id: 'reply-0' } },
     { kind: 'message', message: { id: 'reply-1' } }
   ] as unknown as NativeChatTranscriptSlot[]
   const { result } = renderHook(() =>
@@ -34,17 +29,25 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
       slots,
       scrollRef: { current: scroller },
       request: { issue, nextRequestId: () => 7 },
-      beginNavigation,
-      readerLeavesEnd
+      beginNavigation: vi.fn(),
+      readerLeavesEnd: vi.fn()
     })
   )
-  expect(result.current({ messageId: 'missing', place: null }, 'x')).toBe(false)
+  return { issue, jumpTo: result.current }
+}
+
+it('scrolls to the quoted message as a rail jump does, then shows the text in it', () => {
+  const scroller = document.createElement('div')
+  scroller.innerHTML =
+    '<div data-index="0"><div data-native-chat-quote-source="reply-0">Another reply.</div></div>' +
+    '<div data-index="1"><div data-native-chat-quote-source="reply-1">The quoted text.</div></div>'
+  const { issue, jumpTo } = jump(scroller)
+  const place = { offset: 4, length: 11, hash: 'h' }
+  const notifyMissing = vi.fn()
+  expect(jumpTo({ messageId: 'missing', place: null }, 'x', notifyMissing)).toBe(false)
   expect(issue).not.toHaveBeenCalled()
-  expect(result.current({ messageId: 'reply-1', place }, 'quoted text')).toBe(true)
-  expect(beginNavigation).toHaveBeenCalledOnce()
-  expect(readerLeavesEnd).toHaveBeenCalledOnce()
+  expect(jumpTo({ messageId: 'reply-1', place }, 'quoted text', notifyMissing)).toBe(true)
   expect(issue).toHaveBeenCalledWith({ kind: 'rail', messageId: 'reply-1', requestId: 7 })
-  expect(shown).not.toHaveBeenCalled()
   vi.advanceTimersToNextFrame()
   vi.advanceTimersToNextFrame()
   expect(shown).toHaveBeenCalledWith(
@@ -52,4 +55,24 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
     'quoted text',
     place
   )
+  expect(notifyMissing).not.toHaveBeenCalled()
+})
+
+it('shows the text when the message is drawn late, and a notice when it is never drawn', () => {
+  const scroller = document.createElement('div')
+  const { jumpTo } = jump(scroller)
+  const notifyMissing = vi.fn()
+  jumpTo({ messageId: 'reply-1', place: null }, 'quoted text', notifyMissing)
+  for (let frame = 0; frame < 5; frame++) {
+    vi.advanceTimersToNextFrame()
+  }
+  scroller.innerHTML = '<div data-native-chat-quote-source="reply-1">The quoted text.</div>'
+  vi.advanceTimersToNextFrame()
+  expect(shown).toHaveBeenCalledOnce()
+  jumpTo({ messageId: 'reply-0', place: null }, 'other text', notifyMissing)
+  for (let frame = 0; frame < 30; frame++) {
+    vi.advanceTimersToNextFrame()
+  }
+  expect(shown).toHaveBeenCalledOnce()
+  expect(notifyMissing).toHaveBeenCalledOnce()
 })

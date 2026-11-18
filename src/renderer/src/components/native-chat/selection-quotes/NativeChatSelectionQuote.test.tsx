@@ -9,7 +9,7 @@ import type { NativeChatComposerHandle } from '../composer/native-chat-composer-
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatSelectionQuote } from './NativeChatSelectionQuote'
 import { nativeChatQuoteSourceProps } from './native-chat-quote-selection'
-import { nativeChatQuoteSource, textHash } from './native-chat-quote-sources'
+import { nativeChatQuoteSource } from './native-chat-quote-sources'
 
 vi.mock('@/i18n/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof I18n>()),
@@ -113,7 +113,7 @@ describe('NativeChatSelectionQuote', () => {
       place: {
         offset: 0,
         length: 41,
-        hash: textHash('Use the draft store.\n\nIt already appends.')
+        hash: 'otso1p:41'
       }
     })
   })

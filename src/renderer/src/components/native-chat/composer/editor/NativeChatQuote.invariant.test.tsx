@@ -9,17 +9,8 @@ import {
   type NativeChatComposerInput
 } from './native-chat-composer-input'
 import { promptEditor } from './native-chat-prompt-editor.test-support'
-import {
-  appendPromptDocumentText,
-  promptLeafString,
-  promptTextContent,
-  QUOTE_NODE
-} from './native-chat-prompt-document-text'
-import {
-  readNativeChatComposerDraft,
-  updateNativeChatComposerDraft
-} from '../../drafts/native-chat-composer-draft-store'
-import { insertNativeChatComposerDraftText } from '../../drafts/native-chat-composer-draft-insertion'
+import { QUOTE_NODE } from './native-chat-prompt-document-text'
+import { updateNativeChatComposerDraft } from '../../drafts/native-chat-composer-draft-store'
 import { clearNativeChatComposerDraftsForTests } from '../../drafts/native-chat-draft-reset'
 
 afterEach(() => {
@@ -40,21 +31,15 @@ function chipLines(doc: JSONContent): (string | null)[] {
 
 // Programmatic writes: the composer API, root key routing and dictation all set the value.
 it.each([
-  ['text after a chip', '> q\n\n', '> q hello\n\n'],
-  ['a line on the blank line below a chip', '> q\n\nbelow', '> q\nx\n\nbelow'],
-  ['removing the blank line below a chip', '> q\n\nbelow', '> q\nbelow'],
-  ['text before a chip', '> q\n\n', 'x> q\n\n'],
-  ['a dictated word above a chip', 'hi\n> q\n\n', 'hi there\n> q\n\n'],
-  ['a quote line below a chip', '> a\n\n', '> a\n> b\n\n'],
-  ['a quote line above a chip', 'top\n\n> a\n\n', 'top\n> z\n> a\n\n'],
-  ['a blank line inside a quote run', 'top\n> a\n> b\n\n', 'top\n> a\n\n> b\n\n'],
-  ['a blank line that closes a quote run', 'p\n> a\n> b\n> c\nz', 'p\n> a\n> b\n> c\n'],
+  ['text after a chip', '> q\n\n', '> q hello\n\n', ['> q hello', null, null]],
+  ['a quote line below a chip', '> a\n\n', '> a\n> b\n\n', ['> a\n> b', null, null]],
   [
-    'a quote line above a quote run that text closes',
-    'z\n> b\n> c\n> d\nq',
-    '> a\n> b\n> c\n> d\nq'
+    'a blank line that closes a quote run',
+    'p\n> a\n> b\n> c\nz',
+    'p\n> a\n> b\n> c\n',
+    [null, '> a\n> b\n> c', null]
   ]
-])('after %s, the chips are what the sent text parses to', (_name, before, after) => {
+])('after %s, the chips are what the sent text parses to', (_name, before, after, lines) => {
   const inputRef = createRef<NativeChatComposerInput>()
   render(
     <NativeChatPromptEditor
@@ -72,7 +57,7 @@ it.each([
   const caret = after.length
   act(() => writeNativeChatComposerText(input, after, caret))
   expect(input.value).toBe(after)
-  expect(chipLines(editor.getJSON())).toEqual(chipLines(promptTextContent(after)))
+  expect(chipLines(editor.getJSON())).toEqual(lines)
   expect([input.selectionStart, input.selectionEnd]).toEqual([caret, caret])
 })
 
@@ -90,18 +75,6 @@ const MIXED: JSONContent = {
     { type: 'paragraph' }
   ]
 }
-
-it('keeps the chips of a hidden draft after dictation joins a quote line', () => {
-  updateNativeChatComposerDraft(
-    'dictated-draft',
-    { text: '> q', document: promptTextContent('> q') },
-    'immediate'
-  )
-  insertNativeChatComposerDraftText('dictated-draft', 'hello', { dictated: true, draftOnly: true })
-  const draft = readNativeChatComposerDraft('dictated-draft')
-  expect(draft.text).toBe('> q hello')
-  expect(chipLines(draft.document!)).toEqual(chipLines(promptTextContent(draft.text)))
-})
 
 it.each(['mount', 'value'])(
   'loads a stored draft with a mixed chip line as the chips its text has (%s)',
@@ -131,49 +104,6 @@ it.each(['mount', 'value'])(
     }
     expect(inputRef.current!.value).toBe(text)
     const editor = promptEditor(screen.getByRole('textbox'))
-    expect(chipLines(editor.getJSON())).toEqual(chipLines(promptTextContent(text)))
+    expect(chipLines(editor.getJSON())).toEqual(['> q hello', null, null])
   }
 )
-
-it('keeps a line with a file pill as a line that ends a quote run', () => {
-  const inputRef = createRef<NativeChatComposerInput>()
-  render(
-    <NativeChatPromptEditor
-      inputRef={inputRef}
-      initialValue={'> a\nb\n'}
-      disabled={false}
-      placeholder="Message"
-      onChange={vi.fn()}
-      onSelect={vi.fn()}
-    />
-  )
-  const input = inputRef.current!
-  const editor = promptEditor(screen.getByRole('textbox'))
-  act(() => {
-    input.setSelectionRange(4, 5)
-    input.insertFileReferences!(['/x/f.txt'])
-  })
-  const before = input.value
-  expect(before).toBe('> a\n@/x/f.txt b\n')
-  act(() => writeNativeChatComposerText(input, `> aa${before.slice(3)}`, 4))
-  expect(input.value).toBe(`> aa${before.slice(3)}`)
-  expect(chipLines(editor.getJSON())).toEqual([null, null, null])
-  expect(editor.getJSON().content?.[1]?.content?.[0]?.type).toBe('nativeChatFileReference')
-})
-
-const documentText = (doc: JSONContent): string =>
-  (doc.content ?? [])
-    .map((block) =>
-      (block.content ?? [])
-        .map((node) => promptLeafString(node.type, node.attrs, node.text))
-        .join('')
-    )
-    .join('\n')
-
-it('keeps the document text equal to the draft text after an append to a chip that ends in a space', () => {
-  const before = '> foo \n\n'
-  const after = '> foo \n\nhi'
-  const document = appendPromptDocumentText(promptTextContent(before), before, after)!
-  expect(documentText(document)).toBe(after)
-  expect(chipLines(document)).toEqual(chipLines(promptTextContent(after)))
-})

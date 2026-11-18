@@ -1,8 +1,6 @@
 // Where a quote came from. The app's windows on this computer share this list, and it stays after a
 // restart. It holds short hashes of the quoted text, not the text. The agent never gets it.
-const STORAGE_KEY = 'orca.nativeChat.quoteSources.v2'
-// Version 1 holds quoted text. Remove it, so that no copy stays on disk.
-const OLD_STORAGE_KEY = 'orca.nativeChat.quoteSources.v1'
+const STORAGE_KEY = 'orca.nativeChat.quoteSources'
 const LIMIT = 200
 
 /** Where the quote is in its source element's text, and a hash of the text there. */
@@ -37,7 +35,6 @@ function quoteKey(text: string): string {
 // Read on each use: another window can write between two calls.
 function load(): Entry[] {
   try {
-    localStorage.removeItem(OLD_STORAGE_KEY)
     const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
     return Array.isArray(parsed)
       ? parsed.filter(
@@ -101,13 +98,16 @@ export function quotedFileLocation(
   if (lines) {
     return { pathText: lines[1], line: Number(lines[2]) }
   }
-  // shortcut: a terminal quote has a title and a fence too; a title with a folder or an extension opens as a file, keep the source kind of a quote if a terminal title must not open as a file.
+  // A terminal quote is a title and a code fence too. A title that looks like a path opens as a file.
   return !text.includes(':') && /\/|\.[A-Za-z0-9]+$/.test(text) ? { pathText: text, line: 1 } : null
 }
 
 export type NativeChatQuoteJumpDeps = {
-  /** Shows the message in this transcript and highlights the quote; false when it is not here. */
-  jumpToMessage: ((source: QuoteSource, text: string) => boolean) | null
+  /**
+   * Shows the message in this transcript and highlights the quote; false when it is not here.
+   * Calls `notifyMissing` when the message is not drawn after the jump.
+   */
+  jumpToMessage: ((source: QuoteSource, text: string, notifyMissing: () => void) => boolean) | null
   /** Opens the file at the line and highlights it; false when the chat cannot open it. */
   openFile: ((location: QuotedFileLocation) => boolean) | null
   notifyMissing: () => void
@@ -122,7 +122,7 @@ export function jumpToQuoteSource(
   deps: NativeChatQuoteJumpDeps
 ): 'message' | 'file' | 'missing' {
   const source = nativeChatQuoteSource(text)
-  if (source && deps.jumpToMessage?.(source, text)) {
+  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing)) {
     return 'message'
   }
   const [firstLine = '', secondLine = ''] = text.split('\n')

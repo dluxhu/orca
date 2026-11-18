@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { createRef } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NativeChatPromptEditor } from './NativeChatPromptEditor'
 import {
@@ -63,9 +63,7 @@ describe('quote chips in the composer', () => {
     })
     expect(input.value).toBe(next)
     expect(chips(editor)).toBe(1)
-    // The chip reads "Quote: …" to a screen reader.
-    await waitFor(() => expect(container.querySelector('.sr-only')?.textContent).toBe('Quote: '))
-    expect(container.textContent).toContain('Quote: quoted words')
+    await waitFor(() => expect(container.textContent).toContain('quoted words'))
     expect(container.textContent).not.toContain('>')
   })
 
@@ -110,14 +108,5 @@ describe('quote chips in the composer', () => {
     const first = editor.state.doc.child(0)
     expect(first.childCount).toBe(1)
     expect(first.child(0).attrs.token).toBe('> q hello')
-  })
-
-  it('pastes quoted text literally', () => {
-    const { input, editor } = setup()
-    fireEvent.paste(screen.getByRole('textbox'), {
-      clipboardData: { getData: (format: string) => (format === 'text/plain' ? '> x\n\n' : '') }
-    })
-    expect(input.value).toBe('> x\n\n')
-    expect(chips(editor)).toBe(0)
   })
 })

@@ -19,8 +19,15 @@ it('keeps a paste into a hidden chat draft literal, with no quote chip', () => {
   insertNativeChatComposerDraftText('hidden-paste', '\n> x\n\n', { paste: true, draftOnly: true })
   const draft = readNativeChatComposerDraft('hidden-paste')
   expect(draft.text).toBe('hi\n> x\n\n')
-  expect(draft.document).toBeDefined()
-  expect(nodeTypes(draft.document)).not.toContain('nativeChatQuote')
+  expect(nodeTypes(draft.document)).toEqual([
+    'doc',
+    'paragraph',
+    'text',
+    'paragraph',
+    'text',
+    'paragraph',
+    'paragraph'
+  ])
 })
 
 it('makes a quote chip from typed quote text in a hidden chat draft', () => {

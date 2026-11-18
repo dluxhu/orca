@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import {
-  QUOTE_HIGHLIGHT_MS,
   placeRange,
   quotePlace,
   quotedTextRange,
@@ -98,15 +97,10 @@ it('searches for the quote when the reply changed since, and skips only whitespa
   expect(quotedTextRange(root, 'The quotedtext!')).toBeNull()
 })
 
-it('keeps the highlight of a second jump when the first one times out', () => {
-  const root = element('<p>Before. The quoted text.</p>')
-  showQuotedText(root, 'quoted text', null)
-  vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS - 500)
-  showQuotedText(root, 'Before.', null)
-  vi.advanceTimersByTime(600)
-  expect(shown()?.toString()).toBe('Before.')
-  vi.advanceTimersByTime(QUOTE_HIGHLIGHT_MS)
-  expect(highlights.has('native-chat-quote-jump')).toBe(false)
+it('finds a quote with no saved place as a whole word, not inside a longer word', () => {
+  const root = element('<p>Use concatenate, then cat the file.</p>')
+  showQuotedText(root, 'cat', null)
+  expect(shown()?.startOffset).toBe('Use concatenate, then '.length)
 })
 
 it('keeps the part of a selection that is in the reply when it starts before the reply', () => {

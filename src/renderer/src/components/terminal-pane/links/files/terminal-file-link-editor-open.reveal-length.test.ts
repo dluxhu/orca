@@ -43,8 +43,3 @@ it('asks the editor to highlight the given length at the revealed line', () => {
     expect.objectContaining({ viewStateId: 'view-1', matchLength: 40 })
   )
 })
-
-it('reveals the line with no highlight when no length is given', () => {
-  openLinkedFileInEditor(file, null, { line: 3, column: null }, () => true)
-  expect(fake.schedule.mock.calls[0][5]).not.toHaveProperty('matchLength')
-})

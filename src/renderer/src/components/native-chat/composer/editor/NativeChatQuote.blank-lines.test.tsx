@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { createRef } from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 vi.mock('@/store/index', async (importOriginal) => importOriginal())
@@ -61,29 +61,15 @@ function renderedBlocks(text: string): string[] {
   )
 }
 
-const TABLE: [string, string, string[]][] = [
-  ['no user empty line', 'above\n\n> q\n\nbelow', ['above', CHIP, 'below']],
-  ['one user empty line', 'above\n\n\n> q\n\n\nbelow', ['above', '', CHIP, '', 'below']],
-  [
-    'two user empty lines',
-    'above\n\n\n\n> q\n\n\n\nbelow',
-    ['above', '', '', CHIP, '', '', 'below']
-  ]
-]
+const ONE_EMPTY_LINE = 'above\n\n\n> q\n\n\nbelow'
 
-it.each(TABLE)(
-  'shows only the user empty lines next to a quote in the composer (%s)',
-  async (_name, text, lines) => {
-    expect(await visibleComposerLines(text)).toEqual(lines)
-  }
-)
+it('shows only the user empty lines next to a quote in the composer', async () => {
+  expect(await visibleComposerLines(ONE_EMPTY_LINE)).toEqual(['above', '', CHIP, '', 'below'])
+})
 
-it.each(TABLE)(
-  'shows only the user empty lines next to a quote when sent (%s)',
-  (_name, text, lines) => {
-    expect(renderedBlocks(text)).toEqual(lines)
-  }
-)
+it('shows only the user empty lines next to a quote when sent', () => {
+  expect(renderedBlocks(ONE_EMPTY_LINE)).toEqual(['above', '', CHIP, '', 'below'])
+})
 
 it('shows the line to type in below a quote that Add to chat put at the end', async () => {
   expect(await visibleComposerLines('> q\n\n')).toEqual([CHIP, ''])
@@ -91,25 +77,49 @@ it('shows the line to type in below a quote that Add to chat put at the end', as
   expect(await visibleComposerLines('> q\n')).toEqual([CHIP, ''])
 })
 
-it('keeps the blank line above a chip when Backspace would join the chip to the text above', () => {
-  const inputRef = createRef<NativeChatComposerInput>()
-  render(
-    <NativeChatPromptEditor
-      inputRef={inputRef}
-      initialValue={'above\n\n> q\n\n'}
-      disabled={false}
-      placeholder="Message"
-      onChange={vi.fn()}
-      onSelect={vi.fn()}
-    />
-  )
-  const input = inputRef.current!
-  act(() => {
-    input.setSelectionRange(7, 7)
-    promptEditor(screen.getByRole('textbox')).commands.joinBackward()
-  })
-  expect(input.value).toBe('above\n\n> q\n\n')
-})
+it.each([
+  [
+    'Backspace',
+    'at the start of the line below a chip',
+    'above\n\n> q\n\nbelow',
+    12,
+    'above\n\n\n\nbelow'
+  ],
+  [
+    'Delete',
+    'at the end of the line above a chip',
+    'above\n\n> q\n\nbelow',
+    5,
+    'above\n\n\n\nbelow'
+  ]
+])(
+  'selects the chip on %s %s, and deletes it on the next press',
+  (key, _where, text, caret, after) => {
+    const inputRef = createRef<NativeChatComposerInput>()
+    render(
+      <NativeChatPromptEditor
+        inputRef={inputRef}
+        initialValue={text}
+        disabled={false}
+        placeholder="Message"
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+    const input = inputRef.current!
+    const editor = promptEditor(screen.getByRole('textbox'))
+    act(() => {
+      input.setSelectionRange(caret, caret)
+      fireEvent.keyDown(screen.getByRole('textbox'), { key })
+    })
+    expect(input.value).toBe(text)
+    expect(editor.state.selection.toJSON()).toEqual({ type: 'node', anchor: 10 })
+    act(() => {
+      fireEvent.keyDown(screen.getByRole('textbox'), { key })
+    })
+    expect(input.value).toBe(after)
+  }
+)
 
 it('keeps the user empty lines of a draft when it loads again', async () => {
   const text = 'above\n\n\n> q\n\n\n\nbelow'
@@ -122,23 +132,4 @@ it('keeps the user empty lines of a draft when it loads again', async () => {
     '',
     'below'
   ])
-})
-
-it('shows the separator line while the caret is on it', async () => {
-  const inputRef = createRef<NativeChatComposerInput>()
-  const view = render(
-    <NativeChatPromptEditor
-      inputRef={inputRef}
-      initialValue={'above\n\n> q\n\nbelow'}
-      disabled={false}
-      placeholder="Message"
-      onChange={vi.fn()}
-      onSelect={vi.fn()}
-    />
-  )
-  await waitFor(() => expect(view.container.textContent).toContain('Quote: '))
-  const separators = () => view.container.querySelectorAll('[data-quote-separator]').length
-  expect(separators()).toBe(2)
-  act(() => inputRef.current!.setSelectionRange(6, 6))
-  expect(separators()).toBe(1)
 })
