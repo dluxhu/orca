@@ -32,7 +32,9 @@ Features:
 - **Claude Code chat mode.** Turn Claude Remote Control on and off in a chat tab, and resume a Claude session by its id as a chat ([#3](https://github.com/dluxhu/orca/pull/3)).
 - **Chat CLI.** `orca chat list`, `orca chat read` and `orca chat send` let an agent read and message other chats ([#2](https://github.com/dluxhu/orca/pull/2)).
 - **Mention chats and terminals.** Type `@` in a chat to mention another chat or terminal of the same host ([#10](https://github.com/dluxhu/orca/pull/10)).
+- **Mention chats on other hosts.** The `@` menu also lists the chats and terminals of the host's saved environments, and the agent gets the `--environment` to reach them ([#29](https://github.com/dluxhu/orca/pull/29)).
 - **Quote chips.** "Add to chat" quotes show as chips; a click jumps back to the quoted text and highlights it ([#12](https://github.com/dluxhu/orca/pull/12)).
+- **Comment after a quote.** Type a comment right after a quote chip, on the same line ([#30](https://github.com/dluxhu/orca/pull/30)).
 - **Back to the quote.** After a quote chip jumps to its source, Back returns to the quote and Forward goes to the source again ([#26](https://github.com/dluxhu/orca/pull/26)).
 - **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
 
