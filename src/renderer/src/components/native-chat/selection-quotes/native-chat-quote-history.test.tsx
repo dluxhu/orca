@@ -44,6 +44,7 @@ import { NativeChatQuoteJumpContext, useNativeChatQuoteJump } from './use-native
 import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { Tab } from '../../../../../shared/tab-types'
+import type { AppState } from '@/store/types'
 
 const issue = vi.fn()
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
@@ -90,6 +91,11 @@ function Chat({ content }: { content: string }): React.JSX.Element {
   )
 }
 
+function workspaces(...ids: string[]): AppState['worktreesByRepo'] {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the history reads only each worktree's id.
+  return { repo: ids.map((id) => ({ id })) } as unknown as AppState['worktreesByRepo']
+}
+
 function frames(count: number): void {
   for (let index = 0; index < count; index++) {
     act(() => vi.advanceTimersToNextFrame())
@@ -125,7 +131,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame'] })
   registerWorktreeActivation(mocks.activate, mocks.activateView)
   useAppStore.setState({
-    worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w1' }] },
+    worktreesByRepo: workspaces('w0', 'w1'),
     worktreeNavHistory: ['w0', 'w1'],
     worktreeNavHistoryIndex: 1,
     unifiedTabsByWorktree: {
@@ -306,7 +312,7 @@ const FILE_QUOTE = '> src/a.ts:12-14\n> ```ts\n> const a = 1\n> ```\n\nmy words'
 const FILE_PLACE = { ...PLACE, chip: 0 }
 
 it('lets a file open in another workspace take the source step, so Back reaches the chip', async () => {
-  useAppStore.setState({ worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w1' }, { id: 'w2' }] } })
+  useAppStore.setState({ worktreesByRepo: workspaces('w0', 'w1', 'w2') })
   // The host maps the file to workspace w2; its editor open records w2 later.
   mocks.open.mockImplementation(() => {
     void Promise.resolve().then(() => useAppStore.getState().recordWorktreeVisit('w2'))
@@ -409,7 +415,7 @@ it('does not walk between two chip places of a closed chat', () => {
 
 it('skips the chat places of a removed workspace', () => {
   useAppStore.setState({
-    worktreesByRepo: { repo: [{ id: 'w0' }, { id: 'w2' }] },
+    worktreesByRepo: workspaces('w0', 'w2'),
     worktreeNavHistory: ['w0', { ...PLACE, at: 'chip' }, { ...PLACE, at: 'source' }, 'w2'],
     worktreeNavHistoryIndex: 3
   })
