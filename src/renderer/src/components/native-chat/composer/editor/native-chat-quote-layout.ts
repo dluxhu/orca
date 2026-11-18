@@ -54,45 +54,12 @@ const isChipLine = (block: ProseMirrorNode | null): boolean =>
   block?.childCount === 1 && block.firstChild?.type.name === QUOTE_NODE
 
 /**
- * The position of the chip that Backspace (-1) or Delete (1) at the caret would leave in place: the
- * join removes the hidden line next to the chip, and the layout puts it back. Null in other cases.
+ * The blank lines that keep a chip apart from the text next to it: the first empty line below a
+ * chip, unless it is the last line, and the last empty line above a chip that has text above it.
+ * The text keeps them; the composer hides them. More empty lines are the user's.
  */
-export function chipPastSeparator(
-  { doc, selection }: EditorState,
-  direction: -1 | 1
-): number | null {
-  const { $head } = selection
-  const edge = direction < 0 ? 0 : $head.parent.content.size
-  if (!selection.empty || $head.depth !== 1 || $head.parentOffset !== edge) {
-    return null
-  }
-  const index = $head.index(0)
-  const block = (at: number): ProseMirrorNode | null =>
-    at >= 0 && at < doc.childCount ? doc.child(at) : null
-  // The chip itself, or the chip past its hidden line.
-  const chip = isChipLine(block(index + direction))
-    ? index + direction
-    : block(index + direction)?.content.size === 0 && isChipLine(block(index + 2 * direction))
-      ? index + 2 * direction
-      : null
-  if (chip === null) {
-    return null
-  }
-  let position = 0
-  for (let at = 0; at < chip; at++) {
-    position += doc.child(at).nodeSize
-  }
-  return position + 1
-}
-
-/**
- * Hides the one blank line that keeps a chip apart from the text next to it; the text keeps it.
- * More empty lines are the user's, and show. The last line stays: the user types in it.
- */
-export function quoteSeparatorDecorations({ doc, selection }: EditorState): DecorationSet {
-  const decorations: Decoration[] = []
-  const offsets: number[] = []
-  doc.forEach((_block, offset) => offsets.push(offset))
+function separatorLines(doc: ProseMirrorNode): Set<number> {
+  const separators = new Set<number>()
   for (let index = 0; index < doc.childCount; index++) {
     if (doc.child(index).content.size > 0) {
       continue
@@ -103,25 +70,68 @@ export function quoteSeparatorDecorations({ doc, selection }: EditorState): Deco
     }
     const before = index > 0 ? doc.child(index - 1) : null
     const after = last + 1 < doc.childCount ? doc.child(last + 1) : null
-    const hidden = isChipLine(before)
-      ? after || last > index
-        ? index
-        : null
-      : before && isChipLine(after)
-        ? last
-        : null
-    // A caret on that line shows it, so the caret is never out of sight.
-    if (hidden !== null && selection.$head.index(0) !== hidden) {
-      const from = offsets[hidden]
-      decorations.push(
-        Decoration.node(from, from + doc.child(hidden).nodeSize, {
-          class: 'hidden',
-          'data-quote-separator': ''
-        })
-      )
+    if (isChipLine(before) && (after || last > index)) {
+      separators.add(index)
+    } else if (before && isChipLine(after)) {
+      separators.add(last)
     }
     index = last
   }
+  return separators
+}
+
+/**
+ * The position of the chip that Backspace (-1) or Delete (1) at the caret selects. The hidden line
+ * belongs to its chip, so the key selects the chip when the caret is on that line, or on the next
+ * line past it when that line has text or is the edge line of the document. Null in other cases.
+ */
+export function chipPastSeparator(
+  { doc, selection }: EditorState,
+  direction: -1 | 1
+): number | null {
+  const { $head } = selection
+  if (
+    !selection.empty ||
+    $head.depth !== 1 ||
+    $head.parentOffset !== (direction < 0 ? 0 : $head.parent.content.size)
+  ) {
+    return null
+  }
+  const index = $head.index(0)
+  const separators = separatorLines(doc)
+  const chipAt = (at: number): boolean =>
+    at >= 0 && at < doc.childCount && isChipLine(doc.child(at))
+  const edgeLine = direction < 0 ? doc.childCount - 1 : 0
+  const chip =
+    separators.has(index) && chipAt(index + direction)
+      ? index + direction
+      : separators.has(index + direction) &&
+          chipAt(index + 2 * direction) &&
+          ($head.parent.content.size > 0 || index === edgeLine)
+        ? index + 2 * direction
+        : null
+  if (chip === null) {
+    return null
+  }
+  let position = 0
+  for (let at = 0; at < chip; at++) {
+    position += doc.child(at).nodeSize
+  }
+  return position + 1
+}
+
+/** Hides each separator line. A caret on it shows it, so the caret is never out of sight. */
+export function quoteSeparatorDecorations({ doc, selection }: EditorState): DecorationSet {
+  const offsets: number[] = []
+  doc.forEach((_block, offset) => offsets.push(offset))
+  const decorations = [...separatorLines(doc)]
+    .filter((index) => index !== selection.$head.index(0))
+    .map((index) =>
+      Decoration.node(offsets[index], offsets[index] + doc.child(index).nodeSize, {
+        class: 'hidden',
+        'data-quote-separator': ''
+      })
+    )
   return DecorationSet.create(doc, decorations)
 }
 
