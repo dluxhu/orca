@@ -388,6 +388,22 @@ it('ignores the late highlight of a jump after a newer Back', () => {
   expect(document.activeElement).toBe(chip)
 })
 
+it('ignores the late chip focus of a chat place after Back leaves it', () => {
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)
+  const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
+  fireEvent.click(chip)
+  frames(2)
+  issue.mockClear()
+
+  act(() => useAppStore.getState().goBackWorktree())
+  act(() => useAppStore.getState().goBackWorktree())
+  frames(3)
+  expect(mocks.activate).toHaveBeenLastCalledWith('w0', { navigationIntent: 'user-open' })
+  expect(issue).not.toHaveBeenCalled()
+  expect(document.activeElement).not.toBe(chip)
+})
+
 it('keeps the Back of a workspace that shows the current workspace', () => {
   // A removed workspace between two visits of w1: Back still steps to the first one.
   useAppStore.setState({ worktreeNavHistory: ['w1', 'gone', 'w1'], worktreeNavHistoryIndex: 2 })
