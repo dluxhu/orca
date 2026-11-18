@@ -104,7 +104,9 @@ describe('quote chips in the composer', () => {
       editor.commands.setContent({
         type: 'doc',
         content: [
-          ...lines.map((text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })),
+          ...lines.map((text) =>
+            text ? { type: 'paragraph', content: [{ type: 'text', text }] } : { type: 'paragraph' }
+          ),
           { type: 'paragraph' },
           {
             type: 'paragraph',
@@ -154,6 +156,13 @@ describe('quote chips in the composer', () => {
       '',
       joinChipLineUnder(['> x', 'foo']),
       '> x\nfoo\n\n> q\n\nc',
+      ['> q\n\n']
+    ],
+    [
+      'a Backspace that joins a chip line under a text line, a blank line and a quote line',
+      '',
+      joinChipLineUnder(['> x', '', 'foo']),
+      '> x\n\nfoo\n> q\n\nc',
       ['> q\n\n']
     ],
     [

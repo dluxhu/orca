@@ -2,25 +2,29 @@ import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { promptLeafString, QUOTE_LINE, QUOTE_NODE } from './native-chat-prompt-document-text'
 
+const lineText = (nodes: readonly ProseMirrorNode[]): string =>
+  nodes.map(({ type, attrs, text }) => promptLeafString(type.name, attrs, text)).join('')
+
 /**
- * True when Markdown continues an earlier blockquote into the chip at `position`: a line in the
- * run of non-blank lines directly above the chip's line is a quote line.
+ * True when Markdown continues an earlier blockquote into the chip at child `index` of block
+ * `blockIndex`: a line in the run of non-blank lines directly above the chip's line is a quote
+ * line. Reads the blocks upward only to the first blank line.
  */
-function continuesBlockquote(
-  doc: ProseMirrorNode,
-  position: number,
-  startsBlock: boolean
-): boolean {
-  const lines = doc
-    .textBetween(0, position, '\n', ({ type, attrs, text }) =>
-      promptLeafString(type.name, attrs, text)
-    )
-    .split('\n')
-  // A chip that starts its block: the text before it ends at the block's own empty start.
-  let line = lines.length - (startsBlock ? 2 : 1)
-  for (; line >= 0 && lines[line].trim() !== ''; line--) {
-    if (QUOTE_LINE.test(lines[line])) {
-      return true
+function continuesBlockquote(doc: ProseMirrorNode, blockIndex: number, index: number): boolean {
+  for (let at = blockIndex; at >= 0; at--) {
+    const children = doc.child(at).content.content
+    // A chip that starts its block has no text before it on its own line.
+    if (at === blockIndex && index === 0) {
+      continue
+    }
+    const lines = lineText(at === blockIndex ? children.slice(0, index) : children).split('\n')
+    for (const line of lines.toReversed()) {
+      if (line.trim() === '') {
+        return false
+      }
+      if (QUOTE_LINE.test(line)) {
+        return true
+      }
     }
   }
   return false
@@ -36,13 +40,13 @@ function continuesBlockquote(
 export function layoutQuoteChips(state: { doc: ProseMirrorNode; tr: Transaction }): Transaction {
   const { doc, tr } = state
   const edits: { position: number; split: boolean; blankLine: boolean }[] = []
-  doc.forEach((block, blockOffset) => {
+  doc.forEach((block, blockOffset, blockIndex) => {
     block.forEach((node, offset, index) => {
       if (node.type.name !== QUOTE_NODE || block.maybeChild(index - 1)?.type.name === QUOTE_NODE) {
         return
       }
       const position = blockOffset + 1 + offset
-      const blankLine = continuesBlockquote(doc, position, index === 0)
+      const blankLine = continuesBlockquote(doc, blockIndex, index)
       if (index > 0 || blankLine) {
         edits.push({ position, split: index > 0, blankLine })
       }
