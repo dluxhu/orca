@@ -1,4 +1,4 @@
-import { createContext, useCallback, type RefObject } from 'react'
+import { createContext, useCallback, useRef, type RefObject } from 'react'
 import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcript-slot-selection'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
@@ -32,6 +32,7 @@ export function useNativeChatQuoteJump({
   readerLeavesEnd: () => void
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
+  const latest = useRef(0)
   return useCallback(
     ({ messageId, place }, text, notifyMissing) => {
       const index = nativeChatSlotIndexOf(slots, messageId)
@@ -42,8 +43,13 @@ export function useNativeChatQuoteJump({
       readerLeavesEnd()
       issue({ kind: 'rail', messageId, requestId: nextRequestId() })
       // The landing scrolls in a layout effect; the row is drawn two frames later or more.
+      const id = ++latest.current
       let frame = 0
       const showWhenDrawn = (): void => {
+        // A newer jump replaces this one.
+        if (id !== latest.current) {
+          return
+        }
         frame++
         // By the message id: a tool run's member rows use data-index too.
         const source =

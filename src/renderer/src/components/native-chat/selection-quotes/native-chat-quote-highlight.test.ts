@@ -98,9 +98,9 @@ it('searches for the quote when the reply changed since, and skips only whitespa
 })
 
 it('finds a quote with no saved place as a whole word, not inside a longer word', () => {
-  const root = element('<p>Use concatenate, then cat the file.</p>')
+  const root = element('<p>Use bobcat, then cat the file.</p>')
   showQuotedText(root, 'cat', null)
-  expect(shown()?.startOffset).toBe('Use concatenate, then '.length)
+  expect(shown()?.startOffset).toBe('Use bobcat, then '.length)
 })
 
 it('keeps the part of a selection that is in the reply when it starts before the reply', () => {

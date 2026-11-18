@@ -69,16 +69,12 @@ export function chipPastSeparator(
   const index = $head.index(0)
   const block = (at: number): ProseMirrorNode | null =>
     at >= 0 && at < doc.childCount ? doc.child(at) : null
-  const chip =
-    $head.parent.content.size > 0
-      ? // Text next to the hidden line.
-        block(index + direction)?.content.size === 0 && isChipLine(block(index + 2 * direction))
-        ? index + 2 * direction
-        : null
-      : // The hidden line, while the caret shows it.
-        isChipLine(block(index + direction)) && (block(index - direction)?.content.size ?? 0) > 0
-        ? index + direction
-        : null
+  // The chip itself, or the chip past its hidden line.
+  const chip = isChipLine(block(index + direction))
+    ? index + direction
+    : block(index + direction)?.content.size === 0 && isChipLine(block(index + 2 * direction))
+      ? index + 2 * direction
+      : null
   if (chip === null) {
     return null
   }

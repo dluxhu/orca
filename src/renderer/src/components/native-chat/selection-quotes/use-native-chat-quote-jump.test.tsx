@@ -76,3 +76,23 @@ it('shows the text when the message is drawn late, and a notice when it is never
   expect(shown).toHaveBeenCalledOnce()
   expect(notifyMissing).toHaveBeenCalledOnce()
 })
+
+it('drops an older jump when a newer one starts before it lands', () => {
+  const scroller = document.createElement('div')
+  scroller.innerHTML = '<div data-native-chat-quote-source="reply-1">The quoted text.</div>'
+  const { jumpTo } = jump(scroller)
+  const olderMissing = vi.fn()
+  jumpTo({ messageId: 'reply-0', place: null }, 'older text', olderMissing)
+  vi.advanceTimersToNextFrame()
+  jumpTo({ messageId: 'reply-1', place: null }, 'quoted text', vi.fn())
+  scroller.insertAdjacentHTML(
+    'beforeend',
+    '<div data-native-chat-quote-source="reply-0">The older text.</div>'
+  )
+  for (let frame = 0; frame < 30; frame++) {
+    vi.advanceTimersToNextFrame()
+  }
+  expect(shown).toHaveBeenCalledOnce()
+  expect(shown).toHaveBeenCalledWith(scroller.firstElementChild, 'quoted text', null)
+  expect(olderMissing).not.toHaveBeenCalled()
+})
