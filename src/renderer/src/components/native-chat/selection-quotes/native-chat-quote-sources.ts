@@ -3,7 +3,7 @@
 const STORAGE_KEY = 'orca.nativeChat.quoteSources.v2'
 // Version 1 holds quoted text. Remove it, so that no copy stays on disk.
 const OLD_STORAGE_KEY = 'orca.nativeChat.quoteSources.v1'
-const LIMIT = 200
+export const QUOTE_SOURCE_LIMIT = 200
 
 /** Where the quote is in its source element's text, and a hash of the text there. */
 export type QuotePlace = { offset: number; length: number; hash: string }
@@ -64,7 +64,7 @@ export function rememberNativeChatQuoteSource(text: string, source: QuoteSource)
   }
   const { offset = -1, length = 0, hash = '' } = source.place ?? {}
   const entry: Entry = [key, source.messageId, offset, length, hash]
-  const entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
+  const entries = [...load().filter(([known]) => known !== key), entry].slice(-QUOTE_SOURCE_LIMIT)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {

@@ -27,7 +27,7 @@ import type { NativeChatMessage } from '../../../../../../shared/native-chat/nat
 const REPLY: NativeChatMessage = {
   id: 'reply-1',
   role: 'assistant',
-  blocks: [{ type: 'text', text: 'An earlier reply.' }],
+  blocks: [{ type: 'text', text: Array.from({ length: 100 }, () => 'alpha').join(' ') }],
   timestamp: null,
   source: 'transcript'
 }
