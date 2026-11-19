@@ -33,6 +33,8 @@ export type NativeChatGlobalSettings = {
   nativeChatCiResultLines?: boolean
   /** A "New" line above what arrived while the reader was away. Absent follows the default below. */
   nativeChatMarkNewMessages?: boolean
+  /** Enter adds a new line and Cmd/Ctrl+Enter sends. Absent means off. */
+  nativeChatSendWithModEnter?: boolean
   /** The agent's suggested next prompt in an empty composer. Absent means on. */
   nativeChatPromptSuggestions?: boolean
 }
@@ -45,6 +47,13 @@ export function nativeChatMarksNewMessages(
 ): boolean {
   const value = settings?.nativeChatMarkNewMessages
   return typeof value === 'boolean' ? value : NATIVE_CHAT_MARKS_NEW_MESSAGES_BY_DEFAULT
+}
+
+/** Only explicit ON moves the send from Enter to Cmd/Ctrl+Enter. */
+export function nativeChatSendsWithModEnter(
+  settings: { readonly nativeChatSendWithModEnter?: unknown } | null | undefined
+): boolean {
+  return settings?.nativeChatSendWithModEnter === true
 }
 
 /** Only explicit OFF keeps a reader's place on send. */
