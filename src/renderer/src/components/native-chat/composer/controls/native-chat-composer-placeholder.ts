@@ -7,7 +7,7 @@ import { getScreenSubmitShortcutLabel } from '../../../../lib/keyboard/screen-su
 import {
   NATIVE_CHAT_TURN_STATUS_COPY,
   NATIVE_CHAT_COMPOSER_PLACEHOLDER
-} from '../../../../../../shared/native-chat/transcript/native-chat-turn-status'
+} from '../../../../../../shared/native-chat/transcript/turns/native-chat-turn-status'
 
 export function nativeChatComposerPlaceholder(
   hasPty: boolean,
@@ -54,7 +54,7 @@ export function useNativeChatComposerPlaceholder({
   afterStop,
   editing,
   goal,
-  unavailableHint,
+  hint,
   launchPrompt
 }: {
   hasPty: boolean
@@ -62,8 +62,8 @@ export function useNativeChatComposerPlaceholder({
   afterStop?: NativeChatAfterStopSend
   editing: boolean
   goal: boolean
-  /** The reason the composer is disabled; no key sends, so it names none. */
-  unavailableHint?: string
+  /** Shown in place of the default text: why the composer is disabled, a suggested prompt, or a room's hint. */
+  hint?: string
   /** A launch prompt keeps Enter as its send. */
   launchPrompt?: string
 }): string {
@@ -94,8 +94,5 @@ export function useNativeChatComposerPlaceholder({
           'Describe your goal, define measurable outcomes for best results'
         )
   }
-  return (
-    unavailableHint ??
-    nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, sendWithModEnter)
-  )
+  return hint ?? nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t, sendWithModEnter)
 }

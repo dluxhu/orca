@@ -2,19 +2,16 @@ import {
   useCallback,
   useRef,
   type Dispatch,
+  type KeyboardEvent,
   type KeyboardEventHandler,
   type SetStateAction
 } from 'react'
-import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
-import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/native-chat-picker-items'
+import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
+import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/composer/native-chat-picker-items'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'
 import { useAppStore } from '@/store'
-import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
-import {
-  nativeChatMentionItems,
-  type NativeChatMentionFiles
-} from '../pickers/use-native-chat-mention-files'
-import type { NativeChatMentionItem } from '../pickers/native-chat-mentions'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/settings/native-chat-appearance-settings'
+import type { NativeChatMentionFiles } from '../pickers/use-native-chat-mention-files'
 import type { NativeChatComposerSendIntent } from '../submit/native-chat-composer-send-intent'
 import {
   isNativeChatRecallActive,
@@ -26,7 +23,9 @@ import {
 export type UseNativeChatComposerKeyDownArgs = {
   autocomplete: ComposerAutocomplete
   mentionFiles: NativeChatMentionFiles
-  completeMention: (item: NativeChatMentionItem) => void
+  completeMention: (path: string) => void
+  /** The `@` list's own keys first (a bot's chats, a pill's chat list); true when it took the key. */
+  mentionKey?: (event: KeyboardEvent<HTMLElement>, activeSuggestion: number) => boolean
   activeSuggestion: number
   draft: string
   /** Image chips count as composer content, like typed text. */
@@ -36,7 +35,8 @@ export type UseNativeChatComposerKeyDownArgs = {
   completePickerItem: (item: NativeChatPickerItem) => void
   dispatchPickerCommand: (item: Extract<NativeChatPickerItem, { kind: 'command' }>) => void
   dismissPicker: (triggerKey: string) => void
-  interrupt: () => void
+  /** Unset while Escape may not stop the turn; the Stop button still does. */
+  interrupt: (() => void) | undefined
   send: (intent?: NativeChatComposerSendIntent) => void
   /** Cmd/Ctrl+Shift+Enter steers the head queued card, whatever the composer holds. */
   steerHead?: (() => boolean) | undefined
@@ -53,6 +53,7 @@ export function useNativeChatComposerKeyDown({
   autocomplete,
   mentionFiles,
   completeMention,
+  mentionKey,
   activeSuggestion,
   draft,
   hasAttachments = false,
@@ -90,10 +91,12 @@ export function useNativeChatComposerKeyDown({
       if (event.key === 'Escape' && event.defaultPrevented && autocomplete.mode === 'none') {
         return
       }
+      if (mentionKey?.(event, activeSuggestion)) {
+        return
+      }
 
       if (autocomplete.mode !== 'none') {
-        const items =
-          autocomplete.mode === 'slash' ? autocomplete.items : nativeChatMentionItems(mentionFiles)
+        const items = autocomplete.mode === 'slash' ? autocomplete.items : mentionFiles.files
         if (event.key === 'ArrowDown' && items.length > 0) {
           event.preventDefault()
           setActiveSuggestion((index) => (index + 1) % items.length)
@@ -109,8 +112,8 @@ export function useNativeChatComposerKeyDown({
         if (picks && items.length > 0) {
           event.preventDefault()
           if (autocomplete.mode === 'mention') {
-            const mentions = nativeChatMentionItems(mentionFiles)
-            completeMention(mentions[Math.min(activeSuggestion, mentions.length - 1)])
+            const { files } = mentionFiles
+            completeMention(files[Math.min(activeSuggestion, files.length - 1)])
             return
           }
           const item = autocomplete.items[activeSuggestion] ?? autocomplete.items[0]
@@ -136,7 +139,7 @@ export function useNativeChatComposerKeyDown({
 
       if (event.key === 'Escape') {
         event.preventDefault()
-        interrupt()
+        interrupt?.()
         return
       }
       const modified = event.key === 'Enter' && (isMacPlatform() ? event.metaKey : event.ctrlKey)
@@ -200,6 +203,7 @@ export function useNativeChatComposerKeyDown({
       activeSuggestion,
       autocomplete,
       completeMention,
+      mentionKey,
       completePickerItem,
       dismissPicker,
       dispatchPickerCommand,
