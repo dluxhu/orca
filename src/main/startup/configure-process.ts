@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path'
 import { getVersionManagerBinPaths } from '../codex-cli/command'
 import { isWindowsFnmDefaultAliasDir } from '../../shared/shell/command-resolution/fnm-default-alias-dirs'
 import { getMainE2EConfig } from './testing/e2e-config'
+import { FORK_IDENTITY } from '../../shared/fork-identity'
 import { DISABLED_CHROMIUM_FEATURES } from './chromium-policy/disabled-chromium-features'
 import { readHttp1CompatibilityMarker } from './network-compatibility/http1-compatibility-marker'
 import { checkServeUserDataPath } from './serve-launch/serve-user-data-path-guard'
@@ -224,8 +225,14 @@ export function configureDevUserDataPath(isDev: boolean): void {
   if (!isDev) {
     // Fork patch (see docs/fork/PATCHES.md): pin the default `orca` folder as an override.
     // Without the pin, a setPath after the post-ready rename moves userData to `Orca @dLux`.
+    // A nightly build pins its own folder instead.
     if (!app.commandLine.hasSwitch('user-data-dir')) {
-      app.setPath('userData', app.getPath('userData'))
+      app.setPath(
+        'userData',
+        FORK_IDENTITY.userDataName
+          ? join(app.getPath('appData'), FORK_IDENTITY.userDataName)
+          : app.getPath('userData')
+      )
     }
     return
   }

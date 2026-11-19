@@ -89,4 +89,20 @@ describe('Orca @dLux fork in the Electron app', () => {
       expect(labels).toContain('Quit Orca @dLux')
     }
   )
+
+  it('pins its own folder under appData in a nightly build', async () => {
+    vi.resetModules()
+    vi.doMock('../../shared/fork-identity', () => ({
+      FORK_IDENTITY: { userDataName: 'orca-dlux-nightly' }
+    }))
+    try {
+      const { configureDevUserDataPath } = await import('./configure-process')
+      electron.setPath.mockClear()
+      configureDevUserDataPath(false)
+      expect(electron.setPath.mock.calls).toEqual([['userData', '/app-data/orca-dlux-nightly']])
+    } finally {
+      vi.doUnmock('../../shared/fork-identity')
+      vi.resetModules()
+    }
+  })
 })

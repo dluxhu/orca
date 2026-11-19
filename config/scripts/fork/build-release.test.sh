@@ -143,5 +143,34 @@ check 'a criss-cross stack does not bring back what the earlier tip removed' \
    git -C "$repo" cat-file -e v1.1.0-dlux.1:m.txt &&
    git -C "$repo" cat-file -e v1.1.0-dlux.1:s.txt'
 
+# 5. --nightly builds on an upstream commit that is not a tag, adds the nightly identity commit,
+#    and leaves release/latest alone.
+new_repo nightly
+commit main 'upstream nightly' n.txt 'n'
+nightly_sha=$(git -C "$repo" rev-parse main)
+git -C "$repo" checkout -q -b dlux/a v1.0.0
+commit dlux/a 'a adds a' a.txt 'a'
+git -C "$repo" merge -q --no-edit "$nightly_sha" >/dev/null
+order dlux/a
+mkdir -p "$repo/src/shared/remote" "$repo/src/renderer"
+printf "const FORK_CHANNEL = 'stable' as 'stable' | 'nightly'\n" >"$repo/src/shared/fork-identity.ts"
+printf '{ "appId": "com.stablyai.orca.dlux" }\n' >"$repo/src/shared/remote/local-build-compatibility-contract.json"
+printf '<title>Orca @dLux</title>\n' >"$repo/src/renderer/index.html"
+git -C "$repo" add src
+git -C "$repo" commit -q -m 'fork identity'
+git -C "$repo" merge -q --no-edit "$nightly_sha" >/dev/null
+(cd "$repo" && TMPDIR="$root" "$script" --nightly "$nightly_sha" --version 1.1.0-daily.1-dlux.1) \
+  >"$root/out.txt" 2>&1 || true
+check 'a nightly build has the patches, the nightly identity, and no release/latest' \
+  'git -C "$repo" cat-file -e v1.1.0-daily.1-dlux.1:n.txt &&
+   git -C "$repo" cat-file -e v1.1.0-daily.1-dlux.1:a.txt &&
+   git -C "$repo" show v1.1.0-daily.1-dlux.1:src/shared/fork-identity.ts | grep -q "FORK_CHANNEL = '"'"'nightly'"'"'" &&
+   git -C "$repo" show v1.1.0-daily.1-dlux.1:src/shared/remote/local-build-compatibility-contract.json | grep -q dlux.nightly &&
+   git -C "$repo" show v1.1.0-daily.1-dlux.1:src/renderer/index.html | grep -q "Orca @dLux Nightly" &&
+   ! git -C "$repo" rev-parse -q --verify release/latest >/dev/null'
+(cd "$repo" && TMPDIR="$root" "$script" --nightly "$nightly_sha") >"$root/out.txt" 2>&1 &&
+  nightly_no_version=ran || nightly_no_version=refused
+check 'a nightly build without --version is refused' '[ "$nightly_no_version" = refused ]'
+
 [ "$failures" = 0 ] || { echo "$failures case(s) failed"; exit 1; }
 echo 'all cases passed'

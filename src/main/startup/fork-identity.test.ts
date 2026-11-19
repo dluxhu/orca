@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { FORK_IDENTITY, withForkName } from '../../shared/fork-identity'
 import { isOrcaAttributedPrompt } from '../macos-permissions/macos-tcc-prompt-watch'
 import { ensureWindowsAppDataPath } from './windows-startup/windows-app-data-path'
-import { RELEASE_CHANNELS, getReleaseRepoForChannel } from '../../shared/release-channel'
-import { getPlatformUserDataPath } from '../../cli/runtime/metadata'
-import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
+import { RELEASE_CHANNELS, getReleaseRepoForChannel } from '../../shared/updater/release-channel'
+import { getPlatformUserDataPath } from '../../cli/runtime/profile/metadata'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract'
 import {
   getDevInstanceIdentity,
   shouldApplyPreReadyAppName
@@ -21,7 +21,8 @@ describe('Orca @dLux fork identity', () => {
     expect(FORK_IDENTITY).toEqual({
       productName: 'Orca @dLux',
       appId: 'com.stablyai.orca.dlux',
-      releaseRepo: 'dluxhu/orca'
+      releaseRepo: 'dluxhu/orca',
+      userDataName: null
     })
   })
 
@@ -42,7 +43,7 @@ describe('Orca @dLux fork identity', () => {
 
   it('uses the fork appId in the local-build contract, in TS and JSON', () => {
     expect(LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId).toBe(FORK_IDENTITY.appId)
-    expect(require('../../shared/local-build-compatibility-contract.json').appId).toBe(
+    expect(require('../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.json').appId).toBe(
       FORK_IDENTITY.appId
     )
   })

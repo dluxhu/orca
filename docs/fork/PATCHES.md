@@ -18,6 +18,11 @@ script reads its "Release order" list.
 - A release is cut from the newest upstream stable tag, at most once a week. If upstream made
   several stable releases in the week, use only the newest. The version is
   `<upstream version>-dlux.<N>`.
+- Since 2026-11-19 the branches also contain an upstream nightly commit (from `main`), for the
+  nightly release (see "Nightly releases"). Upstream stable tags are on release branches, not on
+  `main`. A stable release on a tag that does not contain that commit gets upstream `main`
+  changes inside each patch. Build stable releases again only from a tag that contains the
+  nightly commit, or after the owner decides how to split the lines.
 - Turn on `git rerere` (`git config rerere.enabled true`), so a resolved conflict is reused
   in the next week and in the release build.
 
@@ -145,6 +150,44 @@ before fork-only ones), add a row, and add a "Branch" section below. Add one lin
    `git push --force-with-lease origin release/latest`. Then make the GitHub release on
    `dluxhu/orca` from the tag.
 
+## Nightly releases
+
+A nightly release is built on the commit of an upstream nightly build, for upstream features
+that no stable release has yet. It is a GitHub prerelease, and it installs beside the stable fork.
+
+1. Find the newest upstream nightly: `gh release list -R stablyai/orca-daily --limit 1`. Its
+   body names the commit. Its version is the tag without `v`, for example
+   `1.4.264-daily.202611181832`. Fetch the commit: `git fetch --no-tags upstream main`.
+2. Merge the commit into each branch of "Release order" (a normal merge, no rebase). Resolve,
+   run the branch's check, commit, and push. Files that only the stable-only commits of the
+   stable tag changed take the nightly's version: the stable tag is not on upstream `main`.
+3. Run `config/scripts/fork/build-release.sh --remote origin --nightly <commit> --version <nightly version>-dlux.<N>`.
+   The script adds one more commit that sets `FORK_CHANNEL = 'nightly'` in
+   `src/shared/fork-identity.ts`, the nightly appId in the local-build contract JSON, and the
+   page title. It does not move `release/latest`.
+4. Build and test as in "Release steps" (steps 3 and 4), with these changes:
+   - The app is `dist/mac-arm64/Orca @dLux Nightly.app`.
+   - For the orcad template graft, use upstream's nightly app of the same version:
+     `gh release download v<nightly version> -R stablyai/orca-daily -p 'Orca-<nightly version>-arm64-mac.zip'`.
+5. On the owner's go-ahead: `git push origin release/<version> v<version>`, then make a GitHub
+   **prerelease** on `dluxhu/orca` from the tag. Do not upload `latest-mac.yml`: no updater
+   then offers the nightly build. The stable feed reads `/releases/latest`, which skips
+   prereleases.
+
+| Identity point | Stable fork                          | Nightly fork                         |
+| -------------- | ------------------------------------ | ------------------------------------ |
+| Product name   | `Orca @dLux`                         | `Orca @dLux Nightly`                 |
+| Bundle id      | `com.stablyai.orca.dlux`             | `com.stablyai.orca.dlux.nightly`     |
+| userData       | `orca` (shared with official Orca)   | `orca-dlux-nightly` (its own)        |
+| Keychain item  | "orca Safe Storage"                  | "orca Safe Storage" (the same item)  |
+
+Known limits of a nightly build:
+
+- The `orca` command outside the app uses the `orca` profile folder. Do not Register the
+  command line in the nightly app. Inside its own terminals, `orca` reaches the nightly app.
+- Its updater reads `/releases/latest` of the fork. When a stable fork release with a higher
+  version exists, it offers that release, and the install fails because the bundle id differs.
+
 ## Default branch and front page
 
 - `release/latest` is the default branch of `dluxhu/orca`, so the GitHub front page shows
@@ -184,7 +227,8 @@ single-instance lock is on that folder.
 do not change.
 
 **Single source.** `src/shared/fork-identity.ts` holds every fork value. The other files only
-read `FORK_IDENTITY`.
+read `FORK_IDENTITY`. Its `FORK_CHANNEL` is `'stable'` on the branch. A nightly release sets
+it to `'nightly'` (see "Nightly releases").
 
 | Identity point                                                                          | Official Orca               | Orca @dLux                                  | File                                                                                                                    |
 | --------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
