@@ -6,17 +6,17 @@ import {
   type NodeViewProps
 } from '@tiptap/react'
 import { MessageSquare, SquareTerminal, Users } from 'lucide-react'
+import { useTranslate } from '@/i18n/use-translate'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   agentReferenceToken,
   type AgentReferenceKind,
   type OrchestrationAgentReference
 } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
-import { nativeChatMentionKindLabel } from '../pickers/native-chat-mentions'
 import { closeHistory } from '@tiptap/pm/history'
 import { promptTextPosition } from './native-chat-prompt-document'
 
-/** A chat or terminal chip says its kind to a screen reader; an orchestration chip has none. */
+/** A chat or terminal chip says its kind to a screen reader; an orchestration chip says "Agent". */
 export function AgentReferencePillContent({
   label,
   kind,
@@ -26,12 +26,18 @@ export function AgentReferencePillContent({
   kind: AgentReferenceKind | null
   selected: boolean
 }): React.JSX.Element {
+  const t = useTranslate()
   const icon = kind === 'chat' ? MessageSquare : kind === 'terminal' ? SquareTerminal : Users
+  const spokenLabel =
+    kind === 'chat'
+      ? t('components.native-chat.composer.chatPillLabel', 'Chat: {{name}}', { name: label })
+      : kind === 'terminal'
+        ? t('components.native-chat.composer.terminalPillLabel', 'Terminal: {{name}}', {
+            name: label
+          })
+        : t('components.native-chat.composer.agentPillLabel', 'Agent: {{name}}', { name: label })
   return (
-    <>
-      {kind ? <span className="sr-only">{`${nativeChatMentionKindLabel(kind)} `}</span> : null}
-      <NativeChatPromptPill icon={icon} label={label} selected={selected} />
-    </>
+    <NativeChatPromptPill icon={icon} label={label} spokenLabel={spokenLabel} selected={selected} />
   )
 }
 
@@ -112,10 +118,11 @@ export function insertAgentReferences(
       to: promptTextPosition(doc, replace.to)
     })
   }
-  const nextNode = editor.state.selection.$to.nodeAfter
-  const hasRightSeparator = nextNode?.isText
-    ? /^\s/u.test(nextNode.text ?? '')
-    : nextNode?.type.name === 'hardBreak'
+  const { $to } = editor.state.selection
+  const nextNode = $to.nodeAfter
+  const endsNonFinalLine =
+    !nextNode && $to.depth > 0 && $to.after(1) < editor.state.doc.content.size
+  const hasRightSeparator = nextNode?.isText ? /^\s/u.test(nextNode.text ?? '') : endsNonFinalLine
   editor.view.dispatch(closeHistory(editor.state.tr))
   editor.commands.insertContent(
     references.flatMap((attrs, index) => [

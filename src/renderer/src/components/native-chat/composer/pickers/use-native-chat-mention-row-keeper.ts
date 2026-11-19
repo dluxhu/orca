@@ -1,17 +1,13 @@
 import { useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react'
-import type { NativeChatMentionItem } from './native-chat-mentions'
-
-/** One `@` menu row. Two hosts can share a session id, so a session row also names its host. */
-export const nativeChatMentionRowId = (item: NativeChatMentionItem): string =>
-  typeof item === 'string' ? `file:${item}` : `${item.hostKey}:${item.kind}:${item.address}`
 
 /** Rows that arrive with no edit (late sessions, late files) keep the highlighted row; an edit resets it. */
 export function useNativeChatMentionRowKeeper(
-  items: readonly NativeChatMentionItem[] | null,
+  rows: readonly string[] | null,
   editKey: string,
-  setActiveSuggestion: Dispatch<SetStateAction<number>>
+  setActiveSuggestion: Dispatch<SetStateAction<number>> | undefined
 ): void {
-  const rowKey = items ? items.map(nativeChatMentionRowId).join('\0') : null
+  // A session row's string starts with \0, so rows join with a separator no row holds.
+  const rowKey = rows ? rows.join('\u0001') : null
   const shownRef = useRef<{ editKey: string; rowIds: string[] } | null>(null)
   // Why layout: the highlight moves before the menu paints, so Enter never picks a row that moved in.
   useLayoutEffect(() => {
@@ -20,9 +16,9 @@ export function useNativeChatMentionRowKeeper(
       shownRef.current = null
       return
     }
-    const rowIds = rowKey === '' ? [] : rowKey.split('\0')
+    const rowIds = rowKey === '' ? [] : rowKey.split('\u0001')
     shownRef.current = { editKey, rowIds }
-    if (!prev || prev.editKey !== editKey) {
+    if (!prev || prev.editKey !== editKey || !setActiveSuggestion) {
       return
     }
     setActiveSuggestion((current) => {
