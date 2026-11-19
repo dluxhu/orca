@@ -115,6 +115,20 @@ it('finds a quote with no saved place as a whole word, not inside a longer word'
   expect(shown()?.startOffset).toBe('Use bobcat, then '.length)
 })
 
+it.each([
+  ['Chinese', '<p>我们使用草稿存储。</p>', '草稿'],
+  ['Japanese', '<p>下書きを保存します。</p>', '保存'],
+  ['Thai', '<p>เราใช้ที่เก็บร่าง</p>', 'ที่เก็บ'],
+  ['a Korean word with a particle', '<p>서울에 갑니다.</p>', '서울'],
+  ['blocks drawn against the next block', '<h2>Setup</h2><p>Run it.</p>', 'Setup']
+])(
+  'finds a quote with no saved place in %s, where no word edge is at the quote',
+  (_name, html, quote) => {
+    showQuotedText(element(html), quote, null)
+    expect(shown()?.toString()).toBe(quote)
+  }
+)
+
 it('keeps the part of a selection that is in the reply when it starts before the reply', () => {
   const page = element('<p>Your prompt</p><div data-reply="">The reply text.</div>')
   const reply = page.querySelector<HTMLElement>('[data-reply]')!
