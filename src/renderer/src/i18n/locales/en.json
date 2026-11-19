@@ -20851,6 +20851,14 @@
         "runLiveBrowser_one": "Using the browser {{count}} time",
         "runLivePlan_one": "Updating the plan {{count}} time"
       },
+      "rawPanel": {
+        "label": "Raw messages",
+        "sent": "Sent to agent",
+        "shortened": "shortened by the host",
+        "showLess": "Show less",
+        "showMore": "Show more",
+        "toggle": "Show raw"
+      },
       "providerFrame": {
         "byteCount_one": "{{count}} byte",
         "byteCount_other": "{{count}} bytes"

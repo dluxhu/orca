@@ -1,8 +1,6 @@
 import { useNativeChatStructuredPaneNotices } from '@/components/native-chat/messages/notices/use-native-chat-structured-pane-notices'
-import {
-  NativeChatCrewFrame,
-  NativeChatCrewPanel
-} from '@/components/orchestration-crew/NativeChatCrewPanel'
+import { NativeChatCrewPanel } from '@/components/orchestration-crew/NativeChatCrewPanel'
+import { NativeChatRawFrame } from '@/components/native-chat/messages/diagnostics/NativeChatRawPanel'
 import { NativeChatUsageLimitActionsProvider } from '@/components/native-chat/usage/NativeChatUsageLimitActions'
 import { useNativeChatHandOff } from '@/components/native-chat/pane/actions/use-native-chat-hand-off'
 import { cn } from '@/lib/class-names'
@@ -276,7 +274,9 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
       data-native-chat-scheme={appearanceStyle.colorScheme}
     >
       {nativeChatPaneHeader(props, ownerWorktreeId, appearanceStyle.colorScheme, handOff)}
-      <NativeChatCrewFrame
+      <NativeChatRawFrame
+        tabId={props.tabId}
+        items={controller.journalItems}
         panel={<NativeChatCrewPanel {...props} composerRef={composerRef} canMention={canMention} />}
       >
         <NativeChatContextClearFade
@@ -341,7 +341,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
             </NativeChatRowActionsProvider>
           )}
         </NativeChatContextClearFade>
-      </NativeChatCrewFrame>
+      </NativeChatRawFrame>
       {readFailure?.final ? null : (
         <>
           {/* Keep queued drafts outside the transcript and above the background-task dock. */}
