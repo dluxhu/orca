@@ -35,6 +35,7 @@ import {
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/composer/native-chat-picker-items'
 import { nativeChatPickerCommands } from '../../../../../../shared/native-chat/input/commands/native-chat-skill-visibility'
 import { useNativeChatSkills } from './use-native-chat-skills'
+import { completeNativeChatMention, type NativeChatMentionSession } from './native-chat-mentions'
 import { useNativeChatPreferredSuggestion } from './use-native-chat-preferred-suggestion'
 import {
   emitNativeChatPickerItemAccepted,
@@ -54,6 +55,8 @@ export type NativeChatPickerState = {
   /** `token` replaces the file-reference form, e.g. a room's `@Name`; with `from`, it replaces
    *  `from` to the caret wherever the menu is (a bot's chats filter on text with spaces). */
   completeMention: (path: string, token?: string, from?: number) => void
+  /** Puts a chat or terminal chip where the `@query` is. */
+  completeSessionMention: (session: NativeChatMentionSession) => void
   dismiss: (triggerKey: string) => void
   handleDraftOrCaretChange: (value: string, caret: number) => void
   /** Arrow-key highlight moves; a catalog refresh keeps the row they land on until the next edit. */
@@ -242,6 +245,15 @@ export function useNativeChatPickerState(args: {
     [autocomplete, commitCompletion, liveDraft, textareaRef]
   )
 
+  const completeSessionMention = useCallback(
+    (session: NativeChatMentionSession) => {
+      if (!disabledRef.current && autocomplete.mode === 'mention') {
+        completeNativeChatMention(textareaRef.current, session, liveDraft(), commitCompletion)
+      }
+    },
+    [autocomplete, commitCompletion, liveDraft, textareaRef]
+  )
+
   const handleDraftOrCaretChange = useCallback(
     (value: string, nextCaret: number) => {
       const firstToken = value.split(/\s/, 1)[0] ?? ''
@@ -317,6 +329,7 @@ export function useNativeChatPickerState(args: {
     isPickedSkill,
     completeItem,
     completeMention,
+    completeSessionMention,
     dismiss,
     handleDraftOrCaretChange,
     navigateSuggestion

@@ -19,6 +19,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PickerListbox, PickerOptionButton, PickerStatus } from './NativeChatPickerParts'
 import { NativeChatMentionChatList } from './NativeChatMentionChatList'
 import { cn } from '@/lib/class-names'
+import { NativeChatMentionLabel } from './NativeChatMentionLabel'
+import { nativeChatMentionSessionOf } from './native-chat-mentions'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
 
@@ -311,10 +313,26 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           ? t('components.native-chat.composer.filesLoadFailed', "Couldn't load files")
           : nativeChatMentionEmptyText(room !== null && !room.withFiles)
 
-  // A bot's chat lists the other bots, then files, each under its heading.
+  // A bot's chat lists the other bots, then chats and terminals, then files, each under its heading.
   const bots = room?.withFiles ? files.filter((value) => memberOf(value)).length : 0
   const grouped = room?.withFiles === true && bots + room.unavailable.length > 0
+  const sessionOf = (value: string) => nativeChatMentionSessionOf(mention.sessions, value)
+  const sessions = files.slice(bots).filter((value) => sessionOf(value)).length
   const option = (path: string, index: number) => {
+    const session = sessionOf(path)
+    if (session) {
+      return (
+        <PickerOptionButton
+          key={path}
+          id={`${listboxId}-option-${index}`}
+          selected={index === selectedIndex}
+          activeItemRef={activeItemRef}
+          onChoose={() => onChoose(path)}
+        >
+          <NativeChatMentionLabel item={session} />
+        </PickerOptionButton>
+      )
+    }
     const member = room ? memberOf(path) : undefined
     const selected = index === selectedIndex
     const opens = member?.id && chats?.picker.offers(member.id) ? member.id : null
@@ -366,8 +384,12 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
       {grouped ? <PickerGroupHeading kind="bots" /> : null}
       <div onPointerLeave={() => setHovered(null)}>{files.slice(0, bots).map(option)}</div>
       {grouped ? <NativeChatUnavailableMentions room={room} /> : null}
-      {grouped && files.length > bots ? <PickerGroupHeading kind="files" /> : null}
-      {files.slice(bots).map((path, index) => option(path, index + bots))}
+      {grouped && sessions > 0 ? <PickerGroupHeading kind="sessions" /> : null}
+      {files.slice(bots, bots + sessions).map((path, index) => option(path, index + bots))}
+      {grouped && files.length > bots + sessions ? <PickerGroupHeading kind="files" /> : null}
+      {files
+        .slice(bots + sessions)
+        .map((path, index) => option(path, index + bots + sessions))}
       {statusText ? (
         <PickerStatus>
           {mention.loading ? <LoadingSpinner className="size-3.5" /> : null}

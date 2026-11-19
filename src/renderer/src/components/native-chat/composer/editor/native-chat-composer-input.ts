@@ -15,7 +15,11 @@ export type NativeChatComposerInput = Pick<
   | 'select'
   | 'setSelectionRange'
 > & {
-  insertAgentReferences?: (references: OrchestrationAgentReference[]) => void
+  /** True when a chip went in; `replace` is a text range the chips take the place of. */
+  insertAgentReferences?: (
+    references: OrchestrationAgentReference[],
+    replace?: { from: number; to: number }
+  ) => boolean
   contains?: (node: Node | null) => boolean
   insertText?: (text: string) => void
   insertSkill?: (from: number, to: number, token: string, path?: string) => void

@@ -248,7 +248,8 @@ function NativePromptEditor({
     () =>
       editor
         ? {
-            insertAgentReferences: (references) => insertAgentReferences(editor, references),
+            insertAgentReferences: (references, replace) =>
+              insertAgentReferences(editor, references, replace),
             insertText: (text) => {
               const content = editor.schema.nodeFromJSON(promptTextContent(text))
               editor.view.dispatch(
