@@ -14,6 +14,26 @@ function textNodes(root: Node): Text[] {
   return nodes
 }
 
+/** The range from `start` to `end` in the joined text of `nodes`. */
+function textRange(nodes: Text[], start: number, end: number): Range | null {
+  const range = document.createRange()
+  let started = false
+  for (const node of nodes) {
+    // `<`: a range that starts where a text node ends starts in the next one.
+    if (!started && start < node.data.length) {
+      range.setStart(node, start)
+      started = true
+    }
+    if (started && end <= node.data.length) {
+      range.setEnd(node, end)
+      return range
+    }
+    start -= node.data.length
+    end -= node.data.length
+  }
+  return null
+}
+
 /** Where `range` is in the text of `source`: the selection that "Add to chat" takes. */
 export function quotePlace(source: Element, range: Range): QuotePlace {
   const clamped = range.cloneRange()
@@ -32,56 +52,33 @@ export function quotePlace(source: Element, range: Range): QuotePlace {
 
 /** The range at `place` in the text of `root`, while the text there is still the quoted text. */
 export function placeRange(root: HTMLElement, place: QuotePlace): Range | null {
-  const range = document.createRange()
-  let start = place.offset
-  let end = place.offset + place.length
-  let started = false
-  for (const node of textNodes(root)) {
-    // `<`: a quote that starts where a text node ends starts in the next one.
-    if (!started && start < node.data.length) {
-      range.setStart(node, start)
-      started = true
-    }
-    if (started && end <= node.data.length) {
-      range.setEnd(node, end)
-      return textHash(range.toString()) === place.hash ? range : null
-    }
-    start -= node.data.length
-    end -= node.data.length
-  }
-  return null
+  const range = textRange(textNodes(root), place.offset, place.offset + place.length)
+  return range && textHash(range.toString()) === place.hash ? range : null
 }
 
+const WORD_CHAR = /[\p{L}\p{N}_]/u
+
 /**
- * The first range of `text` in `root`, for a reply drawn again since the quote. The compare skips
- * whitespace only: a selection has line breaks between blocks that the page text does not have.
+ * The first range of `text` in `root`, for a reply drawn again since the quote. Whitespace in the
+ * quote matches any whitespace or none: a selection has line breaks between blocks that the page
+ * text does not have. A quote that starts or ends in a word does not match inside a longer word.
  */
 export function quotedTextRange(root: HTMLElement, text: string): Range | null {
-  const needle = text.replace(/\s/g, '')
-  if (!needle) {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) {
     return null
   }
-  const chars: { node: Text; offset: number }[] = []
-  for (const node of textNodes(root)) {
-    for (let offset = 0; offset < node.data.length; offset++) {
-      if (!/\s/.test(node.data[offset])) {
-        chars.push({ node, offset })
-      }
-    }
-  }
-  const index = chars
-    .map(({ node, offset }) => node.data[offset])
-    .join('')
-    .indexOf(needle)
-  if (index === -1) {
+  const body = words.map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*')
+  const before = WORD_CHAR.test(text.trim()[0]) ? '(?<![\\p{L}\\p{N}_])' : ''
+  const after = WORD_CHAR.test(text.trim().at(-1) ?? '') ? '(?![\\p{L}\\p{N}_])' : ''
+  const nodes = textNodes(root)
+  const match = new RegExp(`${before}${body}${after}`, 'u').exec(
+    nodes.map((node) => node.data).join('')
+  )
+  if (!match) {
     return null
   }
-  const first = chars[index]
-  const last = chars[index + needle.length - 1]
-  const range = document.createRange()
-  range.setStart(first.node, first.offset)
-  range.setEnd(last.node, last.offset + 1)
-  return range
+  return textRange(nodes, match.index, match.index + match[0].length)
 }
 
 /**

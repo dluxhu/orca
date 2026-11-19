@@ -109,6 +109,12 @@ it('keeps the highlight of a second jump when the first one times out', () => {
   expect(highlights.has('native-chat-quote-jump')).toBe(false)
 })
 
+it('finds a quote with no saved place as a whole word, not inside a longer word', () => {
+  const root = element('<p>Use bobcat, then cat the file.</p>')
+  showQuotedText(root, 'cat', null)
+  expect(shown()?.startOffset).toBe('Use bobcat, then '.length)
+})
+
 it('keeps the part of a selection that is in the reply when it starts before the reply', () => {
   const page = element('<p>Your prompt</p><div data-reply="">The reply text.</div>')
   const reply = page.querySelector<HTMLElement>('[data-reply]')!
