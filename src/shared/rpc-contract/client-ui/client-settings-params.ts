@@ -124,6 +124,7 @@ export const SettingsUpdate = z
     codexShareHistoryAcrossAccounts: z.boolean().optional(),
     deleteChatHistoryWithWorkspace: z.boolean().optional(),
     claudeSubagentNavigationEnabled: z.boolean().optional(),
+    claudeRemoteControlForNewChats: z.boolean().optional(),
     defaultRepoSelection: z.array(z.string()).nullable().optional(),
     defaultLinearTeamSelection: z.array(z.string()).nullable().optional(),
     compactWorktreeCards: z.boolean().optional(),

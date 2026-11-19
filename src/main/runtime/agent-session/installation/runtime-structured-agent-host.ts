@@ -51,6 +51,8 @@ export abstract class RuntimeStructuredAgentHost extends OrcaRuntimeWithStartTui
         nativeChatShellEnvironmentPolicy(this.requireStore().getSettings()),
       resolveClaudeAuthPolicy: () =>
         claudeStructuredAuthPolicyForSettings(this.requireStore().getSettings()),
+      claudeRemoteControlForNewChats: () =>
+        this.requireStore().getSettings().claudeRemoteControlForNewChats === true,
       resolveAgentLaunchEnv: (agent) =>
         isTuiAgent(agent)
           ? this.structuredAgentLaunchEnv(agent, this.requireStore().getSettings())

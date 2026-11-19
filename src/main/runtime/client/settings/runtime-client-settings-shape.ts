@@ -19,6 +19,7 @@ export type RuntimeClientSettings = Pick<
   | 'codexShareHistoryAcrossAccounts'
   | 'deleteChatHistoryWithWorkspace'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'terminalCopyTrimsGutter'
   | 'defaultTaskSource'
   | 'defaultTaskViewPreset'
@@ -71,6 +72,7 @@ export type RuntimeClientSettingsUpdate = Pick<
   Partial<GlobalSettings>,
   | 'agentStatusHooksEnabled'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'botsEnabled'
   | 'defaultTuiAgent'
   | 'disabledTuiAgents'
