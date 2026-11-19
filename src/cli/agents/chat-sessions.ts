@@ -1,13 +1,13 @@
-import { agentSessionPromptQuestions } from '../../shared/agent-session/agent-session-question-answer'
+import { agentSessionPromptQuestions } from '../../shared/agent-session/requests/prompts/agent-session-question-answer'
 import { isActionableStructuredAgentSessionPrompt } from '../../shared/agent-session/view/structured-agent-session-live-turn'
 import { isRootAgentJournalItem } from '../../shared/agent-session/journal/agent-session-journal-producer'
 import type { AgentJournalRenderItem } from '../../shared/agent-session/journal/agent-session-journal-types'
 import type {
   RuntimeWorktreeAgentRow,
   RuntimeWorktreePsSummary
-} from '../../shared/runtime-worktree-contracts'
+} from '../../shared/worktree/catalog/runtime-worktree-contracts'
 import { structuredAgentSessionTabId } from '../../shared/agent-session/view/structured-agent-session-projection'
-import { RuntimeClientError } from '../runtime/types'
+import { RuntimeClientError } from '../runtime/connection/types'
 
 const CHAT_HANDLE_PREFIX = structuredAgentSessionTabId('')
 
