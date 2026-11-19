@@ -117,7 +117,7 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       content: [{ type: 'paragraph', content: [{ type: 'nativeChatAgentReference', attrs: crew }] }]
     }
     expect(serializeNativeChatAgentReferences(agentReferenceToken(crew), document)).toBe(
-      '@Worker\n\n[Orca agent "Worker": term_one — message it with orca orchestration send --to term_one]'
+      '@Worker\n\n[Orca agent "Worker": term_one — message it with orca orchestration send --to term_one --subject "<topic>" --body "<message>"]'
     )
   })
 })
