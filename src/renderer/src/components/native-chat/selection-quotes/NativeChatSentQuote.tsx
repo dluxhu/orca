@@ -87,7 +87,9 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
             const isCurrent = beginNativeChatNavigation()
             const jumped = jumpToQuoteSource(sourceText, {
               jumpToMessage:
-                jumpToMessage && ((source, text) => jumpToMessage(source, text, isCurrent)),
+                jumpToMessage &&
+                ((source, text, notifyMissing, isLinkTurn) =>
+                  jumpToMessage(source, text, notifyMissing, () => isCurrent() && isLinkTurn())),
               openFile: (location) => openQuotedFile(location, fileLinkContext),
               notifyMissing: () =>
                 toast(

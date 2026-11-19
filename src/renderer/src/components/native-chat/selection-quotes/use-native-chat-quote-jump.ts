@@ -3,23 +3,26 @@ import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcr
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
 import { showQuotedText } from './native-chat-quote-highlight'
-import type { QuoteSource } from './native-chat-quote-sources'
+import type { NativeChatQuoteJumpDeps } from './native-chat-quote-sources'
 
-/** `isCurrent` is false once a newer chat navigation starts; the deferred scroll and highlight then do nothing. */
-export type NativeChatQuoteJump = (
-  source: QuoteSource,
-  text: string,
-  isCurrent?: () => boolean
-) => boolean
+export type NativeChatQuoteJump = NonNullable<NativeChatQuoteJumpDeps['jumpToMessage']>
 
-/** Scrolls to a loaded message, then gives the scroller to `show`; false when the message is not here. */
+/**
+ * Scrolls to a loaded message, then gives the scroller to `show` until `show` returns true. After
+ * about half a second it calls `notifyMissing`. False when the message is not here. Each later step
+ * does nothing once `isCurrent` is false.
+ */
 export type NativeChatMessageReveal = (
   messageId: string,
-  show: (scroller: HTMLElement) => void,
-  isCurrent?: () => boolean
+  show: (scroller: HTMLElement) => boolean,
+  isCurrent?: () => boolean,
+  notifyMissing?: () => void
 ) => boolean
 
 const ALWAYS_CURRENT = (): boolean => true
+
+// About half a second: the landing draws a loaded row well before this.
+const SOURCE_FRAMES = 30
 
 /** The message reveal of each mounted transcript. Back and Forward use it to show a chat place. */
 export const nativeChatMessageReveals = new Set<NativeChatMessageReveal>()
@@ -43,21 +46,31 @@ export function useNativeChatQuoteJump({
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
   const reveal = useCallback<NativeChatMessageReveal>(
-    (messageId, show, isCurrent = ALWAYS_CURRENT) => {
+    (messageId, show, isCurrent = ALWAYS_CURRENT, notifyMissing) => {
       if (nativeChatSlotIndexOf(slots, messageId) === -1) {
         return false
       }
       beginNavigation()
       readerLeavesEnd()
       issue({ kind: 'rail', messageId, requestId: nextRequestId() })
-      // The landing scrolls in a layout effect; the row is drawn two frames later.
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          if (scrollRef.current && isCurrent()) {
-            show(scrollRef.current)
-          }
-        })
-      )
+      // The landing scrolls in a layout effect; the row is drawn two frames later or more.
+      let frame = 0
+      const showWhenDrawn = (): void => {
+        if (!isCurrent()) {
+          return
+        }
+        frame++
+        const scroller = frame < 2 ? null : scrollRef.current
+        if (scroller && show(scroller)) {
+          return
+        }
+        if (frame < SOURCE_FRAMES) {
+          requestAnimationFrame(showWhenDrawn)
+        } else {
+          notifyMissing?.()
+        }
+      }
+      requestAnimationFrame(showWhenDrawn)
       return true
     },
     [beginNavigation, issue, nextRequestId, readerLeavesEnd, scrollRef, slots]
@@ -69,7 +82,7 @@ export function useNativeChatQuoteJump({
     }
   }, [reveal])
   return useCallback(
-    ({ messageId, place }, text, isCurrent) =>
+    ({ messageId, place }, text, notifyMissing, isCurrent) =>
       reveal(
         messageId,
         (scroller) => {
@@ -80,8 +93,10 @@ export function useNativeChatQuoteJump({
           if (source) {
             showQuotedText(source, text, place)
           }
+          return Boolean(source)
         },
-        isCurrent
+        isCurrent,
+        notifyMissing
       ),
     [reveal]
   )

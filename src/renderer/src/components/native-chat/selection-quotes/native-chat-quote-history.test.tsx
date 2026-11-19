@@ -388,6 +388,27 @@ it('ignores the late highlight of a jump after a newer Back', () => {
   expect(document.activeElement).toBe(chip)
 })
 
+it.each([
+  ['shows a reply that is drawn late', false],
+  ['ignores a reply that is drawn after a newer Back', true]
+])('%s', (_name, back) => {
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)
+  const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
+  const source = screen.getByText('The quoted text.', { selector: 'p' })
+  source.removeAttribute('data-native-chat-quote-source')
+
+  fireEvent.click(chip)
+  frames(5)
+  if (back) {
+    act(() => useAppStore.getState().goBackWorktree())
+  }
+  source.setAttribute('data-native-chat-quote-source', 'reply-1')
+  frames(30)
+  expect(document.activeElement === source).toBe(!back)
+  expect(mocks.toast).not.toHaveBeenCalled()
+})
+
 it('ignores the late chip focus of a chat place after Back leaves it', () => {
   rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
   render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)

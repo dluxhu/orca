@@ -102,7 +102,14 @@ export function showNativeChatQuotePlace(place: WorktreeNavHistoryChatQuoteEntry
     for (const reveal of nativeChatMessageReveals) {
       if (
         !isCurrent() ||
-        reveal(place.messageId, (scroller) => showChip(scroller, place), isCurrent)
+        reveal(
+          place.messageId,
+          (scroller) => {
+            showChip(scroller, place)
+            return true
+          },
+          isCurrent
+        )
       ) {
         return
       }

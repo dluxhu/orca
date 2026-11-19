@@ -56,6 +56,7 @@ it('shows a sent quote as a button that jumps to its message, with no open or cl
   expect(jump).toHaveBeenCalledWith(
     { messageId: 'reply-1', place: null },
     'quoted\nwords',
+    expect.any(Function),
     expect.any(Function)
   )
   expect(document.querySelector('blockquote')).toBeNull()
@@ -83,6 +84,7 @@ it.each([
   expect(jump).toHaveBeenCalledWith(
     { messageId: 'reply-2', place },
     quote.trim(),
+    expect.any(Function),
     expect.any(Function)
   )
   expect(opened.toast).not.toHaveBeenCalled()
