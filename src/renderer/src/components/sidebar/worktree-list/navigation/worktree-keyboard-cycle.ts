@@ -1,5 +1,5 @@
 import {
-  isViewEntry,
+  historyEntryWorkspaceId,
   type WorktreeNavHistoryEntry
 } from '@/store/slices/ui/workspace-navigation-history'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
@@ -80,8 +80,9 @@ export function resolveCycleAnchorWorktreeId(args: {
     index--
   ) {
     const entry = args.navHistory[index]
-    if (entry !== undefined && !isViewEntry(entry) && cyclable.has(entry)) {
-      return entry
+    const workspaceId = entry === undefined ? null : historyEntryWorkspaceId(entry)
+    if (workspaceId !== null && cyclable.has(workspaceId)) {
+      return workspaceId
     }
   }
   return null

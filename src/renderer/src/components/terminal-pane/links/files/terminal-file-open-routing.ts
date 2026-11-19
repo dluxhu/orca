@@ -61,6 +61,8 @@ type TerminalFileOpenDeps = {
   openInSourceGroupSurface?: 'internal' | 'browser'
   /** Highlights this many characters from the revealed column in the editor, for a short time. */
   revealLength?: number
+  /** False: the caller records the history entries of this open, so its activation records no visit. */
+  recordsHistory?: false
 }
 
 export function openDetectedFilePath(
@@ -283,11 +285,21 @@ export function openDetectedFilePath(
     }
 
     if (targetWorktreeId) {
-      // Route by workspace shape and resolved host: folder keys are valid and worktree ids can repeat across hosts.
-      activateAndRevealWorkspace(targetWorktreeId, {
-        providesInitialSurface: true,
-        executionHostId: targetExecutionHostId
-      })
+      const navigating = useAppStore.getState().isNavigatingHistory
+      if (deps.recordsHistory === false) {
+        useAppStore.setState({ isNavigatingHistory: true })
+      }
+      try {
+        // Route by workspace shape and resolved host: folder keys are valid and worktree ids can repeat across hosts.
+        activateAndRevealWorkspace(targetWorktreeId, {
+          providesInitialSurface: true,
+          executionHostId: targetExecutionHostId
+        })
+      } finally {
+        if (deps.recordsHistory === false) {
+          useAppStore.setState({ isNavigatingHistory: navigating })
+        }
+      }
     }
 
     const opened = openLinkedFileInEditor(

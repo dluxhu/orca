@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/hosts/host-section-rows'
 import type { FolderWorkspaceRow } from '../../../../../../shared/sidebar-list/row-types'
-import { getCyclableWorktreeIds } from './worktree-keyboard-cycle'
+import { getCyclableWorktreeIds, resolveCycleAnchorWorktreeId } from './worktree-keyboard-cycle'
 
 const folderRow: FolderWorkspaceRow = {
   type: 'folder-workspace',
@@ -73,5 +73,25 @@ describe('getCyclableWorktreeIds', () => {
       'dup',
       'b'
     ])
+  })
+})
+
+describe('resolveCycleAnchorWorktreeId', () => {
+  it('takes the workspace of a chat place in the history', () => {
+    const place = {
+      kind: 'native-chat-quote',
+      worktreeId: 'w1',
+      tabId: 'tab-1',
+      messageId: 'm1',
+      chip: 0
+    } as const
+    expect(
+      resolveCycleAnchorWorktreeId({
+        activeWorktreeId: null,
+        navHistory: ['w0', 'tasks', { ...place, at: 'chip' }, { ...place, at: 'source' }],
+        navHistoryIndex: 3,
+        worktreeIds: ['w0', 'w1']
+      })
+    ).toBe('w1')
   })
 })
