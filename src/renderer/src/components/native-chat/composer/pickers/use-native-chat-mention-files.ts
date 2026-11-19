@@ -1,54 +1,62 @@
 import { useMemo, type Dispatch, type SetStateAction } from 'react'
 import { useAppStore } from '@/store/index'
-import { useRuntimeFileListForWorktree } from '@/components/quick-open-file-list'
-import { rankQuickOpenFilesWithHistory } from '@/components/quick-open-history-ranking'
+import { useRuntimeFileListForWorktree } from '@/components/file-actions/quick-open/quick-open-file-list'
+import { rankQuickOpenFilesWithHistory } from '@/components/file-actions/quick-open/quick-open-history-ranking'
 import { useQuickOpenHistory } from '@/lib/files/search/quick-open-file-history'
 import { chatWorkspaceByTabId as findTerminalTabWorktreeId } from '../../../../lib/agent-session/tab-identity/structured-chat-tab-index'
 import { useFileListWorktree } from '@/store/workspaces/selection/use-selected-worktree'
 
-import type { NativeChatMentionItem, NativeChatMentionSession } from './native-chat-mentions'
+import {
+  nativeChatMentionSessionOf,
+  nativeChatMentionSessionValue,
+  type NativeChatMentionItem,
+  type NativeChatMentionSession
+} from './native-chat-mentions'
 import { useNativeChatMentionSessions } from './use-native-chat-mention-sessions'
 import { useNativeChatMentionRowKeeper } from './use-native-chat-mention-row-keeper'
-import type { NativeChatStructuredComposerTransport } from '../submit/native-chat-structured-composer-transport'
 
 const MENTION_FILE_LIMIT = 20
 const NO_FILES: readonly string[] = []
 
 export type NativeChatMentionFiles = {
-  /** Workspace-relative paths, best match first. */
+  /** Workspace-relative paths, best match first. Other chats and terminals come first, as
+   *  `nativeChatMentionSessionValue` strings. */
   files: readonly string[]
   loading: boolean
   failed: boolean
-  /** Other chats and terminals, listed before the files. */
+  /** The sessions that the session strings in `files` name. */
   sessions?: readonly NativeChatMentionSession[]
 }
 
-/** Sessions first, then files: the order of the menu and of its keyboard index. */
+/** The rows in menu order: sessions, then files. */
 export function nativeChatMentionItems(mention: NativeChatMentionFiles): NativeChatMentionItem[] {
-  return [...(mention.sessions ?? []), ...mention.files]
+  return mention.files.map((value) => nativeChatMentionSessionOf(mention.sessions, value) ?? value)
 }
 
 /** `query` is null while no `@` token is open. */
-export function useNativeChatMentionFiles(
-  query: string | null,
-  composer: {
-    terminalTabId: string
-    structuredTransport?: Pick<NativeChatStructuredComposerTransport, 'worktreeId' | 'sessionId'>
-    targetPtyId: string | null
-    draft: string
-    caret: number
-    setActiveSuggestion: Dispatch<SetStateAction<number>>
-  }
-): NativeChatMentionFiles {
-  const { terminalTabId, structuredTransport, targetPtyId } = composer
-  const structuredWorktreeId = structuredTransport?.worktreeId
+export function useNativeChatMentionFiles(args: {
+  query: string | null
+  terminalTabId: string
+  structuredWorktreeId?: string
+  /** Also list other chats and terminals. */
+  withSessions?: boolean
+  /** This composer's own chat, left out of the sessions. */
+  structuredSessionId?: string
+  /** This composer's own terminal, left out of the sessions. */
+  targetPtyId?: string | null
+  /** With these, rows that arrive with no edit keep the highlighted row. */
+  draft?: string
+  caret?: number
+  setActiveSuggestion?: Dispatch<SetStateAction<number>>
+}): NativeChatMentionFiles {
+  const { query, terminalTabId, structuredWorktreeId, structuredSessionId } = args
   const { sessions, loading: sessionsLoading } = useNativeChatMentionSessions({
-    query,
+    query: args.withSessions ? query : null,
     terminalTabId,
     structuredWorktreeId,
-    sessionId: structuredTransport?.sessionId,
+    sessionId: structuredSessionId,
     // A chat composer has no PTY of its own.
-    ptyId: structuredTransport ? null : targetPtyId
+    ptyId: structuredSessionId ? null : (args.targetPtyId ?? null)
   })
   const enabled = query !== null
   // Closed is the common state, so the tab scan only runs while a token is open.
@@ -72,9 +80,12 @@ export function useNativeChatMentionFiles(
       files:
         query === null
           ? NO_FILES
-          : rankQuickOpenFilesWithHistory(query, list.files, history)
-              .slice(0, MENTION_FILE_LIMIT)
-              .map((item) => item.path),
+          : [
+              ...sessions.map(nativeChatMentionSessionValue),
+              ...rankQuickOpenFilesWithHistory(query, list.files, history)
+                .slice(0, MENTION_FILE_LIMIT)
+                .map((item) => item.path)
+            ],
       // Enter on an empty menu waits for both lists, so it never sends the `@` token.
       loading: list.loading || sessionsLoading,
       failed,
@@ -83,9 +94,9 @@ export function useNativeChatMentionFiles(
     [failed, history, list.files, list.loading, query, sessions, sessionsLoading]
   )
   useNativeChatMentionRowKeeper(
-    query === null ? null : nativeChatMentionItems(mention),
-    `${composer.caret}\0${composer.draft}`,
-    composer.setActiveSuggestion
+    query === null ? null : mention.files,
+    `${args.caret ?? ''}\0${args.draft ?? ''}`,
+    args.setActiveSuggestion
   )
   return mention
 }

@@ -3,8 +3,8 @@ import { useAppStore } from '@/store/index'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import { getRuntimeTargetForWorktreeOwner } from '@/lib/files/access/file-owner-runtime-target'
 import { chatWorkspaceByTabId as findTerminalTabWorktreeId } from '../../../../lib/agent-session/tab-identity/structured-chat-tab-index'
-import type { RuntimeTerminalListResult } from '../../../../../../shared/runtime-terminal-contracts'
-import type { RuntimeWorktreePsResult } from '../../../../../../shared/runtime-worktree-contracts'
+import type { RuntimeTerminalListResult } from '../../../../../../shared/terminal/runtime/runtime-terminal-contracts'
+import type { RuntimeWorktreePsResult } from '../../../../../../shared/worktree/catalog/runtime-worktree-contracts'
 import {
   filterNativeChatMentionSessions,
   listNativeChatMentionSessions,

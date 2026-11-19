@@ -3,18 +3,15 @@ import { structuredAgentSessionTabId } from '../../../../../../shared/agent-sess
 import {
   formatOrcaSessionAddress,
   isOrcaSessionId
-} from '../../../../../../shared/orca-session-address'
+} from '../../../../../../shared/agent-session/identity/orca-session-address'
 import type { AgentReferenceKind } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
-import {
-  applyMentionSuggestion,
-  removeMentionToken
-} from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
+import { removeMentionToken } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
-import type { RuntimeTerminalSummary } from '../../../../../../shared/runtime-terminal-contracts'
+import type { RuntimeTerminalSummary } from '../../../../../../shared/terminal/runtime/runtime-terminal-contracts'
 import type {
   RuntimeWorktreeAgentRow,
   RuntimeWorktreePsSummary
-} from '../../../../../../shared/runtime-worktree-contracts'
+} from '../../../../../../shared/worktree/catalog/runtime-worktree-contracts'
 
 export type NativeChatMentionSession = {
   kind: AgentReferenceKind
@@ -34,6 +31,25 @@ export function nativeChatMentionKindLabel(kind: AgentReferenceKind): string {
 
 /** A workspace file path, or another chat or terminal. */
 export type NativeChatMentionItem = string | NativeChatMentionSession
+
+// The `@` list holds strings (files, bots); a session row's string starts with a character no path has.
+const SESSION_VALUE_PREFIX = '\u0000session:'
+
+/** The `@` list's string for a session row. */
+export function nativeChatMentionSessionValue(session: NativeChatMentionSession): string {
+  return `${SESSION_VALUE_PREFIX}${session.kind}:${session.hostKey}:${session.address}`
+}
+
+/** The session that an `@` list string names, or null for a file or a bot. */
+export function nativeChatMentionSessionOf(
+  sessions: readonly NativeChatMentionSession[] | undefined,
+  value: string
+): NativeChatMentionSession | null {
+  if (!value.startsWith(SESSION_VALUE_PREFIX)) {
+    return null
+  }
+  return sessions?.find((session) => nativeChatMentionSessionValue(session) === value) ?? null
+}
 
 const MENTION_SESSION_LIMIT = 20
 const CHAT_TAB_PREFIX = structuredAgentSessionTabId('')
@@ -103,19 +119,15 @@ export function filterNativeChatMentionSessions(
     .slice(0, MENTION_SESSION_LIMIT)
 }
 
-/** A file becomes its `@path` text; a session becomes a chip whose send note names the orca command. */
+/** A session becomes a chip in place of the `@query`; its send note names the orca command. */
 export function completeNativeChatMention(
   input: Pick<NativeChatComposerInput, 'value' | 'selectionStart' | 'insertAgentReferences'> | null,
-  item: NativeChatMentionItem,
+  session: NativeChatMentionSession,
   [draft, caret]: [string, number],
   commit: (result: { draft: string; caret: number }) => void
 ): void {
-  if (typeof item === 'string') {
-    commit(applyMentionSuggestion(draft, caret, item))
-    return
-  }
   const token = removeMentionToken(draft, caret)
-  const { kind, label, address, hostKey } = item
+  const { kind, label, address, hostKey } = session
   // A session that is already a chip inserts nothing, so the typed token stays.
   if (
     input?.insertAgentReferences?.([{ kind, label, address, hostKey }], {

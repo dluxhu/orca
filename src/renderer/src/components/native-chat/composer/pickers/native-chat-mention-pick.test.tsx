@@ -13,7 +13,11 @@ import type { NativeChatComposerInput } from '../editor/native-chat-composer-inp
 import { promptText, promptTextOffset } from '../editor/native-chat-prompt-document'
 import { promptTextContent } from '../editor/native-chat-prompt-document-text'
 import { serializeNativeChatAgentReferences } from './native-chat-agent-reference-send'
-import { completeNativeChatMention, type NativeChatMentionItem } from './native-chat-mentions'
+import {
+  completeNativeChatMention,
+  nativeChatMentionSessionValue,
+  type NativeChatMentionSession
+} from './native-chat-mentions'
 import { NativeChatMentionLabel } from './NativeChatMentionLabel'
 import { useNativeChatMentionRowKeeper } from './use-native-chat-mention-row-keeper'
 
@@ -52,7 +56,7 @@ function composer(text: string): { editor: Editor; input: PickInput } {
   return { editor, input }
 }
 
-function pick(input: PickInput, item: NativeChatMentionItem) {
+function pick(input: PickInput, item: NativeChatMentionSession) {
   const commit = vi.fn()
   completeNativeChatMention(input, item, [input.value, input.selectionStart ?? 0], commit)
   return commit
@@ -77,13 +81,6 @@ describe('picking a session from the @ menu', () => {
     )
   })
 
-  it('turns a file pick into its @path text, with no chip', () => {
-    const { editor, input } = composer('ask @rel')
-    const commit = pick(input, 'docs/release.md')
-    expect(commit).toHaveBeenCalledWith({ draft: 'ask @docs/release.md ', caret: 21 })
-    expect(chips(editor)).toEqual([])
-  })
-
   it('keeps the typed token when the session is already a chip', () => {
     const { editor, input } = composer('ask @rel')
     pick(input, session)
@@ -98,23 +95,24 @@ describe('picking a session from the @ menu', () => {
 })
 
 describe('mention rows that arrive with no edit', () => {
-  function useRows(items: NativeChatMentionItem[], editKey: string) {
+  function useRows(items: string[], editKey: string) {
     const [active, setActive] = useState(0)
     useNativeChatMentionRowKeeper(items, editKey, setActive)
     return { active, setActive }
   }
 
   it('keep the highlighted row until the next edit', () => {
-    const initialProps: { items: NativeChatMentionItem[]; editKey: string } = {
+    const row = nativeChatMentionSessionValue(session)
+    const initialProps: { items: string[]; editKey: string } = {
       items: ['a.ts', 'b.ts'],
       editKey: '1'
     }
     const view = renderHook(({ items, editKey }) => useRows(items, editKey), { initialProps })
     act(() => view.result.current.setActive(1))
-    view.rerender({ items: [session, 'a.ts', 'b.ts'], editKey: '1' })
+    view.rerender({ items: [row, 'a.ts', 'b.ts'], editKey: '1' })
     expect(view.result.current.active).toBe(2)
     act(() => view.result.current.setActive(0))
-    view.rerender({ items: ['b.ts', session], editKey: '2' })
+    view.rerender({ items: ['b.ts', row], editKey: '2' })
     expect(view.result.current.active).toBe(0)
   })
 })
@@ -131,15 +129,17 @@ describe('what a screen reader hears', () => {
   })
 
   it('says the kind of a chat or terminal chip', () => {
+    const spoken = (view: ReturnType<typeof render>) =>
+      view.container.querySelector('.sr-only')?.textContent
     const chat = render(
       <AgentReferencePillContent label="Release notes" kind="chat" selected={false} />
     )
-    expect(chat.container.textContent).toBe('Chat Release notes')
+    expect(spoken(chat)).toBe('Chat: Release notes')
     const terminal = render(
       <AgentReferencePillContent label="Runner" kind="terminal" selected={false} />
     )
-    expect(terminal.container.textContent).toBe('Terminal Runner')
+    expect(spoken(terminal)).toBe('Terminal: Runner')
     const crew = render(<AgentReferencePillContent label="Worker" kind={null} selected={false} />)
-    expect(crew.container.textContent).toBe('Worker')
+    expect(spoken(crew)).toBe('Agent: Worker')
   })
 })

@@ -1,5 +1,5 @@
-import { parseOrcaSessionAddress } from '../../orca-session-address'
-import { isTerminalHandle } from '../../terminal-handle-prefix'
+import { parseOrcaSessionAddress } from '../../agent-session/identity/orca-session-address'
+import { isTerminalHandle } from '../../terminal/terminal-handle-prefix'
 
 /** `kind` marks an `@` mention of a chat or a terminal; absent marks an orchestration mailbox reference. */
 export type OrchestrationAgentReference = {
@@ -51,7 +51,7 @@ export function agentReferenceNote(
   if (kind === 'terminal' && isTerminalHandle(address)) {
     return `[Orca terminal "${label}": ${address} — send it input with orca terminal send --terminal ${address} --text <text> --enter, and read its output with orca terminal read --terminal ${address}]`
   }
-  return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address}]`
+  return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {
