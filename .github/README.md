@@ -33,8 +33,7 @@ Features:
 - **Chat CLI.** `orca chat list`, `orca chat read` and `orca chat send` let an agent read and message other chats ([#2](https://github.com/dluxhu/orca/pull/2)).
 - **Mention chats and terminals.** Type `@` in a chat to mention another chat or terminal of the same host ([#10](https://github.com/dluxhu/orca/pull/10)).
 - **Mention chats on other hosts.** The `@` menu also lists the chats and terminals of the host's saved environments, and the agent gets the `--environment` to reach them ([#29](https://github.com/dluxhu/orca/pull/29)).
-- **Quote chips.** "Add to chat" quotes show as chips; a click jumps back to the quoted text and highlights it ([#12](https://github.com/dluxhu/orca/pull/12)).
-- **Comment after a quote.** Type a comment right after a quote chip, on the same line ([#30](https://github.com/dluxhu/orca/pull/30)).
+- **Quote chips.** "Add to chat" quotes show as chips; type a comment right after each chip, on its line; a click jumps back to the quoted text and highlights it ([#12](https://github.com/dluxhu/orca/pull/12)).
 - **Shorter long quotes.** A long quote of a recent reply in the same chat goes to the agent shortened, since the agent has that reply already; the chat still shows the full quote ([#31](https://github.com/dluxhu/orca/pull/31)).
 - **Back to the quote.** After a quote chip jumps to its source, Back returns to the quote and Forward goes to the source again ([#26](https://github.com/dluxhu/orca/pull/26)).
 - **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
