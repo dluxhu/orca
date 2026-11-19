@@ -1,10 +1,14 @@
 // Require structured.v1 across every agentSession method before exposing journals or mutations,
-// except rename, which also admits rename-only clients (requireRenameStructuredHost).
+// except rename, which also admits rename-only clients (requireRenameStructuredHost),
+// and history and send, which also admit CLI read-send clients (clientReadsAndSendsOnly).
 // Legacy tab restore may still install the host for fallback rows; that never admits agentSession calls.
 
 import { assertBotGroupSessionAccess } from '../../../../../bots/bot-group-session-access'
 import { agentSessionRefusalError } from '../../../../../../shared/agent-session/failures/agent-session-wire-refusals'
-import { AGENT_SESSION_RENAME_ONLY_CLIENT_CAPABILITY } from '../../../../../../shared/agent-session/capabilities/structured-agent-session-surface-capabilities'
+import {
+  AGENT_SESSION_CLI_READ_SEND_CLIENT_CAPABILITY,
+  AGENT_SESSION_RENAME_ONLY_CLIENT_CAPABILITY
+} from '../../../../../../shared/agent-session/capabilities/structured-agent-session-surface-capabilities'
 import { getStructuredAgentSessionHost } from '../../../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import type { StructuredAgentSessionHost } from '../../../../../native-chat/agent-session-wire/host/structured-agent-session-host'
 import type { StructuredAgentSessionCaller } from '../../../../../native-chat/agent-session-wire/host/structured-agent-session-host-types'
@@ -128,6 +132,27 @@ export async function requireRenameStructuredHost(
   ) {
     return requireInstalledStructuredHost(ctx, sessionId)
   }
+  if (!getStructuredAgentSessionHost()) {
+    await ctx.runtime.ensureStructuredAgentSessionHost()
+  }
+  return requireHostOrRefusal()
+}
+
+/** A client that asked only to read and send chats (the paired CLI) gets agentSession.history and agentSession.send. */
+export function clientReadsAndSendsOnly(
+  ctx: Pick<RpcContext, 'clientCapabilities' | 'clientKind'>
+): boolean {
+  return (
+    !supportsStructuredAgentSessions(ctx) &&
+    ctx.clientCapabilities?.includes(AGENT_SESSION_CLI_READ_SEND_CLIENT_CAPABILITY) === true
+  )
+}
+
+export async function requireReadSendStructuredHost(
+  ctx: RpcContext,
+  sessionId: string
+): Promise<StructuredAgentSessionHost> {
+  assertBotGroupSessionAccess(ctx.runtime, sessionId, ctx.caller)
   if (!getStructuredAgentSessionHost()) {
     await ctx.runtime.ensureStructuredAgentSessionHost()
   }
