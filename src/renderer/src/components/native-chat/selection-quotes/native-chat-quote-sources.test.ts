@@ -80,7 +80,12 @@ describe('jumpToQuoteSource', () => {
     rememberNativeChatQuoteSource(fileQuote, source('reply-1'))
     const fake = deps()
     expect(jumpToQuoteSource(fileQuote, fake)).toBe('message')
-    expect(fake.jumpToMessage).toHaveBeenCalledWith(source('reply-1'), fileQuote)
+    expect(fake.jumpToMessage).toHaveBeenCalledWith(
+      source('reply-1'),
+      fileQuote,
+      fake.notifyMissing,
+      expect.any(Function)
+    )
     expect(fake.openFile).not.toHaveBeenCalled()
   })
 

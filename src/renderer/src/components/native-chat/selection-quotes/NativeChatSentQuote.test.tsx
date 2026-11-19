@@ -53,7 +53,12 @@ it('shows a sent quote as a button that jumps to its message, with no open or cl
   expect(chip).not.toHaveAttribute('aria-expanded')
   expect(screen.getByText('my reply')).toBeInTheDocument()
   fireEvent.click(chip)
-  expect(jump).toHaveBeenCalledWith({ messageId: 'reply-1', place: null }, 'quoted\nwords')
+  expect(jump).toHaveBeenCalledWith(
+    { messageId: 'reply-1', place: null },
+    'quoted\nwords',
+    expect.any(Function),
+    expect.any(Function)
+  )
   expect(document.querySelector('blockquote')).toBeNull()
 })
 
@@ -76,7 +81,12 @@ it.each([
   const jump = vi.fn(() => true)
   sent(`my words\n\n${formatNativeChatQuote(quote)}reply`, jump)
   fireEvent.click(screen.getByRole('button', { name: /^Quote: / }))
-  expect(jump).toHaveBeenCalledWith({ messageId: 'reply-2', place }, quote.trim())
+  expect(jump).toHaveBeenCalledWith(
+    { messageId: 'reply-2', place },
+    quote.trim(),
+    expect.any(Function),
+    expect.any(Function)
+  )
   expect(opened.toast).not.toHaveBeenCalled()
 })
 
