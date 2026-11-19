@@ -210,10 +210,13 @@ it.each(IN_FULL)('sends %s in full', async (_name, quote, source, chat) => {
 // The user's own earlier message in this chat: the agent has it as it has a reply.
 const mine = (quote: string) => reply(quote, { role: 'user' })
 const MINE_SHORT = LONG_SHORT.replace('your earlier reply', 'my earlier message')
+// A user turn and its reply: only the reply counts toward the last 5.
+const turns = (count: number) => Array.from({ length: count }, () => [user(), message({})]).flat()
 
 it.each([
   ['with no reply after it', [mine(LONG)]],
-  ['with 4 replies after it', [mine(LONG), ...replies(4)]]
+  ['with 4 replies after it', [mine(LONG), ...replies(4)]],
+  ['with 4 user turns and 4 replies after it', [mine(LONG), ...turns(4)]]
 ])('sends a long quote of my own earlier message %s shortened', async (_name, chat) => {
   expect(await send(LONG, IN_CHAT, chat)).toBe(`${MINE_SHORT}\n\nmy comment`)
 })
