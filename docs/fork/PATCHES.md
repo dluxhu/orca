@@ -18,11 +18,11 @@ script reads its "Release order" list.
 - A release is cut from the newest upstream stable tag, at most once a week. If upstream made
   several stable releases in the week, use only the newest. The version is
   `<upstream version>-dlux.<N>`.
-- Since 2026-11-19 the branches also contain an upstream nightly commit (from `main`), for the
-  nightly release (see "Nightly releases"). Upstream stable tags are on release branches, not on
-  `main`. A stable release on a tag that does not contain that commit gets upstream `main`
-  changes inside each patch. Build stable releases again only from a tag that contains the
-  nightly commit, or after the owner decides how to split the lines.
+- Two lines: the `dlux/*` branches are the stable line, on the upstream stable tag. The
+  `nightly/*` branches are the nightly line: each is its `dlux/*` branch with an upstream
+  nightly commit merged in (see "Nightly releases"). Never merge a nightly commit into a
+  `dlux/*` branch: upstream stable tags are on release branches, not on `main`, so a stable
+  release would then get `main` changes inside each patch.
 - Turn on `git rerere` (`git config rerere.enabled true`), so a resolved conflict is reused
   in the next week and in the release build.
 
@@ -158,10 +158,15 @@ that no stable release has yet. It is a GitHub prerelease, and it installs besid
 1. Find the newest upstream nightly: `gh release list -R stablyai/orca-daily --limit 1`. Its
    body names the commit. Its version is the tag without `v`, for example
    `1.4.264-daily.202611181832`. Fetch the commit: `git fetch --no-tags upstream main`.
-2. Merge the commit into each branch of "Release order" (a normal merge, no rebase). Resolve,
-   run the branch's check, commit, and push. Files that only the stable-only commits of the
-   stable tag changed take the nightly's version: the stable tag is not on upstream `main`.
+2. For each branch `dlux/<name>` of "Release order", update `nightly/<name>`: make it from
+   `dlux/<name>` the first time, then merge the new `dlux/<name>` commits and the nightly commit
+   into it (normal merges, no rebase). Resolve, run the branch's check, commit, and push
+   `nightly/<name>`. Do not change `dlux/<name>`. Files that only the stable-only commits of
+   the stable tag changed take the nightly's version: the stable tag is not on upstream `main`.
+   `nightly/fork-setup` holds the nightly tooling and this section.
 3. Run `config/scripts/fork/build-release.sh --remote origin --nightly <commit> --version <nightly version>-dlux.<N>`.
+   It applies `nightly/<name>` in place of each `dlux/<name>`, in the release order of
+   `nightly/fork-setup`.
    The script adds one more commit that sets `FORK_CHANNEL = 'nightly'` in
    `src/shared/fork-identity.ts`, the nightly appId in the local-build contract JSON, and the
    page title. It does not move `release/latest`.

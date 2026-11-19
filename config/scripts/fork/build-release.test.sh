@@ -148,10 +148,11 @@ check 'a criss-cross stack does not bring back what the earlier tip removed' \
 new_repo nightly
 commit main 'upstream nightly' n.txt 'n'
 nightly_sha=$(git -C "$repo" rev-parse main)
-git -C "$repo" checkout -q -b dlux/a v1.0.0
-commit dlux/a 'a adds a' a.txt 'a'
+git -C "$repo" checkout -q -b nightly/a v1.0.0
+commit nightly/a 'a adds a' a.txt 'a'
 git -C "$repo" merge -q --no-edit "$nightly_sha" >/dev/null
 order dlux/a
+git -C "$repo" checkout -q -b nightly/fork-setup dlux/fork-setup
 mkdir -p "$repo/src/shared/remote" "$repo/src/renderer"
 printf "const FORK_CHANNEL = 'stable' as 'stable' | 'nightly'\n" >"$repo/src/shared/fork-identity.ts"
 printf '{ "appId": "com.stablyai.orca.dlux" }\n' >"$repo/src/shared/remote/local-build-compatibility-contract.json"

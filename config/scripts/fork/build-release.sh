@@ -19,7 +19,9 @@
 # It never pushes. With --remote <name>, it reads the patch branches from <name>/.
 #
 # --nightly <commit>: the base is that upstream commit (the commit of an upstream nightly build)
-# and --version is required (<upstream nightly version>-dlux.<N>). It fetches no tags. After the
+# and --version is required (<upstream nightly version>-dlux.<N>). It fetches no tags. It reads
+# the nightly line: each `dlux/<name>` of the release order is applied as `nightly/<name>`, and
+# the order comes from nightly/fork-setup. After the
 # patches it adds one commit that switches the app to the nightly identity (src/shared/fork-identity.ts),
 # so the build installs and runs beside the stable fork. It does not move release/latest.
 set -euo pipefail
@@ -99,11 +101,14 @@ git rev-parse -q --verify "refs/tags/$tag" >/dev/null && die "tag $tag exists"
 [ "$(git config --bool rerere.enabled || true)" = 'true' ] ||
   echo 'build-release: note: rerere is off; run `git config rerere.enabled true`' >&2
 
-patches_ref="${prefix}${FORK_PATCHES_REF:-dlux/fork-setup}"
+line=dlux
+[ -z "$nightly" ] || line=nightly
+patches_ref="${prefix}${FORK_PATCHES_REF:-$line/fork-setup}"
 patches_file="${patches_ref}:docs/fork/PATCHES.md"
 branch_text=$(git show "$patches_file" |
   awk '/^## Release order/{on=1; next} /^## /{on=0} on' |
-  sed -nE 's/^[0-9]+\. `([^`]+)`.*/\1/p')
+  sed -nE 's/^[0-9]+\. `([^`]+)`.*/\1/p' |
+  sed "s#^dlux/#$line/#")
 # Read one branch per line into an array; this works in bash and in zsh.
 branches=()
 while IFS= read -r line; do
