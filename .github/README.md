@@ -37,6 +37,7 @@ Features:
 - **Shorter long quotes.** A long quote of a recent reply in the same chat goes to the agent shortened, since the agent has that reply already; the chat still shows the full quote ([#31](https://github.com/dluxhu/orca/pull/31)).
 - **Back to the quote.** After a quote chip jumps to its source, Back returns to the quote and Forward goes to the source again ([#26](https://github.com/dluxhu/orca/pull/26)).
 - **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
+- **Show raw.** A "Show raw" button in a chat's title bar opens a panel with the exact messages sent to the agent and what comes back ([#33](https://github.com/dluxhu/orca/pull/33)).
 
 Fixes:
 
