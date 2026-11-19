@@ -39,6 +39,8 @@ import { useAppStore } from '@/store/index'
 import { registerWorktreeActivation } from '@/lib/workspace/activation/worktree-activation-nav-registration'
 import { reopenClosedWorkspaceTab } from '@/components/reopen-closed-workspace-tab'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
+import { MessageRow } from '../messages/rows/NativeChatMessageRow'
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { NativeChatQuoteJumpContext, useNativeChatQuoteJump } from './use-native-chat-quote-jump'
@@ -52,6 +54,7 @@ const issue = vi.fn()
 // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
 const SLOTS = [
   { kind: 'message', message: { id: 'reply-1' } },
+  { kind: 'message', message: { id: 'mine-earlier' } },
   { kind: 'message', message: { id: 'mine' } }
 ] as unknown as NativeChatTranscriptSlot[]
 const OWNER = {
@@ -89,6 +92,18 @@ function Chat({
             <div data-native-chat-message-id="reply-1">
               <p data-native-chat-quote-source="reply-1">The quoted text.</p>
             </div>
+            {/* The user's own earlier message, drawn by the real row. */}
+            <MessageRow
+              message={{
+                id: 'mine-earlier',
+                role: 'user',
+                timestamp: 0,
+                source: 'transcript',
+                blocks: [{ type: 'text', text: 'My earlier words.' }]
+              }}
+              expandSignal={false}
+              onScrollMessageToTop={() => {}}
+            />
             <div data-native-chat-message-id="mine">
               <NativeChatMarkdown content={content} variant="document" quoteChips />
             </div>
@@ -215,6 +230,24 @@ it('goes Back from a quoted reply to its chip, and Forward to the reply again', 
     index: 2
   })
   expect(mocks.activateView).not.toHaveBeenCalled()
+})
+
+it("goes Back from the user's own quoted message to its chip, and Forward to it again", () => {
+  rememberNativeChatQuoteSource('My earlier words.', { messageId: 'mine-earlier', place: null })
+  render(<Chat content={'> My earlier words.\n\nmy words'} />, { wrapper: TranslationScopeProvider })
+  const chip = screen.getByRole('button', { name: 'Quote: My earlier words.' })
+  const source = document.querySelector('[data-native-chat-quote-source="mine-earlier"]')
+
+  fireEvent.click(chip)
+  frames(2)
+  expect(source).not.toBeNull()
+  expect(document.activeElement).toBe(source)
+  act(() => useAppStore.getState().goBackWorktree())
+  frames(3)
+  expect(document.activeElement).toBe(chip)
+  act(() => useAppStore.getState().goForwardWorktree())
+  frames(5)
+  expect(document.activeElement).toBe(source)
 })
 
 it('goes Back from a quoted file to its chip, and Forward opens the file again', () => {
@@ -445,6 +478,25 @@ it('stops a pending jump on Back when the jump recorded no place', () => {
   expect(mocks.activate).toHaveBeenCalledWith('w0', { navigationIntent: 'user-open' })
   source.setAttribute('data-native-chat-quote-source', 'reply-1')
   frames(30)
+  expect(document.activeElement).not.toBe(source)
+})
+
+it('stops a pending jump on Back to a page when the jump recorded no place', () => {
+  useAppStore.setState({
+    worktreeNavHistory: ['automations', 'w1'],
+    worktreeNavHistoryIndex: 1,
+    unifiedTabsByWorktree: { w1: [] }
+  })
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(<Chat content={'> The quoted text.\n\nmy words'} />)
+  const source = screen.getByText('The quoted text.', { selector: 'p' })
+  source.removeAttribute('data-native-chat-quote-source')
+  fireEvent.click(screen.getByRole('button', { name: 'Quote: The quoted text.' }))
+  frames(3)
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(mocks.activateView).toHaveBeenCalledWith('automations')
+  source.setAttribute('data-native-chat-quote-source', 'reply-1')
+  frames(40)
   expect(document.activeElement).not.toBe(source)
 })
 
