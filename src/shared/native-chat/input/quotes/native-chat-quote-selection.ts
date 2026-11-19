@@ -2,7 +2,7 @@ import { markdownMathSelectionText } from '../../../markdown/markdown-math-selec
 
 /** Only agent-reply prose marked with this attribute may be quoted, in desktop and phone chat. */
 export const NATIVE_CHAT_QUOTE_SOURCE_PROPS = { 'data-native-chat-quote-source': '' } as const
-/** The desktop reply's attribute: its value is the message id, so a quote can find its source. */
+/** The desktop message's attribute: its value is the message id, so a quote can find its source. */
 export function nativeChatQuoteSourceProps(messageId: string): Record<string, string> {
   return { 'data-native-chat-quote-source': messageId }
 }
