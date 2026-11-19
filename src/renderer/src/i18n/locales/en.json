@@ -21723,6 +21723,8 @@
       "dismissDeliveryNotice": "Dismiss",
       "editDeliveryNotice": "Edit",
       "addSelectionToChat": "Add to chat",
+      "quoteChip": "Quote",
+      "quoteSourceMissing": "The source of this quote is not available.",
       "messageNotSent": "Message not sent",
       "messageSending": "Sending…",
       "userMessage": {

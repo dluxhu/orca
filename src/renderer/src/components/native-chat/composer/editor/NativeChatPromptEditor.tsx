@@ -25,6 +25,7 @@ import {
   insertPromptMention,
   NativeChatFileReference,
   NativeChatImageReference,
+  NativeChatQuote,
   nativeChatPromptPills,
   promptLeafText,
   promptText,
@@ -32,6 +33,7 @@ import {
   promptTextPosition
 } from './native-chat-prompt-document'
 import { openingPromptContent, promptTextContent } from './native-chat-prompt-document-text'
+import { reparseQuoteChips } from './native-chat-quote-reparse'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -103,6 +105,7 @@ function NativePromptEditor({
       }),
       NativeChatAgentReference,
       ...nativeChatPromptPills,
+      NativeChatQuote,
       NativeChatUnkernedRunDecorations,
       NativeChatHardBreakParagraphs,
       // A disabled box still says why it is disabled, as the plain text box's placeholder does.
@@ -137,7 +140,7 @@ function NativePromptEditor({
         if (text == null) {
           return false
         }
-        const content = editor?.schema.nodeFromJSON(promptTextContent(text))
+        const content = editor?.schema.nodeFromJSON(promptTextContent(text, { literal: true }))
         if (!content) {
           return false
         }
@@ -251,7 +254,7 @@ function NativePromptEditor({
             insertAgentReferences: (references, replace) =>
               insertAgentReferences(editor, references, replace),
             insertText: (text) => {
-              const content = editor.schema.nodeFromJSON(promptTextContent(text))
+              const content = editor.schema.nodeFromJSON(promptTextContent(text, { literal: true }))
               editor.view.dispatch(
                 editor.state.tr.replaceSelection(new Slice(content.content, 1, 1))
               )
@@ -299,6 +302,7 @@ function NativePromptEditor({
               )
               editor.commands.command(({ tr }) => {
                 tr.replaceRange(from, to, new Slice(content.content, 1, 1))
+                reparseQuoteChips(tr)
                 tr.setMeta('preventUpdate', true)
                 return true
               })
