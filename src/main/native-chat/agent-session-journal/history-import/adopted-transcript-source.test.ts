@@ -43,8 +43,11 @@ describe('a Claude transcript adopted into a workspace', () => {
   })
 
   it('refuses a conversation that never ran in this workspace', async () => {
-    await expect(validate(['/workspace', '/other/repo'])).rejects.toThrow(
-      'This conversation belongs to another directory.'
-    )
+    await expect(validate(['/workspace', '/other/repo'])).rejects.toMatchObject({
+      refusal: {
+        code: 'agent_session_identity_required',
+        details: { reason: 'transcriptUnreadable', otherFolder: true }
+      }
+    })
   })
 })
