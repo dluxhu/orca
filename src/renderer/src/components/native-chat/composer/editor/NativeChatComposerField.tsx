@@ -17,7 +17,7 @@ import { NativeChatComposerActions } from '../controls/NativeChatComposerActions
 import { NativeChatComposerNotices } from '../controls/NativeChatComposerNotices'
 import type { NativeChatComposerNotice } from '../controls/native-chat-composer-notice'
 import type { NativeChatContextUsageSummary } from '../../../../../../shared/native-chat/native-chat-context-usage-summary'
-import { nativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
+import { useNativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
 import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-target'
 import type {
   SessionOptionDescriptor,
@@ -27,7 +27,6 @@ import type { NativeChatOptionPickerRequest } from '../../session/options/contro
 import type { NativeChatComposerImageAttachment } from '../../attachments/chips/native-chat-image-attachment'
 import { NativeChatImageAttachmentPreview } from '../../attachments/chips/NativeChatImageAttachmentPreview'
 import type { NativeChatComposerGoalMode } from '../submit/use-native-chat-composer-submit'
-import { useTranslate } from '@/i18n/use-translate'
 import { useNativeChatComposerDraftUnsaved } from '../../drafts/use-native-chat-draft-unsaved'
 import { useLatestHandler } from '@/lib/use-latest-handler'
 import type { NativeChatFollowUpBehavior } from '../../../../../../shared/native-chat/input/native-chat-follow-up-behavior'
@@ -174,7 +173,15 @@ export function NativeChatComposerField({
   launchPrompt,
   workspaceFooter
 }: NativeChatComposerFieldProps): React.JSX.Element {
-  const t = useTranslate()
+  const placeholder = useNativeChatComposerPlaceholder({
+    hasPty,
+    canSend,
+    afterStop,
+    editing: editSession !== undefined,
+    goal: goalMode?.active === true,
+    unavailableHint,
+    launchPrompt: launchPrompt?.placeholder
+  })
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const optionCount =
     autocomplete.mode === 'slash'
@@ -358,19 +365,7 @@ export function NativeChatComposerField({
                   ? `${pickerListboxId}-option-${Math.min(activeSuggestion, optionCount - 1)}`
                   : undefined
               }
-              placeholder={
-                launchPrompt
-                  ? launchPrompt.placeholder
-                  : editSession
-                    ? t('components.native-chat.queuedMessages.editMessage', 'Edit message')
-                    : goalMode?.active
-                      ? t(
-                          'components.native-chat.goal.placeholder',
-                          'Describe your goal, define measurable outcomes for best results'
-                        )
-                      : (unavailableHint ??
-                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t))
-              }
+              placeholder={placeholder}
               // Let layout handle wrapping and touch targets; scroll after eight lines (a launch prompt: one line growing to six) without JavaScript measurement.
               // An empty launch prompt also grows to fit a wrapping placeholder: a paragraph-wide float that keeps its height, with a zero-width margin box so the caret line stays put.
               className={cn(

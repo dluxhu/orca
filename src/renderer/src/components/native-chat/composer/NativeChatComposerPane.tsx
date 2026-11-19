@@ -333,13 +333,13 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       hasAttachments: imageAttachments.length > 0,
       ...(!editSession && steerHead ? { steerHead } : {}),
       chordSteersHead: sendButton.chordSteersHead,
+      launchPrompt: launchPrompt !== undefined,
       setActiveSuggestion: picker.navigateSuggestion,
       setDraft,
       setCaret
     })
 
-    const pickerOpen = autocomplete.mode !== 'none'
-    const steerChord = useNativeChatSteerChordPreview(root, sendButton, steerHead, send, pickerOpen)
+    const chord = useNativeChatSteerChordPreview(root, sendButton, steerHead, send, autocomplete)
 
     const draftEvents = useNativeChatDraftEvents({
       draft,
@@ -392,8 +392,8 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
           onDictationHoldStart={dictation.startHoldDictation}
           onDictationHoldEnd={dictation.stopHoldDictation}
           onSend={send}
-          steerPreview={steerChord.preview}
-          onSteerPreview={steerChord.runPreview}
+          steerPreview={chord.preview}
+          onSteerPreview={chord.runPreview}
           onStop={interrupt}
           sessionOptionsSurface={sessionOptions.surface}
           sessionOptionsSnapshot={sessionOptions.snapshot}
