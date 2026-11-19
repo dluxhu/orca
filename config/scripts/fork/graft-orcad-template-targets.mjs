@@ -71,7 +71,9 @@ export function graftOrcadTemplateTargets({ outDir, upstreamResources, upstreamV
 function main() {
   const upstreamResources = process.argv[2]
   if (!upstreamResources || !existsSync(join(upstreamResources, 'orcad-template'))) {
-    throw new Error('usage: graft-orcad-template-targets.mjs <upstream app>/Contents/Resources')
+    throw new Error(
+      'usage: graft-orcad-template-targets.mjs <upstream app>/Contents/Resources [<base version>]'
+    )
   }
   const plist = resolve(upstreamResources, '..', 'Info.plist')
   const upstreamVersion = execFileSync(
@@ -83,7 +85,8 @@ function main() {
     outDir: join(root, 'out'),
     upstreamResources,
     upstreamVersion,
-    version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
+    // A nightly base has no version in package.json; its release passes the nightly's version.
+    version: process.argv[3] ?? JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
   })
   process.stdout.write(`[graft-orcad-template-targets] ok: grafted ${grafted.join(', ')}\n`)
 }

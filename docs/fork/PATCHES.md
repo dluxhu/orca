@@ -172,8 +172,10 @@ that no stable release has yet. It is a GitHub prerelease, and it installs besid
    page title. It does not move `release/latest`.
 4. Build and test as in "Release steps" (steps 3 and 4), with these changes:
    - The app is `dist/mac-arm64/Orca @dLux Nightly.app`.
-   - For the orcad template graft, use upstream's nightly app of the same version:
-     `gh release download v<nightly version> -R stablyai/orca-daily -p 'Orca-<nightly version>-arm64-mac.zip'`.
+   - For the orcad template graft, use upstream's nightly app of the same version, and give
+     the graft script that version (`package.json` on `main` has no release version):
+     `gh release download v<nightly version> -R stablyai/orca-daily -p 'Orca-<nightly version>-arm64-mac.zip'`,
+     then `node config/scripts/fork/graft-orcad-template-targets.mjs <app>/Contents/Resources <nightly version>`.
 5. On the owner's go-ahead: `git push origin release/<version> v<version>`, then make a GitHub
    **prerelease** on `dluxhu/orca` from the tag. Do not upload `latest-mac.yml`: no updater
    then offers the nightly build. The stable feed reads `/releases/latest`, which skips
