@@ -7,10 +7,7 @@ import {
   type RefObject
 } from 'react'
 import { flushSync } from 'react-dom'
-import {
-  formatNativeChatQuote,
-  nativeChatSelectionText
-} from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
+import { nativeChatSelectionText } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { readNativeChatTranscriptSelection } from '../../selection-quotes/native-chat-transcript-selection'
 import { Clipboard, Copy, Image as ImageIcon, SquareTerminal } from 'lucide-react'
 import {
