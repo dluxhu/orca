@@ -1,3 +1,5 @@
+import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
+
 // Where a quote came from. The app's windows on this computer share this list, and it stays after a
 // restart. It holds short hashes of the quoted text, not the text. The agent never gets it.
 const STORAGE_KEY = 'orca.nativeChat.quoteSources.v2'
@@ -106,8 +108,19 @@ export function quotedFileLocation(
 }
 
 export type NativeChatQuoteJumpDeps = {
-  /** Shows the message in this transcript and highlights the quote; false when it is not here. */
-  jumpToMessage: ((source: QuoteSource, text: string) => boolean) | null
+  /**
+   * Shows the message in this transcript and highlights the quote; false when it is not here.
+   * Calls `notifyMissing` when the message is not drawn after the jump. Each later step does
+   * nothing once `isCurrent` is false.
+   */
+  jumpToMessage:
+    | ((
+        source: QuoteSource,
+        text: string,
+        notifyMissing: () => void,
+        isCurrent: () => boolean
+      ) => boolean)
+    | null
   /** Opens the file at the line and highlights it; false when the chat cannot open it. */
   openFile: ((location: QuotedFileLocation) => boolean) | null
   notifyMissing: () => void
@@ -121,8 +134,10 @@ export function jumpToQuoteSource(
   text: string,
   deps: NativeChatQuoteJumpDeps
 ): 'message' | 'file' | 'missing' {
+  // Each chip click is one link open: it stops the later steps of every earlier one.
+  const isCurrent = beginLinkOpenRequest()
   const source = nativeChatQuoteSource(text)
-  if (source && deps.jumpToMessage?.(source, text)) {
+  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing, isCurrent)) {
     return 'message'
   }
   const [firstLine = '', secondLine = ''] = text.split('\n')
