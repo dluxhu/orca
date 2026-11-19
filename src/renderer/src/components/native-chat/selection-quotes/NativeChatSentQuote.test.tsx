@@ -94,6 +94,8 @@ it('shows the full quoted text when the chip has keyboard focus', async () => {
   sent('> a long quote\n> on two lines\n\nreply')
   const chip = screen.getByRole('button', { name: 'Quote: a long quote on two lines' })
   await act(async () => {
+    // Tooltips open on keyboard focus, not on a pointer's.
+    fireEvent.keyDown(document.body, { key: 'Tab' })
     chip.focus()
   })
   expect(await screen.findByRole('tooltip')).toHaveTextContent('a long quote on two lines')
