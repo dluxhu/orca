@@ -4,7 +4,7 @@
 import { AGENT_LAUNCH_SURFACES } from '../../agent-launch/contracts/agent-launch-surface'
 import { z } from 'zod'
 import { isAgentSessionOptions } from '../../agent-session/lifecycle/agent-session-record'
-import { parseAgentSessionOperationTimestamp } from '../../agent-session/agent-session-host-authority'
+import { parseAgentSessionOperationTimestamp } from '../../agent-session/lifecycle/operations/agent-session-host-authority'
 import { parsePaneKey } from '../../workspace-layout/stable-pane-id'
 import { isValidHostTerminalTabId } from '../../workspace-layout/terminal-surfaces/terminal-tab-id'
 import { isTuiAgent } from '../../agent-launch/catalog/tui-agent-config'
@@ -14,7 +14,6 @@ import { FolderWorkspaceCreate } from '../workspaces/folder-workspace-params'
 import { LaunchSourceParam } from './launch-source-param'
 import { TerminalTabIdParam } from '../terminal/agent-session-params'
 import { SessionId } from '../structured-agent-session/structured-agent-session-identifiers'
-import { isStructuredAgentSessionIdFor } from '../../agent-session/structured-agent-session-create'
 import { AgentLaunchAccountEnv } from '../../agent-launch/startup/agent-launch-account-env'
 import { ResumeSource } from '../structured-agent-session/structured-agent-session-resume-params'
 
@@ -118,18 +117,11 @@ export const AgentLaunchFields = z.object({
   remoteControl: z.literal(true).optional()
 })
 
-/** Caller IDs must retain the agent lane encoded by host-minted IDs; a resume stays a chat. */
+/** A resume stays a chat; Remote Control needs a new host-minted chat. */
 function refuseInconsistentLaunch(
   launch: z.infer<typeof AgentLaunchFields>,
   ctx: z.RefinementCtx
 ): void {
-  if (launch.sessionId && !isStructuredAgentSessionIdFor(launch.agent, launch.sessionId)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['sessionId'],
-      message: 'Launch session id must be named for its agent'
-    })
-  }
   // A resume is an explicit chat in an existing workspace, so no route can start a fresh conversation.
   if (
     launch.resumeFrom &&
