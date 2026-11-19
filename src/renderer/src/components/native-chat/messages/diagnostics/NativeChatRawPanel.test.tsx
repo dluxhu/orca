@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { NativeChatPaneHeader } from '../../pane/actions/NativeChatPaneHeader'
+import { routeNativeChatRootKeyToInput } from '../../composer/focus/native-chat-root-key-routing'
 import type {
   AgentJournalItemBody,
   AgentJournalRenderItem
 } from '../../../../../../shared/agent-session/journal/agent-session-journal-types'
-import { NativeChatRawFrame, NativeChatRawPanel, useNativeChatRawPanel } from './NativeChatRawPanel'
+import { NativeChatRawFrame, NativeChatRawPanel } from './NativeChatRawPanel'
 
 afterEach(cleanup)
 
@@ -77,30 +80,133 @@ describe('the raw panel', () => {
   })
 })
 
+function sentEntry(blocks: Extract<AgentJournalItemBody, { kind: 'message' }>['blocks']) {
+  render(
+    <NativeChatRawPanel items={[item('sent', 1, { kind: 'message', role: 'user', blocks })]} />
+  )
+  const entry = screen.getAllByRole('listitem')[0]
+  return {
+    text: entry.querySelector('pre')?.textContent,
+    images: within(entry)
+      .queryAllByRole('listitem')
+      .map((image) => image.textContent)
+  }
+}
+
+describe('a sent message with images', () => {
+  it('lists each image before the text and keeps it out of the sent text', () => {
+    expect(
+      sentEntry([
+        { type: 'text', text: 'look' },
+        { type: 'image-ref', path: '/shots/a.png' }
+      ])
+    ).toEqual({ text: 'look', images: ['Image: /shots/a.png'] })
+  })
+
+  it('joins the text around an image as Claude does', () => {
+    expect(
+      sentEntry([
+        { type: 'text', text: 'first' },
+        { type: 'image-ref', url: 'https://example.invalid/x.png' },
+        { type: 'text', text: 'second' }
+      ])
+    ).toEqual({ text: 'first\nsecond', images: ['Image: https://example.invalid/x.png'] })
+  })
+})
+
+describe('the fold boundary', () => {
+  const folds = (text: string): boolean => {
+    render(
+      <NativeChatRawPanel
+        items={[item('x', 1, { kind: 'message', role: 'user', blocks: [{ type: 'text', text }] })]}
+      />
+    )
+    const more = screen.queryByRole('button', { name: 'Show more' }) !== null
+    cleanup()
+    return more
+  }
+  const lines = (count: number): string =>
+    Array.from({ length: count }, (_, index) => `l${index}`).join('\n')
+
+  it('folds past 16 lines or 1600 characters', () => {
+    expect({
+      lines16: folds(lines(16)),
+      lines17: folds(lines(17)),
+      chars1600: folds('a'.repeat(1600)),
+      chars1601: folds('a'.repeat(1601))
+    }).toEqual({ lines16: false, lines17: true, chars1600: false, chars1601: true })
+  })
+})
+
+describe('an entry update', () => {
+  it('formats a row again only when its revision changes', () => {
+    const reply = (text: string, revision: number): AgentJournalRenderItem => ({
+      ...item('reply', 1, { kind: 'message', role: 'assistant', blocks: [{ type: 'text', text }] }),
+      revision
+    })
+    const view = render(<NativeChatRawPanel items={[reply('one', 1)]} />)
+    view.rerender(<NativeChatRawPanel items={[reply('same revision', 1)]} />)
+    expect(screen.getByRole('listitem')).toHaveTextContent('one')
+    view.rerender(<NativeChatRawPanel items={[reply('two', 2)]} />)
+    expect(screen.getByRole('listitem')).toHaveTextContent('two')
+  })
+})
+
 function Chat({ tabId }: { tabId: string }): React.JSX.Element {
-  const raw = useNativeChatRawPanel(tabId)
   return (
-    <>
-      <button type="button" aria-pressed={raw.open} onClick={raw.toggle}>
-        Show raw
-      </button>
+    <TooltipProvider>
+      <NativeChatPaneHeader
+        tabId={tabId}
+        worktreeId="workspace"
+        groupId="group"
+        nativeChat={{ sessionId: 'session', agent: undefined }}
+        focused
+        colorScheme={undefined}
+      />
       <NativeChatRawFrame tabId={tabId} items={[]} panel={null}>
         transcript
       </NativeChatRawFrame>
-    </>
+    </TooltipProvider>
   )
 }
 
-describe('the raw panel toggle', () => {
+describe('the Show raw toggle', () => {
   it('opens the panel only for its own chat tab and keeps it open after a remount', () => {
     const view = render(<Chat tabId="tab-a" />)
+    const toggle = () => screen.getByRole('button', { name: 'Show raw' })
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('region', { name: 'Raw messages' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Show raw' }))
-    expect(screen.getByRole('button', { name: 'Show raw' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(toggle())
+    expect(toggle()).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('region', { name: 'Raw messages' })).toBeInTheDocument()
     view.rerender(<Chat key="tab-b" tabId="tab-b" />)
+    expect(toggle()).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('region', { name: 'Raw messages' })).toBeNull()
     view.rerender(<Chat key="tab-a" tabId="tab-a" />)
     expect(screen.getByRole('region', { name: 'Raw messages' })).toBeInTheDocument()
+  })
+})
+
+describe('Space in the panel', () => {
+  it('stays with the focused panel and does not reach the composer', () => {
+    render(<NativeChatRawPanel items={[]} />)
+    const panel = screen.getByRole('region', { name: 'Raw messages' })
+    panel.focus()
+    const insertTypedText = vi.fn(() => true)
+    routeNativeChatRootKeyToInput(
+      {
+        key: ' ',
+        ctrlKey: false,
+        metaKey: false,
+        defaultPrevented: false,
+        target: panel,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn()
+      },
+      { insertTypedText, focus: vi.fn() } as never,
+      null
+    )
+    expect(document.activeElement).toBe(panel)
+    expect(insertTypedText).not.toHaveBeenCalled()
   })
 })
