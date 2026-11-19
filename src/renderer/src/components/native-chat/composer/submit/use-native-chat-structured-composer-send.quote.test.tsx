@@ -207,6 +207,26 @@ it.each(IN_FULL)('sends %s in full', async (_name, quote, source, chat) => {
   expect(await send(quote, source, chat)).toBe(`${formatNativeChatQuote(quote)}my comment`)
 })
 
+// The user's own earlier message in this chat: the agent has it as it has a reply.
+const mine = (quote: string) => reply(quote, { role: 'user' })
+const MINE_SHORT = LONG_SHORT.replace('your earlier reply', 'my earlier message')
+
+it.each([
+  ['with no reply after it', [mine(LONG)]],
+  ['with 4 replies after it', [mine(LONG), ...replies(4)]]
+])('sends a long quote of my own earlier message %s shortened', async (_name, chat) => {
+  expect(await send(LONG, IN_CHAT, chat)).toBe(`${MINE_SHORT}\n\nmy comment`)
+})
+
+it.each([
+  ['from before /clear', [mine(LONG), user({ command: { name: 'clear' } })]],
+  ['from before a compaction', [mine(LONG), system('compaction')]],
+  ['with 5 replies after it', [mine(LONG), ...replies(5)]],
+  ['from a hook copy', [reply(LONG, { role: 'user', source: 'hook' })]]
+])('sends a long quote of my own earlier message %s in full', async (_name, chat) => {
+  expect(await send(LONG, IN_CHAT, chat)).toBe(`${formatNativeChatQuote(LONG)}my comment`)
+})
+
 it('sends a quote of the reply 5 back shortened', async () => {
   expect(await send(LONG, IN_CHAT, [reply(LONG), ...replies(4)])).toBe(
     `${LONG_SHORT}\n\nmy comment`
