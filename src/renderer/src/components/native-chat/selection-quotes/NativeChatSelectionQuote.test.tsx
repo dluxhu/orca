@@ -8,7 +8,7 @@ import { useAppStore } from '../../../store/index'
 import type { NativeChatComposerHandle } from '../composer/native-chat-composer-types'
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatSelectionQuote } from './NativeChatSelectionQuote'
-import { nativeChatQuoteSourceProps } from './native-chat-quote-selection'
+import { nativeChatQuoteSourceProps } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { nativeChatQuoteSource, textHash } from './native-chat-quote-sources'
 
 vi.mock('@/i18n/i18n', async (importOriginal) => ({
