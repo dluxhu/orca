@@ -9,8 +9,8 @@ import { join, resolve } from 'node:path'
 import {
   ORCAD_TEMPLATE_MANIFEST_FILENAME,
   ORCAD_TEMPLATE_TARGETS_DIR
-} from '../../../src/shared/orcad-artifacts.ts'
-import { ORCAD_TEMPLATE_TARGETS } from '../../../src/shared/node-runtime-pin.ts'
+} from '../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts'
+import { ORCAD_TEMPLATE_TARGETS } from '../../../src/shared/node-runtime/node-runtime-pin.ts'
 import { verifyPackagedOrcadTemplate } from '../orcad-distribution/template/verify-packaged-orcad-template.cjs'
 
 const root = resolve(import.meta.dirname, '../../..')

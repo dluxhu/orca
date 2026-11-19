@@ -1,4 +1,4 @@
-import { FORK_IDENTITY } from './fork-identity'
+import { FORK_IDENTITY } from '../../fork-identity'
 
 export const LOCAL_BUILD_COMPATIBILITY_CONTRACT = {
   formatVersion: 1,

@@ -1,5 +1,5 @@
 import { shell } from 'electron'
-import { FORK_IDENTITY } from '../../shared/fork-identity'
+import { FORK_IDENTITY } from '../../../shared/fork-identity'
 
 const MACOS_PACKAGED_BUNDLE_ID = FORK_IDENTITY.appId
 const MACOS_NOTIFICATION_SETTINGS_URL =

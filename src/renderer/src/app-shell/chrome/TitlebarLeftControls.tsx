@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, MoreHorizontal, PanelLeft } from 'lucide-react'
 import logo from '../../../../../resources/logo.svg'
 import { useTranslate } from '@/i18n/use-translate'
-import { withForkName } from '../../../shared/fork-identity'
+import { withForkName } from '../../../../shared/fork-identity'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ContextMenu,
