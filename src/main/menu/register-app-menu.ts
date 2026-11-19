@@ -8,6 +8,7 @@ import { createAppMenuSelectionItem, resolveNativeEditTarget } from './app-menu-
 import { createAppMenuQuitItems, type AppMenuQuitHandlers } from './app-menu-quit-item'
 import { createAppMenuReloadAndDevToolsItems } from './app-menu-reload-devtools-items'
 import { labeledAppMenuRole } from './labeled-app-menu-role'
+import { withForkName } from '../../shared/fork-identity'
 import { createAppWindowMenu } from './app-menu-window'
 
 export type AppearanceMenuState = {
@@ -127,13 +128,13 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
   const macAppMenu: Electron.MenuItemConstructorOptions = {
     label: options.appMenuLabel ?? app.name,
     submenu: [
-      labeledAppMenuRole('about', 'menu.about', 'About Orca'),
+      forkLabeled(labeledAppMenuRole('about', 'menu.about', 'About Orca')),
       checkForUpdatesItem,
       settingsItem,
       { type: 'separator' },
       labeledAppMenuRole('services', 'menu.services', 'Services'),
       { type: 'separator' },
-      labeledAppMenuRole('hide', 'menu.hide', 'Hide Orca'),
+      forkLabeled(labeledAppMenuRole('hide', 'menu.hide', 'Hide Orca')),
       labeledAppMenuRole('hideOthers', 'menu.hideOthers', 'Hide Others'),
       labeledAppMenuRole('unhide', 'menu.unhide', 'Show All'),
       { type: 'separator' },
@@ -285,7 +286,7 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
         ? []
         : ([
             { type: 'separator' },
-            labeledAppMenuRole('about', 'menu.about', 'About Orca'),
+            forkLabeled(labeledAppMenuRole('about', 'menu.about', 'About Orca')),
             checkForUpdatesItem
           ] satisfies Electron.MenuItemConstructorOptions[]))
     ]
@@ -315,4 +316,11 @@ export function rebuildAppMenu(): void {
   if (lastRegisterOptions) {
     buildAndApplyMenu(lastRegisterOptions)
   }
+}
+
+// Fork patch: About and Hide name the fork. See docs/fork/PATCHES.md.
+function forkLabeled(
+  item: Electron.MenuItemConstructorOptions
+): Electron.MenuItemConstructorOptions {
+  return { ...item, label: item.label === undefined ? undefined : withForkName(item.label) }
 }
