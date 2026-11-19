@@ -66,7 +66,13 @@ const OWNER = {
   isVisible: true
 }
 
-function Chat({ content }: { content: string }): React.JSX.Element {
+function Chat({
+  content,
+  owner = OWNER
+}: {
+  content: string
+  owner?: React.ContextType<typeof NativeChatMarkdownImageOwnerContext>
+}): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const jump = useNativeChatQuoteJump({
     slots: SLOTS,
@@ -77,7 +83,7 @@ function Chat({ content }: { content: string }): React.JSX.Element {
   })
   return (
     <TooltipProvider delayDuration={0}>
-      <NativeChatMarkdownImageOwnerContext.Provider value={OWNER}>
+      <NativeChatMarkdownImageOwnerContext.Provider value={owner}>
         <NativeChatQuoteJumpContext.Provider value={jump}>
           <div ref={scrollRef}>
             <div data-native-chat-message-id="reply-1">
@@ -407,6 +413,39 @@ it.each([
   frames(30)
   expect(document.activeElement === source).toBe(!back)
   expect(mocks.toast).not.toHaveBeenCalled()
+})
+
+it('ignores the late chip focus of a chat place after a newer link open', () => {
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)
+  const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
+  fireEvent.click(chip)
+  frames(2)
+  act(() => useAppStore.getState().goBackWorktree())
+  // A link in another pane opens before the transcript shows the chip.
+  beginLinkOpenRequest()
+  frames(3)
+  expect(document.activeElement).not.toBe(chip)
+})
+
+it('stops a pending jump on Back when the jump recorded no place', () => {
+  rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
+  render(
+    <Chat
+      content={'> other\n\n> The quoted text.\n\nmy words'}
+      owner={{ ...OWNER, fileLinkContext: { ...OWNER.fileLinkContext, sourceTabId: undefined } }}
+    />
+  )
+  const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
+  const source = screen.getByText('The quoted text.', { selector: 'p' })
+  source.removeAttribute('data-native-chat-quote-source')
+  fireEvent.click(chip)
+  frames(5)
+  act(() => useAppStore.getState().goBackWorktree())
+  expect(mocks.activate).toHaveBeenCalledWith('w0', { navigationIntent: 'user-open' })
+  source.setAttribute('data-native-chat-quote-source', 'reply-1')
+  frames(30)
+  expect(document.activeElement).not.toBe(source)
 })
 
 it('ignores the late chip focus of a chat place after Back leaves it', () => {

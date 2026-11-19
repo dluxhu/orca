@@ -11,7 +11,7 @@ import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
-import { beginNativeChatNavigation, recordNativeChatQuoteJump } from './native-chat-quote-history'
+import { recordNativeChatQuoteJump } from './native-chat-quote-history'
 import { quotedText } from './native-chat-quote-selection'
 import { CommentMarkdownBlockLineContext } from '@/components/sidebar/comment-markdown-code-renderers'
 
@@ -84,12 +84,8 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           className="my-1 max-w-full"
           onClick={(event) => {
             const chip = event.currentTarget
-            const isCurrent = beginNativeChatNavigation()
             const jumped = jumpToQuoteSource(sourceText, {
-              jumpToMessage:
-                jumpToMessage &&
-                ((source, text, notifyMissing, isLinkTurn) =>
-                  jumpToMessage(source, text, notifyMissing, () => isCurrent() && isLinkTurn())),
+              jumpToMessage,
               openFile: (location) => openQuotedFile(location, fileLinkContext),
               notifyMissing: () =>
                 toast(

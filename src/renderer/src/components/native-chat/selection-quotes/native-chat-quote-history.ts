@@ -6,7 +6,6 @@ import type { NativeChatFileLinkContext } from '../links/actions/native-chat-fil
 import { nativeChatMessageReveals } from './use-native-chat-quote-jump'
 import {
   hasChatTab,
-  isChatPlace,
   type WorktreeNavHistoryChatQuoteEntry
 } from '@/store/slices/ui/workspace-navigation-history-chat-place'
 
@@ -14,27 +13,6 @@ const MESSAGE = '[data-native-chat-message-id]'
 const CHIP = '[data-native-chat-sent-quote]'
 // True while Forward clicks a chip again: that jump is in the history already.
 let replaying = false
-let navigation = 0
-
-/**
- * Starts a chat navigation: a quote jump, or Back or Forward to or from a chat place. Its deferred
- * effects (scroll, focus, highlight) run only while it is the newest one. It also supersedes
- * pending link opens, so the file open of an older jump does not land after it.
- */
-export function beginNativeChatNavigation(): () => boolean {
-  const id = ++navigation
-  beginLinkOpenRequest()
-  return () => id === navigation
-}
-
-/** Stops the deferred effects of the current chat place when Back or Forward leaves it. */
-export function leaveNativeChatQuotePlace(): void {
-  const { worktreeNavHistory, worktreeNavHistoryIndex } = useAppStore.getState()
-  if (isChatPlace(worktreeNavHistory[worktreeNavHistoryIndex])) {
-    beginNativeChatNavigation()
-  }
-}
-
 /** Adds the chip's place and its source to Back and Forward, after a jump from the chip. */
 export function recordNativeChatQuoteJump(
   chip: HTMLElement,
@@ -90,7 +68,7 @@ function showChip(scroller: HTMLElement, place: WorktreeNavHistoryChatQuoteEntry
 
 /** Shows a chat place from Back or Forward: focuses the chip, or jumps from the chip to its source again. */
 export function showNativeChatQuotePlace(place: WorktreeNavHistoryChatQuoteEntry): void {
-  const isCurrent = beginNativeChatNavigation()
+  const isCurrent = beginLinkOpenRequest()
   const state = useAppStore.getState()
   // A closed chat leaves only its workspace, which the caller opened.
   if (!hasChatTab(place, state)) {
