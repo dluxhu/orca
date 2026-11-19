@@ -4,7 +4,7 @@ import { useRef } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getDefaultSettings } from '../../../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import { useAppStore } from '@/store'
 import { getScreenSubmitAltShortcutLabel } from '@/lib/keyboard/screen-submit-shortcut'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'

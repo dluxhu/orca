@@ -2,7 +2,7 @@ import type { NativeChatAfterStopSend } from '../submit/native-chat-composer-tar
 import { translate } from '../../../../i18n/i18n'
 import { useTranslate, type Translate } from '../../../../i18n/use-translate'
 import { useAppStore } from '../../../../store'
-import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 import { getScreenSubmitShortcutLabel } from '../../../../lib/keyboard/screen-submit-shortcut'
 import {
   NATIVE_CHAT_TURN_STATUS_COPY,

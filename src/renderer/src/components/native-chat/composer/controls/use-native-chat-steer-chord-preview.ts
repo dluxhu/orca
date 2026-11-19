@@ -5,8 +5,8 @@ import { createNativeChatSteerChordPreviewHook } from '../../../../../../shared/
 import type { NativeChatComposerSendIntent } from '../submit/native-chat-composer-send-intent'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'
 import { useAppStore } from '@/store'
-import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
-import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
+import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 
 const useSteerChordPreview = createNativeChatSteerChordPreviewHook({ useEffect, useState })
 

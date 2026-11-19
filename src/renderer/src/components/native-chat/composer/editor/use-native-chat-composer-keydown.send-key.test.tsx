@@ -4,7 +4,7 @@ import { fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
-import { getDefaultSettings } from '../../../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import { useAppStore } from '@/store'
 import { useNativeChatComposerKeyDown } from './use-native-chat-composer-keydown'
 

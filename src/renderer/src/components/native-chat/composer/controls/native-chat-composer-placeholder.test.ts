@@ -2,7 +2,7 @@
 import { renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { getDefaultSettings } from '../../../../../../shared/constants'
+import { getDefaultSettings } from '../../../../../../shared/orca-profiles/constants'
 import { getScreenSubmitShortcutLabel } from '../../../../lib/keyboard/screen-submit-shortcut'
 import { useAppStore } from '../../../../store'
 import {
