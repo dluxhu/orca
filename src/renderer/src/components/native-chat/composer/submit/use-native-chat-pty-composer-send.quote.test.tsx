@@ -19,7 +19,7 @@ vi.mock('../../../../store/index', () => {
   return { useAppStore: Object.assign(() => undefined, { getState: () => state }) }
 })
 
-import { formatNativeChatQuote } from '../../selection-quotes/native-chat-quote-selection'
+import { formatNativeChatQuote } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { rememberNativeChatQuoteSource } from '../../selection-quotes/native-chat-quote-sources'
 import { useNativeChatPtyComposerSend } from './use-native-chat-pty-composer-send'
 import type { NativeChatMessage } from '../../../../../../shared/native-chat/native-chat-types'
