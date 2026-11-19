@@ -4,9 +4,9 @@ import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
 import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
 import { getRuntimeTargetForWorktreeOwner } from '@/lib/files/access/file-owner-runtime-target'
 import { chatWorkspaceByTabId as findTerminalTabWorktreeId } from '../../../../lib/agent-session/tab-identity/structured-chat-tab-index'
-import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
-import type { RuntimeTerminalListResult } from '../../../../../../shared/runtime-terminal-contracts'
-import type { RuntimeWorktreePsResult } from '../../../../../../shared/runtime-worktree-contracts'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import type { RuntimeTerminalListResult } from '../../../../../../shared/terminal/runtime/runtime-terminal-contracts'
+import type { RuntimeWorktreePsResult } from '../../../../../../shared/worktree/catalog/runtime-worktree-contracts'
 import {
   listNativeChatMentionSessionRows,
   NATIVE_CHAT_MENTION_SESSIONS_METHOD,

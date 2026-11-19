@@ -1,5 +1,5 @@
 import { defineMethod } from '../../core'
-import { getAppEnvironment } from '../../../../../shared/app-environment'
+import { getAppEnvironment } from '../../../../../shared/app-lifecycle/app-environment'
 import { listEnvironments } from '../../../../../shared/remote-runtime/host-store/runtime-environment-store'
 import { callRuntimeEnvironment } from '../../../../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { isGatedOffWslHost } from '../../../../wsl/host-lifecycle/wsl-host-gate'
