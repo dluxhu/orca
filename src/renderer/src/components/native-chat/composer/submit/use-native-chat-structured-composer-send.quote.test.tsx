@@ -282,7 +282,7 @@ it('shows the full quote in the sent chip and jumps to its reply', async () => {
   )
   const chip = screen.getByRole('button', { name: `Quote: ${LONG.replace(/\s+/g, ' ')}` })
   fireEvent.click(chip)
-  expect(jump).toHaveBeenCalledWith(IN_CHAT, LONG)
+  expect(jump).toHaveBeenCalledWith(IN_CHAT, LONG, expect.any(Function), expect.any(Function))
 })
 
 it('keeps the jump of a short quote after the full text is gone from memory', async () => {
