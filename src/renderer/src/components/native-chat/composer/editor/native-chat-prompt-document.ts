@@ -1,12 +1,15 @@
 import { NativeChatFileReferencePill } from './NativeChatFileReferencePill'
 import { NativeChatSkillPill, skillLabel } from './NativeChatSkillPill'
 import { NativeChatImageReferencePill } from './NativeChatImageReferencePill'
+import { NativeChatQuotePill } from './NativeChatQuotePill'
+import { chipPastSeparator, nativeChatQuoteLayout } from './native-chat-quote-layout'
 import { formatNativeChatFileReference } from '../../../../../../shared/agent-image-paste'
 import { imageReferenceToken } from '../../../../../../shared/native-chat/native-chat-image-reference'
 import {
   FILE_REFERENCE_NODE,
   IMAGE_REFERENCE_NODE,
-  promptLeafString
+  promptLeafString,
+  QUOTE_NODE
 } from './native-chat-prompt-document-text'
 import { ReactNodeViewRenderer, Node, type JSONContent } from '@tiptap/react'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
@@ -62,6 +65,28 @@ export const NativeChatImageReference = Node.create({
     'span',
     { 'data-native-chat-image-reference': node.attrs.attachmentId }
   ]
+})
+
+/** A quote "Add to chat" took; `token` is the Markdown blockquote the agent reads. */
+export const NativeChatQuote = Node.create({
+  name: QUOTE_NODE,
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+  addNodeView: () => ReactNodeViewRenderer(NativeChatQuotePill),
+  addAttributes: () => ({ token: { default: '' } }),
+  renderText: ({ node }) => node.attrs.token,
+  renderHTML: ({ node }) => ['span', { 'data-native-chat-quote': node.attrs.token }],
+  addProseMirrorPlugins: () => [nativeChatQuoteLayout],
+  addKeyboardShortcuts() {
+    // Selects the chip, so the next press deletes it.
+    const selectChip = (direction: -1 | 1) => (): boolean => {
+      const position = chipPastSeparator(this.editor.state, direction)
+      return position !== null && this.editor.commands.setNodeSelection(position)
+    }
+    return { Backspace: selectChip(-1), Delete: selectChip(1) }
+  }
 })
 
 export function promptSkillRefs(document: JSONContent | undefined): AgentJournalSkillRef[] {
