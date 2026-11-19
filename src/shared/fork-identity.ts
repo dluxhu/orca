@@ -1,7 +1,7 @@
 // The "Orca @dLux" fork identity. Every fork-specific name comes from here. See docs/fork/PATCHES.md.
 
 // `build-release.sh --nightly` sets this to 'nightly' in the release commit. Patch branches keep 'stable'.
-const FORK_CHANNEL = 'stable' as 'stable' | 'nightly'
+const FORK_CHANNEL = 'nightly' as 'stable' | 'nightly'
 const NIGHTLY = FORK_CHANNEL === 'nightly'
 
 export const FORK_IDENTITY = {
