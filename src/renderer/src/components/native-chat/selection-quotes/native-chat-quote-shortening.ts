@@ -14,7 +14,7 @@ import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import { getCodeFenceLanguageLabel } from '../markdown/code/code-fence-language-label'
 
-/** A quote of an earlier reply goes to the agent shortened only when it is longer than this. */
+/** A quote of an earlier message goes to the agent shortened only when it is longer than this. */
 export const QUOTE_SHORTEN_THRESHOLD = 400
 const EDGE = 80
 // A first or last sentence shorter than this ("E.g.") says too little: the edge is cut instead.
@@ -47,8 +47,11 @@ function tail(text: string): string {
   return space !== -1 && space < EDGE / 2 ? cut.slice(space + 1) : cut
 }
 
+/** Who wrote the quoted message: the agent (a reply) or the user. */
+type QuoteAuthor = 'reply' | 'user'
+
 /** The quote token in the short shape: the first sentence, how much is left out, the last one. */
-export function shortenedQuoteToken(quote: string): string {
+export function shortenedQuoteToken(quote: string, author: QuoteAuthor = 'reply'): string {
   const flat = quote.replace(/\s+/g, ' ').trim()
   const sentences = flat.split(/(?<=[.!?])\s+/)
   const first = head(sentences[0].length < SHORT_SENTENCE ? flat : sentences[0])
@@ -57,7 +60,7 @@ export function shortenedQuoteToken(quote: string): string {
   const omitted = words(flat.slice(first.length, flat.length - last.length))
   return [
     `> ${first} …`,
-    `> (${omitted} quoted words left out; the full text is in your earlier reply)`,
+    `> (${omitted} quoted words left out; the full text is in ${author === 'reply' ? 'your earlier reply' : 'my earlier message'})`,
     `> … ${last}`
   ]
     .join('\n')
@@ -98,32 +101,39 @@ function drawnText(node: MarkdownNode): string {
 const bare = (text: string): string => text.replace(/\s/g, '')
 
 /**
- * True when the agent still has the reply `messageId` with the quote in it: a reply of this
- * transcript (not a screen scrape or a hook copy) after the last clear or compaction, among the
- * last `RECENT_REPLIES` replies, whose text holds the quote.
+ * Who wrote the message `messageId` with the quote in it, while the agent still has it; null
+ * otherwise. The message is a reply or a user message of this transcript (not a screen scrape or a
+ * hook copy), after the last clear or compaction, with fewer than `RECENT_REPLIES` replies after
+ * it, and its text holds the quote.
  */
-function agentHasQuote(
+function quoteAuthorInContext(
   quote: string,
   messageId: string,
   chatMessages: readonly NativeChatMessage[]
-): boolean {
+): QuoteAuthor | null {
   const ordered = orderNativeChatDisplayMessages(chatMessages)
   let replies = 0
   for (let index = ordered.length - 1; index >= 0 && replies < RECENT_REPLIES; index--) {
     const message = ordered[index]
     if (isContextBoundary(message)) {
-      return false
+      return null
     }
-    if (message.role !== 'assistant' || message.source !== 'transcript') {
+    if (
+      (message.role !== 'assistant' && message.role !== 'user') ||
+      message.source !== 'transcript'
+    ) {
       continue
     }
-    replies++
     if (message.id === messageId) {
       const text = message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
-      return bare(drawnText(markdown.parse(text) as MarkdownNode)).includes(bare(quote))
+      const holdsQuote = bare(drawnText(markdown.parse(text) as MarkdownNode)).includes(bare(quote))
+      return holdsQuote ? (message.role === 'assistant' ? 'reply' : 'user') : null
+    }
+    if (message.role === 'assistant') {
+      replies++
     }
   }
-  return false
+  return null
 }
 
 /** Keeps the newest `QUOTE_SOURCE_LIMIT` full quotes. */
@@ -137,8 +147,8 @@ function rememberFullQuote(short: string, quote: string): void {
 }
 
 /**
- * The text for the agent: each long quote of a reply the agent still has is in the short shape.
- * The quote's recorded source names the reply.
+ * The text for the agent: each long quote of a reply or a user message that the agent still has is
+ * in the short shape. The quote's recorded source names the message.
  */
 export function shortenSameChatQuotes(
   text: string,
@@ -163,12 +173,12 @@ export function shortenSameChatQuotes(
     const quote = quotedText(token)
     const source = nativeChatQuoteSource(quote)
     let sent = token
-    if (
-      quote.length > QUOTE_SHORTEN_THRESHOLD &&
-      source &&
-      agentHasQuote(quote, source.messageId, chatMessages)
-    ) {
-      sent = shortenedQuoteToken(quote)
+    const author =
+      quote.length > QUOTE_SHORTEN_THRESHOLD && source
+        ? quoteAuthorInContext(quote, source.messageId, chatMessages)
+        : null
+    if (source && author) {
+      sent = shortenedQuoteToken(quote, author)
       // The sent bubble's chip jumps by its own text, which is the short text after a restart.
       rememberNativeChatQuoteSource(quotedText(sent), source)
       rememberFullQuote(quotedText(sent), quote)
