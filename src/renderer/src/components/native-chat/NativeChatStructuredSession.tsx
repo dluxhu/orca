@@ -1,5 +1,6 @@
 import { useBotLinkPrompt } from '@/lib/agent-session/open/bot-link-item-target'
-import { NativeChatCrewFrame, NativeChatCrewPanel } from '../orchestration-crew/NativeChatCrewPanel'
+import { NativeChatCrewPanel } from '../orchestration-crew/NativeChatCrewPanel'
+import { NativeChatRawFrame } from './messages/diagnostics/NativeChatRawPanel'
 import { NativeChatUsageLimitActionsProvider } from './usage/NativeChatUsageLimitActions'
 import { useNativeChatHandOff } from './pane/actions/use-native-chat-hand-off'
 import { useNativeChatStructuredPaneNotices } from '@/components/native-chat/messages/notices/use-native-chat-structured-pane-notices'
@@ -247,7 +248,9 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
     <NativeChatSlackMirrorContext.Provider value={slackMirror}>
       <NativeChatSurface surface={surface} working={controller.isWorking}>
         {nativeChatPaneHeader(props, ownerWorktreeId, surface.appearance.colorScheme, handOff)}
-        <NativeChatCrewFrame
+        <NativeChatRawFrame
+          tabId={props.tabId}
+          items={controller.journalItems}
           panel={
             <NativeChatCrewPanel {...props} composerRef={composerRef} canMention={canMention} />
           }
@@ -313,7 +316,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
               </NativeChatRowActionsProvider>
             )}
           </NativeChatContextClearFade>
-        </NativeChatCrewFrame>
+        </NativeChatRawFrame>
         {readFailure?.final ? null : (
           <>
             {/* Keep queued drafts outside the transcript and above the background-task dock. */}
