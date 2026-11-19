@@ -142,7 +142,7 @@ export function resolveClaudeReplayTurn(
       requestedAt: null,
       clientMessageId: null,
       remote: true,
-      ...(session.translator?.openTurnInLiveProviderCycle ? { folded: true as const } : {})
+      ...(session.translator?.turnCycle.openedInLiveProviderCycle ? { folded: true as const } : {})
     }
   }
   const current = session.dispatchWaiters[0]
