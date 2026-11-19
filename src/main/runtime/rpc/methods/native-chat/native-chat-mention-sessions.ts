@@ -97,7 +97,7 @@ export const NATIVE_CHAT_MENTION_SESSION_METHODS = [
         terminals: () =>
           runtime.listTerminals(undefined, undefined, { includeVisualLayouts: false })
       }
-      const saved = listEnvironments(userDataPath)
+      const saved = (await listEnvironments(userDataPath))
         .filter((environment) => !isGatedOffWslHost(environment))
         .map((environment): NativeChatMentionHost => ({
           environment: environment.name,
