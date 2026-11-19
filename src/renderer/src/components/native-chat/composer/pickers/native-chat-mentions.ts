@@ -1,27 +1,11 @@
 import { translate } from '@/i18n/i18n'
-import { structuredAgentSessionTabId } from '../../../../../../shared/agent-session/view/structured-agent-session-projection'
-import {
-  formatOrcaSessionAddress,
-  isOrcaSessionId
-} from '../../../../../../shared/agent-session/identity/orca-session-address'
 import type { AgentReferenceKind } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import { removeMentionToken } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
 import type { NativeChatComposerInput } from '../editor/native-chat-composer-input'
-import type { RuntimeTerminalSummary } from '../../../../../../shared/terminal/runtime/runtime-terminal-contracts'
-import type {
-  RuntimeWorktreeAgentRow,
-  RuntimeWorktreePsSummary
-} from '../../../../../../shared/worktree/catalog/runtime-worktree-contracts'
+import type { NativeChatMentionSessionRow } from '../../../../../../shared/native-chat/native-chat-mention-sessions'
 
-export type NativeChatMentionSession = {
-  kind: AgentReferenceKind
-  label: string
-  /** `orca_session_id:<id>` for a chat, the terminal handle for a terminal. */
-  address: string
-  hostKey: string
-  /** The workspace of the session, to tell same-named sessions apart. */
-  detail: string
-}
+/** A row from the asking host's `nativeChat.mentionSessions`, keyed for the chip. */
+export type NativeChatMentionSession = NativeChatMentionSessionRow & { hostKey: string }
 
 export function nativeChatMentionKindLabel(kind: AgentReferenceKind): string {
   return kind === 'chat'
@@ -52,70 +36,17 @@ export function nativeChatMentionSessionOf(
 }
 
 const MENTION_SESSION_LIMIT = 20
-const CHAT_TAB_PREFIX = structuredAgentSessionTabId('')
-
-/** The chats and terminals of one host that this composer can mention; `self` is left out. */
-export function listNativeChatMentionSessions(
-  ps: {
-    worktrees: readonly (Pick<RuntimeWorktreePsSummary, 'displayName'> & {
-      agents: readonly Pick<
-        RuntimeWorktreeAgentRow,
-        'paneKey' | 'parentPaneKey' | 'conversationName' | 'displayName' | 'taskTitle'
-      >[]
-    })[]
-  } | null,
-  terminals: {
-    terminals: readonly Pick<
-      RuntimeTerminalSummary,
-      'handle' | 'ptyId' | 'branch' | 'title' | 'paneTitle' | 'orphaned'
-    >[]
-  } | null,
-  hostKey: string,
-  self: { sessionId?: string; ptyId?: string | null }
-): NativeChatMentionSession[] {
-  const chats = (ps?.worktrees ?? []).flatMap((worktree) =>
-    worktree.agents.flatMap((agent) => {
-      if (agent.parentPaneKey !== null || !agent.paneKey.startsWith(CHAT_TAB_PREFIX)) {
-        return []
-      }
-      const id = agent.paneKey.slice(CHAT_TAB_PREFIX.length).split(':')[0]
-      if (!isOrcaSessionId(id) || id === self.sessionId) {
-        return []
-      }
-      return [
-        {
-          kind: 'chat' as const,
-          label: agent.conversationName || agent.displayName || agent.taskTitle || id,
-          address: formatOrcaSessionAddress(id),
-          hostKey,
-          detail: worktree.displayName
-        }
-      ]
-    })
-  )
-  const ptys = (terminals?.terminals ?? []).flatMap((terminal) =>
-    terminal.orphaned || (self.ptyId && terminal.ptyId === self.ptyId)
-      ? []
-      : [
-          {
-            kind: 'terminal' as const,
-            label: terminal.paneTitle || terminal.title || terminal.handle,
-            address: terminal.handle,
-            hostKey,
-            detail: terminal.branch
-          }
-        ]
-  )
-  return [...chats, ...ptys]
-}
-
 export function filterNativeChatMentionSessions(
   sessions: readonly NativeChatMentionSession[],
   query: string
 ): NativeChatMentionSession[] {
   const needle = query.toLowerCase()
   return sessions
-    .filter((session) => session.label.toLowerCase().includes(needle))
+    .filter(
+      (session) =>
+        session.label.toLowerCase().includes(needle) ||
+        session.detail.toLowerCase().includes(needle)
+    )
     .slice(0, MENTION_SESSION_LIMIT)
 }
 
@@ -127,10 +58,13 @@ export function completeNativeChatMention(
   commit: (result: { draft: string; caret: number }) => void
 ): void {
   const token = removeMentionToken(draft, caret)
-  const { kind, label, address, hostKey } = session
+  const { kind, label, address, hostKey, environment } = session
+  const reference = environment
+    ? { kind, label: `${label} (${environment})`, address, hostKey, environment }
+    : { kind, label, address, hostKey }
   // A session that is already a chip inserts nothing, so the typed token stays.
   if (
-    input?.insertAgentReferences?.([{ kind, label, address, hostKey }], {
+    input?.insertAgentReferences?.([reference], {
       from: token.caret,
       to: caret
     })

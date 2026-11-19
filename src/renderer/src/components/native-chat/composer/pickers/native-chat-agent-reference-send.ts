@@ -41,7 +41,7 @@ export function serializeNativeChatAgentReferences(
   const occurrences: (SelectedReference | string)[] = []
   const render = (node: JSONContent): string => {
     if (node.type === 'nativeChatAgentReference') {
-      const { label, address, hostKey, kind } = node.attrs ?? {}
+      const { label, address, hostKey, kind, environment } = node.attrs ?? {}
       if (typeof label !== 'string' || typeof address !== 'string' || typeof hostKey !== 'string') {
         return ''
       }
@@ -49,7 +49,8 @@ export function serializeNativeChatAgentReferences(
         label,
         address,
         hostKey,
-        ...(kind === 'chat' || kind === 'terminal' ? { kind } : {})
+        ...(kind === 'chat' || kind === 'terminal' ? { kind } : {}),
+        ...(typeof environment === 'string' && environment ? { environment } : {})
       }
       const literal = agentReferenceToken(reference)
       if (isPublicOrchestrationAddress(address)) {
@@ -148,7 +149,7 @@ export function serializeNativeChatAgentReferences(
     .map((part) => (typeof part === 'string' ? part : `@${part.opaque.label}`))
     .join('')
   const notes = [...selected.values()].map(({ reference, label }) =>
-    agentReferenceNote(label, reference.address, reference.kind)
+    agentReferenceNote(label, reference.address, reference.kind, reference.environment)
   )
   return layout === 'goal'
     ? `${body.trimEnd()} ${notes.join(' ')}`
