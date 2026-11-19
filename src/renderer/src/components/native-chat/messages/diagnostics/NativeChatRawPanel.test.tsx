@@ -191,6 +191,7 @@ describe('Space in the panel', () => {
   it('stays with the focused panel and does not reach the composer', () => {
     render(<NativeChatRawPanel items={[]} />)
     const panel = screen.getByRole('region', { name: 'Raw messages' })
+    expect(panel).toHaveAttribute('tabindex', '0')
     panel.focus()
     const insertTypedText = vi.fn(() => true)
     routeNativeChatRootKeyToInput(
