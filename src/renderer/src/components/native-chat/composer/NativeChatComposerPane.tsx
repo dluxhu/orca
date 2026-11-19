@@ -219,7 +219,18 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
     })
     const contextUsageSummary = useNativeChatContextUsageSummary(structuredTransport)
 
-    const sendRouting = {
+    const sendStructured = useNativeChatStructuredComposerSend({
+      agent,
+      draftScopeKey,
+      imageAttachments,
+      structuredTransport,
+      isComposing: imeEnterGesture.isComposing,
+      clearSkillOrigin,
+      setDraft,
+      setCaret
+    })
+
+    const ptyCommandRouting = {
       agent,
       disabled,
       isDispatchingSessionOption: sessionOptions.isDispatching,
@@ -233,19 +244,11 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       setCaret,
       clearSkillOrigin,
       clearImageAttachments,
-      setNotice,
-      chatMessages: recallSource?.messages
+      setNotice
     }
-    const sendStructured = useNativeChatStructuredComposerSend({
-      ...sendRouting,
-      draftScopeKey,
-      imageAttachments,
-      structuredTransport,
-      isComposing: imeEnterGesture.isComposing
-    })
     const sendPty = useNativeChatPtyComposerSend({
       draftScopeKey,
-      ...sendRouting,
+      ...ptyCommandRouting,
       draft,
       imageAttachments,
       launchDraft: launchSeed?.launchDraft,
@@ -303,7 +306,7 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
         ...picker,
         structuredTransport,
         sendStructured,
-        ptyCommandRouting: { ...sendRouting, setActiveSuggestion },
+        ptyCommandRouting: { ...ptyCommandRouting, setActiveSuggestion },
         setNotice,
         sendMessage: submission.send
       })

@@ -12,7 +12,6 @@ import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
 import { quotedText } from './native-chat-quote-selection'
-import { nativeChatFullQuote } from './native-chat-quote-shortening'
 import { CommentMarkdownBlockLineContext } from '@/components/sidebar/comment-markdown-code-renderers'
 
 type HastNode = {
@@ -65,16 +64,13 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
   const t = useTranslate()
   const jumpToMessage = useContext(NativeChatQuoteJumpContext)
   const fileLinkContext = useContext(NativeChatMarkdownImageOwnerContext)?.fileLinkContext ?? null
-  // A long quote went to the agent shortened; the chip shows the full quote it was in this app.
-  const shown = hastText(node).trim()
-  const sentText =
+  const text = hastText(node).trim()
+  const sourceText =
     quoteSourceText(
       useContext(NativeChatQuoteContentContext),
       useContext(CommentMarkdownBlockLineContext),
       node
-    ) ?? shown
-  const sourceText = nativeChatFullQuote(sentText)
-  const text = sourceText === sentText ? shown : sourceText
+    ) ?? text
   return (
     <Tooltip>
       <TooltipTrigger asChild>
