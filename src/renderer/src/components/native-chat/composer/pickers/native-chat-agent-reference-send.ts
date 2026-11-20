@@ -3,6 +3,7 @@ import { imageReferenceToken } from '../../../../../../shared/native-chat/native
 import {
   agentReferenceNote,
   agentReferenceToken,
+  isAgentReferenceKind,
   isPublicOrchestrationAddress,
   mayHoldAgentReferences,
   printableAgentLabel,
@@ -49,7 +50,7 @@ export function serializeNativeChatAgentReferences(
         label,
         address,
         hostKey,
-        ...(kind === 'chat' || kind === 'terminal' ? { kind } : {})
+        ...(isAgentReferenceKind(kind) ? { kind } : {})
       }
       const literal = agentReferenceToken(reference)
       if (isPublicOrchestrationAddress(address)) {

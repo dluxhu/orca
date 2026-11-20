@@ -9,6 +9,7 @@ import { MessageSquare, SquareTerminal, Users } from 'lucide-react'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   agentReferenceToken,
+  isAgentReferenceKind,
   type AgentReferenceKind,
   type OrchestrationAgentReference
 } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
@@ -26,7 +27,7 @@ export function AgentReferencePillContent({
   kind: AgentReferenceKind | null
   selected: boolean
 }): React.JSX.Element {
-  const icon = kind === 'chat' ? MessageSquare : kind === 'terminal' ? SquareTerminal : Users
+  const icon = kind === 'chat' ? MessageSquare : kind ? SquareTerminal : Users
   return (
     <>
       {kind ? <span className="sr-only">{`${nativeChatMentionKindLabel(kind)} `}</span> : null}
@@ -46,7 +47,7 @@ function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Elemen
     >
       <AgentReferencePillContent
         label={String(node.attrs.label)}
-        kind={kind === 'chat' || kind === 'terminal' ? kind : null}
+        kind={isAgentReferenceKind(kind) ? kind : null}
         selected={selected}
       />
     </NodeViewWrapper>
