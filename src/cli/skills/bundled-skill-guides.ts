@@ -554,7 +554,7 @@ const ORCA_CLI_MARKDOWN = [
   "```",
   "",
   "- To find a session on another host, run `environment list`, then `chat list` or `terminal list` with each `--environment`. Match the chat title or the workspace name: a chat title comes from its first message, so people often name a chat by its workspace.",
-  "- A note from an `@` mention gives the exact command. Keep its `--environment`.",
+  "- A note from an `@` mention gives the exact command. Keep its `--environment` or `--on`.",
   "- If the host is not in `environment list`, it is not paired with this machine. Do not guess an address or a pairing code. Tell the user to run `orca serve` on that host and `orca environment add --name <name> --pairing-code <pairing-url>` here once, with the pairing URL that `orca serve` prints.",
   "- If a saved host does not answer, it is off or not reachable. Report it; do not retry in a loop.",
   "",

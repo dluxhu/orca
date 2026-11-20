@@ -1,7 +1,7 @@
 import { parseOrcaSessionAddress } from '../../agent-session/identity/orca-session-address'
 import { isTerminalHandle } from '../../terminal/terminal-handle-prefix'
 
-/** `kind` marks an `@` mention of a chat or a terminal; absent marks an orchestration mailbox reference. */
+/** `kind` marks an `@` mention of a chat, a terminal agent or a plain shell; absent marks an orchestration mailbox reference. */
 export type OrchestrationAgentReference = {
   label: string
   address: string
@@ -11,7 +11,12 @@ export type OrchestrationAgentReference = {
   environment?: string
 }
 
-export type AgentReferenceKind = 'chat' | 'terminal'
+/** `terminal` is a terminal with an agent in it; `shell` is a terminal with none. */
+export type AgentReferenceKind = 'chat' | 'terminal' | 'shell'
+
+export function isAgentReferenceKind(value: unknown): value is AgentReferenceKind {
+  return value === 'chat' || value === 'terminal' || value === 'shell'
+}
 
 export function isPublicOrchestrationAddress(address: string): boolean {
   return (
@@ -45,7 +50,9 @@ function shellWord(value: string): string {
   return /^[\w.@:+-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`
 }
 
-/** The routing line a sent message ends with, one per mentioned agent. */
+/** The routing line a sent message ends with, one per mentioned agent. A chat or a terminal agent
+ *  gets Orca mail, as a bot does. A chat shows the mail as a card from the sender. A plain shell reads
+ *  no mail, so it gets typed input. `environment` names the host of a session on another host. */
 export function agentReferenceNote(
   label: string,
   address: string,
@@ -54,15 +61,14 @@ export function agentReferenceNote(
 ): string {
   const name = environment ? printableAgentLabel(environment) : ''
   // Shell quotes do not stop the CLI from reading a leading `-` as a flag; `--flag=value` does.
-  const host = name ? ` --environment${name.startsWith('-') ? '=' : ' '}${shellWord(name)}` : ''
-  const session = kind === 'chat' ? parseOrcaSessionAddress(address) : null
-  if (session) {
-    return `[Orca chat "${label}": session ${session} — send it a message with orca chat send${host} --session ${session} --text <message>, and read its replies with orca chat read${host} --session ${session}]`
+  const host = (flag: string) =>
+    name ? ` --${flag}${name.startsWith('-') ? '=' : ' '}${shellWord(name)}` : ''
+  if (kind === 'shell' && isTerminalHandle(address)) {
+    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send${host('environment')} --terminal ${address} --text <text> --enter, and read its output with orca terminal read${host('environment')} --terminal ${address}]`
   }
-  if (kind === 'terminal' && isTerminalHandle(address)) {
-    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send${host} --terminal ${address} --text <text> --enter, and read its output with orca terminal read${host} --terminal ${address}]`
-  }
-  return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
+  // `--on` carries mail to a paired host; its replies come back here.
+  const mail = `message it with orca orchestration send${host('on')} --to ${address}`
+  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — ${mail} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {

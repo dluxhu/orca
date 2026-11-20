@@ -10,6 +10,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   agentReferenceToken,
+  isAgentReferenceKind,
   type AgentReferenceKind,
   type OrchestrationAgentReference
 } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
@@ -27,11 +28,11 @@ export function AgentReferencePillContent({
   selected: boolean
 }): React.JSX.Element {
   const t = useTranslate()
-  const icon = kind === 'chat' ? MessageSquare : kind === 'terminal' ? SquareTerminal : Users
+  const icon = kind === 'chat' ? MessageSquare : kind ? SquareTerminal : Users
   const spokenLabel =
     kind === 'chat'
       ? t('components.native-chat.composer.chatPillLabel', 'Chat: {{name}}', { name: label })
-      : kind === 'terminal'
+      : kind
         ? t('components.native-chat.composer.terminalPillLabel', 'Terminal: {{name}}', {
             name: label
           })
@@ -52,7 +53,7 @@ function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Elemen
     >
       <AgentReferencePillContent
         label={String(node.attrs.label)}
-        kind={kind === 'chat' || kind === 'terminal' ? kind : null}
+        kind={isAgentReferenceKind(kind) ? kind : null}
         selected={selected}
       />
     </NodeViewWrapper>

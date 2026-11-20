@@ -33,9 +33,32 @@ const ps = {
 
 const terminals = {
   terminals: [
-    { handle: 'term_one', ptyId: 'pty-1', branch: 'main', title: 'zsh', paneTitle: 'Runner' },
-    { handle: 'term_two', ptyId: 'pty-2', branch: 'main', title: 'zsh' },
-    { handle: 'term_old', ptyId: null, branch: 'main', title: 'Gone', orphaned: true }
+    {
+      handle: 'term_one',
+      ptyId: 'pty-1',
+      tabId: 'tab-1',
+      leafId: 'leaf-1',
+      branch: 'main',
+      title: 'zsh',
+      paneTitle: 'Runner'
+    },
+    {
+      handle: 'term_two',
+      ptyId: 'pty-2',
+      tabId: 'tab-2',
+      leafId: 'leaf-2',
+      branch: 'main',
+      title: 'zsh'
+    },
+    {
+      handle: 'term_old',
+      ptyId: null,
+      tabId: 'tab-3',
+      leafId: 'leaf-3',
+      branch: 'main',
+      title: 'Gone',
+      orphaned: true
+    }
   ]
 }
 
@@ -56,6 +79,17 @@ describe('listNativeChatMentionSessionRows', () => {
         detail: 'repo/main'
       },
       { kind: 'terminal', label: 'Runner', address: 'term_one', detail: 'main' }
+    ])
+  })
+
+  it('marks a terminal with no agent row as a plain shell', () => {
+    expect(
+      listNativeChatMentionSessionRows(ps, terminals, {}).map((s) => [s.address, s.kind])
+    ).toEqual([
+      ['orca_session_id:chat_aaaaaaaa', 'chat'],
+      ['orca_session_id:chat_bbbbbbbb', 'chat'],
+      ['term_one', 'terminal'],
+      ['term_two', 'shell']
     ])
   })
 
@@ -81,7 +115,7 @@ describe('listNativeChatMentionSessionRows', () => {
 })
 
 describe('serializeNativeChatAgentReferences for @ mentions', () => {
-  it('tells the agent to use orca chat and orca terminal', () => {
+  it('tells the agent to mail a chat or a terminal agent, and to type into a plain shell', () => {
     const chat = {
       label: 'Release notes',
       address: 'orca_session_id:chat_aaaaaaaa',
@@ -94,6 +128,7 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       hostKey: 'local',
       kind: 'terminal' as const
     }
+    const shell = { label: 'Build', address: 'term_two', hostKey: 'local', kind: 'shell' as const }
     const document: JSONContent = {
       type: 'doc',
       content: [
@@ -103,18 +138,21 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
             { type: 'text', text: 'ask ' },
             { type: 'nativeChatAgentReference', attrs: chat },
             { type: 'text', text: ' and ' },
-            { type: 'nativeChatAgentReference', attrs: terminal }
+            { type: 'nativeChatAgentReference', attrs: terminal },
+            { type: 'text', text: ' and ' },
+            { type: 'nativeChatAgentReference', attrs: shell }
           ]
         }
       ]
     }
-    const text = `ask ${agentReferenceToken(chat)} and ${agentReferenceToken(terminal)}`
+    const text = `ask ${agentReferenceToken(chat)} and ${agentReferenceToken(terminal)} and ${agentReferenceToken(shell)}`
     expect(serializeNativeChatAgentReferences(text, document)).toBe(
       [
-        'ask @Release notes and @Runner',
+        'ask @Release notes and @Runner and @Build',
         '',
-        '[Orca chat "Release notes": session chat_aaaaaaaa — send it a message with orca chat send --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --session chat_aaaaaaaa]',
-        '[Orca terminal "Runner": term_one — send it input with orca terminal send --terminal term_one --text <text> --enter, and read its output with orca terminal read --terminal term_one]'
+        '[Orca chat "Release notes": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Runner": term_one — message it with orca orchestration send --to term_one --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Build": term_two — send it input with orca terminal send --terminal term_two --text <text> --enter, and read its output with orca terminal read --terminal term_two]'
       ].join('\n')
     )
   })
@@ -134,6 +172,13 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       kind: 'terminal' as const,
       environment: 'my box'
     }
+    const shell = {
+      label: 'Build (my box)',
+      address: 'term_two',
+      hostKey: 'local:my box',
+      kind: 'shell' as const,
+      environment: 'my box'
+    }
     const document: JSONContent = {
       type: 'doc',
       content: [
@@ -142,23 +187,26 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
           content: [
             { type: 'nativeChatAgentReference', attrs: chat },
             { type: 'text', text: ' ' },
-            { type: 'nativeChatAgentReference', attrs: terminal }
+            { type: 'nativeChatAgentReference', attrs: terminal },
+            { type: 'text', text: ' ' },
+            { type: 'nativeChatAgentReference', attrs: shell }
           ]
         }
       ]
     }
-    const text = `${agentReferenceToken(chat)} ${agentReferenceToken(terminal)}`
+    const text = `${agentReferenceToken(chat)} ${agentReferenceToken(terminal)} ${agentReferenceToken(shell)}`
     expect(serializeNativeChatAgentReferences(text, document)).toBe(
       [
-        '@Notes (laptop) @Runner (my box)',
+        '@Notes (laptop) @Runner (my box) @Build (my box)',
         '',
-        '[Orca chat "Notes (laptop)": session chat_aaaaaaaa — send it a message with orca chat send --environment laptop --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --environment laptop --session chat_aaaaaaaa]',
-        "[Orca terminal \"Runner (my box)\": term_one — send it input with orca terminal send --environment 'my box' --terminal term_one --text <text> --enter, and read its output with orca terminal read --environment 'my box' --terminal term_one]"
+        '[Orca chat "Notes (laptop)": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --on laptop --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Runner (my box)": term_one — message it with orca orchestration send --on \'my box\' --to term_one --subject "<topic>" --body "<message>"]',
+        "[Orca terminal \"Build (my box)\": term_two — send it input with orca terminal send --environment 'my box' --terminal term_two --text <text> --enter, and read its output with orca terminal read --environment 'my box' --terminal term_two]"
       ].join('\n')
     )
   })
 
-  it('passes an environment name that starts with a dash as --environment=<name>', () => {
+  it('passes an environment name that starts with a dash as --on=<name>', () => {
     const chat = {
       label: 'Notes (-x)',
       address: 'orca_session_id:chat_aaaaaaaa',
@@ -171,8 +219,7 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       content: [{ type: 'paragraph', content: [{ type: 'nativeChatAgentReference', attrs: chat }] }]
     }
     const sent = serializeNativeChatAgentReferences(agentReferenceToken(chat), document)
-    expect(sent).toContain('orca chat send --environment=-x --session chat_aaaaaaaa')
-    expect(sent).toContain('orca chat read --environment=-x --session chat_aaaaaaaa')
+    expect(sent).toContain('orca orchestration send --on=-x --to orca_session_id:chat_aaaaaaaa')
   })
 
   it('keeps the orchestration note for a reference without a kind', () => {

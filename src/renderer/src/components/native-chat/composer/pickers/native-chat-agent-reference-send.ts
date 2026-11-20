@@ -3,6 +3,7 @@ import { promptLeafString } from '../editor/native-chat-prompt-document-text'
 import {
   agentReferenceNote,
   agentReferenceToken,
+  isAgentReferenceKind,
   isPublicOrchestrationAddress,
   mayHoldAgentReferences,
   printableAgentLabel,
@@ -49,7 +50,7 @@ export function serializeNativeChatAgentReferences(
         label,
         address,
         hostKey,
-        ...(kind === 'chat' || kind === 'terminal' ? { kind } : {}),
+        ...(isAgentReferenceKind(kind) ? { kind } : {}),
         ...(typeof environment === 'string' && environment ? { environment } : {})
       }
       const literal = agentReferenceToken(reference)

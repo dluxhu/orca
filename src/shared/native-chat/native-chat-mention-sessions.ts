@@ -51,6 +51,8 @@ const MentionTerminals = z.object({
     z.object({
       handle: z.string(),
       ptyId: z.string().nullish(),
+      tabId: z.string().nullish(),
+      leafId: z.string().nullish(),
       branch: z.string(),
       title: z.string().nullish(),
       paneTitle: z.string().nullish(),
@@ -87,12 +89,18 @@ export function listNativeChatMentionSessionRows(
       ]
     })
   )
+  // A terminal with an agent row reads Orca mail; a plain shell does not.
+  const agentPanes = new Set(
+    (ps?.worktrees ?? []).flatMap((worktree) => worktree.agents.map((agent) => agent.paneKey))
+  )
   const ptys = (terminals?.terminals ?? []).flatMap((terminal) =>
     terminal.orphaned || (self.ptyId && terminal.ptyId === self.ptyId)
       ? []
       : [
           {
-            kind: 'terminal' as const,
+            kind: agentPanes.has(`${terminal.tabId}:${terminal.leafId}`)
+              ? ('terminal' as const)
+              : ('shell' as const),
             label: terminal.paneTitle || terminal.title || terminal.handle,
             address: terminal.handle,
             detail: terminal.branch
