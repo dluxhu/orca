@@ -70,7 +70,8 @@ export const NativeChatAgentReference = Node.create({
     label: { default: '' },
     address: { default: '' },
     hostKey: { default: '' },
-    kind: { default: null }
+    kind: { default: null },
+    environment: { default: null }
   }),
   addNodeView: () => ReactNodeViewRenderer(AgentReferencePill),
   renderText: ({ node }) =>
