@@ -1,6 +1,20 @@
 import { parseOrcaSessionAddress } from '../../agent-session/identity/orca-session-address'
+import { isTerminalHandle } from '../../terminal/terminal-handle-prefix'
 
-export type OrchestrationAgentReference = { label: string; address: string; hostKey: string }
+/** `kind` marks an `@` mention of a chat, a terminal agent or a plain shell; absent marks an orchestration mailbox reference. */
+export type OrchestrationAgentReference = {
+  label: string
+  address: string
+  hostKey: string
+  kind?: AgentReferenceKind
+}
+
+/** `terminal` is a terminal with an agent in it; `shell` is a terminal with none. */
+export type AgentReferenceKind = 'chat' | 'terminal' | 'shell'
+
+export function isAgentReferenceKind(value: unknown): value is AgentReferenceKind {
+  return value === 'chat' || value === 'terminal' || value === 'shell'
+}
 
 export function isPublicOrchestrationAddress(address: string): boolean {
   return (
@@ -29,9 +43,18 @@ export function agentReferenceToken(reference: OrchestrationAgentReference): str
   return `@${reference.label}${AGENT_REFERENCE_MARK}${reference.address})`
 }
 
-/** The routing line a sent message ends with, one per mentioned agent. */
-export function agentReferenceNote(label: string, address: string): string {
-  return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
+/** The routing line a sent message ends with, one per mentioned agent. A chat or a terminal agent
+ *  gets Orca mail, as a bot does. A chat shows the mail as a card from the sender. A plain shell reads
+ *  no mail, so it gets typed input. */
+export function agentReferenceNote(
+  label: string,
+  address: string,
+  kind?: AgentReferenceKind | null
+): string {
+  if (kind === 'shell' && isTerminalHandle(address)) {
+    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send --terminal ${address} --text <text> --enter, and read its output with orca terminal read --terminal ${address}]`
+  }
+  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {
