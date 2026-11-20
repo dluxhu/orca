@@ -85,6 +85,7 @@ export type StructuredAgentModelCatalogDeps = Pick<
   | 'resolveAgentAccountHome'
   | 'resolveLaunchArgs'
   | 'resolveClaudeAuthPolicy'
+  | 'claudeRemoteControlForNewChats'
   | 'resolveClaudeCommand'
   | 'resolveCodexCommand'
   | 'resolveCodexAccountKind'

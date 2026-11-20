@@ -1,5 +1,10 @@
 import { getAgentSettingsRowId } from './agent-settings-navigation'
 import {
+  getClaudeRemoteControlDescription,
+  getClaudeRemoteControlSearchKeywords,
+  getClaudeRemoteControlTitle
+} from './behavior/claude-remote-control-copy'
+import {
   getClaudeSubagentNavigationTitle,
   getClaudeSubagentNavigationDescription,
   getClaudeSubagentNavigationSearchKeywords
@@ -194,6 +199,12 @@ const getAllAgentsPaneSearchEntries = createLocalizedCatalog(() => [
     title: getClaudeSubagentNavigationTitle(),
     description: getClaudeSubagentNavigationDescription(),
     keywords: getClaudeSubagentNavigationSearchKeywords()
+  },
+  {
+    id: 'claude-remote-control',
+    title: getClaudeRemoteControlTitle(),
+    description: getClaudeRemoteControlDescription(),
+    keywords: getClaudeRemoteControlSearchKeywords()
   },
   {
     title: getAgentWorkspaceTrustTitle(),
