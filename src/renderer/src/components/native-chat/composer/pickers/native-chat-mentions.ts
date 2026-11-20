@@ -67,7 +67,7 @@ export function listNativeChatMentionSessions(
   terminals: {
     terminals: readonly Pick<
       RuntimeTerminalSummary,
-      'handle' | 'ptyId' | 'branch' | 'title' | 'paneTitle' | 'orphaned'
+      'handle' | 'ptyId' | 'tabId' | 'leafId' | 'branch' | 'title' | 'paneTitle' | 'orphaned'
     >[]
   } | null,
   hostKey: string,
@@ -93,12 +93,18 @@ export function listNativeChatMentionSessions(
       ]
     })
   )
+  // A terminal with an agent row reads Orca mail; a plain shell does not.
+  const agentPanes = new Set(
+    (ps?.worktrees ?? []).flatMap((worktree) => worktree.agents.map((agent) => agent.paneKey))
+  )
   const ptys = (terminals?.terminals ?? []).flatMap((terminal) =>
     terminal.orphaned || (self.ptyId && terminal.ptyId === self.ptyId)
       ? []
       : [
           {
-            kind: 'terminal' as const,
+            kind: agentPanes.has(`${terminal.tabId}:${terminal.leafId}`)
+              ? ('terminal' as const)
+              : ('shell' as const),
             label: terminal.paneTitle || terminal.title || terminal.handle,
             address: terminal.handle,
             hostKey,
