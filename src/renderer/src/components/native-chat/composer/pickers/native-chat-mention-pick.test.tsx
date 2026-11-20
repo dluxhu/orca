@@ -65,7 +65,7 @@ const chips = (editor: Editor) =>
   )
 
 describe('picking a session from the @ menu', () => {
-  it('puts a chat chip where the token was, and the send note names orca chat', () => {
+  it('puts a chat chip where the token was, and the send note mails the chat', () => {
     const { editor, input } = composer('ask @rel')
     const commit = pick(input, session)
     expect(input.value).not.toContain('@rel')
@@ -74,11 +74,11 @@ describe('picking a session from the @ menu', () => {
       expect.objectContaining({ attrs: expect.objectContaining({ kind: 'chat' }) })
     ])
     expect(serializeNativeChatAgentReferences(input.value, editor.getJSON())).toContain(
-      'orca chat send --session chat_aaaaaaaa --text <message>'
+      'orca orchestration send --to orca_session_id:chat_aaaaaaaa --subject'
     )
   })
 
-  it('names the host on a chip from another host, and the send note names its environment', () => {
+  it('names the host on a chip from another host, and the send note mails it there', () => {
     const { editor, input } = composer('ask @rel')
     pick(input, { ...session, hostKey: 'local:laptop', environment: 'laptop' })
     expect(chips(editor)).toEqual([
@@ -87,7 +87,7 @@ describe('picking a session from the @ menu', () => {
       })
     ])
     expect(serializeNativeChatAgentReferences(input.value, editor.getJSON())).toContain(
-      'orca chat send --environment laptop --session chat_aaaaaaaa --text <message>'
+      'orca orchestration send --on laptop --to orca_session_id:chat_aaaaaaaa --subject'
     )
   })
 

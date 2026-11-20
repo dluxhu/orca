@@ -104,7 +104,8 @@ describe('nativeChat.mentionSessions', () => {
         environment: 'laptop'
       },
       {
-        kind: 'terminal',
+        // No agent row runs in it, so it is a plain shell.
+        kind: 'shell',
         label: 'zsh',
         address: 'term_lap',
         detail: 'laptop-main',
