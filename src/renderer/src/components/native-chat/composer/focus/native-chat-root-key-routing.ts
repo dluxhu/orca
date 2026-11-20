@@ -18,11 +18,13 @@ export function routeNativeChatRootKeyToInput(
   composer: NativeChatComposerHandle | null,
   questionAnswerInput: HTMLInputElement | HTMLTextAreaElement | null
 ): void {
-  // A focused transcript or code box owns Space paging; typing elsewhere still reaches the composer.
+  // A focused transcript, raw panel or code box owns Space paging; typing elsewhere still reaches the composer.
   if (
     event.key === ' ' &&
     event.target instanceof HTMLElement &&
-    event.target.matches('[data-native-chat-scroll], [data-native-chat-code-content]') &&
+    event.target.matches(
+      '[data-native-chat-scroll], [data-native-chat-raw-panel], [data-native-chat-code-content]'
+    ) &&
     event.target.ownerDocument.activeElement === event.target
   ) {
     return
