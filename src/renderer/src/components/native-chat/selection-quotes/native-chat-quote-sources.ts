@@ -5,7 +5,7 @@ import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
 const STORAGE_KEY = 'orca.nativeChat.quoteSources.v2'
 // Version 1 holds quoted text. Remove it, so that no copy stays on disk.
 const OLD_STORAGE_KEY = 'orca.nativeChat.quoteSources.v1'
-const LIMIT = 200
+export const QUOTE_SOURCE_LIMIT = 200
 
 /** Where the quote is in its source element's text, and a hash of the text there. */
 export type QuotePlace = { offset: number; length: number; hash: string }
@@ -26,7 +26,7 @@ export function textHash(text: string): string {
  * The quote as "Add to chat" writes it: the text with no trailing whitespace on a line, and no
  * whitespace at its two ends. Both sides hash this source text, never the rendered quote.
  */
-function quoteKey(text: string): string {
+export function quoteKey(text: string): string {
   const normalized = text
     .replace(/\r\n?/g, '\n')
     .split('\n')
@@ -66,7 +66,7 @@ export function rememberNativeChatQuoteSource(text: string, source: QuoteSource)
   }
   const { offset = -1, length = 0, hash = '' } = source.place ?? {}
   const entry: Entry = [key, source.messageId, offset, length, hash]
-  const entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
+  const entries = [...load().filter(([known]) => known !== key), entry].slice(-QUOTE_SOURCE_LIMIT)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
   } catch {
