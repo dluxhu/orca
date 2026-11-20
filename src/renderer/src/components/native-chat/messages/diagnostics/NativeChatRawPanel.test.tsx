@@ -211,3 +211,67 @@ describe('Space in the panel', () => {
     expect(insertTypedText).not.toHaveBeenCalled()
   })
 })
+
+describe('the panel scroll', () => {
+  // happy-dom lays nothing out, so each element gets a fixed viewport and a settable content height.
+  const viewport = { clientHeight: 200, scrollHeight: 1000 }
+  const tops = new WeakMap<Element, number>()
+  const restore: (() => void)[] = []
+  function fakeGeometry(): void {
+    const define = (name: string, descriptor: PropertyDescriptor): void => {
+      const before = Object.getOwnPropertyDescriptor(HTMLElement.prototype, name)
+      Object.defineProperty(HTMLElement.prototype, name, { configurable: true, ...descriptor })
+      restore.push(() =>
+        before
+          ? Object.defineProperty(HTMLElement.prototype, name, before)
+          : delete (HTMLElement.prototype as unknown as Record<string, unknown>)[name]
+      )
+    }
+    define('clientHeight', { get: () => viewport.clientHeight })
+    define('scrollHeight', { get: () => viewport.scrollHeight })
+    define('scrollTop', {
+      get(this: Element) {
+        return tops.get(this) ?? 0
+      },
+      set(this: Element, value: number) {
+        tops.set(this, value)
+      }
+    })
+  }
+  afterEach(() => {
+    for (const undo of restore.splice(0)) {
+      undo()
+    }
+    viewport.scrollHeight = 1000
+  })
+  const rows = (count: number): AgentJournalRenderItem[] =>
+    Array.from({ length: count }, (_, index) =>
+      item(`row-${index}`, index, { kind: 'status', text: `row ${index}` })
+    )
+  const panel = () => screen.getByRole('region', { name: 'Raw messages' })
+  const atEnd = () => panel().scrollTop >= viewport.scrollHeight - viewport.clientHeight
+
+  it('opens at the newest entry', () => {
+    fakeGeometry()
+    render(<NativeChatRawPanel items={rows(3)} />)
+    expect(atEnd()).toBe(true)
+  })
+
+  it('follows new entries while it is at the end', () => {
+    fakeGeometry()
+    const view = render(<NativeChatRawPanel items={rows(3)} />)
+    viewport.scrollHeight = 1500
+    view.rerender(<NativeChatRawPanel items={rows(4)} />)
+    expect(atEnd()).toBe(true)
+  })
+
+  it('stays where the reader scrolled up to', () => {
+    fakeGeometry()
+    const view = render(<NativeChatRawPanel items={rows(3)} />)
+    panel().scrollTop = 100
+    fireEvent.scroll(panel())
+    viewport.scrollHeight = 1500
+    view.rerender(<NativeChatRawPanel items={rows(4)} />)
+    expect(panel().scrollTop).toBe(100)
+  })
+})

@@ -1,7 +1,12 @@
-import { memo, useState, useSyncExternalStore } from 'react'
+import { memo, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { NativeChatCrewFrame } from '@/components/orchestration-crew/NativeChatCrewPanel'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
+import {
+  geometryOf,
+  isNearBottom,
+  NATIVE_CHAT_FOLLOW_REARM_PX
+} from '../../viewport/scroll/native-chat-autoscroll'
 import type {
   AgentJournalItemBody,
   AgentJournalRenderItem
@@ -130,8 +135,24 @@ export function NativeChatRawPanel({
   const ordered = items.toSorted(
     (a, b) => a.sequence - b.sequence || (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0)
   )
+  const scrollRef = useRef<HTMLElement>(null)
+  // Open at the newest entry, and follow new ones until the reader scrolls up.
+  const followingRef = useRef(true)
+  useLayoutEffect(() => {
+    const panel = scrollRef.current
+    if (panel && followingRef.current) {
+      panel.scrollTop = panel.scrollHeight
+    }
+  }, [items])
   return (
     <section
+      ref={scrollRef}
+      onScroll={(event) => {
+        followingRef.current = isNearBottom(
+          geometryOf(event.currentTarget),
+          NATIVE_CHAT_FOLLOW_REARM_PX
+        )
+      }}
       data-native-chat-raw-panel
       tabIndex={0}
       aria-label={t('components.native-chat.rawPanel.label', 'Raw messages')}
