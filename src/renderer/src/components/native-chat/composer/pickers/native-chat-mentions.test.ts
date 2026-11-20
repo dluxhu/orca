@@ -72,7 +72,7 @@ describe('listNativeChatMentionSessions', () => {
 })
 
 describe('serializeNativeChatAgentReferences for @ mentions', () => {
-  it('tells the agent to use orca chat and orca terminal', () => {
+  it('tells the agent to mail a chat or a terminal as Orca mail, as bots do', () => {
     const chat = {
       label: 'Release notes',
       address: 'orca_session_id:chat_aaaaaaaa',
@@ -104,8 +104,8 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       [
         'ask @Release notes and @Runner',
         '',
-        '[Orca chat "Release notes": session chat_aaaaaaaa — send it a message with orca chat send --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --session chat_aaaaaaaa]',
-        '[Orca terminal "Runner": term_one — send it input with orca terminal send --terminal term_one --text <text> --enter, and read its output with orca terminal read --terminal term_one]'
+        '[Orca chat "Release notes": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Runner": term_one — message it with orca orchestration send --to term_one --subject "<topic>" --body "<message>"]'
       ].join('\n')
     )
   })

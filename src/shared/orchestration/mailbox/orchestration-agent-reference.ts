@@ -1,5 +1,4 @@
 import { parseOrcaSessionAddress } from '../../agent-session/identity/orca-session-address'
-import { isTerminalHandle } from '../../terminal/terminal-handle-prefix'
 
 /** `kind` marks an `@` mention of a chat or a terminal; absent marks an orchestration mailbox reference. */
 export type OrchestrationAgentReference = {
@@ -38,20 +37,14 @@ export function agentReferenceToken(reference: OrchestrationAgentReference): str
   return `@${reference.label}${AGENT_REFERENCE_MARK}${reference.address})`
 }
 
-/** The routing line a sent message ends with, one per mentioned agent. */
+/** The routing line a sent message ends with, one per mentioned agent. A chat or a terminal gets
+ *  Orca mail, as a bot does, so its chat shows the message as a card from the sender. */
 export function agentReferenceNote(
   label: string,
   address: string,
   kind?: AgentReferenceKind | null
 ): string {
-  const session = kind === 'chat' ? parseOrcaSessionAddress(address) : null
-  if (session) {
-    return `[Orca chat "${label}": session ${session} — send it a message with orca chat send --session ${session} --text <message>, and read its replies with orca chat read --session ${session}]`
-  }
-  if (kind === 'terminal' && isTerminalHandle(address)) {
-    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send --terminal ${address} --text <text> --enter, and read its output with orca terminal read --terminal ${address}]`
-  }
-  return `[Orca agent "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
+  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {
