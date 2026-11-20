@@ -81,6 +81,7 @@ const {
   verifySkillsCliRuntime
 } = require('./scripts/runtime-verification/skills-cli/verify-skills-cli-runtime.cjs')
 const { assertNotDarkBuild } = require('./dark-build-switches.cjs')
+const { FORK_IDENTITY } = require('../src/shared/fork-identity.ts')
 const {
   verifyStaticAppImagePackage
 } = require('./scripts/desktop-distribution/appimage/static-appimage-package-contract.cjs')
@@ -131,7 +132,7 @@ const devChannelRepo = isHourlyChannel
     : isAdhocChannel
       ? 'orca-adhoc'
       : null
-const appId = 'com.stablyai.orca'
+const appId = FORK_IDENTITY.appId
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
@@ -266,7 +267,7 @@ const ORCA_MAC_TEAM_ID = '6CX3WHS9HZ'
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId,
-  productName: 'Orca',
+  productName: FORK_IDENTITY.productName,
   protocols: [{ name: 'Orca', schemes: ['orca'] }],
   toolsets: { appimage: '1.0.3' },
   ...(devChannelBuildVersion
@@ -846,8 +847,8 @@ module.exports = {
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
-    repo: devChannelRepo ?? 'orca',
+    owner: FORK_IDENTITY.releaseRepo.split('/')[0],
+    repo: FORK_IDENTITY.releaseRepo.split('/')[1],
     // Keep main-repo releases draft until release-cut verifies all assets; early --publish always would expose missing Windows installers.
     releaseType: devChannelRepo ? 'prerelease' : 'draft'
   }

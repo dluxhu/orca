@@ -1,6 +1,8 @@
+import { FORK_IDENTITY } from '../../fork-identity'
+
 export const LOCAL_BUILD_COMPATIBILITY_CONTRACT = {
   formatVersion: 1,
-  appId: 'com.stablyai.orca',
+  appId: FORK_IDENTITY.appId,
   stateSchemaVersion: 1,
   readableStateSchemaVersions: [1],
   daemonProtocolVersion: 60,
