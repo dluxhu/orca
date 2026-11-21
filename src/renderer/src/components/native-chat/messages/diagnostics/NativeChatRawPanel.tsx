@@ -11,7 +11,7 @@ import {
 import { Braces } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { useTranslate } from '@/i18n/use-translate'
+import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
 import {
   geometryOf,
@@ -142,6 +142,7 @@ const RawEntry = memo(
     marked: boolean
   }): React.JSX.Element {
     const t = useTranslate()
+    const intlLocale = useIntlLocale()
     const [expanded, setExpanded] = useState(false)
     const { body } = item
     const sent = body.kind === 'message' && body.role === 'user'
@@ -157,7 +158,7 @@ const RawEntry = memo(
       >
         <div className="flex items-center gap-2 text-chat-foreground-faint">
           <time dateTime={time.toISOString()}>
-            {time.toLocaleTimeString(undefined, { hour12: false })}
+            {time.toLocaleTimeString(intlLocale, { hour12: false })}
           </time>
           <span className={sent ? 'font-medium text-chat-foreground-strong' : undefined}>
             {sent
