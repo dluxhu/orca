@@ -22,11 +22,11 @@ import type { NativeChatAlignEdge } from '../virtualization/use-native-chat-view
 
 type NavigationRequest =
   | { kind: 'diff'; target: NativeChatDiffReveal }
-  | { kind: 'rail'; messageId: string; requestId: number }
+  | { kind: 'rail'; messageId: string; requestId: number; fromLink?: true }
 
 export type NativeChatNavigationRequest = {
   revealedDiff: NativeChatDiffReveal | null
-  railJump: { messageId: string; requestId: number } | null
+  railJump: { messageId: string; requestId: number; fromLink?: true } | null
   /** The one slot the window keeps mounted until the request lands. */
   revealIndex: number
   issue: (request: NavigationRequest | null) => void
@@ -101,6 +101,22 @@ export function useNativeChatNavigation({
   )
   const historyJump = useNativeChatHistoryJump({
     step: (target) => {
+      if (target.kind === 'item') {
+        const pending = journalItems?.find((item) => item.itemId === target.id)?.body
+        if (
+          (pending?.kind === 'approval' || pending?.kind === 'question') &&
+          pending.resolution.state === 'pending'
+        ) {
+          return 'landed'
+        }
+        const index = nativeChatSlotIndexOf(slots, target.id)
+        if (index < 0) {
+          holdHistory()
+          return 'page'
+        }
+        issue({ kind: 'rail', messageId: target.id, requestId: nextRequestId(), fromLink: true })
+        return 'landed'
+      }
       if (target.kind === 'rail') {
         return nativeChatRailJumpStep(rail.items, target.id, requestRailJump)
       }
@@ -157,7 +173,8 @@ export function useNativeChatNavigation({
     scrollRef,
     request,
     beginNavigation,
-    readerLeavesEnd
+    readerLeavesEnd,
+    startHistoryJump
   })
   useNativeChatRailJumpLanding({
     railJump: request.railJump,
@@ -165,6 +182,7 @@ export function useNativeChatNavigation({
     scrollRef,
     scrollMessageToTop,
     onActivate: rail.onActivate,
+    onScroll: request.railJump?.fromLink ? readerLeavesEnd : undefined,
     release: issue
   })
   return {
