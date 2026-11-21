@@ -256,6 +256,7 @@ read `FORK_IDENTITY`.
 | "About Orca" and "Hide Orca" menu items                                                 | `Orca`                      | `Orca @dLux`                                | `src/main/menu/register-app-menu.ts` (`withForkName` from `src/shared/fork-identity.ts`)                                |
 | Window title, in-app titlebar name                                                      | `Orca`                      | `Orca @dLux`                                | `src/main/window/createMainWindow.ts`, `src/renderer/index.html`, `src/renderer/src/app-shell/TitlebarLeftControls.tsx` |
 | TCC prompt watch: responsible bundle ids                                                | official ids                | adds `com.stablyai.orca.dlux` and `.helper` | `src/main/macos-permissions/macos-tcc-prompt-watch.ts`                                                                  |
+| Computer Use helper: trusted agent apps                                                 | official ids                | adds `com.stablyai.orca.dlux` and `.dlux.*` | `native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift`                               |
 
 **Keychain.** Electron takes the safeStorage Keychain item from the app name before
 `ready`. A packaged build has no `productName` in its `package.json`, so that name is the
@@ -302,7 +303,7 @@ packaged builds: both change the Keychain item and the userData folder. To find
 new bundle id literals that upstream added, run:
 
 ```sh
-git grep -nE "com\.stablyai\.orca['\"]" -- src config ':!*.test.*'
+git grep -nE "com\.stablyai\.orca['\"]" -- src config native ':!*.test.*'
 ```
 
 ### Part 2: update feed
@@ -380,6 +381,7 @@ pnpm install
 pnpm run typecheck
 pnpm run lint
 pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork src/main/orcad/browser-providers/orcad-browser-provider.test.ts src/cli/runtime/profile/metadata.fork.test.ts
+swift test --package-path native/computer-use-macos --filter TrustedOrcaApplicationTests
 ```
 
 By hand, on macOS, with official Orca signed in first:
@@ -392,7 +394,7 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (22): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+Source and config (23): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
 `config/scripts/fork/graft-orcad-template-targets.mjs` (new),
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
@@ -407,10 +409,12 @@ Source and config (22): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`,
 `src/main/orcad/browser-providers/orcad-browser-provider.ts`, `.github/workflows/pr.yml`
-(the package job reads the Linux `/opt` folder from `productName`).
+(the package job reads the Linux `/opt` folder from `productName`),
+`native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift`.
 
-Tests (20): `src/main/startup/fork-identity.test.ts` (new),
+Tests (21): `src/main/startup/fork-identity.test.ts` (new),
 `src/cli/runtime/profile/metadata.fork.test.ts` (new),
+`native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TrustedOrcaApplicationTests.swift` (new),
 `config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
 `config/scripts/fork/build-release.test.sh` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
