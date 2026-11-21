@@ -335,7 +335,9 @@ describe('agent mail between paired Orca servers', () => {
     const saved = readAnswerSenderSnapshot(onB!.answer_sender_snapshot)
     expect(saved?.name).toBe("term_a on Jinwoo's Mac")
     expect(saved?.origin).toBeUndefined()
-    expect(formatMessageBanner(onB!)).toContain("From: TERM_A ON JINWOO'S MAC (term_a on Jinwoo's Mac)")
+    expect(formatMessageBanner(onB!)).toContain(
+      "From: TERM_A ON JINWOO'S MAC (term_a on Jinwoo's Mac)"
+    )
   })
 
   it('delivers a reply queued before both servers restart exactly once', async () => {
