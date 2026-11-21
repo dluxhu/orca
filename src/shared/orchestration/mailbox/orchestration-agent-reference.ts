@@ -76,28 +76,52 @@ const NOTE_KINDS: Record<string, readonly (AgentReferenceKind | null)[]> = {
 
 export type SentAgentMention = { label: string; kind: AgentReferenceKind | null }
 
-/** A sent message is its typed text, a blank line, and one routing note per mentioned agent.
- *  Gives the typed text and the mentions, or null when the text does not end in such notes. */
-export function splitAgentReferenceNotes(
-  text: string
-): { body: string; mentions: SentAgentMention[] } | null {
-  const end = text.lastIndexOf('\n\n')
-  if (end === -1) {
+/** The mention of a note exactly as agentReferenceNote writes it, with the label as the note frames it. */
+function noteMention(note: string): { framed: string; mention: SentAgentMention } | null {
+  const head = NOTE_HEAD.exec(note)
+  const kind = head
+    ? NOTE_KINDS[head[1]].find(
+        (candidate) => agentReferenceNote(head[2], head[3], candidate) === note
+      )
+    : undefined
+  if (!head || kind === undefined) {
     return null
   }
-  const body = text.slice(0, end)
+  // The note escapes `\ " [ ]` as Markdown does; the shown label has no escapes.
+  return { framed: head[2], mention: { label: head[2].replace(/\\(.)/g, '$1'), kind } }
+}
+
+/** A sent message is its typed text, then one routing note per mentioned agent: after a blank line
+ *  and one per line, or, for a goal, on the same line after a space each. Gives the typed text and
+ *  the mentions, or null when the text does not end in such notes for mentions in the text. */
+export function splitAgentReferenceNotes(
+  text: string,
+  layout: 'message' | 'goal' = 'message'
+): { body: string; mentions: SentAgentMention[] } | null {
+  let start = text.length
+  let notes: string[] = []
+  if (layout === 'goal') {
+    // A note frames `[` in its label, so ` [Orca ` starts a note and nothing in it.
+    for (;;) {
+      const at = text.lastIndexOf(' [Orca ', start - 1)
+      if (at === -1 || !noteMention(text.slice(at + 1, start))) {
+        break
+      }
+      notes.unshift(text.slice(at + 1, start))
+      start = at
+    }
+  } else if (text.includes('\n\n')) {
+    start = text.lastIndexOf('\n\n')
+    notes = text.slice(start + 2).split('\n')
+  }
+  const body = text.slice(0, start)
   const mentions: SentAgentMention[] = []
-  for (const line of text.slice(end + 2).split('\n')) {
-    const head = NOTE_HEAD.exec(line)
-    // Only a note exactly as agentReferenceNote writes it, for a mention in the text, counts.
-    const kinds = head
-      ? NOTE_KINDS[head[1]].filter((kind) => agentReferenceNote(head[2], head[3], kind) === line)
-      : []
-    if (!head || kinds.length === 0 || !body.includes(`@${head[2]}`)) {
+  for (const note of notes) {
+    const found = noteMention(note)
+    if (!found || !body.includes(`@${found.framed}`)) {
       return null
     }
-    // The note escapes `\ " [ ]` as Markdown does; the shown label has no escapes.
-    mentions.push({ label: head[2].replace(/\\(.)/g, '$1'), kind: kinds[0] })
+    mentions.push(found.mention)
   }
-  return { body, mentions }
+  return mentions.length > 0 ? { body, mentions } : null
 }
