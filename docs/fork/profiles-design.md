@@ -798,25 +798,63 @@ and a profile app installed agent hooks into shared folders. Fix in slice 1:
   --profile <id> serve` and `orca open` start the target's own app: the profile's app, or the
   default app for `default`.
 
-**Safety model until slice 2.** Each writer to a shared folder has its own check
-(`isAppProfileRuntime()`), and each review round found more writers. Until slice 2, these checks
-are the only guard. Slice 2 gives each profile its own home folders for the agent configs and
-`~/.orca` (`ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`), which removes this
-class of fault.
+**Isolation (slice 2, in this PR).** Each profile has its own home folders under
+`<userData>/orca-home`. The first module of the main process (`app-profile-early-env.ts`), the
+first module of `orcad` (`orcad-app-profile-env.ts`) and the CLI's `--profile` selection set the
+variables below in the process environment, before any other module reads a path. Terminals,
+serve, `orcad` and agent launches inherit them. A value that the user set stays. A value that
+another profile set is replaced, and the default app removes values that it inherits from a
+profile's terminal (`ORCA_APP_PROFILE_ENV_KEYS` names the values a profile set). A profile's serve
+LaunchAgent carries them too.
 
-**Writers to the real home that stay in a profile (slice 2).**
+| Variable | Profile folder | Moves (each CLI's docs or source) |
+| --- | --- | --- |
+| `ORCA_HOME_DIR` | `orca-home` | `~/.orca`: credentials, API keys, cookies, hook scripts, host terminal policy, keybindings, theme sync, the hook install lock |
+| `CLAUDE_CONFIG_DIR` | `orca-home/agents/claude` | Claude Code settings, hooks, sessions, plugins, `.claude.json`, `.credentials.json`, and its Keychain entry |
+| `CODEX_HOME` | `agents/codex` | Codex `config.toml`, `auth.json`, history, logs |
+| `GROK_HOME` | `agents/grok` | Grok Build config, auth, sessions, skills, plugins, logs |
+| `COPILOT_HOME` | `agents/copilot` | Copilot CLI settings, auth, sessions, hooks |
+| `HERMES_HOME` | `agents/hermes` | Hermes config and user data |
+| `KIMI_CODE_HOME` | `agents/kimi-code` | Kimi Code config, sessions, logs, OAuth |
+| `KIRO_HOME` | `agents/kiro` | Kiro agents, prompts, skills, settings, sessions |
+| `OPENCLAW_STATE_DIR` | `agents/openclaw` | OpenClaw config, credentials, sessions, logs |
+| `MIMOCODE_HOME` | `agents/mimocode` | MiMo Code config, data, state, cache |
+| `GEMINI_CLI_HOME` | `agents/gemini` (Gemini makes `.gemini` in it) | Gemini CLI user config and storage |
+| `QWEN_HOME` | `agents/qwen` | Qwen Code global config and runtime data |
+| `QODER_CONFIG_DIR` | `agents/qoder` | Qoder CLI user config |
+| `CODEBUDDY_CONFIG_DIR` | `agents/codebuddy` | CodeBuddy config, history, runtime data |
+| `CLINE_DIR` | `agents/cline` | Cline CLI config, providers, sessions, logs |
 
-- Hooks that other launch paths can install. Slice 2 checks every agent launch path.
-- The keybindings service: `app.getPath('home')`, so `~/.orca/keybindings.json` of the real home.
-- The floating workspace: Electron's native home path.
-- Every other `~/.orca` site in section 3 (credentials, API keys, MiniMax cookies, host terminal
-  policy) and the agent folders: they move with `ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`
-  and `GROK_HOME` in slice 2.
+Every Orca site that builds one of these folders goes through `app-profile-homes.ts`
+(`orcaHomeDir()`, `defaultAgentHomeDir()`, `defaultClaudeJsonPath()`), and the Codex home path
+(`getSystemCodexHomePath()`) follows `CODEX_HOME` from the profile. A static test fails when a raw
+`homedir()` path, an `os.homedir()` path to `.claude.json` or a `$HOME/.<agent>` template for one
+of these folders appears outside the helpers, unless the line reads the folder's variable first.
+Its allow-list names each exception and its reason (WSL guest homes, `orcad`'s data folder, the
+frozen hook command forms).
+
+The Keychain item is per profile: the profile start sets the name `orca-<id>` before ready, so
+Electron uses "orca-<id> Safe Storage".
+
+**Agents that stay on the real home.** These have no folder variable, or Orca rewrites the variable
+per pane, or the folder moves only with XDG variables that would also move git and other tools:
+Pi, OMP and Prime Agent (`PI_CODING_AGENT_DIR`, `PRIME_AGENT_CODING_AGENT_DIR`: Orca sets them per
+pane), OpenCode (`OPENCODE_CONFIG_DIR` only adds a folder; config and data follow
+`XDG_CONFIG_HOME` and `XDG_DATA_HOME`), Cursor (`CURSOR_CONFIG_DIR` moves only
+`cli-config.json`), Antigravity, Devin, Factory, Rovo Dev, Amp, JCode, Zcode and DSH. For them, the
+`isAppProfileRuntime()` checks stay the only guard: a profile installs, refreshes and removes no
+hook, plugin or config of theirs.
+
+**Safety model.** The per-profile folders are the first guard. The `isAppProfileRuntime()` checks
+on each writer are the second one: a profile still installs no managed agent hooks. The hook
+command forms keep `${HOME-}/.orca` (the Codex form is frozen bytes that Codex approves by hash),
+so a later change that turns hooks on in a profile must first give the commands an
+`ORCA_HOME_DIR` form.
 
 **Other findings.**
 
-- The keybindings service and the floating workspace use Electron's native home path, not `HOME`.
-  A test `HOME` does not isolate them (see the list above).
+- The floating workspace uses Electron's native home path; it is a working folder, not a config
+  folder. Keybindings now follow `ORCA_HOME_DIR`.
 - The profile apps show macOS "App Running in Background" notices for Work and Home (their terminal
   host jobs).
 - The main window loads `app.asar` from the default app's real path.
