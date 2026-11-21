@@ -15,11 +15,10 @@ script reads its "Release order" list.
 - Use normal commits. Do not amend or force-push. To update a branch, merge the new stable
   tag into it.
 - Only `dlux/fork-setup` changes this file. Other branches keep their notes in their PR.
-- A release is cut from the newest upstream stable tag, at most once a week. If upstream made
-  several stable releases in the week, use only the newest. The version is
-  `<upstream version>-dlux.<N>`.
+- A release is cut from the newest upstream stable tag whenever a release is necessary. There
+  is no weekly limit and no wait for a newer tag. The version is `<upstream version>-dlux.<N>`.
 - Turn on `git rerere` (`git config rerere.enabled true`), so a resolved conflict is reused
-  in the next week and in the release build.
+  in the next merge and in the release build.
 
 ## Release order
 
@@ -61,14 +60,19 @@ To add a branch: base it on `upstream-stable`, add it to the numbered list above
 before fork-only ones), add a row, and add a "Branch" section below. Add one line for it to the
 "Patches" list in `.github/README.md`. When its upstream state changes, update its "Upstream PR" cell.
 
-## Weekly steps
+## Steps for a new upstream stable tag
+
+Do these steps when upstream publishes a new stable tag. Do not wait for a newer tag.
 
 1. Fast-forward `main` to upstream (for upstream submissions):
    `git fetch upstream --tags && git checkout main && git merge --ff-only upstream/main && git push origin main`.
-2. If upstream made a stable release this week, move `upstream-stable` to the newest stable
-   tag: `git branch -f upstream-stable <tag> && git push --force-with-lease origin upstream-stable`.
-3. For each branch in "Release order": `git checkout <branch> && git merge <tag>`. Resolve
-   the conflicts with the branch's "Re-apply" notes, run its check, commit, and push it.
+2. Move `upstream-stable` to the newest stable tag:
+   `git branch -f upstream-stable <tag> && git push --force-with-lease origin upstream-stable`.
+3. For each branch in "Release order": `git checkout <branch> && git merge <tag>`. A stacked
+   branch merges its updated base branch instead. Resolve the conflicts with the branch's
+   "Re-apply" notes, run its check, commit, and push it. Each stable tag is on its own upstream
+   release branch. A file that only the stable-only commits of the old tag changed takes the
+   version of the new tag.
 4. Build one release on that tag (below). Publish it only on the owner's go-ahead.
 
 ## Release steps
@@ -152,7 +156,7 @@ before fork-only ones), add a row, and add a "Branch" section below. Add one lin
 - `release/latest` is the default branch of `dluxhu/orca`, so the GitHub front page shows
   the shipped fork. Each release force-moves it. Nobody bases work on it.
 - The front page text is `.github/README.md` (GitHub shows it before the root `README.md`).
-  The root `README.md` stays upstream's, so the weekly merge never conflicts on it.
+  The root `README.md` stays upstream's, so the merge of a new stable tag never conflicts on it.
 - `main` stays a clean copy of upstream, for upstream submissions. Fork pull requests target
   `upstream-stable` or a patch branch.
 
