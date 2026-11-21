@@ -45,3 +45,14 @@ it('opens a Markdown preview quote with no line at the top of its file', async (
   expect(quotedFileLocation('Terminal', true)).toBeNull()
   expect(quotedFileLocation('just some words', true)).toBeNull()
 })
+
+it('keeps the chat of a source, and reads sources stored before it as of no chat', async () => {
+  const sources = await appWindow()
+  sources.rememberNativeChatQuoteSource('alpha', { ...at('m1'), chat: 'claude:s1' })
+  expect(sources.nativeChatQuoteSource('alpha')).toEqual({ ...at('m1'), chat: 'claude:s1' })
+  // An entry of the earlier shape: no chat.
+  const key = Object.keys(localStorage)[0]
+  const [stored] = JSON.parse(localStorage.getItem(key) ?? '[]')
+  localStorage.setItem(key, JSON.stringify([stored.slice(0, 5)]))
+  expect(sources.nativeChatQuoteSource('alpha')).toEqual(at('m1'))
+})
