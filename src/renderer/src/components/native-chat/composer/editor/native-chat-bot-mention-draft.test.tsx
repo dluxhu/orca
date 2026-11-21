@@ -78,8 +78,8 @@ const UPGRADED: JSONContent = {
         { type: 'text', text: ' ' },
         IMAGE,
         { type: 'text', text: ' ' },
-        // The editor gives a saved chip its default `kind` and `environment`.
-        { ...AGENT, attrs: { ...AGENT.attrs, kind: null, environment: null } },
+        // The editor gives a saved chip its default `kind`, `environment` and `agentType`.
+        { ...AGENT, attrs: { ...AGENT.attrs, kind: null, environment: null, agentType: '' } },
         { type: 'text', text: TAIL }
       ]
     }

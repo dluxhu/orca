@@ -31,6 +31,15 @@ import {
 import { useNativeChatMentionChatDrill } from './composer/pickers/use-native-chat-mention-chat-drill'
 import { nativeChatMentionChatOptions } from './composer/pickers/NativeChatMentionChatList'
 import {
+  NativeChatCrewContext,
+  useNativeChatCrewState
+} from '../orchestration-crew/use-native-chat-crew'
+import {
+  crewAgentMentions,
+  NO_CREW_AGENT_MENTIONS
+} from '../orchestration-crew/native-chat-crew-mentions'
+import type { NativeChatMentionToken } from './composer/editor/native-chat-composer-input'
+import {
   nativeChatMentionSessionOf,
   type NativeChatMentionSession
 } from './composer/pickers/native-chat-mentions'
@@ -40,6 +49,8 @@ const memberOf = (room: NativeChatComposerRoom | undefined, value: string) =>
 
 const NO_MATCHES: NativeChatMentionFiles = { files: [], loading: false, failed: false }
 const NO_NOTICES: readonly NativeChatComposerNotice[] = []
+const NO_VALUES: readonly string[] = []
+const NO_MEMBERS: NativeChatComposerRoom['mentions'] = []
 
 /** `@` names workspace files, or in a room its members (the owner's bots above the files in any other
  *  chat), in the file menu's shape so keys are shared; a bot's row opens its chats one level down. */
@@ -48,7 +59,7 @@ export function useNativeChatComposerMentions(
   draft: string,
   picker: {
     autocomplete: ComposerAutocomplete
-    completeMention: (path: string, token?: string, from?: number) => void
+    completeMention: (path: string, token?: NativeChatMentionToken, from?: number) => void
     /** Picks another chat or terminal; absent, the `@` list offers none. */
     completeSessionMention?: (session: NativeChatMentionSession) => void
   },
@@ -104,6 +115,26 @@ export function useNativeChatComposerMentions(
     withSessions: completeSessionMention !== undefined,
     query: room && !room.withFiles ? null : query
   })
+  // The strip's own crew subscription: rows only while `@` is open, never a read per keystroke.
+  const crew = useContext(NativeChatCrewContext)
+  const menuOpen = query !== null
+  const crewRows = useNativeChatCrewState(menuOpen ? crew : null).rows
+  const wantCrewRows = menuOpen ? crew?.wantRows : undefined
+  useEffect(() => wantCrewRows?.(), [wantCrewRows])
+  const crewHost = crew
+    ? crew.target.kind === 'local'
+      ? 'local'
+      : crew.target.environmentId
+    : null
+  const crewAgents = useMemo(
+    () =>
+      crewRows && crewHost ? crewAgentMentions(crewRows, crewHost, t) : NO_CREW_AGENT_MENTIONS,
+    [crewRows, crewHost, t]
+  )
+  const agents = useMemo(
+    () => (query !== null ? rankNativeChatRoomMembers(crewAgents.mentions, query) : NO_VALUES),
+    [crewAgents, query]
+  )
   const ranked = useMemo(
     () => (room && query !== null ? rankNativeChatRoomMembers(room.mentions, query) : null),
     [room, query]
@@ -113,20 +144,30 @@ export function useNativeChatComposerMentions(
     [ranked, room]
   )
   const mentionFiles = useMemo<NativeChatMentionFiles>(() => {
+    // The room's bots lead the list, above this chat's crew agents.
     if (!room) {
-      return workspaceFiles
+      return agents.length > 0
+        ? { ...workspaceFiles, files: [...agents, ...workspaceFiles.files] }
+        : workspaceFiles
     }
     if (room.withFiles) {
-      return { ...workspaceFiles, files: [...pickable, ...workspaceFiles.files] }
+      return { ...workspaceFiles, files: [...pickable, ...agents, ...workspaceFiles.files] }
     }
-    return query === null ? NO_MATCHES : { files: pickable, loading: false, failed: false }
-  }, [room, query, pickable, workspaceFiles])
+    return query === null
+      ? NO_MATCHES
+      : { files: [...pickable, ...agents], loading: false, failed: false }
+  }, [room, query, agents, pickable, workspaceFiles])
   const botIdOf = useCallback((value: string) => memberOf(room, value)?.id ?? null, [room])
   const chooseMention = useCallback(
     (value: string) => {
       const session = nativeChatMentionSessionOf(mentionFiles.sessions, value)
       if (session) {
         completeSessionMention?.(session)
+        return
+      }
+      const agent = crewAgents.references.get(value)
+      if (agent) {
+        completeMention(value, agent, drill.parent?.from)
         return
       }
       const id = botIdOf(value)
@@ -154,7 +195,8 @@ export function useNativeChatComposerMentions(
       completeMention,
       room,
       ownRoom,
-      botChatRoom
+      botChatRoom,
+      crewAgents
     ]
   )
 
@@ -167,10 +209,19 @@ export function useNativeChatComposerMentions(
             mentions: room.mentions,
             withFiles: room.withFiles === true,
             unavailable: ranked?.filter((name) => !pickable.includes(name)) ?? [],
+            agents: crewAgents.mentions,
             ...(drillPicker ? { chats: { picker: drillPicker, drill } } : {})
           }
-        : null,
-    [room, draft, ranked, pickable, drillPicker, drill]
+        : crewAgents.mentions.length > 0
+          ? {
+              replies: null,
+              mentions: NO_MEMBERS,
+              withFiles: true,
+              unavailable: NO_VALUES,
+              agents: crewAgents.mentions
+            }
+          : null,
+    [room, draft, ranked, pickable, drillPicker, drill, crewAgents]
   )
 
   const handleKey = useCallback(

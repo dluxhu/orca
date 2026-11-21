@@ -9,6 +9,8 @@ export type OrchestrationAgentReference = {
   kind?: AgentReferenceKind
   /** The saved environment that reaches a mentioned chat or terminal on another host. */
   environment?: string
+  /** The agent's logo on its composer pill; never part of the sent text. */
+  agentType?: string
 }
 
 /** `terminal` is a terminal with an agent in it; `shell` is a terminal with none. */
