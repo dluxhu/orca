@@ -105,7 +105,11 @@ export function NativeChatUserMessageRow({
   // A Slack message draws its markup; copy keeps `markdown`, its readable form.
   const drawn = message.drawnMarkdown
   // The bubble shows what the user typed; the agent also got the routing notes.
-  const sent = useMemo(() => (from ? null : splitAgentReferenceNotes(markdown)), [from, markdown])
+  const layout = message.sentAs === 'goal' ? 'goal' : 'message'
+  const sent = useMemo(
+    () => (from ? null : splitAgentReferenceNotes(markdown, layout)),
+    [from, layout, markdown]
+  )
   const typed = sent?.body ?? markdown
   if (folded) {
     return <div ref={rowRef} hidden />
