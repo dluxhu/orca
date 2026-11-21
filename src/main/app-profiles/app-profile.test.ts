@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -54,7 +54,19 @@ describe('resolveAppProfile', () => {
         defaultRoot: '/root',
         readMarker: () => 'home'
       })
-    ).toThrow('belongs to the profile "home"')
+    ).toThrow('is the profile "home"')
+  })
+
+  it('stops when a given folder has no marker: it never takes the default folder', () => {
+    // `orca --profile default serve` from a profile terminal must not mark the default folder.
+    expect(() =>
+      resolveAppProfile({
+        plist: profilePlist,
+        userDataDirArg: '/Library/Application Support/orca',
+        defaultRoot: '/root',
+        readMarker: () => null
+      })
+    ).toThrow('is not this profile')
   })
 
   it('finds a profile served by the default executable through the marker only', () => {
@@ -92,10 +104,19 @@ describe('isAppProfileRuntime', () => {
   it("is true for a process that serves a profile's userData, orcad too", () => {
     const dir = mkdtempSync(join(tmpdir(), 'orca-profile-runtime-'))
     try {
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: dir })).toBe(false)
-      writeFileSync(join(dir, 'orca-app-profile.json'), '{"id":"work"}')
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: dir })).toBe(true)
+      const plain = join(dir, 'plain')
+      const work = join(dir, 'work')
+      mkdirSync(work)
+      writeFileSync(join(work, 'orca-app-profile.json'), '{"id":"work"}')
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: plain })).toBe(false)
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: work })).toBe(true)
       expect(isAppProfileRuntime({})).toBe(false)
+      // One read per folder: the checks run on every terminal and hook event.
+      mkdirSync(plain)
+      writeFileSync(join(plain, 'orca-app-profile.json'), '{"id":"late"}')
+      rmSync(join(work, 'orca-app-profile.json'))
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: plain })).toBe(false)
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: work })).toBe(true)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

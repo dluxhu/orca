@@ -34,9 +34,11 @@ export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
     const root = readPlistString(input.plist, APP_PROFILE_PLIST_ROOT_KEY) ?? input.defaultRoot
     const userDataPath = input.userDataDirArg ?? join(root, plistId)
     const markerId = input.readMarker(userDataPath)
-    if (markerId && markerId !== plistId) {
+    // A given folder must carry this profile's marker: a profile app must never take, and mark,
+    // the default folder or another profile's folder.
+    if (markerId ? markerId !== plistId : input.userDataDirArg !== null) {
       throw new Error(
-        `This app is the profile "${plistId}", but ${userDataPath} belongs to the profile "${markerId}".`
+        `This app is the profile "${plistId}", but ${userDataPath} is ${markerId ? `the profile "${markerId}"` : 'not this profile'}.`
       )
     }
     return {
@@ -100,11 +102,25 @@ export function runtimeAppIdentity(): { productName: string; appId: string } {
     : { productName: FORK_IDENTITY.productName, appId: FORK_IDENTITY.appId }
 }
 
+const markedUserData = new Map<string, boolean>()
+
 /**
  * True in a profile app, and in any process (orcad too) that serves a profile's userData.
  * Such a process must not change the shared agent configs or ~/.orca before isolation lands.
  */
 export function isAppProfileRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
   const userDataPath = env.ORCA_USER_DATA_PATH
-  return getAppProfile() !== null || (!!userDataPath && readAppProfileMarker(userDataPath) !== null)
+  if (getAppProfile() !== null) {
+    return true
+  }
+  if (!userDataPath) {
+    return false
+  }
+  // The marker exists before any check runs (create, or the profile's start), so one read is enough.
+  let marked = markedUserData.get(userDataPath)
+  if (marked === undefined) {
+    marked = readAppProfileMarker(userDataPath) !== null
+    markedUserData.set(userDataPath, marked)
+  }
+  return marked
 }
