@@ -6,6 +6,7 @@ import {
   claudeStreamingMessageBody,
   type ClaudeToolUse
 } from './claude-structured-item-translation'
+import { journalClaudeCompaction } from './claude-compaction-row'
 import { publishClaudeTurnActivity } from '../turns/claude-turn-activity'
 import {
   claudeProviderFrameKind,
@@ -219,7 +220,10 @@ export function createClaudeJournalTranslator(
       backgroundTasks.observe(event.message, event.observedAt ?? Date.now())
       messageContext.usageLimits.observe(event.message, turn.command?.rejections)
       const kind = claudeProviderFrameKind(event.message)
+      // A /compact command writes its own row when its result arrives.
+      const compacted = !turn.command && journalClaudeCompaction(deps.sink, event.message, turnScope())
       if (
+        !compacted &&
         !journalClaudeMessage(
           messageContext,
           event.message,

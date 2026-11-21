@@ -128,7 +128,12 @@ export function NativeChatNoticeRow({
     const label =
       look.label === 'contextCleared'
         ? t('components.native-chat.notices.contextCleared', NATIVE_CHAT_NOTICE_COPY.contextCleared)
-        : t('components.native-chat.notices.compaction', NATIVE_CHAT_NOTICE_COPY.compaction)
+        : look.label === 'compactionAutomatic'
+          ? t(
+              'components.native-chat.notices.compactionAutomatic',
+              NATIVE_CHAT_NOTICE_COPY.compactionAutomatic
+            )
+          : t('components.native-chat.notices.compaction', NATIVE_CHAT_NOTICE_COPY.compaction)
     return <NativeChatDividerRow label={label} />
   }
   if (look.kind === 'command-output') {
