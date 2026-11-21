@@ -33,6 +33,28 @@ function sentText(label: string): string {
   })
 }
 
+type Part = string | { label: string; kind: string; address: string }
+
+/** The text a send delivers for a draft of text and chips, made by the real serializer. */
+function send(parts: Part[], layout: 'message' | 'goal' = 'message'): string {
+  const text = parts
+    .map((part) =>
+      typeof part === 'string' ? part : `@${part.label} (Orca agent ${part.address})`
+    )
+    .join('')
+  const content = parts.map((part) =>
+    typeof part === 'string'
+      ? { type: 'text', text: part }
+      : { type: 'nativeChatAgentReference', attrs: { ...part, hostKey: 'local' } }
+  )
+  return serializeNativeChatAgentReferences(
+    text,
+    { type: 'doc', content: [{ type: 'paragraph', content }] },
+    {},
+    layout
+  )
+}
+
 /** The text of the chip the composer shows for a chat. */
 function composerChip(label: string): string {
   const { container, unmount } = render(
@@ -44,7 +66,7 @@ function composerChip(label: string): string {
   return text
 }
 
-function bubble(text: string): HTMLElement {
+function bubble(text: string, sentAs?: 'goal'): HTMLElement {
   const { container } = render(
     <TooltipProvider>
       <MessageRow
@@ -53,7 +75,8 @@ function bubble(text: string): HTMLElement {
           role: 'user',
           timestamp: 0,
           source: 'transcript',
-          blocks: [{ type: 'text', text }]
+          blocks: [{ type: 'text', text }],
+          ...(sentAs ? { sentAs } : {})
         }}
         expandSignal={false}
         onScrollMessageToTop={vi.fn()}
@@ -73,6 +96,30 @@ it('shows a sent mention as its chip and hides the routing note the agent got', 
   const shown = bubble(text)
   expect(shown.textContent).toBe(`ask ${composerChip('Tech "Lead"')} now`)
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Tech "Lead"')
+})
+
+it('hides the notes of a goal, which follow the text on the same line', () => {
+  const text = send(
+    ['do it ', { label: 'A', kind: 'chat', address: 'orca_session_id:chat_aaaaaaaa' }],
+    'goal'
+  )
+  expect(text).toMatch(/^do it @A \[Orca chat "A": [^\n]+\]$/)
+  expect(bubble(text, 'goal').textContent).toBe(`do it ${composerChip('A')}`)
+})
+
+it('makes a label that starts with another label one chip', () => {
+  const shown = bubble(
+    send([
+      'ask ',
+      { label: 'A', kind: 'terminal', address: 'term_a1' },
+      ' and ',
+      { label: 'AB', kind: 'terminal', address: 'term_b2' },
+      ' now'
+    ])
+  )
+  const badges = [...shown.querySelectorAll('[data-slot="badge"]')]
+  expect(badges.map((badge) => badge.textContent)).toEqual(['A', 'AB'])
+  expect(shown.textContent).not.toContain('@')
 })
 
 it('shows a message with no note as before', () => {

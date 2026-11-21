@@ -22,6 +22,28 @@ describe('splitAgentReferenceNotes', () => {
     })
   })
 
+  it('splits only the last blank line from the notes', () => {
+    const note = agentReferenceNote('A', 'term_a1', 'terminal')
+    expect(splitAgentReferenceNotes(`p1\n\np2 @A\n\n${note}`)).toEqual({
+      body: 'p1\n\np2 @A',
+      mentions: [{ label: 'A', kind: 'terminal' }]
+    })
+  })
+
+  it('splits the notes of a goal from the end of its one line', () => {
+    const a = agentReferenceNote('A', 'term_a1', 'terminal')
+    const b = agentReferenceNote('B', 'orca_session_id:chat_aaaaaaaa', 'chat')
+    expect(splitAgentReferenceNotes(`do @A [x] and @B ${a} ${b}`, 'goal')).toEqual({
+      body: 'do @A [x] and @B',
+      mentions: [
+        { label: 'A', kind: 'terminal' },
+        { label: 'B', kind: 'chat' }
+      ]
+    })
+    expect(splitAgentReferenceNotes(`do @A ${a}`)).toBeNull()
+    expect(splitAgentReferenceNotes(`do @A ${a} more`, 'goal')).toBeNull()
+  })
+
   it('keeps text whose last lines are not notes as they were written', () => {
     const note = agentReferenceNote('A', 'term_a1', 'terminal')
     expect(splitAgentReferenceNotes('@A')).toBeNull()
