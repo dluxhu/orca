@@ -9,9 +9,9 @@ import type { AgentSessionRecordStore } from '../../../agent-session/records/age
 import { openTestAgentSessionRecordStore } from '../../../agent-session/records/agent-session-record-store-test-harness'
 import type { OrcaRuntimeService } from '../../../orca-runtime'
 import { RpcDispatcher } from '../../dispatcher'
-import { RuntimeRpcFailureError } from '../../../../../cli/runtime/types'
+import { RuntimeRpcFailureError } from '../../../../../cli/runtime/connection/types'
 import { withCliAgentLaunchRecovery } from '../../../../../cli/agents/agent-launch-recovery'
-import type { RuntimeRpcFailure } from '../../../../../shared/runtime-rpc-envelope'
+import type { RuntimeRpcFailure } from '../../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
 import {
   methodNamed,
   runtimeStub,
