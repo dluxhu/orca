@@ -33,22 +33,27 @@ export function nativeChatMentionItems(mention: NativeChatMentionFiles): NativeC
   return mention.files.map((value) => nativeChatMentionSessionOf(mention.sessions, value) ?? value)
 }
 
-/** `query` is null while no `@` token is open. */
-export function useNativeChatMentionFiles(args: {
-  query: string | null
-  terminalTabId: string
-  structuredWorktreeId?: string
-  /** Also list other chats and terminals. */
-  withSessions?: boolean
-  /** This composer's own chat, left out of the sessions. */
+/** The composer's own chat or terminal, which the sessions leave out. */
+export type NativeChatMentionScope = {
   structuredSessionId?: string
-  /** This composer's own terminal, left out of the sessions. */
+  /** A chat composer has none. */
   targetPtyId?: string | null
-  /** With these, rows that arrive with no edit keep the highlighted row. */
-  draft?: string
-  caret?: number
-  setActiveSuggestion?: Dispatch<SetStateAction<number>>
-}): NativeChatMentionFiles {
+}
+
+/** `query` is null while no `@` token is open. */
+export function useNativeChatMentionFiles(
+  args: NativeChatMentionScope & {
+    query: string | null
+    terminalTabId: string
+    structuredWorktreeId?: string
+    /** Also list other chats and terminals. */
+    withSessions?: boolean
+    /** With these, rows that arrive with no edit keep the highlighted row. */
+    draft?: string
+    caret?: number
+    setActiveSuggestion?: Dispatch<SetStateAction<number>>
+  }
+): NativeChatMentionFiles {
   const { query, terminalTabId, structuredWorktreeId, structuredSessionId } = args
   const { sessions, loading: sessionsLoading } = useNativeChatMentionSessions({
     query: args.withSessions ? query : null,
