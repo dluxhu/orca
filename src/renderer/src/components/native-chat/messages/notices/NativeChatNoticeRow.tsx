@@ -37,6 +37,7 @@ import {
   type BotContextChange
 } from '../../../../../../shared/bots/bot-context-note'
 import { NativeChatDividerRow } from '../../NativeChatDividerRow'
+import { nativeChatDividerLabel } from './native-chat-divider-label'
 import { agentSessionRestartNoteText } from './agent-session-restart-note-text'
 import * as Details from '../diagnostics/NativeChatProviderDetails'
 import { NativeChatSetupButton } from '../../host-access/NativeChatSetupButton'
@@ -125,16 +126,7 @@ export function NativeChatNoticeRow({
     return <NativeChatForkedFromRow look={look} />
   }
   if (look.kind === 'divider') {
-    const label =
-      look.label === 'contextCleared'
-        ? t('components.native-chat.notices.contextCleared', NATIVE_CHAT_NOTICE_COPY.contextCleared)
-        : look.label === 'compactionAutomatic'
-          ? t(
-              'components.native-chat.notices.compactionAutomatic',
-              NATIVE_CHAT_NOTICE_COPY.compactionAutomatic
-            )
-          : t('components.native-chat.notices.compaction', NATIVE_CHAT_NOTICE_COPY.compaction)
-    return <NativeChatDividerRow label={label} />
+    return <NativeChatDividerRow label={nativeChatDividerLabel(t, look.label)} />
   }
   if (look.kind === 'command-output') {
     // Why: command output is laid out in columns; proportional type breaks its grid.

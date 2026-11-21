@@ -11,7 +11,10 @@ afterEach(async () => {
 })
 
 const row = (text: string) => (
-  <NativeChatNoticeRow agentName="Claude" block={{ type: 'text', text, presentation: 'compaction' }} />
+  <NativeChatNoticeRow
+    agentName="Claude"
+    block={{ type: 'text', text, presentation: 'compaction' }}
+  />
 )
 
 it('names an automatic compaction divider with its trigger', async () => {

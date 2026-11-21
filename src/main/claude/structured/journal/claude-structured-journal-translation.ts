@@ -220,10 +220,8 @@ export function createClaudeJournalTranslator(
       backgroundTasks.observe(event.message, event.observedAt ?? Date.now())
       messageContext.usageLimits.observe(event.message, turn.command?.rejections)
       const kind = claudeProviderFrameKind(event.message)
-      // A /compact command writes its own row when its result arrives.
-      const compacted = !turn.command && journalClaudeCompaction(deps.sink, event.message, turnScope())
       if (
-        !compacted &&
+        !journalClaudeCompaction(deps.sink, event.message, turnScope(), turn.command !== null) &&
         !journalClaudeMessage(
           messageContext,
           event.message,

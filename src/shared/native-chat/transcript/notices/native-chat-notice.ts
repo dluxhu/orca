@@ -74,7 +74,10 @@ export function nativeChatNoticeLook(block: NativeChatTextBlock): NativeChatNoti
     // The row text is the only place that keeps the trigger.
     return {
       kind: 'divider',
-      label: block.text === NATIVE_CHAT_NOTICE_COPY.compactionAutomatic ? 'compactionAutomatic' : 'compaction'
+      label:
+        block.text === NATIVE_CHAT_NOTICE_COPY.compactionAutomatic
+          ? 'compactionAutomatic'
+          : 'compaction'
     }
   }
   if (presentation === 'context-cleared') {

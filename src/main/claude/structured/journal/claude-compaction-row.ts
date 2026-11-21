@@ -25,9 +25,11 @@ export function claudeCompactionRow(frame: Record<string, unknown>): AgentJourna
 export function journalClaudeCompaction(
   sink: StructuredAgentSessionEventSink,
   frame: Record<string, unknown>,
-  turnScope: AgentJournalTurnScope
+  turnScope: AgentJournalTurnScope,
+  commandOpen: boolean
 ): boolean {
-  const row = isRootClaudeFrame(frame) ? claudeCompactionRow(frame) : null
+  // A /compact command writes its own row when its result arrives.
+  const row = !commandOpen && isRootClaudeFrame(frame) ? claudeCompactionRow(frame) : null
   const uuid = claudeText(frame.uuid)
   if (!row || !uuid) {
     return false
