@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, type RefObject } from 'react'
 import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcript-slot-selection'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
+import type { useNativeChatHistoryJump } from '../viewport/navigation/use-native-chat-history-jump'
 import { showQuotedText } from './native-chat-quote-highlight'
 import type { NativeChatQuoteJumpDeps } from './native-chat-quote-sources'
 
@@ -30,19 +31,51 @@ export const nativeChatMessageReveals = new Set<NativeChatMessageReveal>()
 /** The transcript's jump to a quoted message; null outside a transcript. */
 export const NativeChatQuoteJumpContext = createContext<NativeChatQuoteJump | null>(null)
 
-/** Scrolls to a loaded message as a rail jump does, then shows the quoted text in it. */
+/** Gives the scroller to `show` on each frame until `show` returns true, for about half a second. */
+function showWhenDrawn(
+  scrollRef: RefObject<HTMLDivElement | null>,
+  show: (scroller: HTMLElement) => boolean,
+  isCurrent: () => boolean,
+  notifyMissing?: () => void
+): void {
+  // The landing scrolls in a layout effect; the row is drawn two frames later or more.
+  let frame = 0
+  const step = (): void => {
+    if (!isCurrent()) {
+      return
+    }
+    frame++
+    const scroller = frame < 2 ? null : scrollRef.current
+    if (scroller && show(scroller)) {
+      return
+    }
+    if (frame < SOURCE_FRAMES) {
+      requestAnimationFrame(step)
+    } else {
+      notifyMissing?.()
+    }
+  }
+  requestAnimationFrame(step)
+}
+
+/**
+ * Scrolls to the message as a rail jump does, then shows the quoted text in it. A chip pages a
+ * message that is not loaded in from older history first, as a link to a message does.
+ */
 export function useNativeChatQuoteJump({
   slots,
   scrollRef,
   request,
   beginNavigation,
-  readerLeavesEnd
+  readerLeavesEnd,
+  startHistoryJump
 }: {
   slots: readonly NativeChatTranscriptSlot[]
   scrollRef: RefObject<HTMLDivElement | null>
   request: Pick<NativeChatNavigationRequest, 'issue' | 'nextRequestId'>
   beginNavigation: () => void
   readerLeavesEnd: () => void
+  startHistoryJump: ReturnType<typeof useNativeChatHistoryJump>['start']
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
   const reveal = useCallback<NativeChatMessageReveal>(
@@ -53,24 +86,7 @@ export function useNativeChatQuoteJump({
       beginNavigation()
       readerLeavesEnd()
       issue({ kind: 'rail', messageId, requestId: nextRequestId() })
-      // The landing scrolls in a layout effect; the row is drawn two frames later or more.
-      let frame = 0
-      const showWhenDrawn = (): void => {
-        if (!isCurrent()) {
-          return
-        }
-        frame++
-        const scroller = frame < 2 ? null : scrollRef.current
-        if (scroller && show(scroller)) {
-          return
-        }
-        if (frame < SOURCE_FRAMES) {
-          requestAnimationFrame(showWhenDrawn)
-        } else {
-          notifyMissing?.()
-        }
-      }
-      requestAnimationFrame(showWhenDrawn)
+      showWhenDrawn(scrollRef, show, isCurrent, notifyMissing)
       return true
     },
     [beginNavigation, issue, nextRequestId, readerLeavesEnd, scrollRef, slots]
@@ -82,22 +98,32 @@ export function useNativeChatQuoteJump({
     }
   }, [reveal])
   return useCallback(
-    ({ messageId, place }, text, notifyMissing, isCurrent) =>
-      reveal(
-        messageId,
-        (scroller) => {
-          // By the message id: a tool run's member rows use data-index too.
-          const source = scroller.querySelector<HTMLElement>(
-            `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
-          )
-          if (source) {
-            showQuotedText(source, text, place)
-          }
-          return Boolean(source)
-        },
-        isCurrent,
-        notifyMissing
-      ),
-    [reveal]
+    ({ messageId, place }, text, notifyMissing, isCurrent) => {
+      const show = (scroller: HTMLElement): boolean => {
+        // By the message id: a tool run's member rows use data-index too.
+        const source = scroller.querySelector<HTMLElement>(
+          `[data-native-chat-quote-source="${CSS.escape(messageId)}"]`
+        )
+        if (source) {
+          showQuotedText(source, text, place)
+        }
+        return Boolean(source)
+      }
+      if (reveal(messageId, show, isCurrent, notifyMissing)) {
+        return true
+      }
+      // A long chat keeps only its latest messages loaded, for example after a send. The link landing
+      // takes the reader off the end. Back and Forward do not page: they ask each transcript.
+      beginNavigation()
+      startHistoryJump({ kind: 'item', id: messageId }, (result) => {
+        if (result === 'landed') {
+          showWhenDrawn(scrollRef, show, isCurrent, notifyMissing)
+        } else if (result === 'missing' && isCurrent()) {
+          notifyMissing()
+        }
+      })
+      return true
+    },
+    [beginNavigation, reveal, scrollRef, startHistoryJump]
   )
 }

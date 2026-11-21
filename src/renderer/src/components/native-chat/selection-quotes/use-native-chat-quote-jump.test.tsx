@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const shown = vi.hoisted(() => vi.fn())
 vi.mock('./native-chat-quote-highlight', () => ({ showQuotedText: shown }))
 
-import { useNativeChatQuoteJump } from './use-native-chat-quote-jump'
+import { nativeChatMessageReveals, useNativeChatQuoteJump } from './use-native-chat-quote-jump'
 import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
 import { jumpToQuoteSource, rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
@@ -24,6 +24,7 @@ const current = () => true
 
 function jump(scroller: HTMLDivElement) {
   const issue = vi.fn()
+  const startHistoryJump = vi.fn()
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the jump reads only each slot's kind and message id.
   const slots = [
     { kind: 'message', message: { id: 'reply-0' } },
@@ -35,10 +36,11 @@ function jump(scroller: HTMLDivElement) {
       scrollRef: { current: scroller },
       request: { issue, nextRequestId: () => 7 },
       beginNavigation: vi.fn(),
-      readerLeavesEnd: vi.fn()
+      readerLeavesEnd: vi.fn(),
+      startHistoryJump
     })
   )
-  return { issue, jumpTo: result.current }
+  return { issue, startHistoryJump, jumpTo: result.current }
 }
 
 it('scrolls to the quoted message as a rail jump does, then shows the text in it', () => {
@@ -46,11 +48,21 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
   scroller.innerHTML =
     '<div data-index="0"><div data-native-chat-quote-source="reply-0">Another reply.</div></div>' +
     '<div data-index="1"><div data-native-chat-quote-source="reply-1">The quoted text.</div></div>'
-  const { issue, jumpTo } = jump(scroller)
+  const { issue, startHistoryJump, jumpTo } = jump(scroller)
   const place = { offset: 4, length: 11, hash: 'h' }
   const notifyMissing = vi.fn()
-  expect(jumpTo({ messageId: 'missing', place: null }, 'x', notifyMissing, current)).toBe(false)
+  expect(jumpTo({ messageId: 'not-loaded', place: null }, 'x', notifyMissing, current)).toBe(true)
   expect(issue).not.toHaveBeenCalled()
+  expect(startHistoryJump).toHaveBeenCalledWith(
+    { kind: 'item', id: 'not-loaded' },
+    expect.any(Function)
+  )
+  // Back and Forward ask each transcript, so only a chip pages history.
+  startHistoryJump.mockClear()
+  expect([...nativeChatMessageReveals].map((reveal) => reveal('not-loaded', () => true))).toEqual([
+    false
+  ])
+  expect(startHistoryJump).not.toHaveBeenCalled()
   expect(jumpTo({ messageId: 'reply-1', place }, 'quoted text', notifyMissing, current)).toBe(true)
   expect(issue).toHaveBeenCalledWith({ kind: 'rail', messageId: 'reply-1', requestId: 7 })
   vi.advanceTimersToNextFrame()

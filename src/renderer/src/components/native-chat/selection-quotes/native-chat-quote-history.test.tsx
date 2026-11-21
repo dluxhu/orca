@@ -82,7 +82,8 @@ function Chat({
     scrollRef,
     request: { issue, nextRequestId: () => 1 },
     beginNavigation: () => {},
-    readerLeavesEnd: () => {}
+    readerLeavesEnd: () => {},
+    startHistoryJump: () => {}
   })
   return (
     <TooltipProvider delayDuration={0}>
@@ -234,7 +235,9 @@ it('goes Back from a quoted reply to its chip, and Forward to the reply again', 
 
 it("goes Back from the user's own quoted message to its chip, and Forward to it again", () => {
   rememberNativeChatQuoteSource('My earlier words.', { messageId: 'mine-earlier', place: null })
-  render(<Chat content={'> My earlier words.\n\nmy words'} />, { wrapper: TranslationScopeProvider })
+  render(<Chat content={'> My earlier words.\n\nmy words'} />, {
+    wrapper: TranslationScopeProvider
+  })
   const chip = screen.getByRole('button', { name: 'Quote: My earlier words.' })
   const source = document.querySelector('[data-native-chat-quote-source="mine-earlier"]')
 
