@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../app-profiles/app-profile'
 import { access, readdir, rm, rmdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
@@ -124,6 +125,8 @@ function registryOutcome(
   return { state: 'removed', detail: null }
 }
 
+const APP_PROFILE_SHARED = 'The default Orca app still uses them.'
+
 async function runAgentHooks(
   plan: OrcaUninstallPlan,
   host: OrcaUninstallHost,
@@ -140,6 +143,10 @@ async function runAgentHooks(
   const otherBuild = plan.otherOrcaBuildName
   if (otherBuild) {
     return update(() => ({ state: 'kept-shared', detail: `${otherBuild} still uses these hooks.` }))
+  }
+  // Fork patch: an app profile shares the agent configs with the default app until isolation.
+  if (isAppProfileRuntime()) {
+    return update(() => ({ state: 'kept-shared', detail: APP_PROFILE_SHARED }))
   }
   try {
     await host.disableAgentStatusHooks()
@@ -209,6 +216,9 @@ async function runHookScripts(
   }
   if (plan.otherOrcaBuildName) {
     return { ...entry, state: 'kept-shared', detail: `${plan.otherOrcaBuildName} still uses them.` }
+  }
+  if (isAppProfileRuntime()) {
+    return { ...entry, state: 'kept-shared', detail: APP_PROFILE_SHARED }
   }
   // Hook entries left in an agent's config still call these scripts on every event.
   const stillHooked = plan.agents.filter(

@@ -9,6 +9,7 @@ import {
   closeSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -21,7 +22,6 @@ import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILES_REGISTRY,
-  APP_PROFILES_ROOT_ENV,
   appProfilesAppsDir,
   appProfilesRoot,
   readAppProfileRegistry,
@@ -52,6 +52,8 @@ export type CreateAppProfileOptions = {
   name: string
   port?: number
   defaultAppPath: string
+  /** Test runs only: write the profiles root into Info.plist, so a Dock launch finds a test root. */
+  pinRoot?: boolean
   env?: NodeJS.ProcessEnv
   home?: string
   run?: RunTool
@@ -102,7 +104,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
   }
   const root = resolve(appProfilesRoot(env, home))
   const appsDir = resolve(appProfilesAppsDir(env, home))
-  const defaultApp = resolve(options.defaultAppPath)
+  const defaultApp = defaultAppOf(resolve(options.defaultAppPath))
   const source = join(defaultApp, 'Contents')
   mkdirSync(root, { recursive: true })
   mkdirSync(appsDir, { recursive: true })
@@ -185,7 +187,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       plutil('-replace', 'CFBundleIdentifier', '-string', bundleId)
       plutil('-replace', 'CFBundleDisplayName', '-string', name)
       plutil('-replace', APP_PROFILE_PLIST_ID_KEY, '-string', id)
-      if (env[APP_PROFILES_ROOT_ENV]) {
+      if (options.pinRoot) {
         plutil('-replace', APP_PROFILE_PLIST_ROOT_KEY, '-string', root)
       }
       // Only the Profile Manager takes orca: links. The asar integrity fuse is off.
@@ -238,6 +240,15 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
   })
 }
 
+/** A profile's `orca` runs in the profile app; its app.asar link points into the default app. */
+function defaultAppOf(appPath: string): string {
+  const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
+  if (readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null) {
+    return appPath
+  }
+  return resolve(realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar')), '..', '..', '..')
+}
+
 function readPlistKeyExists(xml: string, key: string): boolean {
   return xml.includes(`<key>${key}</key>`)
 }
@@ -271,10 +282,13 @@ function withRegistryLock<T>(root: string, body: () => T): T {
 
 /** The CLI entry: `orca profiles create <name> [--port N]`. */
 export function runProfilesCreate(argv: string[]): void {
-  const portIndex = argv.indexOf('--port')
-  const port = portIndex === -1 ? undefined : Number(argv[portIndex + 1])
+  // --pin-root: test runs with ORCA_PROFILES_ROOT; an inherited root must not stick in a bundle.
+  const pinRoot = argv.includes('--pin-root')
+  const args = argv.filter((arg) => arg !== '--pin-root')
+  const portIndex = args.indexOf('--port')
+  const port = portIndex === -1 ? undefined : Number(args[portIndex + 1])
   const rest =
-    portIndex === -1 ? argv : argv.filter((_, i) => i !== portIndex && i !== portIndex + 1)
+    portIndex === -1 ? args : args.filter((_, i) => i !== portIndex && i !== portIndex + 1)
   if (rest.length !== 1) {
     throw new RuntimeClientError(
       'invalid_argument',
@@ -293,6 +307,6 @@ export function runProfilesCreate(argv: string[]): void {
       'Run this command with the orca CLI of an Orca app.'
     )
   }
-  const entry = createAppProfile({ name: rest[0], port, defaultAppPath })
+  const entry = createAppProfile({ name: rest[0], port, defaultAppPath, pinRoot })
   process.stdout.write(`${JSON.stringify(entry, null, 2)}\n`)
 }

@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   writeFileSync
 } from 'node:fs'
@@ -99,7 +100,8 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       defaultAppPath: app,
       env: env(),
       run,
-      now: () => 1
+      now: () => 1,
+      pinRoot: true
     })
     const contents = join(entry.appPath, 'Contents')
     expect(entry).toEqual({
@@ -179,6 +181,22 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(() =>
       createAppProfile({ name: 'Other', port: 6790, defaultAppPath: app, env: env(), run })
     ).toThrow('inside the port range')
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile app', () => {
+  it('links to the default app and keeps an inherited root out of Info.plist', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
+    // A profile's own `orca` passes the profile app as the running app.
+    const home = createAppProfile({ name: 'Home', defaultAppPath: work.appPath, env: env(), run })
+    expect(home.bundleId).toBe('com.stablyai.orca.dlux.profile.home')
+    expect(readlinkSync(join(home.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(
+      join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
+    )
+    for (const entry of [work, home]) {
+      const plist = join(entry.appPath, 'Contents', 'Info.plist')
+      expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBeNull()
+    }
   })
 })
 
