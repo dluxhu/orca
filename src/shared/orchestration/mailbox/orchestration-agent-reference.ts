@@ -62,3 +62,38 @@ export function terminalAgentReference(reference: OrchestrationAgentReference): 
     ? `${printableAgentLabel(reference.label)}${AGENT_REFERENCE_MARK}${reference.address}) `
     : null
 }
+
+const NOTE_HEAD = /^\[Orca (agent|chat|terminal) "((?:[^"\\]|\\.)*)": (\S+) — /
+const NOTE_KINDS: Record<string, readonly (AgentReferenceKind | null)[]> = {
+  agent: [null],
+  chat: ['chat'],
+  terminal: ['terminal', 'shell']
+}
+
+export type SentAgentMention = { label: string; kind: AgentReferenceKind | null }
+
+/** A sent message is its typed text, a blank line, and one routing note per mentioned agent.
+ *  Gives the typed text and the mentions, or null when the text does not end in such notes. */
+export function splitAgentReferenceNotes(
+  text: string
+): { body: string; mentions: SentAgentMention[] } | null {
+  const end = text.lastIndexOf('\n\n')
+  if (end === -1) {
+    return null
+  }
+  const body = text.slice(0, end)
+  const mentions: SentAgentMention[] = []
+  for (const line of text.slice(end + 2).split('\n')) {
+    const head = NOTE_HEAD.exec(line)
+    // Only a note exactly as agentReferenceNote writes it, for a mention in the text, counts.
+    const kinds = head
+      ? NOTE_KINDS[head[1]].filter((kind) => agentReferenceNote(head[2], head[3], kind) === line)
+      : []
+    if (!head || kinds.length === 0 || !body.includes(`@${head[2]}`)) {
+      return null
+    }
+    // The note escapes `\ " [ ]` as Markdown does; the shown label has no escapes.
+    mentions.push({ label: head[2].replace(/\\(.)/g, '$1'), kind: kinds[0] })
+  }
+  return { body, mentions }
+}
