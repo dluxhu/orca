@@ -136,7 +136,7 @@ describe('app profile homes', () => {
       defaultCodexHomeDir(),
       getClaudePluginMetadataPaths(homedir(), '/repo').installedPlugins,
       ...(['gemini', 'copilot', 'kiro', 'cline', 'codebuddy', 'openclaw'] as const).map(
-        (agent) => AI_VAULT_AGENT_SOURCES[agent].rootDirs({}, [])[0]
+        (agent) => AI_VAULT_AGENT_SOURCES[agent]!.rootDirs({}, [])[0]
       ),
       ...['home-codex', 'codex-plugin-cache', 'home-qoder', 'home-copilot'].map(skillRoot),
       ...(['claude', 'gemini', 'grok', 'codebuddy', 'kiro'] as const).map(
