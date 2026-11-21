@@ -28,7 +28,6 @@ import {
   insertPromptMention,
   NativeChatFileReference,
   NativeChatImageReference,
-  NativeChatQuote,
   nativeChatPromptPills,
   promptLeafText,
   promptText,
@@ -36,7 +35,7 @@ import {
   promptTextPosition
 } from './native-chat-prompt-document'
 import { openingPromptContent, promptTextContent } from './native-chat-prompt-document-text'
-import { reparseQuoteChips } from './native-chat-quote-reparse'
+import { replacePromptText } from './native-chat-quote-reparse'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -108,7 +107,6 @@ function NativePromptEditor({
       }),
       NativeChatAgentReference,
       ...nativeChatPromptPills,
-      NativeChatQuote,
       NativeChatUnkernedRunDecorations,
       NativeChatHardBreakParagraphs,
       // A disabled box still says why it is disabled, as the plain text box's placeholder does.
@@ -306,9 +304,7 @@ function NativePromptEditor({
                 promptTextContent(value.slice(start, value.length - end))
               )
               editor.commands.command(({ tr }) => {
-                tr.replaceRange(from, to, new Slice(content.content, 1, 1))
-                reparseQuoteChips(tr)
-                tr.setMeta('preventUpdate', true)
+                replacePromptText(tr, from, to, new Slice(content.content, 1, 1))
                 return true
               })
               applyPosition(previousRange)

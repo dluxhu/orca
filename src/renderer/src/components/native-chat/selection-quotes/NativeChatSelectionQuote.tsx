@@ -51,7 +51,9 @@ export function NativeChatSelectionQuote({
         const quotable = composerRef.current?.acceptsText()
           ? readNativeChatQuotableSelection(root)
           : null
-        offeredSource.current = quotable ? quoteSourceOf(quotable.sourceElement, quotable.range) : null
+        offeredSource.current = quotable
+          ? quoteSourceOf(quotable.sourceElement, quotable.range)
+          : null
         return quotable
       }}
       onSelectionSettled={copyTranscriptSelectionOnSelect}

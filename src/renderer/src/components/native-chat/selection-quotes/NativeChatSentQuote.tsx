@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslate } from '@/i18n/use-translate'
 import { openDetectedFilePath } from '@/components/terminal-pane/links/files/terminal-file-open-routing'
+import { openLinkedFileInEditor } from '@/components/terminal-pane/links/files/terminal-file-link-editor-open'
+import { isHtmlFilePath } from '@/components/terminal-pane/links/files/local-html-file-destinations'
+import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
+import { relativePathInsideRoot } from '../../../../../shared/file-access/cross-platform-path'
 import type { NativeChatFileLinkContext } from '../links/actions/native-chat-file-link-context'
 import { resolveNativeChatFileLink } from '../links/actions/native-chat-file-link'
 import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target-actions'
@@ -51,7 +55,24 @@ function openQuotedFile(
   if (!context || !target) {
     return false
   }
-  openDetectedFilePath(target.absolutePath, target.line ?? location.line, 1, {
+  const line = target.line ?? location.line
+  // An HTML file opens as a page, which has no lines: a quote of its source opens the editor.
+  const relativePath = relativePathInsideRoot(context.worktreePath, target.absolutePath)
+  if (isHtmlFilePath(target.absolutePath) && relativePath) {
+    openLinkedFileInEditor(
+      {
+        filePath: target.absolutePath,
+        relativePath,
+        worktreeId: context.worktreeId,
+        runtimeEnvironmentId: context.runtimeEnvironmentId
+      },
+      null,
+      { line, column: 1, length: Number.MAX_SAFE_INTEGER },
+      beginLinkOpenRequest()
+    )
+    return true
+  }
+  openDetectedFilePath(target.absolutePath, line, 1, {
     ...nativeChatFileOpenDeps(target, context),
     // The reveal stops at the line end, so this highlights the first quoted line.
     revealLength: Number.MAX_SAFE_INTEGER
@@ -78,7 +99,8 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           type="button"
           variant="outline"
           size="xs"
-          className="my-1 max-w-full"
+          // The end margin is the one space before the comment on its line.
+          className="my-1 me-1 max-w-full"
           onClick={() =>
             jumpToQuoteSource(sourceText, {
               jumpToMessage,
@@ -99,7 +121,7 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           <span className="truncate">{text.replace(/\s+/g, ' ')}</span>
         </Button>
       </TooltipTrigger>
-      <TooltipContent className="max-w-md whitespace-pre-wrap">{text}</TooltipContent>
+      <TooltipContent className="max-w-md whitespace-pre-wrap">{sourceText}</TooltipContent>
     </Tooltip>
   )
 }
