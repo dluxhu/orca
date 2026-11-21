@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const shown = vi.hoisted(() => vi.fn())
 vi.mock('./native-chat-quote-highlight', () => ({ showQuotedText: shown }))
 
-import { useNativeChatQuoteJump } from './use-native-chat-quote-jump'
+import { nativeChatMessageReveals, useNativeChatQuoteJump } from './use-native-chat-quote-jump'
 import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
 import { jumpToQuoteSource, rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
@@ -58,6 +58,12 @@ it('scrolls to the quoted message as a rail jump does, then shows the text in it
     { kind: 'item', id: 'not-loaded' },
     expect.any(Function)
   )
+  // Back and Forward ask each transcript, so only a chip pages history.
+  startHistoryJump.mockClear()
+  expect([...nativeChatMessageReveals].map((reveal) => reveal('not-loaded', () => true))).toEqual([
+    false
+  ])
+  expect(startHistoryJump).not.toHaveBeenCalled()
   expect(jumpTo({ messageId: 'reply-1', place }, 'quoted text', notifyMissing, current)).toBe(true)
   expect(issue).toHaveBeenCalledWith({ kind: 'rail', messageId: 'reply-1', requestId: 7 })
   vi.advanceTimersToNextFrame()
