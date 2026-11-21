@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { MessageSquarePlus, SquareSplitVertical } from 'lucide-react'
+import { Braces, MessageSquarePlus, SquareSplitVertical } from 'lucide-react'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -13,6 +13,7 @@ import { NativeChatResumeInCliButton } from './NativeChatResumeInCliButton'
 import { NativeChatSettingsButton } from '../../appearance/NativeChatSettingsButton'
 import type { NativeChatStructuredViewProps } from '../../native-chat-view-types'
 import type { NativeChatHandOff } from './use-native-chat-hand-off'
+import { useNativeChatRawPanel } from '../../messages/diagnostics/NativeChatRawPanel'
 
 const HEADER_STYLE: React.CSSProperties & Record<'--orca-pane-title-bg', string> = {
   '--orca-pane-title-bg': 'var(--chat-canvas)'
@@ -47,6 +48,8 @@ export function NativeChatPaneHeader({
     'components.agentSessionContinuation.handOffToAnotherAgent',
     'Hand Off to Another Agent'
   )
+  const rawPanel = useNativeChatRawPanel(tabId)
+  const showRaw = t('components.native-chat.rawPanel.toggle', 'Show raw')
   return (
     <div
       className="pane-title-bar z-20"
@@ -78,6 +81,26 @@ export function NativeChatPaneHeader({
             </TooltipContent>
           </Tooltip>
         ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="pane-title"
+              size="icon-xs"
+              aria-label={showRaw}
+              aria-pressed={rawPanel.open}
+              onClick={(event) => {
+                event.stopPropagation()
+                rawPanel.toggle()
+              }}
+            >
+              <Braces className="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={4}>
+            {showRaw}
+          </TooltipContent>
+        </Tooltip>
         {nativeChat.agent && agentForksConversations(nativeChat.agent) ? (
           <NativeChatResumeInCliButton
             tabId={tabId}
