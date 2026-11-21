@@ -21135,6 +21135,7 @@
         "forkedFromUnknown": "Forked from another chat"
       },
       "composer": {
+        "mentionHostUnknown": "{{name}} is on a host this window is not connected to.",
         "send": "Send",
         "planMode": "Plan",
         "moreControls": "More chat controls",

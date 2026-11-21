@@ -1,14 +1,32 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { afterEach, expect, it, vi } from 'vitest'
+import { useAppStore } from '@/store'
+import { openOrchestrationDispatch } from '@/lib/agent-session/open/open-agent-message-sender'
+import { NativeChatVisualOwnerContext } from '../../media/visuals/native-chat-visual-owner'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from './NativeChatMessageRow'
 import { serializeNativeChatAgentReferences } from '../../composer/pickers/native-chat-agent-reference-send'
 import { AgentReferencePillContent } from '../../composer/editor/native-chat-agent-reference'
 
-afterEach(cleanup)
+vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() } }))
+vi.mock('@/lib/agent-session/open/open-agent-message-sender', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openOrchestrationDispatch: vi.fn(async () => {})
+}))
+
+const initialStore = useAppStore.getState()
+
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+  useAppStore.setState(initialStore, true)
+})
 
 const chip = (label: string, kind: string, environment?: string) => ({
   type: 'nativeChatAgentReference',
@@ -77,8 +95,8 @@ function composerTerminalBadge(label: string): string {
   return text
 }
 
-function bubble(text: string, sentAs?: 'goal'): HTMLElement {
-  const { container } = render(
+function bubble(text: string, sentAs?: 'goal', chatHost?: RuntimeClientTarget): HTMLElement {
+  const row = (
     <TooltipProvider>
       <MessageRow
         message={{
@@ -92,7 +110,18 @@ function bubble(text: string, sentAs?: 'goal'): HTMLElement {
         expandSignal={false}
         onScrollMessageToTop={vi.fn()}
       />
-    </TooltipProvider>,
+    </TooltipProvider>
+  )
+  const { container } = render(
+    chatHost ? (
+      <NativeChatVisualOwnerContext.Provider
+        value={{ target: chatHost, sessionId: 'this-chat', worktreeId: 'workspace' }}
+      >
+        {row}
+      </NativeChatVisualOwnerContext.Provider>
+    ) : (
+      row
+    ),
     { wrapper: TranslationScopeProvider }
   )
   return container.querySelector<HTMLElement>('.native-chat-markdown')!
@@ -163,4 +192,40 @@ it('shows text that only looks like a note', () => {
   // A real note for an agent the text does not mention is not a send note either.
   const unmentioned = sentText('Tech Lead').replace('ask @Tech Lead now', 'ask now')
   expect(bubble(unmentioned).textContent).toContain('[Orca chat "Tech Lead"')
+})
+
+it('opens the mentioned chat on the chat host when its chip is clicked', async () => {
+  bubble(sentText('Tech Lead'), undefined, { kind: 'environment', environmentId: 'env-a' })
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'orca_session_id:chat_aaaaaaaa',
+    'Tech Lead',
+    { kind: 'environment', environmentId: 'env-a' }
+  )
+})
+
+it("opens a mention on another host through this window's environment of that name", async () => {
+  useAppStore.setState({
+    runtimeEnvironments: [{ id: 'env-box', name: 'box' }] as never
+  })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, { kind: 'local' })
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'orca_session_id:chat_aaaaaaaa',
+    'Lead on Box (box)',
+    { kind: 'environment', environmentId: 'env-box' }
+  )
+})
+
+it('says so when this window does not know the host of the mention', async () => {
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, { kind: 'local' })
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
 })
