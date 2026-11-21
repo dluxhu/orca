@@ -71,10 +71,12 @@ const OWNER = {
 
 function Chat({
   content,
-  owner = OWNER
+  owner = OWNER,
+  startHistoryJump = () => {}
 }: {
   content: string
   owner?: React.ContextType<typeof NativeChatMarkdownImageOwnerContext>
+  startHistoryJump?: Parameters<typeof useNativeChatQuoteJump>[0]['startHistoryJump']
 }): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const jump = useNativeChatQuoteJump({
@@ -83,7 +85,8 @@ function Chat({
     request: { issue, nextRequestId: () => 1 },
     beginNavigation: () => {},
     readerLeavesEnd: () => {},
-    startHistoryJump: () => {}
+    startHistoryJump,
+    sessionKey: 'claude:chat'
   })
   return (
     <TooltipProvider delayDuration={0}>
@@ -283,6 +286,21 @@ it('records nothing when the source is missing', () => {
   expect(history()).toEqual({ entries: ['w0', 'w1'], index: 1 })
 })
 
+it('records no step for a chip whose source no older page has, so Forward pages nothing', () => {
+  const startHistoryJump = vi.fn(
+    (_target: unknown, settled?: (result: 'landed' | 'missing' | 'aborted') => void) =>
+      settled?.('missing')
+  )
+  rememberNativeChatQuoteSource('Older words.', { messageId: 'not-loaded', place: null })
+  render(<Chat content={'> Older words.\n\nmy words'} startHistoryJump={startHistoryJump} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Quote: Older words.' }))
+  expect(mocks.toast).toHaveBeenCalledWith('The source of this quote is not available.')
+  expect(history()).toEqual({ entries: ['w0', 'w1'], index: 1 })
+  act(() => useAppStore.getState().goForwardWorktree())
+  frames(5)
+  expect(startHistoryJump).toHaveBeenCalledOnce()
+})
+
 it('keeps Back and Forward between workspaces, and skips the source of a closed chat', () => {
   act(() => useAppStore.getState().goBackWorktree())
   expect(mocks.activate).toHaveBeenLastCalledWith('w0', { navigationIntent: 'user-open' })
@@ -337,6 +355,7 @@ it('records the next chip click after Forward replays a jump', () => {
   useAppStore.setState({ worktreeNavHistory: ['w0', 'w1'], worktreeNavHistoryIndex: 1 })
 
   fireEvent.click(chip)
+  frames(2)
   expect(history()).toEqual({
     entries: ['w0', { ...PLACE, at: 'chip' }, { ...PLACE, at: 'source' }],
     index: 2
@@ -416,18 +435,19 @@ it('ignores the late landing of a jump after a newer Back', async () => {
   expect(document.activeElement).toBe(chip)
 })
 
-it('ignores the late highlight of a jump after a newer Back', () => {
+it('ignores the late highlight of a jump after a newer Back, and records no step for it', () => {
   rememberNativeChatQuoteSource('The quoted text.', { messageId: 'reply-1', place: null })
   render(<Chat content={'> other\n\n> The quoted text.\n\nmy words'} />)
   const chip = screen.getByRole('button', { name: 'Quote: The quoted text.' })
   const source = screen.getByText('The quoted text.', { selector: 'p' })
 
   fireEvent.click(chip)
+  // The jump has not shown its source yet, so Back leaves the workspace.
   act(() => useAppStore.getState().goBackWorktree())
-  frames(2)
+  frames(3)
   expect(document.activeElement).not.toBe(source)
-  frames(1)
-  expect(document.activeElement).toBe(chip)
+  expect(mocks.activate).toHaveBeenLastCalledWith('w0', { navigationIntent: 'user-open' })
+  expect(history()).toEqual({ entries: ['w0', 'w1'], index: 0 })
 })
 
 it.each([

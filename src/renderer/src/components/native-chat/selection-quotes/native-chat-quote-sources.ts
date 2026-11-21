@@ -9,9 +9,17 @@ const LIMIT = 200
 
 /** Where the quote is in its source element's text, and a hash of the text there. */
 export type QuotePlace = { offset: number; length: number; hash: string }
-export type QuoteSource = { messageId: string; place: QuotePlace | null }
+/** `chat` is the transcript the message is in; sources stored before it have none. */
+export type QuoteSource = { messageId: string; place: QuotePlace | null; chat?: string }
 
-type Entry = [key: string, messageId: string, offset: number, length: number, hash: string]
+type Entry = [
+  key: string,
+  messageId: string,
+  offset: number,
+  length: number,
+  hash: string,
+  chat?: string
+]
 
 /** FNV-1a over UTF-16 code units, with the length: short, and the same in each window. */
 export function textHash(text: string): string {
@@ -45,7 +53,7 @@ function load(): Entry[] {
       ? parsed.filter(
           (entry): entry is Entry =>
             Array.isArray(entry) &&
-            entry.length === 5 &&
+            (entry.length === 5 || (entry.length === 6 && typeof entry[5] === 'string')) &&
             typeof entry[0] === 'string' &&
             typeof entry[1] === 'string' &&
             typeof entry[2] === 'number' &&
@@ -65,7 +73,7 @@ export function rememberNativeChatQuoteSource(text: string, source: QuoteSource)
     return
   }
   const { offset = -1, length = 0, hash = '' } = source.place ?? {}
-  const entry: Entry = [key, source.messageId, offset, length, hash]
+  const entry: Entry = [key, source.messageId, offset, length, hash, source.chat ?? '']
   const entries = [...load().filter(([known]) => known !== key), entry].slice(-LIMIT)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
@@ -81,8 +89,12 @@ export function nativeChatQuoteSource(text: string): QuoteSource | null {
   if (!entry) {
     return null
   }
-  const [, messageId, offset, length, hash] = entry
-  return { messageId, place: offset >= 0 ? { offset, length, hash } : null }
+  const [, messageId, offset, length, hash, chat] = entry
+  return {
+    messageId,
+    place: offset >= 0 ? { offset, length, hash } : null,
+    ...(chat ? { chat } : {})
+  }
 }
 
 export type QuotedFileLocation = { pathText: string; line: number }
@@ -109,21 +121,25 @@ export function quotedFileLocation(
 
 export type NativeChatQuoteJumpDeps = {
   /**
-   * Shows the message in this transcript and highlights the quote. It pages older history in when
-   * the message is not loaded. Calls `notifyMissing` when no page has the message, or when the
+   * Shows the message in this transcript and highlights the quote; false when the source is in
+   * another chat. It pages older history in when the message is not loaded. Calls `notifyMissing` when no page has the message, or when the
    * message is not drawn after the jump. Each later step does nothing once `isCurrent` is false.
+   * Calls `shown` when it shows the quote.
    */
   jumpToMessage:
     | ((
         source: QuoteSource,
         text: string,
         notifyMissing: () => void,
-        isCurrent: () => boolean
+        isCurrent: () => boolean,
+        shown?: () => void
       ) => boolean)
     | null
   /** Opens the file at the line and highlights it; false when the chat cannot open it. */
   openFile: ((location: QuotedFileLocation) => boolean) | null
   notifyMissing: () => void
+  /** Runs once the jump shows its message or opens its file, not when it fails. */
+  shown?: () => void
 }
 
 /**
@@ -137,12 +153,13 @@ export function jumpToQuoteSource(
   // Each chip click is one link open: it stops the later steps of every earlier one.
   const isCurrent = beginLinkOpenRequest()
   const source = nativeChatQuoteSource(text)
-  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing, isCurrent)) {
+  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing, isCurrent, deps.shown)) {
     return 'message'
   }
   const [firstLine = '', secondLine = ''] = text.split('\n')
   const location = quotedFileLocation(firstLine, /^\s*(?:```|~~~)/.test(secondLine))
   if (location && deps.openFile?.(location)) {
+    deps.shown?.()
     return 'file'
   }
   deps.notifyMissing()
