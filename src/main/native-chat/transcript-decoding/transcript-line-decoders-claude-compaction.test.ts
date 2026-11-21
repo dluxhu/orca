@@ -89,10 +89,16 @@ it('imports a /compact transcript with one divider', async () => {
     })
     expect(prepared.ok).toBe(true)
     const dividers = (prepared.ok ? prepared.items : []).filter(
-      ({ body }) => body.kind === 'status' && body.presentation === 'compaction'
+      ({ body }) =>
+        body.kind === 'message' &&
+        body.blocks.some((block) => block.type === 'text' && block.presentation === 'compaction')
     )
     expect(dividers.map(({ body }) => body)).toEqual([
-      { kind: 'status', text: 'Context compacted', presentation: 'compaction' }
+      {
+        kind: 'message',
+        role: 'system',
+        blocks: [{ type: 'text', text: 'Context compacted', presentation: 'compaction' }]
+      }
     ])
   } finally {
     await rm(root, { recursive: true, force: true })
