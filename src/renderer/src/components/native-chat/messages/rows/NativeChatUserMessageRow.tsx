@@ -1,6 +1,7 @@
 import { NativeChatSetupButton } from '../../host-access/NativeChatSetupButton'
 import { NativeChatTextAttachments } from '../../media/text/NativeChatTextAttachments'
 import { Goal } from 'lucide-react'
+import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
@@ -10,6 +11,7 @@ import type { NativeChatDeliveryNotice } from './NativeChatMessageRow'
 import { NativeChatRewindAction } from '../actions/NativeChatRewindAction'
 import type { NativeChatRewindSurface } from '../actions/use-native-chat-rewind-host'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
+import { plainNativeChatAgentMentions } from '../../markdown/native-chat-agent-mentions'
 import { NativeChatUserMessageFold } from './NativeChatUserMessageFold'
 import { NativeChatCodeBlock } from '../../markdown/code/NativeChatCodeBlock'
 import { NativeChatCopyButton } from '../actions/NativeChatCopyButton'
@@ -18,6 +20,7 @@ import { NativeChatAgentMessageCard } from './NativeChatAgentMessageCard'
 import { NativeChatDetailsDisclosure } from '../diagnostics/NativeChatProviderDetails'
 import { NativeChatImageAttachments } from '../../media/images/NativeChatImageAttachments'
 import type { deriveNativeChatRowContent } from '../../../../../../shared/native-chat/transcript/native-chat-row-content'
+import { splitAgentReferenceNotes } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
 const USER_META_REVEAL =
   'transition-opacity can-hover:pointer-events-none can-hover:opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 [.group:has(:focus-visible)_&]:pointer-events-auto [.group:has(:focus-visible)_&]:opacity-100'
@@ -86,6 +89,13 @@ export function NativeChatUserMessageRow({
   // Agent-authored input belongs to the turn but uses a left-aligned sender row instead of the person’s bubble.
   const from = message.from
   const sending = deliveryNotice?.sending === true
+  // The bubble shows what the user typed; the agent also got the routing notes.
+  const layout = message.sentAs === 'goal' ? 'goal' : 'message'
+  const sent = useMemo(
+    () => (from ? null : splitAgentReferenceNotes(markdown, layout)),
+    [from, layout, markdown]
+  )
+  const typed = sent ? plainNativeChatAgentMentions(sent.body, sent.mentions) : markdown
   return (
     <div
       ref={rowRef}
@@ -113,13 +123,13 @@ export function NativeChatUserMessageRow({
               />
               <NativeChatUserMessageFold
                 messageId={message.id}
-                markdown={markdown}
+                markdown={typed}
                 onRefolded={onRefolded}
                 // List numbers hang into the bubble's padding; clipping at the text edge cut them off.
                 className="-mx-3.5 px-3.5"
               >
                 <NativeChatTextAttachments
-                  content={markdown}
+                  content={typed}
                   structured={structuredAttachments}
                   runtimeContext={runtimeContext}
                   renderText={(text) => (
@@ -127,6 +137,7 @@ export function NativeChatUserMessageRow({
                       rowKey={message.id}
                       content={text}
                       variant="document"
+                      agentMentions={sent?.mentions}
                       className="text-sm"
                       renderCodeBlock={NativeChatCodeBlock}
                     />

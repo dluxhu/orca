@@ -154,4 +154,52 @@ describe('useNativeChatComposerKeyDown', () => {
       expect(pressModEnter('steer this').steerHead).not.toHaveBeenCalled()
     })
   })
+
+  describe('mention picks', () => {
+    const session = {
+      kind: 'chat' as const,
+      label: 'Release notes',
+      address: 'orca_session_id:chat_aaaaaaaa',
+      hostKey: 'local',
+      detail: 'repo/main'
+    }
+
+    function Composer({
+      activeSuggestion,
+      completeMention
+    }: {
+      activeSuggestion: number
+      completeMention: (item: unknown) => void
+    }): React.JSX.Element {
+      const onKeyDown = useNativeChatComposerKeyDown({
+        autocomplete: { mode: 'mention', query: 're', triggerKey: '@:0' },
+        activeSuggestion,
+        draft: '@re',
+        mentionFiles: { files: ['README.md'], loading: false, failed: false, sessions: [session] },
+        completeMention,
+        isComposing: () => false,
+        completePickerItem: vi.fn(),
+        dispatchPickerCommand: vi.fn(),
+        dismissPicker: vi.fn(),
+        interrupt: vi.fn(),
+        send: vi.fn(),
+        setActiveSuggestion: vi.fn(),
+        setDraft: vi.fn(),
+        setCaret: vi.fn()
+      })
+      return (
+        <textarea aria-label="composer" value="@re" onChange={() => {}} onKeyDown={onKeyDown} />
+      )
+    }
+
+    it('lists sessions before files in one keyboard order', () => {
+      const completeMention = vi.fn()
+      const first = render(<Composer activeSuggestion={0} completeMention={completeMention} />)
+      fireEvent.keyDown(first.container.querySelector('textarea')!, { key: 'Enter' })
+      first.unmount()
+      const second = render(<Composer activeSuggestion={1} completeMention={completeMention} />)
+      fireEvent.keyDown(second.container.querySelector('textarea')!, { key: 'Enter' })
+      expect(completeMention.mock.calls).toEqual([[session], ['README.md']])
+    })
+  })
 })
