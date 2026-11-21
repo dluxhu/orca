@@ -69,10 +69,12 @@ const OWNER = {
   isVisible: true
 }
 
+const NO_HISTORY_JUMP = (): void => {}
+
 function Chat({
   content,
   owner = OWNER,
-  startHistoryJump = () => {}
+  startHistoryJump = NO_HISTORY_JUMP
 }: {
   content: string
   owner?: React.ContextType<typeof NativeChatMarkdownImageOwnerContext>
