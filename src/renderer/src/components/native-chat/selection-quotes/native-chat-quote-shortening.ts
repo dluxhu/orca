@@ -120,7 +120,8 @@ function quoteAuthorInContext(
     }
     if (message.id === messageId) {
       const text = message.blocks.map((block) => (block.type === 'text' ? block.text : '')).join('')
-      const holdsQuote = bare(drawnText(markdown.parse(text) as MarkdownNode)).includes(bare(quote))
+      const tree: MarkdownNode = markdown.parse(text)
+      const holdsQuote = bare(drawnText(tree)).includes(bare(quote))
       return holdsQuote ? (message.role === 'assistant' ? 'reply' : 'user') : null
     }
   }

@@ -109,7 +109,7 @@ async function send(
   if (source) {
     rememberNativeChatQuoteSource(quote, source)
   }
-  const transport = {
+  const stub = {
     capturePresentation: () => () => true,
     send: vi.fn(() => true),
     dispatchCommand: vi.fn(async () => ({ handled: false, accepted: false, error: null })),
@@ -124,7 +124,9 @@ async function send(
     runtime: 'local',
     sessionId: 'quote-short',
     runtimeEnvironmentId: null
-  } as unknown as NativeChatStructuredComposerTransport
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the send reads only the fields this stub sets.
+  const transport = stub as unknown as NativeChatStructuredComposerTransport
   const { result } = renderHook(() =>
     useNativeChatStructuredComposerSend({
       agent: 'claude',
