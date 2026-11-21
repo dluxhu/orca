@@ -28,12 +28,13 @@ import {
   type ReleaseChannel
 } from '../../../../../shared/updater/release-channel'
 
+// Fork patch: Stable and Daily describe the fork's Stable and Nightly apps.
 const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
-  stable: 'Shipped releases. What everyone else is running.',
+  stable: 'Orca @dLux releases: the fork patches on the newest upstream stable release.',
   rc: 'Release candidates cut ahead of each stable.',
   hourly: 'macOS and Windows. Unvetted builds from main, built every hour. No tests.',
   daily:
-    'macOS and Windows. Unvetted builds from main, cut once a day at 14:15 UTC (early morning Pacific). No tests.',
+    'macOS only. Orca @dLux Nightly: the fork patches on an upstream daily build. A separate app with its own profile.',
   adhoc: 'macOS and Windows. One-off builds cut from a branch to try a feature before it lands.'
 }
 
@@ -45,9 +46,9 @@ const DEDICATED_CHANNEL_WARNINGS: Record<DedicatedRepoChannel, { key: string; fa
         'Hourly builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.'
     },
     daily: {
-      key: 'auto.components.settings.ReleaseChannelSection.dailyWarning',
+      key: 'auto.components.settings.ReleaseChannelSection.nightlyWarning',
       fallback:
-        'Daily builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.'
+        'Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.'
     },
     adhoc: {
       key: 'auto.components.settings.ReleaseChannelSection.adhocWarning',
@@ -316,8 +317,8 @@ export function ReleaseChannelSection(): React.JSX.Element {
         ) : needsManualInstall && selectedBuild ? (
           <p className="text-xs text-muted-foreground">
             {t(
-              'auto.components.settings.ReleaseChannelSection.manualInstallHint',
-              '{{value0}} builds are unsigned on Windows, so the in-app updater cannot install one over a signed build. Run the downloaded installer once — Windows will warn about an unknown publisher — and every later switch, including back to Stable, works from here.',
+              'auto.components.settings.ReleaseChannelSection.forkManualInstallHint',
+              '{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel.',
               { value0: RELEASE_CHANNEL_LABELS[activeChannel] }
             )}
           </p>

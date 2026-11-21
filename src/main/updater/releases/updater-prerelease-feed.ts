@@ -5,6 +5,7 @@ import {
   getPlatformManifestReadiness,
   requestGitHubReleaseHead
 } from './updater-release-readiness'
+import { getVersionChannel } from '../../../shared/release-channel'
 
 import {
   applyReleaseDelay,
@@ -63,7 +64,8 @@ async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
         continue
       }
       const version = normalizeTagToVersion(tag)
-      if (isValidVersion(version)) {
+      // Fork patch: the Nightly app has its own feed. The stable app never takes a nightly build.
+      if (isValidVersion(version) && getVersionChannel(version) !== 'daily') {
         const releasedAt = Date.parse(entry[1].match(ENTRY_UPDATED_RE)?.[1] ?? '')
         tags.push({ tag, version, releasedAt: Number.isNaN(releasedAt) ? null : releasedAt })
       }
@@ -91,7 +93,8 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
     }
     const tag = decodeURIComponent(match[1])
     const version = normalizeTagToVersion(tag)
-    if (!isValidVersion(version) || isPrereleaseVersion(version)) {
+    // Fork patch: a stable fork version (`-dlux.N`) is a semver prerelease, but it is the stable channel.
+    if (getVersionChannel(version) !== 'stable') {
       return null
     }
     return (await getPlatformManifestReadiness(tag)) === 'ready' ? tag : null

@@ -136,10 +136,12 @@ function parseReleaseEntry(
   }
   // Platform release legs publish independently; offer only artifacts that actually exist.
   const assetNames = readAssetNames(entry.assets)
-  if (!hasInstallableArtifactForPlatform(platform, assetNames)) {
+  const installerAsset = findInstallerAssetName(platform, assetNames)
+  // Fork patch: a Nightly build installs by hand from its installer, so it has no update manifest.
+  const manualOnly = channel === 'daily' && installerAsset !== null
+  if (!manualOnly && !hasInstallableArtifactForPlatform(platform, assetNames)) {
     return null
   }
-  const installerAsset = findInstallerAssetName(platform, assetNames)
   const name = typeof entry.name === 'string' ? entry.name.trim() : ''
   return {
     tag,

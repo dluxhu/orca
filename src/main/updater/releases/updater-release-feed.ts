@@ -11,6 +11,7 @@ import type { CheckFailureSource } from '../lifecycle/updater-state'
 import type { UpdateCheckVariant } from '../lifecycle/updater-types'
 import { ReleaseFeedPreflightError } from '../lifecycle/updater-state'
 import { UpdaterInstallExecution } from '../lifecycle/updater-install-execution'
+import { getVersionChannel } from '../../../shared/release-channel'
 
 export abstract class UpdaterReleaseFeed extends UpdaterInstallExecution {
   protected clearPrereleaseFallbackContextIfSettled(): void {
@@ -120,6 +121,17 @@ export abstract class UpdaterReleaseFeed extends UpdaterInstallExecution {
     const autoUpdater = this.getAutoUpdater()
     // Pin the concrete tag because latest/download can move between check and download; stable checks exclude prereleases.
     const currentVersion = app.getVersion()
+    // Fork patch: the Nightly app reads the fixed `nightly` prerelease, which holds the manifest of
+    // the newest nightly build. electron-updater compares the versions. The update delay does not apply.
+    if (getVersionChannel(currentVersion) === 'daily') {
+      this.delayedUpdate = null
+      this.clearPrereleaseFallbackContext()
+      this.clearPublishingWindowLastGoodCheck()
+      const url = getReleaseDownloadUrl('nightly')
+      console.info(`[updater] nightly feed pinned: current=${currentVersion} → ${url}`)
+      autoUpdater.setFeedURL({ provider: 'generic', url })
+      return 'ready'
+    }
     const isPerfCheck = variant === 'perf'
     const includePrerelease =
       isPerfCheck || this.includePrereleaseActive || isPrereleaseVersion(currentVersion)

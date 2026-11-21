@@ -2,19 +2,14 @@ import { compareAppVersions, isValidAppVersion } from '../app-lifecycle/identity
 
 export type ReleaseChannel = 'stable' | 'rc' | 'hourly' | 'daily' | 'adhoc'
 
-export const RELEASE_CHANNELS: readonly ReleaseChannel[] = [
-  'stable',
-  'rc',
-  'hourly',
-  'daily',
-  'adhoc'
-]
+// Fork patch: the fork has two channels. `daily` is the fork's Nightly app.
+export const RELEASE_CHANNELS: readonly ReleaseChannel[] = ['stable', 'daily']
 
 export const RELEASE_CHANNEL_LABELS: Readonly<Record<ReleaseChannel, string>> = {
   stable: 'Stable',
   rc: 'RC',
   hourly: 'Hourly',
-  daily: 'Daily',
+  daily: 'Nightly',
   adhoc: 'Adhoc'
 }
 
@@ -62,6 +57,11 @@ export function isChannelSupportedOnPlatform(
   channel: ReleaseChannel,
   platform: NodeJS.Platform
 ): boolean {
+  // Fork patch: a channel that the fork does not list is not available. The profile is shared with
+  // official Orca, so a saved override can name an upstream channel.
+  if (!RELEASE_CHANNELS.includes(channel)) {
+    return false
+  }
   if (!hasDedicatedReleaseRepo(channel)) {
     return true
   }
@@ -76,11 +76,10 @@ export function requiresManualDevChannelInstall(options: {
   runningChannel: ReleaseChannel | null
   targetChannel: ReleaseChannel
 }): boolean {
-  const { platform, runningChannel, targetChannel } = options
-  if (platform !== 'win32' || !hasDedicatedReleaseRepo(targetChannel)) {
-    return false
-  }
-  return runningChannel === null || !hasDedicatedReleaseRepo(runningChannel)
+  // Fork patch: Stable and Nightly are separate apps with their own bundle ids. Only the stable app
+  // installs a stable build in place. The Nightly app updates in place only from its own feed.
+  const { runningChannel, targetChannel } = options
+  return !(runningChannel === 'stable' && targetChannel === 'stable')
 }
 
 export function getReleaseRepoForChannel(channel: ReleaseChannel): string {
@@ -155,10 +154,17 @@ export function parseDevBuildStamp(version: string): Date | null {
   )
 }
 
+// Fork patch: `<upstream stable>-dlux.N` is a stable fork build, `<upstream daily>-dlux.N` a Nightly.
+const FORK_VERSION = /^\d+\.\d+\.\d+(-daily\.\d{12})?-dlux\.\d+$/
+
 export function getVersionChannel(version: string): ReleaseChannel | null {
   const normalized = normalizeTagToVersion(version)
   if (!isValidAppVersion(normalized)) {
     return null
+  }
+  const forkVersion = normalized.match(FORK_VERSION)
+  if (forkVersion) {
+    return forkVersion[1] ? 'daily' : 'stable'
   }
   if (isHourlyVersion(normalized)) {
     return 'hourly'
