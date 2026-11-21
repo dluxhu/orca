@@ -117,6 +117,7 @@ export const nativeChatPromptPills = [
   NativeChatFileReference,
   NativeChatImageReference,
   NativeChatBotMention,
+  NativeChatQuote,
   NativeChatPromptPillKeys
 ]
 
