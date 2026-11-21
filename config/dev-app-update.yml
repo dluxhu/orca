@@ -1,4 +1,4 @@
 provider: github
-owner: stablyai
+owner: dluxhu
 repo: orca
 updaterCacheDirName: orca-updater

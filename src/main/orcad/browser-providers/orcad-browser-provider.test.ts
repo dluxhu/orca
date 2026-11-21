@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcess, spawnProcess } from '@orca/process-host'
 import { agentBrowserCommandOf } from '../../browser/agent-browser/testing/agent-browser-bridge-test-harness'
 import {
+  installedElectronCandidates,
   resolveInstalledElectronExecutable,
   resolveOrcadBrowserProvider
 } from './orcad-browser-provider'
@@ -112,6 +113,16 @@ describe.skipIf(process.platform === 'win32')('resolveInstalledElectronExecutabl
 
     await expect(resolveInstalledElectronExecutable([link, electron])).resolves.toBe(electron)
     await expect(resolveInstalledElectronExecutable([link])).resolves.toBeNull()
+  })
+})
+
+describe('installedElectronCandidates', () => {
+  // Fork patch: with official Orca also installed, headless orcad must start the fork's Electron.
+  it('lists only the fork bundle on macOS', () => {
+    expect(installedElectronCandidates('darwin', '/Users/me', {})).toEqual([
+      '/Applications/Orca @dLux.app/Contents/MacOS/Orca @dLux',
+      '/Users/me/Applications/Orca @dLux.app/Contents/MacOS/Orca @dLux'
+    ])
   })
 })
 
