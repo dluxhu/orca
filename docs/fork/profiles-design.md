@@ -736,7 +736,7 @@ Measured on 2026-11-21 on one Mac with macOS 27.2 (build 26B123), Apple silicon.
   ad hoc on code with another identity, as in a release, but not with a Developer ID.
 - The build has no `orcad` template, so `orca serve` runs on Electron.
 - Two profiles, "Work" and "Home", in a test folder. `ORCA_PROFILES_ROOT` and
-  `ORCA_PROFILES_APPS_DIR` select the test folders; `orca profiles create` then also writes
+  `ORCA_PROFILES_APPS_DIR` select the test folders; `orca profiles create --pin-root` also writes
   `OrcaAppProfilesRoot` into the profile's `Info.plist`.
 - The apps ran with a test `HOME`. It holds one link, `Library/Keychains`, to the user's keychains.
 - No GUI input was possible in the session (no clicks), so steps that need a click are not done.
@@ -776,14 +776,29 @@ and a profile app installed agent hooks into shared folders. Fix in slice 1:
 - `orca serve service install` for a profile (its userData has the marker) writes `HOME`,
   `ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME` and `ORCA_PROFILES_ROOT` of the
   caller into the unit.
-- A profile app, and every process that serves a profile's userData (also `orcad`), installs and
-  removes no managed agent hooks until the isolation slice gives each profile its own folders.
-  Agent launches still install their own hooks (for example Codex at launch): slice 2.
+- A profile app, and every process that serves a profile's userData (also `orcad`), writes nothing
+  to the shared agent folders until the isolation slice gives each profile its own folders. One
+  check, `isAppProfileRuntime()`, stops: the managed hook install, refresh and removal; the Claude
+  agent view (`~/.claude/keybindings.json` and its markers); the OpenCode status plugin refresh;
+  the Claude Code theme sync; and the uninstall of the shared hooks, plugins and
+  `~/.orca/agent-hooks` (the uninstall reports them as kept for the default app).
+- `orca profiles create` started from a profile's `orca` finds the default app through the
+  profile's `app.asar` link, so it does not nest the bundle id. It writes `OrcaAppProfilesRoot`
+  only with the hidden test flag `--pin-root`, never from an inherited `ORCA_PROFILES_ROOT`.
+
+**Writers to the real home that stay in a profile (slice 2).**
+
+- Hooks that an agent launch installs (for example `startCodexHooks` for Codex at launch).
+- The keybindings service: `app.getPath('home')`, so `~/.orca/keybindings.json` of the real home.
+- The floating workspace: Electron's native home path.
+- Every other `~/.orca` site in section 3 (credentials, API keys, MiniMax cookies, host terminal
+  policy) and the agent folders: they move with `ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`
+  and `GROK_HOME` in slice 2.
 
 **Other findings.**
 
 - The keybindings service and the floating workspace use Electron's native home path, not `HOME`.
-  A test `HOME` does not isolate them. Slice 2 must move them to the profile's home.
+  A test `HOME` does not isolate them (see the list above).
 - The profile apps show macOS "App Running in Background" notices for Work and Home (their terminal
   host jobs).
 - The main window loads `app.asar` from the default app's real path.
