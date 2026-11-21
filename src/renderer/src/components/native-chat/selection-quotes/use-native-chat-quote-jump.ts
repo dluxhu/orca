@@ -46,8 +46,10 @@ function showWhenDrawn(
     if (!isCurrent()) {
       return
     }
-    frame++
-    deadline ||= performance.now() + SOURCE_WAIT_MS
+    frame += 1
+    if (deadline === 0) {
+      deadline = performance.now() + SOURCE_WAIT_MS
+    }
     const scroller = frame < 2 ? null : scrollRef.current
     if (scroller && show(scroller)) {
       return
