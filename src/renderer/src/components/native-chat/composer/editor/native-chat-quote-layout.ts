@@ -1,4 +1,3 @@
-import { Extension } from '@tiptap/core'
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
@@ -158,20 +157,5 @@ export const nativeChatQuoteLayout = new Plugin({
     return (tr ?? state.tr).setSelection(
       TextSelection.create(doc, pastGap(doc, caret.$from.index(0), back))
     )
-  }
-})
-
-export const NativeChatQuoteGapKeys = Extension.create({
-  name: 'nativeChatQuoteGapKeys',
-  // Ahead of the default keymap, whose Backspace and Delete would join the empty line.
-  priority: 1000,
-  addKeyboardShortcuts() {
-    const run = (key: Parameters<typeof quoteGapKey>[1]) => () => quoteGapKey(this.editor.view, key)
-    return {
-      Backspace: run('Backspace'),
-      Delete: run('Delete'),
-      ArrowLeft: run('ArrowLeft'),
-      ArrowRight: run('ArrowRight')
-    }
   }
 })

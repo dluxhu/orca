@@ -5,9 +5,9 @@ import {
   placeRange,
   quotePlace,
   quotedTextRange,
+  quoteSourceOf,
   showQuotedText
 } from './native-chat-quote-highlight'
-import { readNativeChatQuotableSelection } from './native-chat-quote-selection'
 
 const highlights = new Map<string, { range: Range }>()
 
@@ -146,13 +146,9 @@ it("records the quote's message and the chat of the transcript it is in", () => 
     '<div data-native-chat-quote-chat="claude:s1"><p data-native-chat-quote-source="m1">Hello</p></div>' +
     '<p data-native-chat-quote-source="m2">Hello</p>'
   const [inChat, alone] = document.querySelectorAll('p')
-  const select = (paragraph: HTMLElement) => {
-    const range = document.createRange()
-    range.selectNodeContents(paragraph.firstChild!)
-    window.getSelection()!.removeAllRanges()
-    window.getSelection()!.addRange(range)
-    return readNativeChatQuotableSelection(document.body)?.source
-  }
-  expect(select(inChat)).toMatchObject({ messageId: 'm1', chat: 'claude:s1' })
-  expect(select(alone)).not.toHaveProperty('chat')
+  const range = document.createRange()
+  range.selectNodeContents(inChat)
+  expect(quoteSourceOf(inChat, range)).toMatchObject({ messageId: 'm1', chat: 'claude:s1' })
+  range.selectNodeContents(alone)
+  expect(quoteSourceOf(alone, range)).not.toHaveProperty('chat')
 })

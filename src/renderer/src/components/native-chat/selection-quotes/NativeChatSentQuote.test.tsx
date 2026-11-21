@@ -17,7 +17,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatMarkdown } from '../markdown/NativeChatMarkdown'
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { NativeChatQuoteJumpContext, type NativeChatQuoteJump } from './use-native-chat-quote-jump'
-import { formatNativeChatQuote } from './native-chat-quote-selection'
+import { formatNativeChatQuote } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 
 afterEach(() => {
@@ -94,6 +94,8 @@ it('shows the full quoted text when the chip has keyboard focus', async () => {
   sent('> a long quote\n> on two lines\n\nreply')
   const chip = screen.getByRole('button', { name: 'Quote: a long quote on two lines' })
   await act(async () => {
+    // Tooltips open on keyboard focus, not on a pointer's.
+    fireEvent.keyDown(document.body, { key: 'Tab' })
     chip.focus()
   })
   expect(await screen.findByRole('tooltip')).toHaveTextContent('a long quote on two lines')
