@@ -79,7 +79,7 @@ it('shows a mention of a chat on another host as its chip, with no note', () => 
   const text = sentText('Lead on Box (box)', 'box')
   expect(text).toContain(' — message it with orca orchestration send --on box --to ')
   const shown = bubble(text)
-  expect(shown.textContent).toBe('ask Chat Lead on Box (box) now')
+  expect(shown.textContent).toBe(`ask ${composerChip('Lead on Box (box)')} now`)
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Lead on Box (box)')
 })
 
