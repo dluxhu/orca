@@ -33,7 +33,6 @@ import {
 } from './native-chat-prompt-document'
 import { promptTextContent, withQuoteChipsParsed } from './native-chat-prompt-document-text'
 import { reparseQuoteChips } from './native-chat-quote-reparse'
-import { NativeChatQuoteGapKeys } from './native-chat-quote-layout'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -107,7 +106,6 @@ function NativePromptEditor({
         NativeChatFileReference,
         NativeChatImageReference,
         NativeChatQuote,
-        NativeChatQuoteGapKeys,
         NativeChatUnkernedRunDecorations,
         // A disabled box still says why it is disabled, as the plain text box's placeholder does.
         Placeholder.configure({

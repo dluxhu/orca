@@ -2,7 +2,7 @@ import { NativeChatFileReferencePill } from './NativeChatFileReferencePill'
 import { NativeChatSkillPill, skillLabel } from './NativeChatSkillPill'
 import { NativeChatImageReferencePill } from './NativeChatImageReferencePill'
 import { NativeChatQuotePill } from './NativeChatQuotePill'
-import { nativeChatQuoteLayout } from './native-chat-quote-layout'
+import { nativeChatQuoteLayout, NativeChatQuoteGapKeys } from './native-chat-quote-layout'
 import { formatNativeChatFileReference } from '../../../../../../shared/agent-image-paste'
 import { imageReferenceToken } from '../../../../../../shared/native-chat/native-chat-image-reference'
 import {
@@ -78,7 +78,8 @@ export const NativeChatQuote = Node.create({
   addAttributes: () => ({ token: { default: '' } }),
   renderText: ({ node }) => node.attrs.token,
   renderHTML: ({ node }) => ['span', { 'data-native-chat-quote': node.attrs.token }],
-  addProseMirrorPlugins: () => [nativeChatQuoteLayout]
+  addProseMirrorPlugins: () => [nativeChatQuoteLayout],
+  addExtensions: () => [NativeChatQuoteGapKeys]
 })
 
 export function promptSkillRefs(document: JSONContent | undefined): AgentJournalSkillRef[] {
