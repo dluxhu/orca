@@ -38,6 +38,7 @@ Features:
 - **Back to the quote.** After a quote chip jumps to its source, Back returns to the quote and Forward goes to the source again ([#26](https://github.com/dluxhu/orca/pull/26)).
 - **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
 - **Show raw.** A "Show raw" button in a chat's title bar opens a panel with the exact messages sent to the agent and what comes back ([#33](https://github.com/dluxhu/orca/pull/33)).
+- **Stable and Nightly.** The release channel switcher lists Stable and Nightly. Nightly is a separate app that updates itself to newer Nightly builds; the stable app never takes a Nightly build ([#38](https://github.com/dluxhu/orca/pull/38)).
 
 Fixes:
 
