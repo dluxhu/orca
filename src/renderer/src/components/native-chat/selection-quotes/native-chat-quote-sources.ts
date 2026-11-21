@@ -124,19 +124,23 @@ export type NativeChatQuoteJumpDeps = {
    * Shows the message in this transcript and highlights the quote; false when the source is in
    * another chat. It pages older history in when the message is not loaded. Calls
    * `notifyMissing` when no page has the message, or when the message is not drawn after the
-   * jump. Each later step does nothing once `isCurrent` is false.
+   * jump. Each later step does nothing once `isCurrent` is false. Calls `shown` when it shows
+   * the quote.
    */
   jumpToMessage:
     | ((
         source: QuoteSource,
         text: string,
         notifyMissing: () => void,
-        isCurrent: () => boolean
+        isCurrent: () => boolean,
+        shown?: () => void
       ) => boolean)
     | null
   /** Opens the file at the line and highlights it; false when the chat cannot open it. */
   openFile: ((location: QuotedFileLocation) => boolean) | null
   notifyMissing: () => void
+  /** Runs once the jump shows its message or opens its file, not when it fails. */
+  shown?: () => void
 }
 
 /**
@@ -150,12 +154,13 @@ export function jumpToQuoteSource(
   // Each chip click is one link open: it stops the later steps of every earlier one.
   const isCurrent = beginLinkOpenRequest()
   const source = nativeChatQuoteSource(text)
-  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing, isCurrent)) {
+  if (source && deps.jumpToMessage?.(source, text, deps.notifyMissing, isCurrent, deps.shown)) {
     return 'message'
   }
   const [firstLine = '', secondLine = ''] = text.split('\n')
   const location = quotedFileLocation(firstLine, /^\s*(?:```|~~~)/.test(secondLine))
   if (location && deps.openFile?.(location)) {
+    deps.shown?.()
     return 'file'
   }
   deps.notifyMissing()

@@ -11,6 +11,7 @@ import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
+import { nativeChatQuoteJumpRecorder } from './native-chat-quote-history'
 import { quotedText } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { nativeChatFullQuote } from './native-chat-quote-shortening'
 import { CommentMarkdownBlockLineContext } from '@/components/comment-markdown/comment-markdown-code-renderers'
@@ -55,7 +56,9 @@ function openQuotedFile(
   openDetectedFilePath(target.absolutePath, target.line ?? location.line, 1, {
     ...nativeChatFileOpenDeps(target, context),
     // The reveal stops at the line end, so this highlights the first quoted line.
-    revealLength: Number.MAX_SAFE_INTEGER
+    revealLength: Number.MAX_SAFE_INTEGER,
+    // The jump's source entry is its landing place.
+    recordsHistory: false
   })
   return true
 }
@@ -83,7 +86,7 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           variant="outline"
           size="xs"
           className="my-1 max-w-full"
-          onClick={() =>
+          onClick={(event) => {
             jumpToQuoteSource(sourceText, {
               jumpToMessage,
               openFile: (location) => openQuotedFile(location, fileLinkContext),
@@ -93,9 +96,11 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
                     'components.native-chat.quoteSourceMissing',
                     'The source of this quote is not available.'
                   )
-                )
+                ),
+              // A jump joins Back and Forward only once it shows its source.
+              shown: nativeChatQuoteJumpRecorder(event.currentTarget, fileLinkContext)
             })
-          }
+          }}
           data-native-chat-sent-quote=""
         >
           <Quote aria-hidden="true" />
