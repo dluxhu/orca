@@ -21267,6 +21267,7 @@
         "imageUnavailable": "Preview unavailable",
         "mentionChat": "Chat",
         "mentionTerminal": "Terminal",
+        "placeholderSendWithModEnter": "Ask anything, @ to mention files, / for commands, {{shortcut}} to send",
         "botFor": "For: {{detail}}",
         "agents": "Agents",
         "bots": "Bots",
@@ -21725,7 +21726,8 @@
         "paused": "Paused goal",
         "blocked": "Goal blocked",
         "limited": "Goal limited",
-        "attachmentsUnsupported": "Remove attachments before setting a goal."
+        "attachmentsUnsupported": "Remove attachments before setting a goal.",
+        "placeholderWithModEnter": "Describe your goal, define measurable outcomes for best results, {{shortcut}} to send"
       },
       "fileLinks": {
         "notFound": "File not found: {{value0}}",
@@ -21797,7 +21799,8 @@
         "clearAll": "Clear all",
         "editReturned": "Your edit is in the chat box.",
         "commandsUnsupported": "Commands can't be saved in a queued message.",
-        "imageCount": "{{count}} images"
+        "imageCount": "{{count}} images",
+        "editMessageWithModEnter": "Edit message, {{shortcut}} to save"
       },
       "thought": "Thought",
       "thoughtForDuration": "Thought for {{duration}}",
@@ -23070,6 +23073,11 @@
         "turnDiffsCopy": "Shows the files each turn changed, with line counts, below the reply.",
         "turnDiffsSearchChangedFiles": "changed files",
         "turnDiffsSearchEdits": "edits",
+        "sendWithModEnterTitle": "Send with {{shortcut}}",
+        "sendWithModEnterCopy": "Enter adds a new line instead of sending. The other way of sending, to queue or to steer, moves to {{shortcut}}.",
+        "sendWithModEnterSearchNewLine": "new line",
+        "sendWithModEnterSearchShortcut": "keyboard shortcut",
+        "followUpBehaviorCopyModEnter": "Messages sent while the agent works wait as cards until the turn ends, instead of going into the running turn. {{shortcut}} does the opposite for one message, and with nothing typed steers the first waiting card into the running turn. Messages with images wait as cards too.",
         "promptSuggestionsTitle": "Suggested prompts",
         "promptSuggestionsCopy": "After Claude replies, its guess at your next message shows in the empty message box. Press Tab to use it. Each guess is an extra request that counts toward your Claude usage.",
         "promptSuggestionsSearchNext": "next prompt",
