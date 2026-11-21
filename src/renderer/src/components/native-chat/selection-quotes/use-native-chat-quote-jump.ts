@@ -77,7 +77,7 @@ export function useNativeChatQuoteJump({
   beginNavigation: () => void
   readerLeavesEnd: () => void
   startHistoryJump: ReturnType<typeof useNativeChatHistoryJump>['start']
-  /** This chat; a source from another chat is not here, so its jump pages nothing. */
+  /** This chat; a source from another chat that is not loaded here pages nothing. */
   sessionKey: string
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
@@ -106,9 +106,6 @@ export function useNativeChatQuoteJump({
   }, [reveal])
   return useCallback(
     ({ messageId, place, chat }, text, notifyMissing, isCurrent, shown) => {
-      if (chat !== undefined && chat !== sessionKey) {
-        return false
-      }
       const show = (scroller: HTMLElement): boolean => {
         // By the message id: a tool run's member rows use data-index too.
         const source = scroller.querySelector<HTMLElement>(
@@ -122,6 +119,10 @@ export function useNativeChatQuoteJump({
       }
       if (reveal(messageId, show, isCurrent, notifyMissing)) {
         return true
+      }
+      // A loaded message is here whatever its chat; the chat only rules out paging this chat.
+      if (chat !== undefined && chat !== sessionKey) {
+        return false
       }
       // A long chat keeps only its latest messages loaded, for example after a send. The link landing
       // takes the reader off the end. Back and Forward do not page: they ask each transcript.
