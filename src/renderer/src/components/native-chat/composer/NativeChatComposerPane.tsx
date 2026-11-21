@@ -129,7 +129,6 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       structuredWorktreeId: structuredTransport?.worktreeId,
       structuredSessionId: structuredTransport?.sessionId,
       targetPtyId,
-      setActiveSuggestion,
       caret,
       notices
     })
