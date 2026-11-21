@@ -33,6 +33,7 @@ Features:
 - **Chat CLI.** `orca chat list`, `orca chat read` and `orca chat send` let an agent read and message other chats ([#2](https://github.com/dluxhu/orca/pull/2)).
 - **Mention chats and terminals.** Type `@` in a chat to mention another chat or terminal of the same host ([#10](https://github.com/dluxhu/orca/pull/10)).
 - **Mention chats on other hosts.** The `@` menu also lists the chats and terminals of the host's saved environments, and the agent gets the `--environment` to reach them ([#29](https://github.com/dluxhu/orca/pull/29)).
+- **Open a mentioned chat.** In a sent message, a click on a mention chip opens that chat or terminal ([#42](https://github.com/dluxhu/orca/pull/42)).
 - **Quote chips.** "Add to chat" quotes show as chips; type a comment right after each chip, on its line; a click jumps back to the quoted text and highlights it ([#12](https://github.com/dluxhu/orca/pull/12)).
 - **Shorter long quotes.** A long quote of a recent reply in the same chat goes to the agent shortened, since the agent has that reply already; the chat still shows the full quote ([#31](https://github.com/dluxhu/orca/pull/31)).
 - **Back to the quote.** After a quote chip jumps to its source, Back returns to the quote and Forward goes to the source again ([#26](https://github.com/dluxhu/orca/pull/26)).
@@ -40,6 +41,7 @@ Features:
 - **Show raw.** A "Show raw" button in a chat's title bar opens a panel with the exact messages sent to the agent and what comes back ([#33](https://github.com/dluxhu/orca/pull/33)).
 - **Plain bare #numbers in chat.** A project setting, "Link bare #numbers in chat" (on by default). Turn it off, and a bare `#123` or `PR #123` in a chat stays text; `owner/repo#123` still links ([#39](https://github.com/dluxhu/orca/pull/39)).
 - **Automatic compaction divider.** When Claude Code compacts its context on its own, the chat shows a "Context compacted automatically" divider, also after the chat is read again from the Claude transcript ([#40](https://github.com/dluxhu/orca/pull/40)).
+- **Sender names across Orcas.** Mail from a chat on another Orca shows that chat's name to the agent, and a click on the "Message from" card opens the chat on its Orca ([#41](https://github.com/dluxhu/orca/pull/41)).
 - **Stable and Nightly.** The release channel switcher lists Stable and Nightly. Nightly is a separate app that updates itself to newer Nightly builds; the stable app never takes a Nightly build ([#38](https://github.com/dluxhu/orca/pull/38)).
 
 Fixes:
