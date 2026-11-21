@@ -23,6 +23,7 @@ import { nativeChatSlotIndexOf } from '../../conversation/slots/native-chat-tran
 import type { NativeChatTranscriptSlot } from '../../conversation/slots/native-chat-transcript-slots'
 import { nativeChatRailJumpStep, useNativeChatHistoryJump } from './use-native-chat-history-jump'
 import { useNativeChatRailJumpLanding } from './use-native-chat-rail-jump-landing'
+import { useNativeChatQuoteJump } from '../../selection-quotes/use-native-chat-quote-jump'
 import type { NativeChatAlignEdge } from '../virtualization/use-native-chat-viewport-align'
 
 type NavigationRequest =
@@ -211,6 +212,15 @@ export function useNativeChatNavigation({
     beginNavigation()
     scrollToBottom()
   }, [beginNavigation, scrollToBottom])
+  const jumpToQuote = useNativeChatQuoteJump({
+    slots,
+    scrollRef,
+    request,
+    beginNavigation,
+    readerLeavesEnd,
+    startHistoryJump,
+    sessionKey
+  })
   useNativeChatRailJumpLanding({
     railJump: request.railJump,
     slots,
@@ -225,6 +235,7 @@ export function useNativeChatNavigation({
     selectRailItem,
     revealDiff,
     jumpToLatest,
+    jumpToQuote,
     pendingRailId: historyJump.pending?.kind === 'rail' ? historyJump.pending.id : null
   }
 }
