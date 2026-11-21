@@ -323,6 +323,24 @@ describe('agent mail between paired Orca servers', () => {
     expect(formatMessageBanner(back!)).toContain(`From: Build doctor (${CHAT_ON_B} on Build Box)`)
   })
 
+  it('drops the link of mail that claims to come from a chat of this Orca', async () => {
+    vi.spyOn(a.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
+    vi.spyOn(b.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
+    const send = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.send')!
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test double carrying only the fields the code under test reads.
+    await send.handler({ from: CHAT_ON_A, on: 'devB', to: 'term_b', subject: 'Plan?' }, {
+      runtime: a.runtime,
+      orchestrationCaller: {
+        address: CHAT_ON_A,
+        terminalHandle: null,
+        orcaSessionId: CHAT_ON_A.slice(16),
+        paneKey: null
+      }
+    } as unknown as RpcContext)
+    const [onB] = mailFor(b, 'term_b')
+    expect(readAnswerSenderSnapshot(onB!.answer_sender_snapshot)?.origin).toBeUndefined()
+  })
+
   it('keeps the sender label of mail whose Orca sent no name or location', async () => {
     vi.spyOn(a.runtime, 'readStoreInstallationId').mockRejectedValue(new Error('no profile'))
     await mutation(a, 'orchestration.send', {

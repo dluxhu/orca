@@ -28,8 +28,6 @@ import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtim
 import type { AgentMessageSender } from '../../../../../../shared/agent-session/journal/agent-session-message-source'
 import type { Tab } from '../../../../../../shared/workspace-layout/tab-groups/tab-types'
 import { useBotForWorkspace } from '@/components/bots/bot-workspace'
-import { useRuntimeStatusByEnvironmentId } from '@/store/slices/runtime-status/views/use-runtime-status-view'
-import type { RuntimeStatuses } from '@/store/slices/runtime-status/views/runtime-status-owner'
 import { runtimeTargetForInstallation } from '@/runtime/hosts/selection/runtime-target-for-installation'
 import { parseOrcaSessionAddress } from '../../../../../../shared/agent-session/identity/orca-session-address'
 import type { Bot } from '../../../../../../shared/bot-types'
@@ -156,15 +154,22 @@ function labelSourceSelector(
 }
 
 /** A chat on another Orca, by the host this window reaches that Orca through. */
-function originSourceSelector(
-  hostId: string,
-  sessionId: string,
-  statuses: RuntimeStatuses
-): (state: AppState) => LabelSource {
+function originSourceSelector(hostId: string, sessionId: string): (state: AppState) => LabelSource {
   let previous: LabelSource = { host: null, worktreeId: null }
+  let hostInputs: unknown[] = []
+  let host: string | null = null
   return (state) => {
-    const target = runtimeTargetForInstallation(state, statuses, hostId)
-    const host = target ? executionHostIdForStructuredTarget(target) : null
+    // The host lookup reads every host status, so it runs only when those inputs change.
+    const inputs = [
+      state.runtimeStatusByEnvironmentId,
+      state.ownLineageInstallationId,
+      state.removedRuntimeEnvironmentIds
+    ]
+    if (inputs.some((value, index) => value !== hostInputs[index])) {
+      hostInputs = inputs
+      const target = runtimeTargetForInstallation(state, state.runtimeStatusByEnvironmentId, hostId)
+      host = target ? executionHostIdForStructuredTarget(target) : null
+    }
     const tab = host ? findAgentMessageSenderChatTab(state, sessionId, host) : undefined
     if (host !== previous.host || tab !== previous.tab) {
       previous = {
@@ -187,13 +192,12 @@ function useAgentMessageSenderChat(
   const { address, orcaSessionId, terminalHandle } = sender?.party ?? {}
   const originHost = sender?.origin?.hostId
   const originSession = sender?.origin ? parseOrcaSessionAddress(sender.origin.address) : null
-  const statuses = useRuntimeStatusByEnvironmentId()
   const stableTarget = useStableSenderTarget(target)
   const select = useMemo(
     () =>
       // A chat on another Orca is named from that Orca, when this window reaches it.
       originHost && originSession
-        ? originSourceSelector(originHost, originSession, statuses)
+        ? originSourceSelector(originHost, originSession)
         : labelSourceSelector(
             address !== undefined
               ? {
@@ -214,8 +218,7 @@ function useAgentMessageSenderChat(
       stableTarget,
       dispatchId,
       originHost,
-      originSession,
-      statuses
+      originSession
     ]
   )
   return useLeasedSenderSelector(NO_ROWS, select)

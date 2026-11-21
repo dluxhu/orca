@@ -42,7 +42,7 @@ export async function openOnOrcaHost(
     toast.info(
       translate(
         'components.native-chat.agentMessage.hostNotConnected',
-        '{{name}} is on another Orca host, and this window is not connected to it.',
+        '{{name}} is on a host this window is not connected to.',
         { name: label }
       )
     )
