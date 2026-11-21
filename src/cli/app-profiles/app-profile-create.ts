@@ -36,6 +36,7 @@ import { RuntimeClientError } from '../runtime/connection/types'
 const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
 const NOTIFICATION_HELPER = 'orca-notification-status'
+const ELECTRON_FRAMEWORK = 'Electron Framework.framework'
 // The default app uses 6768 and its fallback ladder up to 6799.
 const DEFAULT_APP_PORTS = { first: 6768, last: 6799 }
 const PROFILE_PORT_BASE = 6800
@@ -161,12 +162,15 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
           helpers.push(join(contents, 'MacOS', entry))
         }
       }
-      // Electron helper apps are copies, so they find the profile as their main bundle.
+      // Electron helper apps are copies, so they find the profile as their main bundle. Helpers
+      // crash at start when the Electron framework is a link (slice 1, U4), so it is an APFS clone.
       for (const entry of readdirSync(join(source, 'Frameworks'))) {
         const from = join(source, 'Frameworks', entry)
         const to = join(contents, 'Frameworks', entry)
         if (entry.endsWith('.app')) {
           run('/usr/bin/ditto', [from, to])
+        } else if (entry === ELECTRON_FRAMEWORK) {
+          run('/bin/cp', ['-cR', from, to])
         } else {
           symlinkSync(from, to)
         }
@@ -269,9 +273,13 @@ function withRegistryLock<T>(root: string, body: () => T): T {
 export function runProfilesCreate(argv: string[]): void {
   const portIndex = argv.indexOf('--port')
   const port = portIndex === -1 ? undefined : Number(argv[portIndex + 1])
-  const rest = portIndex === -1 ? argv : argv.filter((_, i) => i !== portIndex && i !== portIndex + 1)
+  const rest =
+    portIndex === -1 ? argv : argv.filter((_, i) => i !== portIndex && i !== portIndex + 1)
   if (rest.length !== 1) {
-    throw new RuntimeClientError('invalid_argument', 'Usage: orca profiles create <name> [--port N]')
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Usage: orca profiles create <name> [--port N]'
+    )
   }
   if (process.platform !== 'darwin') {
     throw new RuntimeClientError('unsupported_platform', 'Profiles are only on macOS.')
@@ -280,7 +288,10 @@ export function runProfilesCreate(argv: string[]): void {
   const executable = getPackagedElectronExecutable() ?? process.execPath
   const defaultAppPath = getMacAppBundlePath(executable)
   if (!defaultAppPath) {
-    throw new RuntimeClientError('invalid_argument', 'Run this command with the orca CLI of an Orca app.')
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Run this command with the orca CLI of an Orca app.'
+    )
   }
   const entry = createAppProfile({ name: rest[0], port, defaultAppPath })
   process.stdout.write(`${JSON.stringify(entry, null, 2)}\n`)

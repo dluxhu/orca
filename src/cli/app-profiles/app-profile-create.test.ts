@@ -1,5 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -51,9 +59,16 @@ beforeEach(() => {
   file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
   file(join(contents, 'MacOS', 'orca-keyboard-layout'), 'layout')
   file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
-  file(join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents', 'MacOS', 'h'), 'helper')
+  file(
+    join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents', 'MacOS', 'h'),
+    'helper'
+  )
+  file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
-  file(join(contents, 'Resources', 'profile-template', 'orca-notification-status'), 'profile variant')
+  file(
+    join(contents, 'Resources', 'profile-template', 'orca-notification-status'),
+    'profile variant'
+  )
   calls = []
 })
 
@@ -79,7 +94,13 @@ function plistValue(path: string, key: string): string | null {
 
 describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
   it('builds the thin bundle: copied executables and helpers, linked frameworks and resources', () => {
-    const entry = createAppProfile({ name: 'Orca - Work', defaultAppPath: app, env: env(), run, now: () => 1 })
+    const entry = createAppProfile({
+      name: 'Orca - Work',
+      defaultAppPath: app,
+      env: env(),
+      run,
+      now: () => 1
+    })
     const contents = join(entry.appPath, 'Contents')
     expect(entry).toEqual({
       id: 'orca-work',
@@ -93,10 +114,20 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     const isLink = (path: string): boolean => lstatSync(path).isSymbolicLink()
     expect(isLink(join(contents, 'MacOS', 'Orca'))).toBe(false)
     expect(lstatSync(join(contents, 'MacOS', 'Orca')).mode & 0o111).not.toBe(0)
-    expect(readFileSync(join(contents, 'MacOS', 'orca-notification-status'), 'utf8')).toBe('profile variant')
+    expect(readFileSync(join(contents, 'MacOS', 'orca-notification-status'), 'utf8')).toBe(
+      'profile variant'
+    )
     expect(isLink(join(contents, 'Frameworks', 'Orca Helper (Renderer).app'))).toBe(false)
-    expect(readlinkSync(join(contents, 'Frameworks', 'Electron Framework.framework'))).toBe(
-      join(app, 'Contents', 'Frameworks', 'Electron Framework.framework')
+    // The Electron framework is a clone: helpers crash when it is a link (slice 1, U4).
+    expect(isLink(join(contents, 'Frameworks', 'Electron Framework.framework'))).toBe(false)
+    expect(
+      readFileSync(
+        join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'),
+        'utf8'
+      )
+    ).toBe('fw')
+    expect(readlinkSync(join(contents, 'Frameworks', 'Squirrel.framework'))).toBe(
+      join(app, 'Contents', 'Frameworks', 'Squirrel.framework')
     )
     expect(isLink(join(contents, 'Resources'))).toBe(false)
     expect(readlinkSync(join(contents, 'Resources', 'app.asar'))).toBe(
@@ -127,7 +158,9 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     }
     expect(calls.at(-1)).toEqual([expect.stringMatching(/lsregister$/), '-f', entry.appPath])
 
-    expect(JSON.parse(readFileSync(join(entry.userDataPath, 'orca-app-profile.json'), 'utf8'))).toEqual({
+    expect(
+      JSON.parse(readFileSync(join(entry.userDataPath, 'orca-app-profile.json'), 'utf8'))
+    ).toEqual({
       id: 'orca-work'
     })
     const registry = JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))

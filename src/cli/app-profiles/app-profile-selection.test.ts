@@ -58,8 +58,8 @@ describe('selectAppProfile', () => {
   })
 
   it('names the known profiles for an unknown id', () => {
-    expect(() => selectAppProfile(['--profile', 'nope', 'status'], { ORCA_PROFILES_ROOT: root })).toThrow(
-      'No profile "nope". Profiles: default, work.'
-    )
+    expect(() =>
+      selectAppProfile(['--profile', 'nope', 'status'], { ORCA_PROFILES_ROOT: root })
+    ).toThrow('No profile "nope". Profiles: default, work.')
   })
 })

@@ -9,6 +9,7 @@ import { getOptionalServeBind, resolveServeBindValue } from '../runtime/commands
 import { formatServeServiceInstall, formatServeServiceStatus } from './serve-service-format'
 import { resolveLaunchUserDataPath } from '../runtime/profile/launch-user-data-path'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
+import { readAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
 import {
   clearServeSupervisorBrake,
   readServeSupervisorBrake
@@ -60,6 +61,29 @@ function resolveServeServiceBind(raw: string | null | undefined): string | null 
   return resolveServeBindValue(raw)
 }
 
+// The service manager starts the unit with the login HOME. A profile's server must see the
+// same home and agent folders as the profile's terminal, or it writes to the shared ones.
+const APP_PROFILE_SERVICE_ENV_KEYS = [
+  'HOME',
+  'ORCA_HOME_DIR',
+  'CLAUDE_CONFIG_DIR',
+  'CODEX_HOME',
+  'GROK_HOME',
+  'ORCA_PROFILES_ROOT'
+]
+
+export function appProfileServiceEnv(
+  userDataPath: string,
+  env: NodeJS.ProcessEnv
+): Record<string, string> {
+  if (readAppProfileMarker(userDataPath) === null) {
+    return {}
+  }
+  return Object.fromEntries(
+    APP_PROFILE_SERVICE_ENV_KEYS.flatMap((key) => (env[key] ? [[key, env[key]]] : []))
+  )
+}
+
 /** Build the platform service unit after validating all serve network options. */
 function serviceSpec(
   deps: ServeServiceDeps,
@@ -72,11 +96,13 @@ function serviceSpec(
     refusePublic?: boolean
   }
 ): ServeServiceSpec {
+  const userDataPath = resolveLaunchUserDataPath(deps.env)
   return renderServeService({
     platform: deps.platform,
     homeDir: deps.homeDir,
     command: options.command,
-    userDataPath: resolveLaunchUserDataPath(deps.env),
+    userDataPath,
+    env: appProfileServiceEnv(userDataPath, deps.env),
     defaultUserDataPath: getPlatformUserDataPath(deps.platform, deps.homeDir),
     path: resolveServicePath(deps.env),
     port: options.port,

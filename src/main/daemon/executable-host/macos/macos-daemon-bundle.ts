@@ -84,12 +84,12 @@ export async function materializeMacDaemonBundle(
     throw new Error('Could not resolve the running macOS app bundle')
   }
   const appBundle = await realpath(appBundleForMainExecutable(running.executablePath))
-  // A profile app has no host of its own: it uses the default app's release host. Its framework
+  // A profile app has no host of its own: it uses the default app's release host. Its app.asar
   // link points into the default app. A real path, so that the copy is not a link back into it.
   const profile = getAppProfile() !== null
   const hostApp = profile
     ? resolve(
-        await realpath(join(appBundle, 'Contents', 'Frameworks', 'Electron Framework.framework')),
+        await realpath(join(appBundle, 'Contents', 'Resources', 'app.asar')),
         '..',
         '..',
         '..'

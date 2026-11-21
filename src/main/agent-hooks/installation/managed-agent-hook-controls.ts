@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../../app-profiles/app-profile'
 import type {
   AgentHookInstallStatus,
   AgentHookTarget
@@ -130,10 +131,24 @@ async function refreshExistingManagedScripts(options: InstallOptions): Promise<v
   }
 }
 
+// Fork patch: the agent configs and ~/.orca are shared until profile isolation lands
+// (docs/fork/profiles-design.md, section 3). A profile app changes no managed hook there.
+function appProfileSkips(agents: readonly AgentHookTarget[]): AgentHookInstallStatus[] | null {
+  return isAppProfileRuntime()
+    ? agents.map((agent) =>
+        skippedStatus(agent, 'hooks_disabled', 'An app profile installs no agent hooks yet.')
+      )
+    : null
+}
+
 export async function installManagedAgentHooks(
   settings: ManagedHookSettings = null,
   options: InstallOptions = {}
 ): Promise<AgentHookInstallStatus[]> {
+  const profileSkips = appProfileSkips(selectedInstallers(options).map(([agent]) => agent))
+  if (profileSkips) {
+    return profileSkips
+  }
   await refreshExistingManagedScripts(options)
   const installers = selectedInstallers(options)
   const disabled = new Set(normalizeDisabledTuiAgents(settings?.disabledTuiAgents))
@@ -202,6 +217,12 @@ export async function removeManagedAgentHooks(
   options: RemoveOptions = {}
 ): Promise<AgentHookInstallStatus[]> {
   const allowed = options.agents ? new Set(options.agents) : null
+  const profileSkips = appProfileSkips(
+    MANAGED_AGENT_HOOK_REMOVERS.map(([agent]) => agent).filter((a) => allowed?.has(a) ?? true)
+  )
+  if (profileSkips) {
+    return profileSkips
+  }
   const results: AgentHookInstallStatus[] = []
   for (const [agent, remove] of MANAGED_AGENT_HOOK_REMOVERS) {
     if (allowed !== null && !allowed.has(agent)) {
@@ -220,6 +241,12 @@ export async function removeManagedAgentHooksAsync(
   options: RemoveOptions = {}
 ): Promise<AgentHookInstallStatus[]> {
   const allowed = options.agents ? new Set(options.agents) : null
+  const profileSkips = appProfileSkips(
+    MANAGED_AGENT_HOOK_ASYNC_REMOVERS.map(([agent]) => agent).filter((a) => allowed?.has(a) ?? true)
+  )
+  if (profileSkips) {
+    return profileSkips
+  }
   return await Promise.all(
     MANAGED_AGENT_HOOK_ASYNC_REMOVERS.filter(
       ([agent]) => allowed === null || allowed.has(agent)
