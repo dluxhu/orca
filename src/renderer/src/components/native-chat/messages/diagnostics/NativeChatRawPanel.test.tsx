@@ -163,7 +163,7 @@ function Chat({ tabId }: { tabId: string }): React.JSX.Element {
         focused
         colorScheme={undefined}
       />
-      <NativeChatRawFrame tabId={tabId} items={[]} panel={null}>
+      <NativeChatRawFrame tabId={tabId} items={[]}>
         transcript
       </NativeChatRawFrame>
     </TooltipProvider>
