@@ -27,6 +27,8 @@ import { remarkNativeChatFileDestinations } from './native-chat-markdown-file-de
 import { NativeChatLinkPeek } from '../links/previews/NativeChatLinkPeek'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
+import { withNativeChatAgentMentions } from './native-chat-agent-mentions'
+import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -54,6 +56,8 @@ type NativeChatMarkdownProps = Omit<
   streaming?: boolean
   /** The transcript row's identity, so reader choices inside the text outlive the row's mount. */
   rowKey?: string
+  /** The agents a sent message mentions: each `@label` of them shows as a chip. Keep it stable. */
+  agentMentions?: readonly SentAgentMention[]
 }
 
 /** Every chat surface rewrites `file:` destinations before sanitize can drop them. */
@@ -132,6 +136,7 @@ export function NativeChatMarkdown({
   rowKey,
   content,
   variant,
+  agentMentions,
   ...props
 }: NativeChatMarkdownProps): React.JSX.Element {
   const onLinkClick = useNativeChatLinkClick()
@@ -139,10 +144,13 @@ export function NativeChatMarkdown({
   const visualExtension = useNativeChatVisualMarkdownExtension(visualMessageId)
   const extension = useMemo(
     () =>
-      variant === 'document'
-        ? createNativeChatImageExtension(visualExtension, onLinkClick)
-        : withFileDestinations(visualExtension),
-    [onLinkClick, variant, visualExtension]
+      withNativeChatAgentMentions(
+        variant === 'document'
+          ? createNativeChatImageExtension(visualExtension, onLinkClick)
+          : withFileDestinations(visualExtension),
+        agentMentions
+      ),
+    [agentMentions, onLinkClick, variant, visualExtension]
   )
   const fileLinkExists = useNativeChatFileLinkExists(
     linkifyFilePaths && onLinkClick !== undefined,
