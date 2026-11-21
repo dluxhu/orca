@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { AppIdentity } from '../../../shared/app-lifecycle/identity/app-identity'
-import { FORK_IDENTITY } from '../../../shared/fork-identity'
+import { runtimeAppIdentity } from '../../app-profiles/app-profile'
 
 const BASE_APP_NAME = 'Orca'
 const BASE_APP_USER_MODEL_ID = 'com.stablyai.orca'
@@ -58,16 +58,18 @@ export function getDevInstanceIdentity(
   if (!isDev) {
     // Fork patch: the visible name after ready. The pre-ready name stays the package.json
     // `name` (`orca`), which selects the shared "orca Safe Storage" Keychain item.
+    // A profile app has its own name and bundle id.
+    const { productName, appId } = runtimeAppIdentity()
     return {
-      name: FORK_IDENTITY.productName,
-      appName: FORK_IDENTITY.productName,
+      name: productName,
+      appName: productName,
       isDev: false,
       devLabel: null,
       devBranch: null,
       devWorktreeName: null,
       devRepoRoot: null,
       dockBadgeLabel: null,
-      appUserModelId: FORK_IDENTITY.appId
+      appUserModelId: appId
     }
   }
 

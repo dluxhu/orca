@@ -63,6 +63,8 @@ import {
   logSingleInstanceLockFailure
 } from './profile-startup/single-instance-lock'
 import { SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE } from '../../shared/app-lifecycle/launch/single-instance-exit-code'
+import { getAppProfile } from '../app-profiles/app-profile'
+import { takeProfileFromServer } from '../app-profiles/app-profile-serve-exclusion'
 import { setAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { ElectronAppEnvironment } from '../host/electron-app-environment'
 import { installMainProcessTreeKillGate } from '../pty/process-retirement/own-chromium-tree-kill-guard'
@@ -192,6 +194,11 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Register before spawning so CLI/relay-shared tree killing can reach main's gate and breadcrumbs.
   installMainProcessTreeKillGate()
   configureDevUserDataPath(isDev)
+  // A profile app pins its own folder (docs/fork/profiles-design.md, section 1).
+  const appProfile = getAppProfile()
+  if (appProfile && !isDev && !app.commandLine.hasSwitch('user-data-dir')) {
+    app.setPath('userData', appProfile.userDataPath)
+  }
   configureOrcaUserDataPathEnv()
   // #16761: install the lazy environment accessor immediately after userData selection or early resolves can throw/memoize the wrong profile.
   setAppEnvironment(new ElectronAppEnvironment())
@@ -205,6 +212,10 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Electron fixes the Keychain service name before ready; dev userData is already pinned so renaming cannot shift it.
   if (state.devInstanceIdentity && shouldApplyPreReadyAppName(state.devInstanceIdentity)) {
     app.setName(state.devInstanceIdentity.appName)
+  }
+  // A profile has its own Keychain item ("orca-<id> Safe Storage"); userData is pinned already.
+  if (appProfile) {
+    app.setName(`orca-${appProfile.id}`)
   }
   state.startupDiagnosticsEnabled = isStartupDiagnosticsEnabled()
   if (state.startupDiagnosticsEnabled) {
@@ -224,6 +235,11 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
     setSpawnObserver(recordSubprocessSpawn)
   }
   startMainThreadChurnProbe({ extraStats: () => ({ diffCache: settledDiffCache.stats() }) })
+  // Before the instance locks: an Electron serve holds the same locks.
+  if (appProfile && !state.isServeMode && !takeProfileFromServer(getCanonicalUserDataPath())) {
+    app.exit(SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE)
+    return false
+  }
   // Lock after userData override so dev/packaged namespaces differ; concurrent dev copies also need separate profiles to avoid store corruption (#1326, #1312).
   const bypass = shouldBypassSingleInstanceLock({ isDev, isServeMode: state.isServeMode })
   const skip = shouldSkipSingleInstanceLock({ isDev, isServeMode: state.isServeMode })

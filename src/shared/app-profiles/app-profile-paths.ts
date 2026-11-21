@@ -1,0 +1,74 @@
+// App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
+/** The marker in a profile's userData. serve and orcad find the profile through it. */
+export const APP_PROFILE_MARKER = 'orca-app-profile.json'
+export const APP_PROFILES_REGISTRY = 'profiles.json'
+/** The Info.plist key that makes a bundle a profile app. */
+export const APP_PROFILE_PLIST_ID_KEY = 'OrcaAppProfileId'
+/** Info.plist key for a test root. `orca profiles create` writes it only when ORCA_PROFILES_ROOT is set. */
+export const APP_PROFILE_PLIST_ROOT_KEY = 'OrcaAppProfilesRoot'
+/** Overrides the folder that holds profiles.json and the profile userData folders. */
+export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
+/** Overrides the folder that holds the profile apps. */
+export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
+
+export type AppProfileEntry = {
+  id: string
+  name: string
+  bundleId: string
+  appPath: string
+  userDataPath: string
+  port: number
+  createdAt: number
+}
+
+export type AppProfileRegistry = {
+  version: 1
+  defaultAppPath: string
+  urlHandler: { mode: 'ask' } | { mode: 'profile'; profileId: string }
+  profiles: AppProfileEntry[]
+}
+
+export function appProfilesRoot(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env[APP_PROFILES_ROOT_ENV] || join(home, 'Library', 'Application Support', 'Orca Profiles')
+}
+
+export function appProfilesAppsDir(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env[APP_PROFILES_APPS_DIR_ENV] || join(home, 'Applications', 'Orca Profiles')
+}
+
+/** The profile id in a userData folder, or null when the folder is not a profile's. */
+export function readAppProfileMarker(userDataPath: string): string | null {
+  try {
+    const id = (JSON.parse(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8')) as {
+      id?: unknown
+    }).id
+    return typeof id === 'string' && id.length > 0 ? id : null
+  } catch {
+    return null
+  }
+}
+
+export function readAppProfileRegistry(root: string): AppProfileRegistry | null {
+  try {
+    return JSON.parse(readFileSync(join(root, APP_PROFILES_REGISTRY), 'utf8')) as AppProfileRegistry
+  } catch {
+    return null
+  }
+}
+
+/** One `<string>` value of a top-level key in an XML Info.plist. */
+export function readPlistString(xml: string, key: string): string | null {
+  const match = new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`).exec(xml)
+  return match
+    ? match[1]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&amp;/g, '&')
+    : null
+}
