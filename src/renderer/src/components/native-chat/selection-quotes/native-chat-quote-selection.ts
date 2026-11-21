@@ -42,7 +42,14 @@ export function readNativeChatQuotableSelection(
     return null
   }
   const messageId = source.getAttribute('data-native-chat-quote-source')
-  return { text, range, source: messageId ? { messageId, place: quotePlace(source, range) } : null }
+  // The transcript's scroller names its chat, so a quote keeps the chat of its source.
+  const chat = source
+    .closest('[data-native-chat-quote-chat]')
+    ?.getAttribute('data-native-chat-quote-chat')
+  const at = messageId
+    ? { messageId, place: quotePlace(source, range), ...(chat ? { chat } : {}) }
+    : null
+  return { text, range, source: at }
 }
 
 // Triple-click ranges can end outside the reply; check selected text edges instead of range endpoints.
