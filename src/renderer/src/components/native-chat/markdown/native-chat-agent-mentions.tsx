@@ -62,6 +62,8 @@ export function withNativeChatAgentMentions(
   if (!mentions?.length) {
     return extension
   }
+  // Another extension's span renderer still draws every other span.
+  const Span = extension.components.span
   return {
     ...extension,
     remarkPlugins: [...extension.remarkPlugins, [remarkNativeChatAgentMentions, mentions]],
@@ -71,15 +73,17 @@ export function withNativeChatAgentMentions(
     },
     components: {
       ...extension.components,
-      span: ({ node: _node, ...props }) => {
+      span: (props) => {
         const label = (props as Record<string, unknown>)['data-native-chat-agent-mention']
         // Raw HTML can carry the property too; only a mention of this message is a chip.
         const mention = mentions.find((candidate) => candidate.label === label)
-        return mention ? (
-          <AgentReferencePillContent label={mention.label} kind={mention.kind} selected={false} />
-        ) : (
-          <span {...props} />
-        )
+        if (mention) {
+          return (
+            <AgentReferencePillContent label={mention.label} kind={mention.kind} selected={false} />
+          )
+        }
+        const { node: _node, ...rest } = props
+        return typeof Span === 'function' ? <Span {...props} /> : <span {...rest} />
       }
     }
   }
