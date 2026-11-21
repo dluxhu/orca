@@ -221,7 +221,13 @@ export function NativeChatMarkdown({
               slackMentions,
               slackPeople
             )
-          : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions, slackPeople),
+          : withFileDestinations(
+              visualExtension,
+              mentionNames,
+              everyone,
+              slackMentions,
+              slackPeople
+            ),
         agentMentions
       ),
     [

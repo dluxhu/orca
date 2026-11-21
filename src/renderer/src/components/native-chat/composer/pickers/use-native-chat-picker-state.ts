@@ -6,7 +6,6 @@ import {
 } from '../editor/native-chat-composer-input'
 import {
   useCallback,
-  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -37,9 +36,9 @@ import { nativeChatPickerCommands } from '../../../../../../shared/native-chat/i
 import { useNativeChatSkills } from './use-native-chat-skills'
 import { completeNativeChatMention, type NativeChatMentionSession } from './native-chat-mentions'
 import { useNativeChatPreferredSuggestion } from './use-native-chat-preferred-suggestion'
+import { useNativeChatPickerOpenEvents } from './use-native-chat-picker-open-events'
 import {
   emitNativeChatPickerItemAccepted,
-  emitNativeChatPickerOpened,
   emitNativeChatSendClassified
 } from '@/components/native-chat/telemetry/native-chat-telemetry'
 
@@ -101,8 +100,6 @@ export function useNativeChatPickerState(args: {
     isComposing,
     sessionSkills,
     commandAvailable,
-    onPickerOpened,
-    onPickerDemand,
     skillsChecking = false,
     textareaRef,
     setDraft,
@@ -133,7 +130,6 @@ export function useNativeChatPickerState(args: {
     skillOriginRef.current = null
     setDismissed(null)
   })
-  const lastOpenKeyRef = useRef<string | null>(null)
   const derivedAutocomplete = useMemo<ComposerAutocomplete>(
     () =>
       recalledFromHistory || disabled
@@ -177,24 +173,7 @@ export function useNativeChatPickerState(args: {
     setActiveSuggestion
   )
 
-  useEffect(() => {
-    if (autocomplete.mode !== 'slash') {
-      lastOpenKeyRef.current = null
-      return
-    }
-    const openKey = `${dismissalContext}:${autocomplete.triggerKey}`
-    if (lastOpenKeyRef.current !== openKey) {
-      lastOpenKeyRef.current = openKey
-      emitNativeChatPickerOpened({ agent, prefix: autocomplete.prefix })
-      onPickerOpened?.()
-    }
-  }, [agent, autocomplete, dismissalContext, onPickerOpened])
-
-  const menuOpen = autocomplete.mode === 'slash'
-  useEffect(() => {
-    onPickerDemand?.(menuOpen)
-    return () => onPickerDemand?.(false)
-  }, [dismissalContext, menuOpen, onPickerDemand])
+  useNativeChatPickerOpenEvents(args, autocomplete, dismissalContext)
 
   // The editor may be ahead of this render when a key lands just before the pick.
   const liveDraft = useCallback((): [string, number] => {

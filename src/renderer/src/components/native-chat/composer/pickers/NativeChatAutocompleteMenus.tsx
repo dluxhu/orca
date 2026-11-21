@@ -331,19 +331,6 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
   const sessions = leading(listed, (value) => sessionOf(value) !== null)
   const option = (path: string, index: number) => {
     const session = sessionOf(path)
-    if (session) {
-      return (
-        <PickerOptionButton
-          key={path}
-          id={`${listboxId}-option-${index}`}
-          selected={index === selectedIndex}
-          activeItemRef={activeItemRef}
-          onChoose={() => onChoose(path)}
-        >
-          <NativeChatMentionLabel item={session} />
-        </PickerOptionButton>
-      )
-    }
     const member = room ? memberOf(path) : undefined
     const selected = index === selectedIndex
     const opens = member?.id && chats?.picker.offers(member.id) ? member.id : null
@@ -358,7 +345,11 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
         // Room for the Chats action; important, as the row's own px-2 comes later in the CSS.
         className={cn(member && 'items-center', opens && '!pr-20')}
       >
-        <NativeChatMentionOption value={path} member={member} />
+        {session ? (
+          <NativeChatMentionLabel item={session} />
+        ) : (
+          <NativeChatMentionOption value={path} member={member} />
+        )}
         {opens ? (
           <span className="sr-only">
             {t('components.native-chat.composer.chatsHint', 'Right arrow for chats')}
