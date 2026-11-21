@@ -799,13 +799,18 @@ and a profile app installed agent hooks into shared folders. Fix in slice 1:
   default app for `default`.
 
 **Isolation (slice 2, in this PR).** Each profile has its own home folders under
-`<userData>/orca-home`. The first module of the main process (`app-profile-early-env.ts`), the
-first module of `orcad` (`orcad-app-profile-env.ts`) and the CLI's `--profile` selection set the
-variables below in the process environment, before any other module reads a path. Terminals,
-serve, `orcad` and agent launches inherit them. A value that the user set stays. A value that
-another profile set is replaced, and the default app removes values that it inherits from a
-profile's terminal (`ORCA_APP_PROFILE_ENV_KEYS` names the values a profile set). A profile's serve
-LaunchAgent carries them too.
+`<userData>/orca-home`. The variables below are set in the process environment before any module
+reads a path: by the main bundle's banner (Rolldown loads shared chunks before the entry's first
+import, so an imported module is too late; `config/build-plugins/app-profile-homes-banner.ts`), by
+the first module of the `orcad` bundle entry (esbuild keeps import order in one file), and by the
+CLI's `--profile` selection. Terminals, serve, `orcad` and agent launches inherit them; a profile's
+serve LaunchAgent carries them too. A profile sets all of them to its own folders, also when the
+user set a value before the profile started. The default app removes only a profile's values: a
+value under a profile's `orca-home` folder (its userData has the profile marker). It keeps every
+other value. Path code is lazy: a static test fails on a helper call at module load.
+
+Known limit: a shell startup file that exports one of these variables overrides the profile's
+folder in that profile's terminals.
 
 | Variable | Profile folder | Moves (each CLI's docs or source) |
 | --- | --- | --- |
@@ -830,8 +835,12 @@ Every Orca site that builds one of these folders goes through `app-profile-homes
 (`getSystemCodexHomePath()`) follows `CODEX_HOME` from the profile. A static test fails when a raw
 `homedir()` path, an `os.homedir()` path to `.claude.json` or a `$HOME/.<agent>` template for one
 of these folders appears outside the helpers, unless the line reads the folder's variable first.
-Its allow-list names each exception and its reason (WSL guest homes, `orcad`'s data folder, the
-frozen hook command forms).
+It also flags a home held in a name (`join(home, '.codex')`) and `app.getPath('home')`. Its
+allow-list names each exception and its reason (WSL guest and other hosts' homes, Antigravity,
+test harnesses, binary folders, `orcad`'s data folder, the frozen hook command forms). Skill
+discovery, skill install roots (Gemini through `GEMINI_CLI_HOME`, CodeBuddy through
+`CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi) take the
+launch's variable, else the profile's folder.
 
 The Keychain item is per profile: the profile start sets the name `orca-<id>` before ready, so
 Electron uses "orca-<id> Safe Storage".
@@ -850,6 +859,9 @@ on each writer are the second one: a profile still installs no managed agent hoo
 command forms keep `${HOME-}/.orca` (the Codex form is frozen bytes that Codex approves by hash),
 so a later change that turns hooks on in a profile must first give the commands an
 `ORCA_HOME_DIR` form.
+
+Tests: the vitest real-home write guard also refuses writes to `~/.grok` and to the folders
+that a profile's terminal exports, and it clears those variables before each test file.
 
 **Other findings.**
 
