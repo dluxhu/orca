@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { NativeChatMentionItem } from './native-chat-mentions'
 
-const rowId = (item: NativeChatMentionItem): string =>
-  typeof item === 'string' ? `file:${item}` : `${item.kind}:${item.address}`
+/** One `@` menu row. Two hosts can share a session id, so a session row also names its host. */
+export const nativeChatMentionRowId = (item: NativeChatMentionItem): string =>
+  typeof item === 'string' ? `file:${item}` : `${item.hostKey}:${item.kind}:${item.address}`
 
 /** Rows that arrive with no edit (late sessions, late files) keep the highlighted row; an edit resets it. */
 export function useNativeChatMentionRowKeeper(
@@ -10,7 +11,7 @@ export function useNativeChatMentionRowKeeper(
   editKey: string,
   setActiveSuggestion: Dispatch<SetStateAction<number>>
 ): void {
-  const rowKey = items ? items.map(rowId).join('\0') : null
+  const rowKey = items ? items.map(nativeChatMentionRowId).join('\0') : null
   const shownRef = useRef<{ editKey: string; rowIds: string[] } | null>(null)
   // Why layout: the highlight moves before the menu paints, so Enter never picks a row that moved in.
   useLayoutEffect(() => {

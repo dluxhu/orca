@@ -15,6 +15,7 @@ import {
 } from './use-native-chat-mention-files'
 import type { NativeChatMentionItem } from './native-chat-mentions'
 import { NativeChatMentionLabel } from './NativeChatMentionLabel'
+import { nativeChatMentionRowId } from './use-native-chat-mention-row-keeper'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
@@ -392,7 +393,7 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
     <PickerListbox id={listboxId}>
       {items.map((item, index) => (
         <PickerOptionButton
-          key={typeof item === 'string' ? item : `${item.kind}:${item.address}`}
+          key={nativeChatMentionRowId(item)}
           id={`${listboxId}-option-${index}`}
           selected={index === selectedIndex}
           activeItemRef={activeItemRef}

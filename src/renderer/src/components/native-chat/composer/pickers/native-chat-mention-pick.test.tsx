@@ -15,6 +15,7 @@ import { promptTextContent } from '../editor/native-chat-prompt-document-text'
 import { serializeNativeChatAgentReferences } from './native-chat-agent-reference-send'
 import { completeNativeChatMention, type NativeChatMentionItem } from './native-chat-mentions'
 import { NativeChatMentionLabel } from './NativeChatMentionLabel'
+import { NativeChatMentionMenu } from './NativeChatAutocompleteMenus'
 import { useNativeChatMentionRowKeeper } from './use-native-chat-mention-row-keeper'
 
 const session = {
@@ -77,6 +78,19 @@ describe('picking a session from the @ menu', () => {
     )
   })
 
+  it('names the host on a chip from another host, and the send note mails it there', () => {
+    const { editor, input } = composer('ask @rel')
+    pick(input, { ...session, hostKey: 'local:laptop', environment: 'laptop' })
+    expect(chips(editor)).toEqual([
+      expect.objectContaining({
+        attrs: expect.objectContaining({ label: 'Release notes (laptop)', environment: 'laptop' })
+      })
+    ])
+    expect(serializeNativeChatAgentReferences(input.value, editor.getJSON())).toContain(
+      'orca orchestration send --on laptop --to orca_session_id:chat_aaaaaaaa --subject'
+    )
+  })
+
   it('turns a file pick into its @path text, with no chip', () => {
     const { editor, input } = composer('ask @rel')
     const commit = pick(input, 'docs/release.md')
@@ -97,13 +111,13 @@ describe('picking a session from the @ menu', () => {
   })
 })
 
-describe('mention rows that arrive with no edit', () => {
-  function useRows(items: NativeChatMentionItem[], editKey: string) {
-    const [active, setActive] = useState(0)
-    useNativeChatMentionRowKeeper(items, editKey, setActive)
-    return { active, setActive }
-  }
+function useRows(items: NativeChatMentionItem[], editKey: string) {
+  const [active, setActive] = useState(0)
+  useNativeChatMentionRowKeeper(items, editKey, setActive)
+  return { active, setActive }
+}
 
+describe('mention rows that arrive with no edit', () => {
   it('keep the highlighted row until the next edit', () => {
     const initialProps: { items: NativeChatMentionItem[]; editKey: string } = {
       items: ['a.ts', 'b.ts'],
@@ -119,15 +133,53 @@ describe('mention rows that arrive with no edit', () => {
   })
 })
 
+describe('the same session id on two hosts', () => {
+  const laptop = { ...session, hostKey: 'local:laptop', environment: 'laptop' }
+
+  it('keeps the highlighted row on its own host when a late list arrives', () => {
+    const initialProps: { items: NativeChatMentionItem[]; editKey: string } = {
+      items: [laptop],
+      editKey: '1'
+    }
+    const view = renderHook(({ items, editKey }) => useRows(items, editKey), { initialProps })
+    view.rerender({ items: [session, laptop], editKey: '1' })
+    expect(view.result.current.active).toBe(1)
+  })
+
+  it('renders one menu row for each host, with no duplicate key', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const menu = render(
+      <NativeChatMentionMenu
+        mention={{ files: [], loading: false, failed: false, sessions: [session, laptop] }}
+        activeIndex={0}
+        listboxId="mentions"
+        onChoose={() => {}}
+      />
+    )
+    expect(menu.getAllByRole('option').map((row) => row.textContent)).toEqual([
+      'Release notes Chat · This host · repo/main',
+      'Release notes Chat · laptop · repo/main'
+    ])
+    expect(errors.mock.calls.flat().join(' ')).not.toContain('same key')
+    errors.mockRestore()
+  })
+})
+
 describe('what a screen reader hears', () => {
-  it('names a session row by name, kind and workspace', () => {
+  it('names a session row by name, kind, host and workspace', () => {
     const row = render(
       <button type="button">
         <NativeChatMentionLabel item={session} />
       </button>
     )
-    expect(row.getByRole('button').textContent).toBe('Release notes Chat · repo/main')
-    expect(row.getByRole('button', { name: 'Release notes Chat repo/main' })).toBeTruthy()
+    expect(row.getByRole('button').textContent).toBe('Release notes Chat · This host · repo/main')
+    expect(row.getByRole('button', { name: 'Release notes Chat This host repo/main' })).toBeTruthy()
+    const remote = render(
+      <button type="button">
+        <NativeChatMentionLabel item={{ ...session, environment: 'laptop' }} />
+      </button>
+    )
+    expect(remote.getByRole('button', { name: 'Release notes Chat laptop repo/main' })).toBeTruthy()
   })
 
   it('says the kind of a chat or terminal chip', () => {

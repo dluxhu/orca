@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { JSONContent } from '@tiptap/react'
 import { agentReferenceToken } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
-import {
-  filterNativeChatMentionSessions,
-  listNativeChatMentionSessions
-} from './native-chat-mentions'
+import { listNativeChatMentionSessionRows } from '../../../../../../shared/native-chat/native-chat-mention-sessions'
+import { filterNativeChatMentionSessions } from './native-chat-mentions'
 import { serializeNativeChatAgentReferences } from './native-chat-agent-reference-send'
 
 const agent = (paneKey: string, name: string, parentPaneKey: string | null = null) => ({
@@ -64,9 +62,12 @@ const terminals = {
   ]
 }
 
-describe('listNativeChatMentionSessions', () => {
+const local = (rows: ReturnType<typeof listNativeChatMentionSessionRows>) =>
+  rows.map((row) => ({ ...row, hostKey: 'local' }))
+
+describe('listNativeChatMentionSessionRows', () => {
   it('lists top-level chats and live terminals, without the composer itself', () => {
-    const sessions = listNativeChatMentionSessions(ps, terminals, 'local', {
+    const sessions = listNativeChatMentionSessionRows(ps, terminals, {
       sessionId: 'chat_bbbbbbbb',
       ptyId: 'pty-2'
     })
@@ -75,16 +76,15 @@ describe('listNativeChatMentionSessions', () => {
         kind: 'chat',
         label: 'Release notes',
         address: 'orca_session_id:chat_aaaaaaaa',
-        hostKey: 'local',
         detail: 'repo/main'
       },
-      { kind: 'terminal', label: 'Runner', address: 'term_one', hostKey: 'local', detail: 'main' }
+      { kind: 'terminal', label: 'Runner', address: 'term_one', detail: 'main' }
     ])
   })
 
   it('marks a terminal with no agent row as a plain shell', () => {
     expect(
-      listNativeChatMentionSessions(ps, terminals, 'local', {}).map((s) => [s.address, s.kind])
+      listNativeChatMentionSessionRows(ps, terminals, {}).map((s) => [s.address, s.kind])
     ).toEqual([
       ['orca_session_id:chat_aaaaaaaa', 'chat'],
       ['orca_session_id:chat_bbbbbbbb', 'chat'],
@@ -94,14 +94,23 @@ describe('listNativeChatMentionSessions', () => {
   })
 
   it('keeps the other kind when one list failed', () => {
-    expect(
-      listNativeChatMentionSessions(null, terminals, 'local', {}).map((s) => s.address)
-    ).toEqual(['term_one', 'term_two'])
+    expect(listNativeChatMentionSessionRows(null, terminals, {}).map((s) => s.address)).toEqual([
+      'term_one',
+      'term_two'
+    ])
   })
 
   it('filters by name, ignoring case', () => {
-    const sessions = listNativeChatMentionSessions(ps, terminals, 'local', {})
+    const sessions = local(listNativeChatMentionSessionRows(ps, terminals, {}))
     expect(filterNativeChatMentionSessions(sessions, 'RUN').map((s) => s.label)).toEqual(['Runner'])
+  })
+
+  it('filters by workspace name too', () => {
+    const sessions = local(listNativeChatMentionSessionRows(ps, terminals, {}))
+    expect(filterNativeChatMentionSessions(sessions, 'REPO/').map((s) => s.label)).toEqual([
+      'Release notes',
+      'This chat'
+    ])
   })
 })
 
@@ -146,6 +155,71 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
         '[Orca terminal "Build": term_two — send it input with orca terminal send --terminal term_two --text <text> --enter, and read its output with orca terminal read --terminal term_two]'
       ].join('\n')
     )
+  })
+
+  it('names the environment of a chat or terminal on another host', () => {
+    const chat = {
+      label: 'Notes (laptop)',
+      address: 'orca_session_id:chat_aaaaaaaa',
+      hostKey: 'local:laptop',
+      kind: 'chat' as const,
+      environment: 'laptop'
+    }
+    const terminal = {
+      label: 'Runner (my box)',
+      address: 'term_one',
+      hostKey: 'local:my box',
+      kind: 'terminal' as const,
+      environment: 'my box'
+    }
+    const shell = {
+      label: 'Build (my box)',
+      address: 'term_two',
+      hostKey: 'local:my box',
+      kind: 'shell' as const,
+      environment: 'my box'
+    }
+    const document: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'nativeChatAgentReference', attrs: chat },
+            { type: 'text', text: ' ' },
+            { type: 'nativeChatAgentReference', attrs: terminal },
+            { type: 'text', text: ' ' },
+            { type: 'nativeChatAgentReference', attrs: shell }
+          ]
+        }
+      ]
+    }
+    const text = `${agentReferenceToken(chat)} ${agentReferenceToken(terminal)} ${agentReferenceToken(shell)}`
+    expect(serializeNativeChatAgentReferences(text, document)).toBe(
+      [
+        '@Notes (laptop) @Runner (my box) @Build (my box)',
+        '',
+        '[Orca chat "Notes (laptop)": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --on laptop --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Runner (my box)": term_one — message it with orca orchestration send --on \'my box\' --to term_one --subject "<topic>" --body "<message>"]',
+        "[Orca terminal \"Build (my box)\": term_two — send it input with orca terminal send --environment 'my box' --terminal term_two --text <text> --enter, and read its output with orca terminal read --environment 'my box' --terminal term_two]"
+      ].join('\n')
+    )
+  })
+
+  it('passes an environment name that starts with a dash as --on=<name>', () => {
+    const chat = {
+      label: 'Notes (-x)',
+      address: 'orca_session_id:chat_aaaaaaaa',
+      hostKey: 'local:-x',
+      kind: 'chat' as const,
+      environment: '-x'
+    }
+    const document: JSONContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'nativeChatAgentReference', attrs: chat }] }]
+    }
+    const sent = serializeNativeChatAgentReferences(agentReferenceToken(chat), document)
+    expect(sent).toContain('orca orchestration send --on=-x --to orca_session_id:chat_aaaaaaaa')
   })
 
   it('keeps the orchestration note for a reference without a kind', () => {
