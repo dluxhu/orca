@@ -3,6 +3,7 @@ import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcr
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
 import type { useNativeChatHistoryJump } from '../viewport/navigation/use-native-chat-history-jump'
+import { subscribeLinkOpenRequests } from '@/lib/links/link-open-request'
 import { showQuotedText } from './native-chat-quote-highlight'
 import type { NativeChatQuoteJumpDeps } from './native-chat-quote-sources'
 
@@ -22,8 +23,8 @@ export type NativeChatMessageReveal = (
 
 const ALWAYS_CURRENT = (): boolean => true
 
-// About half a second: the landing draws a loaded row well before this.
-const SOURCE_FRAMES = 30
+// The landing draws a loaded row well before this, whatever the display's frame rate.
+const SOURCE_WAIT_MS = 500
 
 /** The message reveal of each mounted transcript. Back and Forward use it to show a chat place. */
 export const nativeChatMessageReveals = new Set<NativeChatMessageReveal>()
@@ -31,7 +32,7 @@ export const nativeChatMessageReveals = new Set<NativeChatMessageReveal>()
 /** The transcript's jump to a quoted message; null outside a transcript. */
 export const NativeChatQuoteJumpContext = createContext<NativeChatQuoteJump | null>(null)
 
-/** Gives the scroller to `show` on each frame until `show` returns true, for about half a second. */
+/** Gives the scroller to `show` on each frame until `show` returns true, for half a second. */
 function showWhenDrawn(
   scrollRef: RefObject<HTMLDivElement | null>,
   show: (scroller: HTMLElement) => boolean,
@@ -40,16 +41,18 @@ function showWhenDrawn(
 ): void {
   // The landing scrolls in a layout effect; the row is drawn two frames later or more.
   let frame = 0
+  let deadline = 0
   const step = (): void => {
     if (!isCurrent()) {
       return
     }
     frame++
+    deadline ||= performance.now() + SOURCE_WAIT_MS
     const scroller = frame < 2 ? null : scrollRef.current
     if (scroller && show(scroller)) {
       return
     }
-    if (frame < SOURCE_FRAMES) {
+    if (performance.now() < deadline) {
       requestAnimationFrame(step)
     } else {
       notifyMissing?.()
@@ -130,9 +133,12 @@ export function useNativeChatQuoteJump({
         return false
       }
       // A long chat keeps only its latest messages loaded, for example after a send. The link landing
-      // takes the reader off the end. Back and Forward do not page: they ask each transcript.
+      // takes the reader off the end. Back and Forward do not page: they ask each transcript. A newer
+      // link open stops the paging before it lands here.
       beginNavigation()
+      const stop = subscribeLinkOpenRequests(beginNavigation)
       startHistoryJump({ kind: 'item', id: messageId }, (result) => {
+        stop()
         if (result === 'landed') {
           showWhenDrawn(scrollRef, show, isCurrent, notifyMissing)
         } else if (result === 'missing' && isCurrent()) {
