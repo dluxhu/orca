@@ -54,6 +54,24 @@ function remarkNativeChatAgentMentions(mentions: readonly SentAgentMention[]) {
   return (tree: Root) => walk(tree)
 }
 
+/** The typed text with each mention as plain Markdown text: the note's `\[` escape starts math.
+ *  The body frames a label as the note does; a character reference keeps each sign literal. */
+export function plainNativeChatAgentMentions(
+  body: string,
+  mentions: readonly SentAgentMention[]
+): string {
+  return [...mentions]
+    .sort((a, b) => b.label.length - a.label.length)
+    .reduce(
+      (text, { label }) =>
+        text.replaceAll(
+          `@${label.replace(/[\\"[\]]/g, '\\$&')}`,
+          `@${label.replace(/[^\p{L}\p{N} ]/gu, (sign) => `&#${sign.codePointAt(0)};`)}`
+        ),
+      body
+    )
+}
+
 /** Shows the agents a sent message mentions as the chips the composer showed. */
 export function withNativeChatAgentMentions(
   extension: CommentMarkdownExtension,

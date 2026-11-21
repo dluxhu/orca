@@ -136,6 +136,11 @@ it('makes a label that starts with another label one chip', () => {
   expect(shown.textContent).not.toContain('@')
 })
 
+it('makes a label with brackets one chip', () => {
+  const shown = bubble(sentText('[WIP] fix'))
+  expect(shown.textContent).toBe(`ask ${composerChip('[WIP] fix')} now`)
+})
+
 it('shows a message with no note as before', () => {
   const shown = bubble('ask @Tech Lead now')
   expect(shown.textContent).toBe('ask @Tech Lead now')
