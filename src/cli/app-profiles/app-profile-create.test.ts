@@ -204,6 +204,17 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and fa
     )
   })
 
+  it('writes the marker before the app is in place', () => {
+    const checking: RunTool = (program, args) => {
+      if (program.endsWith('lsregister')) {
+        expect(existsSync(join(dir, 'data', 'work', 'orca-app-profile.json'))).toBe(true)
+      }
+      return run(program, args)
+    }
+    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: checking })
+    expect(calls.some((call) => call[0].endsWith('lsregister'))).toBe(true)
+  })
+
   it('removes the app when registration fails, so a retry works; the marker stays', () => {
     const failing: RunTool = (program, args) => {
       if (program.endsWith('lsregister')) {

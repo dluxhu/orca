@@ -9,16 +9,23 @@ let root: string
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'orca-app-profiles-'))
   const appPath = join(root, 'Work.app')
-  mkdirSync(join(appPath, 'Contents'), { recursive: true })
-  writeFileSync(
-    join(appPath, 'Contents', 'Info.plist'),
-    '<dict><key>CFBundleExecutable</key>\n<string>Orca @dLux</string></dict>'
-  )
+  const app = (path: string, extra: string): void => {
+    mkdirSync(join(path, 'Contents'), { recursive: true })
+    writeFileSync(
+      join(path, 'Contents', 'Info.plist'),
+      `<dict><key>CFBundleExecutable</key>\n<string>Orca @dLux</string>${extra}</dict>`
+    )
+  }
+  app(appPath, '<key>OrcaAppProfileId</key><string>work</string>')
+  app(join(root, 'Default.app'), '')
   mkdirSync(join(root, 'work'))
   writeFileSync(join(root, 'work', 'orca-app-profile.json'), '{"id":"work"}')
   writeFileSync(
     join(root, 'profiles.json'),
-    JSON.stringify({ profiles: [{ id: 'work', appPath, userDataPath: join(root, 'work') }] })
+    JSON.stringify({
+      defaultAppPath: join(root, 'Default.app'),
+      profiles: [{ id: 'work', appPath, userDataPath: join(root, 'work') }]
+    })
   )
 })
 
@@ -47,7 +54,30 @@ describe('selectAppProfile', () => {
     expect(env.ORCA_USER_DATA_PATH).toBe(join(root, 'work'))
     expect(selectAppProfile(['--profile=default', 'status'], env)).toEqual(['status'])
     expect(env.ORCA_USER_DATA_PATH).toBeUndefined()
-    expect(env.ORCA_APP_EXECUTABLE).toBeUndefined()
+    expect(env.ORCA_APP_EXECUTABLE).toBe(
+      join(root, 'Default.app', 'Contents', 'MacOS', 'Orca @dLux')
+    )
+  })
+
+  it("never runs a profile's bundle for another folder", () => {
+    const workExecutable = join(root, 'Work.app', 'Contents', 'MacOS', 'Orca @dLux')
+    // `orca --profile default serve` in a Work terminal serves the default folder with the default app.
+    const fromWork: NodeJS.ProcessEnv = {
+      ORCA_PROFILES_ROOT: root,
+      ORCA_USER_DATA_PATH: join(root, 'work'),
+      ORCA_APP_EXECUTABLE: workExecutable
+    }
+    selectAppProfile(['--profile', 'default', 'serve'], fromWork)
+    expect(fromWork.ORCA_APP_EXECUTABLE).toBe(
+      join(root, 'Default.app', 'Contents', 'MacOS', 'Orca @dLux')
+    )
+    // An inherited profile executable is dropped for a folder that is not that profile's.
+    const other: NodeJS.ProcessEnv = {
+      ORCA_USER_DATA_PATH: join(root, 'other'),
+      ORCA_APP_EXECUTABLE: workExecutable
+    }
+    selectAppProfile(['serve'], other)
+    expect(other.ORCA_APP_EXECUTABLE).toBeUndefined()
   })
 
   it('finds the executable from the marker of an inherited ORCA_USER_DATA_PATH', () => {
