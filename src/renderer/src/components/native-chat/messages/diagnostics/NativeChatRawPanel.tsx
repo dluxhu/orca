@@ -1,5 +1,4 @@
 import { memo, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { NativeChatCrewFrame } from '@/components/orchestration-crew/NativeChatCrewPanel'
 import { Button } from '@/components/ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import {
@@ -171,17 +170,16 @@ export function NativeChatRawPanel({
 export function NativeChatRawFrame({
   tabId,
   items,
-  ...crew
-}: React.ComponentProps<typeof NativeChatCrewFrame> & {
+  children
+}: {
   tabId: string
   items: readonly AgentJournalRenderItem[]
+  children: React.ReactNode
 }): React.JSX.Element {
   const { open } = useNativeChatRawPanel(tabId)
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <NativeChatCrewFrame {...crew} />
-      </div>
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       {open ? <NativeChatRawPanel items={items} /> : null}
     </div>
   )
