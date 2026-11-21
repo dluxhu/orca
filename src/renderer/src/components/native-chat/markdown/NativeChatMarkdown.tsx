@@ -229,8 +229,9 @@ export function NativeChatMarkdown({
         {...props}
         variant={variant}
         growing={growing || streaming}
-        // Only the document variant's links can peek; bare #123 links follow it.
+        // Only document links can peek. A bare #123 stays text: the agent can mean any repo.
         githubRepo={variant === 'document' ? githubRepo?.referenceRepo : undefined}
+        linkBareGitHubReferences={false}
         onLinkClick={onLinkClick}
         allowFileUriLinks={onLinkClick !== undefined}
         content={

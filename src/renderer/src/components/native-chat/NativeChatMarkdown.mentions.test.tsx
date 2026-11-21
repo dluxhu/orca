@@ -137,11 +137,11 @@ describe("Slack mention tokens in an agent's reply", () => {
         }}
       >
         <NativeChatSlackPeopleContext value={new Map([['U1', 'Ann']])}>
-          <NativeChatMarkdown content="<@U1> see <#C1|123> and #7" variant="document" />
+          <NativeChatMarkdown content="<@U1> see <#C1|123> and o/r#7" variant="document" />
         </NativeChatSlackPeopleContext>
       </NativeChatLinkPeekContext>
     )
     expect(chips(container)).toEqual(['@Ann', '#123'])
-    expect([...container.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['#7'])
+    expect([...container.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['o/r#7'])
   })
 })
