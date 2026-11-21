@@ -66,6 +66,17 @@ function composerChip(label: string): string {
   return text
 }
 
+/** The badge text of the chip the composer shows for a terminal. */
+function composerTerminalBadge(label: string): string {
+  const { container, unmount } = render(
+    <AgentReferencePillContent label={label} kind="terminal" selected={false} />,
+    { wrapper: TranslationScopeProvider }
+  )
+  const text = container.querySelector('[data-slot="badge"]')?.textContent ?? ''
+  unmount()
+  return text
+}
+
 function bubble(text: string, sentAs?: 'goal'): HTMLElement {
   const { container } = render(
     <TooltipProvider>
@@ -118,7 +129,10 @@ it('makes a label that starts with another label one chip', () => {
     ])
   )
   const badges = [...shown.querySelectorAll('[data-slot="badge"]')]
-  expect(badges.map((badge) => badge.textContent)).toEqual(['A', 'AB'])
+  expect(badges.map((badge) => badge.textContent)).toEqual([
+    composerTerminalBadge('A'),
+    composerTerminalBadge('AB')
+  ])
   expect(shown.textContent).not.toContain('@')
 })
 
