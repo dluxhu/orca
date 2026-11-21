@@ -1,14 +1,32 @@
 # Orca profiles on macOS: high-level design (orca T #35)
 
-Status: draft 5 for owner review, the last paper round. It includes the owner decisions of
-2026-11-20 and the review findings on draft 4. This is a read-only study. No code is changed. The UI
-follows the approved mocks.
+## High-level summary
 
-**The remaining unknowns are settled by the slice-1 prototype, not by more paper review.**
+Orca profiles let one Mac run several Orca apps at the same time, like Chrome profiles: each one
+has its own windows, Dock icon, notifications and data. Each profile is a small app in
+"~/Applications/Orca Profiles" that Orca makes and signs on the Mac. It uses the code of the
+installed Orca, so it always runs the same version and needs no update of its own. Profiles are
+fully separate: settings, chats, cookies, keys, integration and agent sign-ins, and network ports.
+Only git, SSH, the shell, project folders, and the terminal and computer-use permissions are shared.
+A Profile Manager inside the Orca app, opened from the Profiles menu, shows each profile as
+Running, Running in background or Stopped, creates, edits and removes profiles, and decides which
+profile opens `orca:` links. Each profile can run its own background server (`orca serve`) on its
+own port, and every `orca` command accepts `--profile <id>`. Work starts on the nightly line with a
+small prototype that proves that macOS accepts these profile apps.
+
+Status: draft 6. The owner answered every open question (2026-11-20). This is a read-only study. No
+code is changed. The UI follows the approved mocks.
+
+**The remaining unknowns (section 10) are settled by the slice-1 prototype, not by more paper review.**
 
 Code references are `path:line` on `upstream-stable` (upstream v1.4.259). "(fork)" means branch
 `dlux/fork-setup`. "(nightly)" means branch `nightly/fork-setup`. "Measured" means a check on an
 installed fork build (Electron 43.8.7), not a code reference.
+
+**Where it is built** (owner): on the nightly line first (`nightly/profiles`, on top of
+`nightly/fork-setup`). The stable line gets it with the first stable release that contains it. All
+names come from `FORK_IDENTITY`, so nightly profiles are listed under "Orca Nightly Profiles" and
+link to the nightly app, and stable profiles under "Orca Profiles".
 
 ## Summary
 
@@ -16,22 +34,23 @@ installed fork build (Electron 43.8.7), not a code reference.
   `Info.plist` (bundle id, name, profile id), icon, main executable, small helper executables and
   Electron helper apps. The large parts (the frameworks, `app.asar` and the other resources) are
   symbolic links into the default Orca app. Orca signs it ad hoc on the Mac. No Developer ID key is
-  necessary. The terminal host is an owner choice (section 1, "Terminal host").
+  necessary.
 - Each profile gets a separate bundle id, so it gets separate notifications, a separate Dock icon
   and separate Dock badges.
 - The thin bundle does not change when the default app updates with the same Electron version. Its
   ad-hoc signature, and the TCC and Keychain grants that depend on it, stay. After an Electron
   upgrade, Orca rebuilds the thin bundle, and each grant is asked for once more.
+- Supporting evidence: another Electron app on the owner's Mac already runs a second profile made
+  the same way (a thin copy with links and its own data folder). It finds all its parts and runs.
 - **Complete isolation** (owner): each profile has its own data, cookies, Keychain key, `~/.orca`
-  folder and hook scripts. Git, SSH, the shell and project folders stay shared. Two exceptions
-  share TCC permissions:
-  - `Orca Computer Use.app` is always shared by all profiles in v1 (question Q6);
-  - the terminal host is shared with the default app under H2 and H3, and isolated per profile
-    under H1 (question Q7).
-- `orca serve` runs **one server per profile** (owner). Each profile can have its own serve service.
-  A profile's serve runs from the profile's own executable, so it has the profile's identity.
-- A separate thin app, "Orca Profile Manager", lists, creates and removes profiles, and handles
-  `orca:` links.
+  folder, hook scripts, agent config folders (agent sign-ins) and ports. Git, SSH, the shell and
+  project folders stay shared. Two parts share their TCC permissions with the default app: the
+  terminal host (owner: option H2) and `Orca Computer Use.app`.
+- `orca serve` runs **one server per profile** (owner), on the profile's own port. Each profile can
+  have its own serve service. A profile's serve runs from the profile's own executable, so it has
+  the profile's identity.
+- The **Profile Manager** is a small app inside the default app's bundle (owner). It lists, creates,
+  edits and removes profiles, and handles `orca:` links.
 - If slice 1 shows that macOS or Electron refuses the thin bundle, the only fallback is a full APFS
   clone of the default app (section 1, option a).
 
@@ -66,7 +85,7 @@ stays hidden. Each app profile has its own upstream profile index inside its own
 
 | Option | Bundle id that macOS sees | Notifications, Dock, badges | Disk | After an update of the default app | Verdict |
 | --- | --- | --- | --- | --- | --- |
-| T. **Thin bundle**: own `Info.plist`, icon, executables and helper apps; links to the frameworks and resources; ad-hoc signed | the profile's | separate | about 2 MB; about 120 MB with terminal host H1 (signing a clone of the host writes its 116 MB Node executable again: measured 119 MB) | not changed while the Electron version stays: same signature, grants stay. Rebuilt at an Electron upgrade. | **Recommended** (owner: "do it the Chrome way") |
+| T. **Thin bundle**: own `Info.plist`, icon, executables and helper apps; links to the frameworks and resources; ad-hoc signed | the profile's | separate | about 2 MB | not changed while the Electron version stays: same signature, grants stay. Rebuilt at an Electron upgrade. | **Recommended** (owner: "do it the Chrome way") |
 | a. APFS clone of the default app, changed `Info.plist` and icon, signed again | the profile's | separate | about 0 until the default app updates | cloned and signed again at each update: grants are lost each time | The only fallback if slice 1 fails for T |
 | b. Stub `.app` that starts the Orca executable with `--user-data-dir` | Orca's: a process belongs to the bundle that holds its executable | shared with the default app | ~100 KB | not changed | Rejected: fails the notification requirement |
 | b0. `open -n` on the same app (what `launch.ts:110-116` does today) | Orca's | shared: one settings entry, two Dock tiles with the same icon | 0 | not changed | Rejected: same reason |
@@ -99,7 +118,6 @@ Mac, not changed at most updates) is the same as Chrome's.
     <name> Helper (Renderer).app      copy
     Electron Framework.framework      link -> <default app>/Contents/Frameworks/Electron Framework.framework
     Mantle.framework, ReactiveObjC.framework, Squirrel.framework   links, as above
-  Helpers/Orca Agents.app             H1 only: per-profile copy, signed ad hoc. H2, H3: not in the bundle (section 1, terminal host)
   Resources/icon.icns                 own icon
   Resources/<each other entry>        link -> <default app>/Contents/Resources/<entry>
   _CodeSignature/CodeResources        ad-hoc seal
@@ -128,10 +146,10 @@ Mac, not changed at most updates) is the same as Chrome's.
 | `CFBundleDisplayName` | the profile name | |
 | `OrcaAppProfileId` (new) | `work` | The main process reads it at start. |
 | `CFBundleURLTypes` | removed, **from slice 1** | Only the Profile Manager dispatches `orca:` links (section 5). A profile that claims the scheme could take the links. |
-| `CFBundleDocumentTypes` | removed | The default app registers `md`, `markdown`, `mdx`, `csv` and `tsv` as an "Alternate" editor (`config/electron-builder.config.cjs:611-626` (fork)). Without removal, every profile shows in "Open With" (question Q15). |
+| `CFBundleDocumentTypes` | not changed | The default app registers `md`, `markdown`, `mdx`, `csv` and `tsv` as an "Alternate" editor (`config/electron-builder.config.cjs:611-626` (fork)). Each profile shows in "Open With" (owner: "exactly what we want"). |
 | `ElectronAsarIntegrity` | removed | The fuse is off (section 0). The value would be out of date after each update. If upstream turns the fuse on, the plist must carry the hash, and it changes at each update. |
 | `CFBundleName`, `CFBundleExecutable`, usage descriptions, `LSEnvironment`, `NSPrincipalClass` | not changed | Electron finds `<CFBundleName> Helper*.app` from the bundle name. TCC prompts read the usage descriptions of the profile bundle. |
-| `CFBundleShortVersionString` | not changed | It stays the version of creation. Finder shows that version. `app.getVersion()` reads `package.json` in `app.asar`, which follows the default app. |
+| `CFBundleShortVersionString` | not changed | It stays the version of creation. Finder shows that version (owner: accepted). `app.getVersion()` reads `package.json` in `app.asar`, which follows the default app. |
 
 The `.app` file name is the name that Finder and the Dock show.
 
@@ -146,6 +164,7 @@ The `.app` file name is the name that Finder and the Dock show.
 | `process.resourcesPath` | `<profile>/Contents/Resources`. Each entry resolves through its link. 164 lines in `src/main` use `resourcesPath`. Slice 1 runs a smoke test: terminal, agent, browser, computer use, `orcad` template, `orca` CLI. | Fix the code that compares real paths. |
 | The `orca` launcher in `Resources/bin` | `cd -P` in the launcher resolves the `bin` link, so the CLI runs from the default app. `ORCA_USER_DATA_PATH` still points it to the profile. | — |
 | Notification helper identity | The profile variant reports the profile's notification settings (below). | Report "unknown" for the profile. |
+| A thin copy with links runs | Supporting evidence: another Electron app on the owner's Mac runs a second profile made the same way (a thin copy with links and its own data folder). | — |
 | Keychain prompt | An ad-hoc app that opens an item that a Developer-ID app made can ask for the login password, not only "Always Allow". With per-profile items (section 3) the profile makes its own item. Slice 1 records the prompt. | Accept the prompt once. |
 
 **Notification helper.** `config/scripts/native-build/macos/build-notification-status-macos.mjs:2,25`
@@ -177,41 +196,29 @@ fails:
 Then `fallBackToFork` runs (`src/main/daemon/executable-host/macos/macos-daemon-launchd.ts:148-151`
 (fork)), and terminals do not survive a restart of the profile.
 
-**Owner choice.**
+**Owner decision: H2** ("Ok, let's do it"). The host is not in the profile bundle. Every profile
+uses the release host of the default app. Orca makes the per-userData copy from it, and checks the
+copy against the host's own Developer ID requirement. Terminals survive a profile restart. The
+terminal processes have the default app's TCC identity, so all profiles share the terminal
+permissions. Data, keys and `~/.orca` stay isolated, because the host reads them from the
+environment of each profile (section 3).
 
-| Option | Terminals survive a profile restart | TCC identity of terminal processes | Cost |
-| --- | --- | --- | --- |
-| H1. **Per-profile copy** of the host, signed ad hoc with id `<profile bundle id>.terminal-host` and its 10 entitlements | yes | its own, per profile (isolated) | about 120 MB per profile. The daemon code changes every release, so the copy is signed again every release, and macOS asks for its TCC grants again each week, unless the explicit-requirement test below succeeds. |
-| H2. The release host, not in the profile bundle: Orca makes the per-userData copy from the default app's host (real path), and checks it against the host's own Developer ID requirement | yes | the default app's (shared, not isolated) | no disk, no prompts. Terminal permissions are the default app's. |
-| H3. No change: the fork fallback | **no** | the profile's (terminals run under the profile process) | no disk, no prompts, no code |
+Not selected: H1 (a per-profile copy of the host, signed ad hoc: isolated terminal permissions, but
+about 120 MB per profile and new TCC prompts at each release, because the daemon code changes every
+release) and H3 (no change: terminals do not survive a profile restart).
 
-**Recommended default: H2.** Terminals survive restarts with no weekly prompts and no 120 MB per
-profile. Data, keys and `~/.orca` stay isolated, because the host reads them from the environment
-of each profile (section 3). Only the terminal permissions are shared, like `Orca Computer Use.app`
-(question Q6). Change to H1 if the slice-1 experiment shows that an explicit requirement keeps the
-grants across a new signature. Then H1 is isolated with no weekly prompts, and only the disk cost stays.
+**Code changes:**
 
-**Slice-1 experiment (H1).** Sign the host copy with an explicit designated requirement:
-`codesign -s - -i <id>.terminal-host -r='designated => identifier "<id>.terminal-host"' --entitlements <host ent>`.
-Grant a TCC permission to a terminal process. Change the daemon code, sign again, and check that the
-grant stays.
-
-**Code changes for H1 or H2:**
-
-- `macos-daemon-bundle.ts:83-84` (fork): the source host. In a profile, H2 takes
-  `<defaultAppPath>/Contents/Helpers/Orca Agents.app` (from the registry or the marker), and H1
-  takes the profile's own copy. In both cases, call `realpath(source)` before `cloneMacTree`.
-  `cloneMacTree` runs `cp -cR` (`src/main/filesystem/macos-tree-clone.ts:12-17` (fork)), which copies a
-  link as a link. A "stable copy" that is a link would point back into the live default app, and
-  `--verify -R` would follow it and pass.
-- `macos-daemon-bundle.ts:103-110` (fork): in a profile, read the host's own requirement (H2:
-  `codesign -d -r-` of the source host; H1: of the signed copy), and accept a line that starts with
-  `# designated => `.
-- `macos-daemon-launchd.ts:83` (fork): `AssociatedBundleIdentifiers`. H2 keeps the default app's id,
-  because the host is the release host and its TCC identity is the default app's. H1 uses
-  `<profile bundle id>.terminal-host`. Slice 1 tests the H1 case: launchd accepts an ad-hoc id with
-  no team for Local Network access.
-- H1 only: the per-profile copy, its signing, and the daemon code hash in `templateKey` (section 7).
+- `macos-daemon-bundle.ts:83-84` (fork): the source host. In a profile, take
+  `<defaultAppPath>/Contents/Helpers/Orca Agents.app` (from the registry or the marker), and call
+  `realpath(source)` before `cloneMacTree`. `cloneMacTree` runs `cp -cR`
+  (`src/main/filesystem/macos-tree-clone.ts:12-17` (fork)), which copies a link as a link. A "stable
+  copy" that is a link would point back into the live default app, and `--verify -R` would follow
+  it and pass.
+- `macos-daemon-bundle.ts:103-110` (fork): in a profile, check the copy against the source host's own
+  requirement (`codesign -d -r-` of the source host), not against the running app's.
+- `macos-daemon-launchd.ts:83` (fork): `AssociatedBundleIdentifiers` keeps the default app's id,
+  because the host is the release host and its TCC identity is the default app's.
 
 ### Changes in the main process
 
@@ -246,16 +253,14 @@ Owner decision: sign ad hoc on the Mac, as Chrome does. The user needs no Develo
 for f in orca-notification-status orca-keyboard-layout orca-process-footprint; do
   codesign --force -s - -i <bundle id> "<profile>/Contents/MacOS/$f"
 done
-codesign --force -s - -i <bundle id>.terminal-host --entitlements <host ent> \
-  "<profile>/Contents/Helpers/Orca Agents.app"            # H1 only
 codesign --force -s - -i <bundle id> --entitlements <ent> "<profile>"
 lsregister -f "<profile>"
 ```
 
-- `<ent>` is the entitlements of the default app, and `<host ent>` the 10 entitlements of the
-  release host (`codesign -d --entitlements`). All of them are allowed in an ad-hoc signature.
-- No `--deep`. The Electron helper copies keep their release signatures (question Q13 has the
-  case where they must change). The linked frameworks keep theirs.
+- `<ent>` is the entitlements of the default app (`codesign -d --entitlements`). All of them are
+  allowed in an ad-hoc signature.
+- No `--deep`. The Electron helper copies keep their release signatures (unknown U6 has the case
+  where they must change). The linked frameworks keep theirs.
 - No `--options runtime` (library validation, section 1).
 - `lsregister` is the Launch Services tool in `CoreServices.framework`.
 
@@ -275,7 +280,8 @@ machine, and signs ad hoc when there is none (the same rule for the Computer Use
 - **Quarantine and notarization.** Orca writes the bundle itself, so it gets no
   `com.apple.quarantine`. Gatekeeper does not check it, and it needs no notarization.
 - **TCC.** Each profile asks once for each service. `Orca Computer Use.app` (linked) keeps its own
-  id and grants, and all profiles share it (question Q6).
+  id and grants, and all profiles share it in v1. A later per-profile copy is possible, signed ad
+  hoc, as a terminal-host copy would be.
 - **App Management (macOS 13 and later).** A change to an app bundle can show "Orca would like to
   modify apps". A rebuild writes a new bundle to a temporary path and swaps it in with a rename.
   Slice 1 tests it.
@@ -293,20 +299,22 @@ Owner decision: "completely separate cookies, keys, etc. for each profile".
 | Keychain Safe Storage item | default: "orca Safe Storage". Profile: "orca-<id> Safe Storage" | one profile | pre-ready `app.setName('orca-<id>')` in a profile only. userData is pinned before, so the name does not move it (`dev-instance-identity.ts:16-19` (fork) keeps packaged builds from a pre-ready rename; profiles are the exception). |
 | `~/.orca`: integration credentials (Linear, Jira, Bitbucket, API keys), MiniMax cookies, Claude theme sync, agent hook scripts and their install lock, host terminal policy, keybindings | default: `~/.orca`. Profile: `<userData>/orca-home` | one profile | an `ORCA_HOME_DIR` override in one helper, used at every site. Searches on `upstream-stable`: `git grep -l -F "join(homedir(), '.orca'" -- src ':!*.test.*'` finds 14 files (for example `src/main/linear/accounts/linear-credential-paths.ts:7-9`, `src/main/credentials/encrypted-api-key-file-store.ts:42-44`, `src/main/agent-hooks/installation/scripts/managed-hook-script-path.ts:6`). Sites that take a `home` parameter: `src/main/agent-hooks/installation/locking/managed-hook-install-lock.ts:52`, `src/main/daemon/admission/host-terminal-policy.ts:27`, `src/main/keybindings/keybinding-file.ts:29`. All literals: `git grep -l -F "'.orca'" -- src ':!*.test.*'` finds 30 files to review (78 with tests). The UI label `~/.orca/keybindings.json` (`src/renderer/src/components/settings/shortcuts/ShortcutsPane.tsx:341`) shows the profile's path. `.orca` paths on remote hosts (SSH, WSL) do not change, on purpose: a remote host has no profile. |
 | Hook commands in agent configs | `"${HOME-}/.orca/agent-hooks/<name>.sh"`: `git grep -n -F '${HOME-}/.orca' -- src ':!*.test.*'` finds `src/main/agent-hooks/installation/commands/runtime-home-hook-command.ts:26,46` and the second Codex form `src/main/codex/hooks/definitions/codex-hook-command-form.ts:23` | one profile | each command reads `${ORCA_HOME_DIR:-$HOME/.orca}`; profile terminals export `ORCA_HOME_DIR` |
-| Agent configs (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`) | default: the agents' own defaults. Profile: under `<userData>/orca-home/agents/` | one profile (question Q3, recommended yes) | profile terminals export the three variables. Orca already routes Claude config homes (`src/main/claude-accounts/profiles/claude-profile-homes.ts`). |
-| Terminal host and its TCC identity | owner choice (section 1): H1 per profile, H2 shared with the default app | H1: one profile; H2: shared | slice 1 |
+| Agent configs and sign-ins (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`) | default: the agents' own defaults. Profile: under `<userData>/orca-home/agents/` | one profile (owner: "that's the whole point of the profiles") | profile terminals export the three variables. Orca already routes Claude config homes (`src/main/claude-accounts/profiles/claude-profile-homes.ts`). |
+| Terminal host and its TCC identity | the default app's release host (H2, section 1) | shared | slice 1 |
+| Serve and WebSocket port | the registry (`port`), set in the profile editor | one profile | section 4 |
 | Worktree folders | where the settings of each profile put them | shared file system; each profile keeps its own records | none |
 | Git, SSH, the shell, project folders | home folder | **shared on purpose** | none |
 | `orca` CLI link | the user's PATH | one link, from the default app | none |
 
 The profile folders are outside the `orca` folder, so official Orca never sees them.
 
-**New profile.** It starts empty and shows onboarding. The create dialog has the option "Copy
-settings from the default profile". It copies the settings only, not chats, projects, worktrees,
-sign-ins or encrypted values. The copy seeds the new profile's state through the same start path
-that upstream uses for a new in-app profile (`initializeNewOrcaProfileState`,
-`src/main/orca-profiles/storage/new-profile-state.ts:17-40`), with the default profile's settings in
-place of the defaults.
+**New profile.** It starts empty and shows onboarding. At the bottom of the New profile dialog, a
+dropdown "Copy settings from:" has the values "No copy" (the default) and the name of each existing
+profile, the default profile too (owner). It copies the settings only, not chats, projects,
+worktrees, sign-ins or encrypted values. The copy seeds the new profile's state through the same
+start path that upstream uses for a new in-app profile (`initializeNewOrcaProfileState`,
+`src/main/orca-profiles/storage/new-profile-state.ts:17-40`), with the selected profile's settings
+in place of the defaults.
 
 ## 4. How profiles know each other
 
@@ -325,6 +333,7 @@ place of the defaults.
       "appPath": "~/Applications/Orca Profiles/Orca - Work.app",
       "userDataPath": "~/Library/Application Support/Orca Profiles/work",
       "icon": { "kind": "badge", "text": "2", "style": "ref-match" },
+      "port": 6769,
       "templateKey": "<hash of the parts in section 7>",
       "createdAt": 1763600000000
     }
@@ -333,55 +342,73 @@ place of the defaults.
 ```
 
 - `urlHandler.mode` is `ask`, or `profile` with a `profileId`. The default profile is implicit,
-  with id `default`. Other `icon.kind` values: `image` (an uploaded badge) and `file` (an uploaded
-  full icon).
-- **One writer.** Only the Profile Manager writes the file, with a temporary file and a rename.
-  The profiles read it and watch it with `fs.watch`.
-- **Status.** Each row shows the state of the profile's serve service (owner; confirmation
-  pending, question Q1), not the window state:
-  - "Service running": the service is live (`orca --profile <id> serve service status`,
-    `src/cli/specs/serve.ts:109-116`);
-  - "Service waiting (app open)": the service is installed, and the running profile app stopped it
-    (below). The app starts it again when it quits;
-  - "Service stopped": no service is installed, or it exited, or the app stopped it and then did not
-    quit normally.
+  with id `default` and the default port 6768 (`DEFAULT_WS_PORT`,
+  `src/main/runtime/rpc/server/runtime-rpc-pairing-types.ts:21`). Other `icon.kind` values: `image`
+  (an uploaded badge) and `file` (an uploaded full icon).
+- **Writers.** The Profile Manager and the local `orca profiles` commands write the file. Each one
+  takes a lock file next to it, and writes a temporary file and a rename. The profiles read the file
+  and watch it with `fs.watch`.
+- **Port** (owner: "a parameter in the profile editor"). Each profile has its own port for the
+  desktop WebSocket endpoint and for `orca serve`. The New profile and Edit dialogs show it. The
+  default is the next free port above the default profile's (6769, then 6770, …). The editor checks
+  that it is a number from 1024 to 65535, that no other profile uses it, and that no other process
+  listens on it now (a warning, not an error). The runtime uses it as the pinned port, in place of
+  6768 (`runtime-rpc-lifecycle.ts:135-146`), and `orca --profile <id> serve` uses it as `--port`.
+- **States** (owner). Each row of the list shows one of:
+  - "Running": the profile app runs;
+  - "Running in background": the profile's serve service runs and the app does not (also after the
+    user quits the app and macOS shows the service as running in the background);
+  - "Stopped": neither runs.
+
+  The Profile Manager reads them from the app's `orca-runtime.json` (its pid, tested with signal 0,
+  as `runtime-rpc-socket-metadata.ts:43-47` does) and from `orca --profile <id> serve service
+  status` (`src/cli/specs/serve.ts:109-116`).
 - **Serve and app exclude each other** in both directions: serve refuses a running app (section 0),
   and the app refuses a profile that a serve (`orcad`) holds ("Orca could not start",
-  `main-process-preflight-failure.ts:10-19`). **One mechanism, in the profile app itself:**
+  `main-process-preflight-failure.ts:10-19`). One mechanism, in the profile app itself:
   - At start, before it takes the profile lock (before `acquireDesktopProfileLockOrExplain`), the
     app checks for its own serve LaunchAgent. If the job is loaded, the app runs
     `launchctl bootout gui/<uid>/<label>` and waits until the profile lock is free.
   - When it quits normally, the app runs `launchctl bootstrap gui/<uid> <plist>` for the job that it
-    stopped.
+    stopped. The row changes from "Running" to "Running in background".
 
   So every path that starts the app works the same: the Dock, Finder, the Profiles menu, an
-  `orca:` forward, `orca open` and "Open" in the Profile Manager. None needs its own step, and the
-  Profile Manager need not run. After a crash of the app, the service stays stopped until the next
-  normal quit; the Profile Manager shows "Service stopped" and offers "Start service".
-- **Open.** Each row has "Open": `open -b <bundleId>`. It brings the profile to the front with a
-  window, or starts it.
+  `orca:` forward, `orca open` and "Open" in the Profile Manager. After a crash of the app, the
+  service stays stopped until the next normal quit; the row shows "Stopped" and offers "Start
+  service".
+- **Open.** Each row has "Open", the default profile's row too: `open -b <bundleId>`. It brings the
+  profile to the front with a window, or starts it.
 - **Messages.** Use the profile's unix socket and token from `orca-runtime.json`, as the CLI does
   (`src/cli/runtime/metadata.ts:11-31`). No new port.
 - **Profiles menu** (owner): a top-level "Profiles" menu in the menu bar of every profile, of the
-  default app and of the Profile Manager. It lists each profile with its status, a check mark on
-  the current one, and "Profile Manager…". A click on a profile does the same as "Open". It is
-  built in `src/main/menu/register-app-menu.ts` (fork) as its own top-level menu.
+  default app and of the Profile Manager. It lists each profile with its state, a check mark on the
+  current one, and "Profile Manager…". A click on a profile does the same as "Open". It is built in
+  `src/main/menu/register-app-menu.ts` (fork) as its own top-level menu.
 
 ### The Profile Manager app
 
-Owner decision: the Profile Manager is a separate app, not part of Settings (as Firefox has a
-separate profile manager).
+Owner decision: the Profile Manager is an app inside the default app's bundle, as Xcode keeps
+Simulator and Instruments inside its own bundle. It is not part of Settings.
 
-- `~/Applications/Orca Profiles/Orca Profile Manager.app`: a thin bundle of the same kind as a
-  profile, with bundle id `<default appId>.profile-manager`, `OrcaAppRole = profile-manager` in its
-  `Info.plist`, and its own badged icon. It keeps `CFBundleURLTypes`, because it is the `orca:`
-  dispatcher (section 5).
-- It starts Orca in Profile Manager mode: the main process opens only the Profile Manager window.
-  It starts no runtime, no agents and no updater. It works when no profile runs.
-- The default app makes it the first time the user selects "Profiles > Profile Manager…" (and
-  `orca profiles manager` makes it from the CLI).
-- Alternative (question Q2): a separate window of the default app, started with
-  `--profile-manager` (as `firefox -P`).
+- **Where:** `<default app>/Contents/Applications/Orca Profile Manager.app`. Finder does not show
+  it, except with "Show Package Contents". The user opens it with "Profiles > Profile Manager…" in
+  any Orca app, or with `orca profiles manager`.
+- **Build:** the release builds it and signs it with the release identity, before the outer bundle
+  is sealed (nested code). Orca does not sign it on the Mac. It updates with the default app.
+- **Shape:** its own `Info.plist` (bundle id `<default appId>.profile-manager`,
+  `OrcaAppRole = profile-manager`, `CFBundleURLTypes` for `orca:`), its own icon, its own copy of the
+  main executable and of the four Electron helper apps (the helper rule of section 1). Its
+  `Frameworks/*.framework` and `Resources/*` entries are relative links to the outer bundle, so they
+  stay inside the bundle and pass `codesign --verify --strict`.
+- **Mode:** it starts Orca in Profile Manager mode: the main process opens only the Profile Manager
+  window. It starts no runtime, no agents and no updater. Its userData is
+  `~/Library/Application Support/Orca Profiles/.manager/`. It is independent of the profiles, and
+  works when no profile runs.
+- **`orca:` handler:** Launch Services does not always register an app inside another app's bundle
+  by itself. So the default app registers the nested app with `lsregister -f` at its first start
+  and after each update. The Profile Manager then calls `app.setAsDefaultProtocolClient('orca')`
+  (`LSSetDefaultHandlerForURLScheme` with its own bundle id) on its first start (section 5). Slice 1
+  checks that Launch Services opens `orca:` links in the nested app (unknown U8).
 
 ## 5. The `orca:` URL
 
@@ -397,7 +424,7 @@ separate profile manager).
   (`LSSetDefaultHandlerForURLScheme`) wins. Without one, Launch Services selects one by its own
   rules, which are not documented and not stable. The fork and official Orca both claim `orca:`
   today (fork `PATCHES.md`, "Not changed on purpose").
-- **Design.** The Profile Manager app is the handler. When it is made, it calls
+- **Design.** The Profile Manager app is the handler. On its first start it calls
   `app.setAsDefaultProtocolClient('orca')` on macOS (extend `orca-protocol-registration.ts:12`).
   Profile apps do not claim the scheme (section 1). The default app keeps its claim, because its
   bundle comes from the release.
@@ -409,14 +436,13 @@ separate profile manager).
 - **Forward.** `open -a <appPath> <url>` sends the URL event to the running app, or starts the app
   and then sends it. The `open-url` handler is registered before `ready` (`index.ts:150`), so a cold
   start gets it. Slice 1 verifies that Electron fires `open-url` for a scheme that the bundle does
-  not claim (question Q11). Fallback: a new runtime call over the target's socket that passes the
+  not claim (unknown U2). Fallback: a new runtime call over the target's socket that passes the
   URL to the same handler; for a stopped target, start it with `open -b` first, wait for
   `orca-runtime.json`, then make the call.
 - **Target.** The target still filters with `isRoutedOrcaDeepLink`, so a forwarded
   `orca://pair?code=…` is dropped. Design: the target accepts every `orca:` URL in `open-url`. It
   routes skill-share and plugin-install links as today, and opens the "add remote host" dialog with
-  the code filled in for a pairing link. Other `orca:` URLs show "This link is not supported"
-  (question Q12).
+  the code filled in for a pairing link. Other `orca:` URLs show "This link is not supported".
 
 ## 6. CLI
 
@@ -453,7 +479,7 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
 | --- | --- |
 | Runtime commands (`chat`, `terminal`, `worktree`, `tab`, `agent`, `project`, `status`, …) | one profile, from the order above |
 | `orca open` | starts that profile app with `open -a <appPath>`, not `open -n … --user-data-dir` (change `launch.ts:85-91,110-116`) |
-| `orca serve` | **one server per profile** (owner). On the `orcad` runtime (`resolveLocalServeRuntime`, `src/cli/runtime/launch.ts:171-195`), serve runs the Node server from the default app's resources, with the default app's TCC identity. It finds the profile only through the marker file, and then applies the profile's `ORCA_HOME_DIR` and Keychain item. `orca --profile work serve` serves "work"; without `--profile`, the default profile. Each profile has its own port and pairing identity, because both are per userData (`runtime-rpc-lifecycle.ts:135-146`). A profile's serve starts `<profile appPath>/Contents/MacOS/<executable>` (the `appPath` from the registry), not the default app's executable that `launch.ts:204-231` starts today. Then serve has the profile's Keychain item, `~/.orca` folder and TCC identity. The main process also finds the profile from the marker file in userData (section 1). The existing rule stays: serve refuses a profile that an Orca process already runs (`src/cli/runtime/serve-electron-preflight.ts:67`, the per-userData lock at `desktop-profile-instance-lock.ts:22`). |
+| `orca serve` | **one server per profile** (owner), on the profile's own port from the registry (section 4). On the `orcad` runtime (`resolveLocalServeRuntime`, `src/cli/runtime/launch.ts:171-195`), serve runs the Node server from the default app's resources, with the default app's TCC identity. It finds the profile only through the marker file, and then applies the profile's `ORCA_HOME_DIR` and Keychain item. `orca --profile work serve` serves "work"; without `--profile`, the default profile. Each profile has its own port and pairing identity, because both are per userData (`runtime-rpc-lifecycle.ts:135-146`). A profile's serve starts `<profile appPath>/Contents/MacOS/<executable>` (the `appPath` from the registry), not the default app's executable that `launch.ts:204-231` starts today. Then serve has the profile's Keychain item, `~/.orca` folder and TCC identity. The main process also finds the profile from the marker file in userData (section 1). The existing rule stays: serve refuses a profile that an Orca process already runs (`src/cli/runtime/serve-electron-preflight.ts:67`, the per-userData lock at `desktop-profile-instance-lock.ts:22`). |
 | `orca serve service install/status/uninstall` | one LaunchAgent per profile. The label and log already carry a hash of the userData (`serve-service-unit.ts:52-54,68-71`). The unit's command runs the profile's executable, as above. |
 | `orca profiles list [--json]` (plural, so it does not clash with `orca profile state`) | all profiles: id, name, app path, service status |
 | CLI registration (Settings > Command line) | only in the default app; hidden in profiles |
@@ -462,8 +488,9 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
 
 - The updater is off in a profile app and in the Profile Manager. A profile runs the code of the
   default app through its links, so it follows the default app's version with no update of its own.
-- **Restart rule.** A running profile must not see the default app's files change under it: a new
-  framework or a new `app.asar` with an old main process can crash it. So:
+- **Restart rule** (owner: acceptable; "The Chrome apps quit in that case, too"). A running profile
+  must not see the default app's files change under it: a new framework or a new `app.asar` with an
+  old main process can crash it. So:
   - When an update is ready, the default app does not install it while a profile runs. Its update
     card shows "Restart all Orca apps to update".
   - That action quits each running profile (a runtime call over its socket) and stops each
@@ -476,7 +503,6 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   - the Electron version;
   - the release cdhashes of the copied executables: `orca-notification-status` (profile variant),
     `orca-keyboard-layout`, `orca-process-footprint`;
-  - with terminal host H1: the cdhash of the host's Node executable and a hash of its daemon code;
   - the default app's top-level `Resources` names;
   - the `Info.plist` keys that the profile copies;
   - the imports of the main executable (`nm -u`).
@@ -484,13 +510,12 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   After an update, if the key is different, the next start of the profile rebuilds its bundle (new
   copies, links and plist keys, sign again). This changes the cdhash, so TCC and the Keychain ask
   once more.
-  - An Orca update with the same Electron version, and the same small executables: no rebuild of
-    the app part. With H1, the host copy is rebuilt at every release, because its daemon code
-    changes (section 1).
+  - An Orca update with the same Electron version and the same small executables: no rebuild.
   - An Electron upgrade: the helper copies and the main executable must match the framework, so a
     rebuild and one more set of prompts.
-- If the default app moves or is renamed, the links break. The Profile Manager finds this from
-  `defaultAppPath` and offers "Repair", which makes the links again (and changes the cdhash).
+- If the default app moves or is renamed, the links break. There is no "Repair" in v1 (owner): the
+  user makes the profile again with the same name. A new profile with the id of an existing data
+  folder uses that folder again (section 9).
 - Option a (fallback) needs a full rebuild after each update, with lost grants each time.
 
 ## 8. Icons
@@ -616,6 +641,10 @@ must be unique, and is also the `.app` file name, so it cannot contain `/` or `:
 write the registry. The profile must quit first. The id, the bundle id and the userData do not
 change. A rename changes the cdhash, so TCC and the Keychain ask once more.
 
+**Recreate.** "New profile" with a name whose id has a data folder already (for example after the
+default app moved, or after Remove with "Keep data") uses that folder again. The marker file in it
+confirms the id. The dialog says so before it creates the app.
+
 **Change of id after creation** is not in this design. A new bundle id loses the notification
 settings, the TCC grants and the Keychain access, and the userData must move.
 
@@ -630,45 +659,42 @@ settings, the TCC grants and the Keychain access, and the userData must move.
    Its Keychain item "orca-<id> Safe Storage" stays with "Keep data", else Orca deletes it.
 6. If the profile handled `orca:` URLs, set the mode to `ask`.
 
-## 10. Risks and open questions
+## 10. Decisions and remaining unknowns
 
-Each question has a recommended default. Decided by the owner: ad-hoc signing (the Chrome way),
-one serve per profile, complete isolation, the separate Profile Manager app, the top-level
-Profiles menu, `--profile` before the command with `ORCA_PROFILE`, Remove to the Trash with "Keep
-data", the TypeScript icon port, the approved mocks.
+**Decided by the owner (2026-11-20):** the thin bundle, signed ad hoc on the Mac (the Chrome way);
+complete isolation, with agent sign-ins per profile; one serve per profile, each with its own port in
+the profile editor; the Profile Manager inside the default app's bundle; the states "Running",
+"Running in background" and "Stopped"; the "Copy settings from:" dropdown (settings only); terminal
+host H2; profiles keep "Open With"; no "Repair" in v1 (recreate with the same name); the old version
+in Finder is accepted; all Orca apps restart for an update; `--profile` before the command with
+`ORCA_PROFILE`; Remove to the Trash with "Keep data"; the top-level Profiles menu; the TypeScript icon
+port; the approved mocks; nightly first. `Orca Computer Use.app` is shared in v1.
 
-| # | Question or risk | Recommended default |
+**Unknowns that slice 1 answers.** Each has the action if the answer is no.
+
+| # | Unknown | If no |
 | --- | --- | --- |
-| Q1 | "Service running" = the profile's serve service runs (owner; confirmation pending). Serve and the app exclude each other. | Three states: "Service running", "Service waiting (app open)", "Service stopped". The profile app stops its own service when it starts and starts it again when it quits (section 4). |
-| Q2 | Profile Manager: a separate app, or a window of the default app (`--profile-manager`, as `firefox -P`)? | The separate app (owner's direction). |
-| Q3 | Separate agent config folders per profile (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`), so each profile can use other agent accounts? | Yes. |
-| Q4 | Does macOS 14, 15 and 26 launch a bundle whose links point outside it, and do notifications and TCC accept it? (Signing and `--verify` pass; `--verify --strict` fails.) | Test first in slice 1. If it fails: option a (clone), with lost grants at each update. |
-| Q5 | A running profile while the default app updates. | The update installs only after "Restart all Orca apps". It quits each running profile, stops each profile's serve service, installs, and then starts again the services and the profiles that ran. |
-| Q6 | `Orca Computer Use.app` is linked, so all profiles share its TCC grants (Accessibility, Screen Recording). This is an exception to complete isolation. | Accept in v1. Later: a per-profile copy, signed ad hoc, as in terminal host H1. |
-| Q7 | Terminal host: H1 (per-profile copy: isolated TCC, about 120 MB, TCC prompts each week unless an explicit requirement keeps them), H2 (release host: shared terminal TCC, no cost) or H3 (no change: terminals do not survive a profile restart)? | H2, until the slice-1 experiment shows that H1 keeps its grants across a new signature. |
-| Q8 | Can the id change after creation? | No. Rename changes only the name. |
-| Q9 | The nightly build has its own default profile (`orca-dlux-nightly`). | The nightly build gets the same feature with its own names: registry and folders "Orca Nightly Profiles", profiles linked to the nightly app, its own Profile Manager. Stable and nightly profiles do not see each other. |
-| Q10 | App Management prompt when Orca writes or changes a profile bundle. | Test in slice 1. Write the new bundle to a temporary path and swap it with a rename. |
-| Q11 | Does `open -a <app> <url>` deliver `open-url` to a bundle that does not claim `orca:`? | Test in slice 1. Fallback: a runtime call over the target's socket. |
-| Q12 | `orca:` URLs that no handler supports today (for example pairing links from a browser). | Pairing links open "add remote host" with the code filled in. Others show "This link is not supported". |
-| Q13 | Chromium's peer requirement check for Mach port rendezvous (`kMachPortRendezvousValidatePeerRequirements` is on; its enforcement is off today). If an Electron upgrade turns enforcement on, an ad-hoc browser process with Developer ID helpers can fail. | Watch at each Electron upgrade (the `templateKey` rebuild runs the slice-1 smoke test). Mitigations, in order: sign the helper copies ad hoc too, with ids under the profile's id (sound: the peer check compares the helpers with the browser process's own requirement, Chromium `process_requirement.cc:447-459`); or turn the enforcement feature off with `--disable-features`, beside `DISABLED_CHROMIUM_FEATURES` (`configure-process.ts`). |
-| Q14 | The profile's `Info.plist` keeps the version of creation, so Finder "Get Info" shows an old version. | Accept. An update of that key would change the cdhash at each update. |
-| Q15 | Document types (`md`, `csv`, …): should profiles show in "Open With"? | No: remove `CFBundleDocumentTypes` in profiles. |
-| Q16 | What does "Copy settings from the default profile" copy? | Settings only. Not chats, projects, worktrees, sign-ins or encrypted values. |
-| Q17 | The default app moves or is renamed: the links break. | The Profile Manager shows "Repair" and makes the links again. |
-| Q18 | Branch: the feature reads the fork identity, but `dlux/fork-setup` is always last in the release order. | A fork-only branch `dlux/profiles`, stacked on `dlux/fork-setup`, last in the order. Update the rule in `PATCHES.md`. |
+| U1 | Does macOS 14, 15 and 26 launch a bundle whose links point outside it, and do notifications and TCC accept it? (Signing and `--verify` pass; `--verify --strict` fails.) | Option a (clone), with lost grants at each update. |
+| U2 | Does `open -a <app> <url>` deliver `open-url` to a bundle that does not claim `orca:`? | A runtime call over the target's socket. |
+| U3 | Does App Management prompt when Orca writes or changes a profile bundle? | Write the new bundle to a temporary path and swap it with a rename; accept one prompt. |
+| U4 | Do the helper copies start and connect, and does the smoke test pass through the links (`process.resourcesPath`, terminal, agent, browser, computer use, `orcad` template, CLI)? | Fix the code that compares real paths; else option a. |
+| U5 | Are `CodeResources` and the cdhash the same after the default app is replaced by a newer build with the same Electron version, with the TCC grant and the Keychain access kept? | Grants are asked again at each update; tell the owner. |
+| U6 | Chromium's peer requirement check for Mach port rendezvous (`kMachPortRendezvousValidatePeerRequirements` is on; its enforcement is off today). If a later Electron turns enforcement on, an ad-hoc browser process with Developer ID helpers can fail. | Sign the helper copies ad hoc too, with ids under the profile's id (sound: the check compares the helpers with the browser process's own requirement, Chromium `process_requirement.cc:447-459`); or turn the enforcement feature off with `--disable-features`, beside `DISABLED_CHROMIUM_FEATURES` (`configure-process.ts`). The `templateKey` rebuild after an Electron upgrade runs the smoke test again. |
+| U7 | Does the profile variant of the notification helper report the profile's own setting? Which Keychain prompt does an ad-hoc profile get for its new item? | Report "unknown" for the profile; accept the prompt once. |
+| U8 | Does Launch Services open `orca:` links in the nested Profile Manager after `lsregister -f` and `setAsDefaultProtocolClient`? | Move the Profile Manager to `~/Applications/Orca Profiles/` as a thin bundle. |
 
 ## 11. Phased plan
 
-Each slice is one PR with its own tests. The product is done only after slice 2 (isolation).
+Each slice is one PR on the nightly line (`nightly/profiles`) with its own tests. The product is
+done only after slice 2 (isolation).
 
 | Slice | Content | Done when |
 | --- | --- | --- |
-| 1. Proof | Main process: read `OrcaAppProfileId`, set userData, runtime identity, updater off, TCC watch prefix match. Release: the profile variant of the notification helper in `profile-template`. Profile marker in userData for every mode. Terminal host: the chosen option (H2 by default) with the source real path, the requirement read and `AssociatedBundleIdentifiers`, and the H1 explicit-requirement experiment. A hidden local command `orca profiles create <name>`: the thin bundle (copies, links), `Info.plist` by `plutil` (no `CFBundleURLTypes`, `CFBundleDocumentTypes` or `ElectronAsarIntegrity`), ad-hoc signatures, `lsregister -f`, the registry. | Two profiles run at the same time, each with its own Dock icon and badge, and its own entry in System Settings > Notifications. A notification from each shows its own name, and a click opens the right app. Renderers start. The profile's notification helper reports the profile's setting. Terminals survive a restart of the profile. `CodeResources` and the cdhash are the same after the default app is replaced by a newer build with the same Electron version, and a TCC grant and the Keychain access stay. The Keychain prompt type is recorded. Answer and record Q4, Q10 and Q11 on macOS 14, 15 and 26. If Q4 fails, change to option a before slice 2. |
-| 2. Isolation | `ORCA_HOME_DIR` for every `~/.orca` site and the hook commands; the per-profile Keychain item (pre-ready name); per-profile agent config folders (if Q3 is yes). | Two profiles signed in to different Linear, Jira and agent accounts do not see each other's sign-ins, cookies or keys. |
-| 3. Profile Manager | The "Orca Profile Manager" app and Profile Manager mode. UI from the approved mocks: list with service status and "Open", create (name, id, "Copy settings from the default profile"), rename, remove, repair. The top-level "Profiles" menu. The update rule ("Restart all Orca apps to update": profiles and their serve services; `templateKey` rebuild). | A profile is created, renamed, removed and repaired from the Profile Manager. An update of the default app restarts the running profiles and their serve services, and their grants stay. |
+| 1. Proof | Main process: read `OrcaAppProfileId` and the marker, set userData, runtime identity, updater off, TCC watch prefix match. Release: the profile variant of the notification helper in `profile-template`. Terminal host H2: the source from the default app (real path), the check against the host's own requirement. A hidden local command `orca profiles create <name>`: the thin bundle (copies, links), `Info.plist` by `plutil` (no `CFBundleURLTypes` or `ElectronAsarIntegrity`), ad-hoc signatures, `lsregister -f`, the marker, the registry. | Two profiles run at the same time, each with its own Dock icon and badge, and its own entry in System Settings > Notifications. A notification from each shows its own name, and a click opens the right app. Terminals survive a restart of the profile. U1 to U7 are answered and recorded on macOS 14, 15 and 26. If U1 fails, change to option a before slice 2. |
+| 2. Isolation | `ORCA_HOME_DIR` for every `~/.orca` site and the hook commands; the per-profile Keychain item (pre-ready name); per-profile agent config folders (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`). | Two profiles signed in to different Linear, Jira and agent accounts do not see each other's sign-ins, cookies or keys. |
+| 3. Profile Manager | The nested "Orca Profile Manager" app (release build) and Profile Manager mode. UI from the approved mocks: list with the three states and "Open" (default profile too), New profile and Edit (name, id, port, "Copy settings from:"), rename, remove, recreate with the same name. The top-level "Profiles" menu. The update rule ("Restart all Orca apps to update": profiles and their serve services; `templateKey` rebuild). U8. | A profile is created, edited, removed and recreated from the Profile Manager. An update of the default app restarts the running profiles and their serve services, and their grants stay. |
 | 4. Icons | TypeScript `ref-match` and the character badge; then style selection, uploaded badge, uploaded full icon; `.icns` writer; golden tests against dock-icon-badger output. | The default icon matches the Python `ref-match` output within the limit. |
-| 5. CLI and serve | `--profile` and `ORCA_PROFILE`, `orca profiles list`, `orca open` per profile, serve and serve service per profile from the profile's executable, the profile app's own stop and start of its service. | `orca --profile work chat list` reads "work". `orca --profile work serve` serves "work" on its own port, beside the default profile's serve. |
+| 5. CLI and serve | `--profile` and `ORCA_PROFILE`, `orca profiles list`, `orca open` per profile, serve and serve service per profile from the profile's executable on the profile's port, the profile app's own stop and start of its service. | `orca --profile work chat list` reads "work". `orca --profile work serve` serves "work" on its own port, beside the default profile's serve. |
 | 6. URL | The Profile Manager as the `orca:` handler, the two modes, the chooser, forwarding of every `orca:` URL, the target's handling of every `orca:` URL. | An `orca:` link opens in the selected profile, or only the chooser shows. The default app's main window does not open. |
 
-Not in this design: Linux and Windows, a change of id after creation.
+Not in this design: Linux and Windows, a change of id after creation, "Repair" of a profile after the default app moves.
