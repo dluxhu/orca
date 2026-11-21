@@ -22,15 +22,20 @@ import { useNativeChatFileLinkExists } from '../links/actions/use-native-chat-fi
 import { NativeChatMarkdownImageLinkContext } from '../media/images/NativeChatMarkdownImage'
 import { NativeChatDeferredMarkdownImage } from '../media/images/NativeChatDeferredMarkdownImage'
 import { remarkNativeChatFileDestinations } from './native-chat-markdown-file-destinations'
+import { remarkNativeChatListItemNumbers } from './native-chat-markdown-list-item-numbers'
 import { NativeChatLinkPeek } from '../links/previews/NativeChatLinkPeek'
 import {
   createNativeChatMentionExtension,
   NativeChatMentionEveryoneContext,
   NativeChatMentionNamesContext,
+  NativeChatSlackPeopleContext,
   withBoundBotMentions
 } from '../native-chat-markdown-mentions'
+import type { SlackPeople } from '../../../../../shared/connectors/slack-message-markup'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
+import { withNativeChatAgentMentions } from './native-chat-agent-mentions'
+import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -60,6 +65,8 @@ type NativeChatMarkdownProps = Omit<
   rowKey?: string
   /** The content is a Slack message's drawn form: its mention links draw as mentions. */
   slackMentions?: boolean
+  /** The agents a sent message mentions: each `@label` of them shows as a chip. Keep it stable. */
+  agentMentions?: readonly SentAgentMention[]
 }
 
 const NO_NAMES: readonly string[] = []
@@ -69,11 +76,17 @@ function withFileDestinations(
   visualExtension: CommentMarkdownExtension | undefined,
   mentionNames: readonly string[] | null,
   everyone = true,
-  slackMentions = false
+  slackMentions = false,
+  slackPeople: SlackPeople | null = null
 ): CommentMarkdownExtension {
-  const names = mentionNames ?? (slackMentions ? NO_NAMES : null)
+  const names = mentionNames ?? (slackMentions || slackPeople ? NO_NAMES : null)
   const mentions = names
-    ? createNativeChatMentionExtension(names, everyone && names.length > 0, slackMentions)
+    ? createNativeChatMentionExtension(
+        names,
+        everyone && names.length > 0,
+        slackMentions,
+        slackPeople
+      )
     : null
   return {
     remarkPlugins: [
@@ -112,7 +125,11 @@ const NATIVE_CHAT_TEXT_BLOCK_COMPONENTS: CommentMarkdownExtension['components'] 
       {children}
     </ol>
   ),
-  li: ({ children }) => <li className="[&>input]:pointer-events-none">{children}</li>
+  li: ({ children, value }) => (
+    <li value={value} className="[&>input]:pointer-events-none">
+      {children}
+    </li>
+  )
 }
 
 function createNativeChatImageExtension(
@@ -120,12 +137,21 @@ function createNativeChatImageExtension(
   onLinkClick: CommentMarkdownLinkClickHandler | undefined,
   mentionNames: readonly string[] | null,
   everyone: boolean,
-  slackMentions: boolean
+  slackMentions: boolean,
+  slackPeople: SlackPeople | null
 ): CommentMarkdownExtension {
   const Anchor = createDocumentCommentMarkdownComponents(onLinkClick).a
-  const base = withFileDestinations(visualExtension, mentionNames, everyone, slackMentions)
+  const base = withFileDestinations(
+    visualExtension,
+    mentionNames,
+    everyone,
+    slackMentions,
+    slackPeople
+  )
   return {
     ...base,
+    remarkPlugins: [...base.remarkPlugins, remarkNativeChatListItemNumbers],
+    sanitizeAttributes: { ...base.sanitizeAttributes, li: ['value'] },
     components: {
       ...NATIVE_CHAT_TEXT_BLOCK_COMPONENTS,
       ...base.components,
@@ -172,6 +198,7 @@ export function NativeChatMarkdown({
   content,
   variant,
   slackMentions = false,
+  agentMentions,
   ...props
 }: NativeChatMarkdownProps): React.JSX.Element {
   const onLinkClick = useNativeChatLinkClick()
@@ -179,18 +206,34 @@ export function NativeChatMarkdown({
   const visualExtension = useNativeChatVisualMarkdownExtension(visualMessageId)
   const mentionNames = withBoundBotMentions(useContext(NativeChatMentionNamesContext), content)
   const everyone = useContext(NativeChatMentionEveryoneContext)
+  // A Slack message's drawn form has its tokens drawn already.
+  const chatSlackPeople = useContext(NativeChatSlackPeopleContext)
+  const slackPeople = slackMentions ? null : chatSlackPeople
   const extension = useMemo(
     () =>
-      variant === 'document'
-        ? createNativeChatImageExtension(
-            visualExtension,
-            onLinkClick,
-            mentionNames,
-            everyone,
-            slackMentions
-          )
-        : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions),
-    [everyone, mentionNames, onLinkClick, slackMentions, variant, visualExtension]
+      withNativeChatAgentMentions(
+        variant === 'document'
+          ? createNativeChatImageExtension(
+              visualExtension,
+              onLinkClick,
+              mentionNames,
+              everyone,
+              slackMentions,
+              slackPeople
+            )
+          : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions, slackPeople),
+        agentMentions
+      ),
+    [
+      agentMentions,
+      everyone,
+      mentionNames,
+      onLinkClick,
+      slackMentions,
+      slackPeople,
+      variant,
+      visualExtension
+    ]
   )
   const fileLinkExists = useNativeChatFileLinkExists(
     linkifyFilePaths && onLinkClick !== undefined,

@@ -54,7 +54,7 @@ export type NativeChatPickerState = {
   completeItem: (item: NativeChatPickerItem) => void
   /** `token` replaces the file-reference form, e.g. a room's `@Name`; with `from`, it replaces
    *  `from` to the caret wherever the menu is (a bot's chats filter on text with spaces). */
-  completeMention: (path: string, token?: string, from?: number) => void
+  completeMention: (path: string, token?: Parameters<typeof applyMention>[4], from?: number) => void
   /** Puts a chat or terminal chip where the `@query` is. */
   completeSessionMention: (session: NativeChatMentionSession) => void
   dismiss: (triggerKey: string) => void
@@ -237,7 +237,7 @@ export function useNativeChatPickerState(args: {
   )
 
   const completeMention = useCallback(
-    (path: string, token?: string, from?: number) => {
+    (path: string, token?: Parameters<typeof applyMention>[4], from?: number) => {
       if (!disabledRef.current && (from !== undefined || autocomplete.mode === 'mention')) {
         commitCompletion(applyMention(textareaRef.current, ...liveDraft(), path, token, from))
       }
