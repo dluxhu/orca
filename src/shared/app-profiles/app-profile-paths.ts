@@ -8,7 +8,7 @@ export const APP_PROFILE_MARKER = 'orca-app-profile.json'
 export const APP_PROFILES_REGISTRY = 'profiles.json'
 /** The Info.plist key that makes a bundle a profile app. */
 export const APP_PROFILE_PLIST_ID_KEY = 'OrcaAppProfileId'
-/** Info.plist key for a test root. `orca profiles create` writes it only when ORCA_PROFILES_ROOT is set. */
+/** Info.plist key for a test root. `orca profiles create --pin-root` writes it. */
 export const APP_PROFILE_PLIST_ROOT_KEY = 'OrcaAppProfilesRoot'
 /** Overrides the folder that holds profiles.json and the profile userData folders. */
 export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
