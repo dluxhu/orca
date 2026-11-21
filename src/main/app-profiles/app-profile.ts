@@ -99,3 +99,12 @@ export function runtimeAppIdentity(): { productName: string; appId: string } {
     ? { productName: profile.name, appId: profile.bundleId }
     : { productName: FORK_IDENTITY.productName, appId: FORK_IDENTITY.appId }
 }
+
+/**
+ * True in a profile app, and in any process (orcad too) that serves a profile's userData.
+ * Such a process must not change the shared agent configs or ~/.orca before isolation lands.
+ */
+export function isAppProfileRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
+  const userDataPath = env.ORCA_USER_DATA_PATH
+  return getAppProfile() !== null || (!!userDataPath && readAppProfileMarker(userDataPath) !== null)
+}

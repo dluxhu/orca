@@ -1,6 +1,9 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { resolveAppProfile } from './app-profile'
+import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
 
 const plist = (entries: Record<string, string>): string =>
   `<plist><dict>${Object.entries(entries)
@@ -81,5 +84,19 @@ describe('resolveAppProfile', () => {
         readMarker
       })
     ).toBeNull()
+  })
+})
+
+describe('isAppProfileRuntime', () => {
+  it("is true for a process that serves a profile's userData, orcad too", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-profile-runtime-'))
+    try {
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: dir })).toBe(false)
+      writeFileSync(join(dir, 'orca-app-profile.json'), '{"id":"work"}')
+      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: dir })).toBe(true)
+      expect(isAppProfileRuntime({})).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
