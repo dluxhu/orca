@@ -17,7 +17,11 @@ export const PeerMailSender = z.object({
   agent: z.string().min(1).max(64).optional(),
   /** The sending Orca's computer name. */
   computer: LINE,
-  bot: z.object({ id: LINE, name: LINE, avatar: LINE.nullable() }).optional()
+  bot: z.object({ id: LINE, name: LINE, avatar: LINE.nullable() }).optional(),
+  /** The sender's chat or terminal address on the sending Orca, which opens it there. */
+  address: LINE.min(1).optional(),
+  /** The sending Orca's installation id: a viewer finds its connection to that Orca by it. */
+  hostId: LINE.min(1).optional()
 })
 export type PeerMailSender = z.infer<typeof PeerMailSender>
 

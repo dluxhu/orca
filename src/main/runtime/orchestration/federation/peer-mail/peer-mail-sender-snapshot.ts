@@ -20,7 +20,10 @@ export function peerMailSenderSnapshot(
       ...(sender.agent ? { agent: sender.agent } : {}),
       ...(sender.bot ? { bot: true } : {}),
       ...(portableAvatar(sender.bot?.avatar) ? { botAvatar: sender.bot?.avatar } : {}),
-      ...(host ? { host } : {})
+      ...(host ? { host } : {}),
+      ...(sender.address && sender.hostId
+        ? { origin: { hostId: sender.hostId, address: sender.address } }
+        : {})
     }
   })
 }

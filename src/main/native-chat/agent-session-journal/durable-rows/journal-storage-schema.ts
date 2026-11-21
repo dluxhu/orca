@@ -104,7 +104,8 @@ const sender = z.object({
   toConversation: salvaged,
   bot: salvaged,
   host: salvaged,
-  botAvatar: salvaged
+  botAvatar: salvaged,
+  origin: salvaged
 })
 const orchestration = z.discriminatedUnion('message', [
   z.object({

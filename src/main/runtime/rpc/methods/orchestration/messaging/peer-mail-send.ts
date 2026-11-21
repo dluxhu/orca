@@ -5,9 +5,9 @@ import type { OrchestrationCompatibilityCallerAuthority } from '../../../../orch
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import {
   deliverPeerMail,
+  locatedPeerMailSender,
   peerMailMessageId,
   peerMailPairing,
-  peerMailSender,
   peerMailSenderLabel,
   requirePeerMailServer
 } from '../../../../orchestration/federation/peer-mail/peer-mail-delivery'
@@ -122,7 +122,7 @@ export async function sendPeerMail(args: {
     chat: params.chat,
     item: params.item,
     attachments,
-    sender: peerMailSender(runtime, caller.address)
+    sender: await locatedPeerMailSender(runtime, caller.address)
   })
   return recordReceiptBeforeNudge(
     args.recordMutationReceipt,
