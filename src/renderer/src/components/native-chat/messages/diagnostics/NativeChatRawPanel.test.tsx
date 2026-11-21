@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatPaneHeader } from '../../pane/actions/NativeChatPaneHeader'
+import { MessageRow } from '../rows/NativeChatMessageRow'
 import { routeNativeChatRootKeyToInput } from '../../composer/focus/native-chat-root-key-routing'
 import type {
   AgentJournalItemBody,
@@ -265,6 +266,29 @@ describe('the panel scroll', () => {
     expect(atEnd()).toBe(true)
   })
 
+  it('stops the follow at a marked reply until the reader scrolls back to the end', () => {
+    fakeGeometry()
+    const scrolled: Element[] = []
+    const before = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this)
+    }
+    restore.push(() => {
+      HTMLElement.prototype.scrollIntoView = before
+    })
+    const focus = { messageId: 'row-1' }
+    const view = render(<NativeChatRawPanel items={rows(3)} focus={focus} />)
+    expect(scrolled).toEqual([screen.getAllByRole('listitem')[1]])
+    viewport.scrollHeight = 1500
+    view.rerender(<NativeChatRawPanel items={rows(4)} focus={focus} />)
+    expect(atEnd()).toBe(false)
+    panel().scrollTop = 1300
+    fireEvent.scroll(panel())
+    viewport.scrollHeight = 2000
+    view.rerender(<NativeChatRawPanel items={rows(5)} focus={focus} />)
+    expect(atEnd()).toBe(true)
+  })
+
   it('stays where the reader scrolled up to', () => {
     fakeGeometry()
     const view = render(<NativeChatRawPanel items={rows(3)} />)
@@ -273,5 +297,99 @@ describe('the panel scroll', () => {
     viewport.scrollHeight = 1500
     view.rerender(<NativeChatRawPanel items={rows(4)} />)
     expect(panel().scrollTop).toBe(100)
+  })
+})
+
+const turn = (turnItemId: string) => ({ kind: 'turn' as const, turnItemId })
+const said = (role: 'user' | 'assistant', text: string): AgentJournalItemBody => ({
+  kind: 'message',
+  role,
+  blocks: [{ type: 'text', text }]
+})
+// Two turns: t1 opens with sent-1, takes a steer, and replies twice; t2 replies once.
+const TURNS: AgentJournalRenderItem[] = [
+  { ...item('sent-1', 1, said('user', 'sent-1')), turnScope: { kind: 'thread' } },
+  {
+    ...item('t1', 2, { kind: 'turn', turnId: 't1', state: 'completed' }),
+    turnScope: { kind: 'thread' }
+  },
+  { ...item('reply-1a', 3, said('assistant', 'reply-1a')), turnScope: turn('t1') },
+  { ...item('steer-1', 4, said('user', 'steer-1')), turnScope: turn('t1') },
+  { ...item('reply-1b', 5, said('assistant', 'reply-1b')), turnScope: turn('t1') },
+  { ...item('sent-2', 6, said('user', 'sent-2')), turnScope: { kind: 'thread' } },
+  {
+    ...item('t2', 7, { kind: 'turn', turnId: 't2', state: 'completed' }),
+    turnScope: { kind: 'thread' }
+  },
+  { ...item('reply-2', 8, said('assistant', 'reply-2')), turnScope: turn('t2') }
+]
+const REPLY_LINK = 'Show raw messages for this reply'
+
+function Reply({ id }: { id: string }): React.JSX.Element {
+  return (
+    <section aria-label={id}>
+      <MessageRow
+        message={{
+          id,
+          role: 'assistant',
+          timestamp: 0,
+          source: 'transcript',
+          blocks: [{ type: 'text', text: `${id} words` }]
+        }}
+        expandSignal={false}
+        onScrollMessageToTop={vi.fn()}
+      />
+    </section>
+  )
+}
+
+function Transcript({ tabId }: { tabId: string }): React.JSX.Element {
+  return (
+    <TooltipProvider>
+      <NativeChatRawFrame tabId={tabId} items={TURNS}>
+        <Reply id="reply-1b" />
+        <Reply id="reply-2" />
+        {/* An imported reply: no journal row holds it. */}
+        <Reply id="imported" />
+      </NativeChatRawFrame>
+    </TooltipProvider>
+  )
+}
+
+const markedEntries = (): string[] =>
+  within(screen.getByRole('region', { name: 'Raw messages' }))
+    .getAllByRole('listitem')
+    .filter((entry) => entry.getAttribute('aria-current') === 'true')
+    .map((entry) => /"(?:text|turnId)": "([^"]+)"/.exec(entry.textContent ?? '')?.[1] ?? '?')
+
+describe('the {} link under a reply', () => {
+  it('shows only under a reply that has raw entries, with its own name', () => {
+    render(<Transcript tabId="link-shown" />)
+    const links = (reply: string) =>
+      within(screen.getByRole('region', { name: reply })).queryAllByRole('button', {
+        name: REPLY_LINK
+      })
+    expect({ one: links('reply-1b'), two: links('reply-2'), imported: links('imported') }).toEqual({
+      one: [expect.any(HTMLButtonElement)],
+      two: [expect.any(HTMLButtonElement)],
+      imported: []
+    })
+  })
+
+  it('opens the panel and marks exactly the rows of that reply’s turn, without what was sent', () => {
+    render(<Transcript tabId="link-marks" />)
+    expect(screen.queryByRole('region', { name: 'Raw messages' })).toBeNull()
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'reply-1b' })).getByRole('button', {
+        name: REPLY_LINK
+      })
+    )
+    expect(markedEntries()).toEqual(['t1', 'reply-1a', 'reply-1b'])
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'reply-2' })).getByRole('button', {
+        name: REPLY_LINK
+      })
+    )
+    expect(markedEntries()).toEqual(['t2', 'reply-2'])
   })
 })

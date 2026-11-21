@@ -1,6 +1,18 @@
-import { memo, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  createContext,
+  memo,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from 'react'
+import { Braces } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/class-names'
 import {
   geometryOf,
   isNearBottom,
@@ -16,11 +28,19 @@ const FOLD_CHARS = 1600
 
 // shortcut: in memory for the app session only; persist it when people ask for it after a restart.
 const openTabs = new Set<string>()
+// The reply that a {} link asked the tab's panel to mark. A new object for each click.
+const focusedTabs = new Map<string, { messageId: string }>()
 const listeners = new Set<() => void>()
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
+}
+
+function notify(): void {
+  for (const listener of listeners) {
+    listener()
+  }
 }
 
 /** The header toggle and the panel read one open state per chat tab. */
@@ -29,14 +49,64 @@ export function useNativeChatRawPanel(tabId: string): { open: boolean; toggle: (
   const toggle = (): void => {
     if (open) {
       openTabs.delete(tabId)
+      focusedTabs.delete(tabId)
     } else {
       openTabs.add(tabId)
     }
-    for (const listener of listeners) {
-      listener()
-    }
+    notify()
   }
   return { open, toggle }
+}
+
+/** A reply's raw entries: the rows of its turn except the sent messages. Outside a turn, its own row. */
+function replyEntries(
+  items: readonly AgentJournalRenderItem[],
+  messageId: string
+): ReadonlySet<string> {
+  const scope = items.find((item) => item.itemId === messageId)?.turnScope
+  if (scope?.kind !== 'turn') {
+    return new Set([messageId])
+  }
+  return new Set(
+    items.flatMap((item) =>
+      item.itemId === scope.turnItemId ||
+      (item.turnScope?.kind === 'turn' &&
+        item.turnScope.turnItemId === scope.turnItemId &&
+        !(item.body.kind === 'message' && item.body.role === 'user'))
+        ? [item.itemId]
+        : []
+    )
+  )
+}
+
+type RawLinkSource = { has: (messageId: string) => boolean; show: (messageId: string) => void }
+const NativeChatRawLinkContext = createContext<RawLinkSource | undefined>(undefined)
+
+/** The {} action under a reply. It shows only for a reply that has raw entries. */
+export function NativeChatRawLink({ messageId }: { messageId: string }): React.JSX.Element | null {
+  const t = useTranslate()
+  const source = useContext(NativeChatRawLinkContext)
+  if (!source?.has(messageId)) {
+    return null
+  }
+  const label = t('components.native-chat.rawPanel.showReply', 'Show raw messages for this reply')
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-chat-foreground-faint transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={label}
+          onClick={() => source.show(messageId)}
+        >
+          <Braces className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={4}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
 }
 
 type SentBlocks = Extract<AgentJournalItemBody, { kind: 'message' }>['blocks']
@@ -64,7 +134,13 @@ function foldedText(text: string): string | null {
 }
 
 const RawEntry = memo(
-  function RawEntry({ item }: { item: AgentJournalRenderItem }): React.JSX.Element {
+  function RawEntry({
+    item,
+    marked
+  }: {
+    item: AgentJournalRenderItem
+    marked: boolean
+  }): React.JSX.Element {
     const t = useTranslate()
     const [expanded, setExpanded] = useState(false)
     const { body } = item
@@ -74,7 +150,11 @@ const RawEntry = memo(
     const folded = foldedText(text)
     const time = new Date(item.observedAt)
     return (
-      <li className="flex flex-col gap-1">
+      <li
+        data-current={marked || undefined}
+        aria-current={marked || undefined}
+        className={cn('flex flex-col gap-1', marked && 'rounded-md bg-accent')}
+      >
         <div className="flex items-center gap-2 text-chat-foreground-faint">
           <time dateTime={time.toISOString()}>
             {time.toLocaleTimeString(undefined, { hour12: false })}
@@ -121,14 +201,19 @@ const RawEntry = memo(
   },
   // Journal rows change only with a new revision.
   (before, after) =>
-    before.item.itemId === after.item.itemId && before.item.revision === after.item.revision
+    before.item.itemId === after.item.itemId &&
+    before.item.revision === after.item.revision &&
+    before.marked === after.marked
 )
 
 /** Read only: the journal rows the chat already holds, with no live announcements. */
 export function NativeChatRawPanel({
-  items
+  items,
+  focus
 }: {
   items: readonly AgentJournalRenderItem[]
+  /** The reply to mark and scroll to. */
+  focus?: { messageId: string }
 }): React.JSX.Element {
   const t = useTranslate()
   const ordered = items.toSorted(
@@ -143,6 +228,17 @@ export function NativeChatRawPanel({
       panel.scrollTop = panel.scrollHeight
     }
   }, [items])
+  const marked = useMemo(
+    () => (focus ? replyEntries(items, focus.messageId) : new Set<string>()),
+    [items, focus]
+  )
+  // A marked reply stops the follow. A scroll back to the end starts it again.
+  useLayoutEffect(() => {
+    if (focus) {
+      followingRef.current = false
+      scrollRef.current?.querySelector('[data-current]')?.scrollIntoView({ block: 'start' })
+    }
+  }, [focus])
   return (
     <section
       ref={scrollRef}
@@ -159,14 +255,14 @@ export function NativeChatRawPanel({
     >
       <ol className="flex flex-col gap-3">
         {ordered.map((item) => (
-          <RawEntry key={item.itemId} item={item} />
+          <RawEntry key={item.itemId} item={item} marked={marked.has(item.itemId)} />
         ))}
       </ol>
     </section>
   )
 }
 
-/** The chat body: the crew frame, and the raw panel beside it while it is open. */
+/** The chat body, and the raw panel beside it while it is open. Its replies get {} links. */
 export function NativeChatRawFrame({
   tabId,
   items,
@@ -177,10 +273,24 @@ export function NativeChatRawFrame({
   children: React.ReactNode
 }): React.JSX.Element {
   const { open } = useNativeChatRawPanel(tabId)
+  const focus = useSyncExternalStore(subscribe, () => focusedTabs.get(tabId))
+  const links = useMemo((): RawLinkSource => {
+    const ids = new Set(items.map((item) => item.itemId))
+    return {
+      has: (messageId) => ids.has(messageId),
+      show: (messageId) => {
+        openTabs.add(tabId)
+        focusedTabs.set(tabId, { messageId })
+        notify()
+      }
+    }
+  }, [items, tabId])
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
-      {open ? <NativeChatRawPanel items={items} /> : null}
+      <NativeChatRawLinkContext.Provider value={links}>
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+      </NativeChatRawLinkContext.Provider>
+      {open ? <NativeChatRawPanel items={items} focus={focus} /> : null}
     </div>
   )
 }

@@ -20,6 +20,7 @@ import {
 import { NativeChatAgentControls } from '../actions/NativeChatAgentControls'
 import { NativeChatImageAttachments } from '../../media/images/NativeChatImageAttachments'
 import { NativeChatForkAction } from '../actions/NativeChatForkAction'
+import { NativeChatRawLink } from '../diagnostics/NativeChatRawPanel'
 import type { useNativeChatWorkRun } from '../../tools/runs/use-native-chat-work-run'
 import { useTranslate } from '@/i18n/use-translate'
 
@@ -132,11 +133,14 @@ export function NativeChatAssistantMessageRow({
           timestamp={message.timestamp}
           onScrollToTop={scrollToTop}
           action={
-            fork ? (
-              <NativeChatForkAction itemId={message.id} fork={fork} />
-            ) : holdsForkSlot ? (
-              <span aria-hidden className="size-6 shrink-0" />
-            ) : null
+            <>
+              {fork ? (
+                <NativeChatForkAction itemId={message.id} fork={fork} />
+              ) : holdsForkSlot ? (
+                <span aria-hidden className="size-6 shrink-0" />
+              ) : null}
+              <NativeChatRawLink messageId={message.id} />
+            </>
           }
           className={cn(
             'w-fit select-none',
