@@ -2,10 +2,19 @@ import { Extension } from '@tiptap/core'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { TextSelection, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+import { QUOTE_NODE } from './native-chat-prompt-document-text'
+import { quoteGapKey } from './native-chat-quote-layout'
 
 // A pill: an inline atom the user can select (a skill, file, image, agent or bot). Not a hard break.
+// Not a quote chip: Backspace or Delete selects it first, and the next press deletes it.
 function isPill(node: ProseMirrorNode | null | undefined): node is ProseMirrorNode {
-  return Boolean(node?.isInline && node.isAtom && !node.isText && node.type.spec.selectable)
+  return Boolean(
+    node?.isInline &&
+      node.isAtom &&
+      !node.isText &&
+      node.type.spec.selectable &&
+      node.type.name !== QUOTE_NODE
+  )
 }
 
 function pillBeside(state: EditorState, side: 'before' | 'after'): ProseMirrorNode | null {
@@ -46,7 +55,7 @@ export function nativeChatPromptPillKey(
   const side = key === 'Backspace' || key === 'ArrowLeft' ? 'before' : 'after'
   const pill = pillBeside(state, side)
   if (!pill) {
-    return false
+    return quoteGapKey(view, key)
   }
   const at = state.selection.from
   const [from, to] = side === 'before' ? [at - pill.nodeSize, at] : [at, at + pill.nodeSize]

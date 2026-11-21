@@ -1,0 +1,207 @@
+{
+  "textAboveQuoteAndComment": {
+    "text": "hi\n\n> quoted\n\nmy comment",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "hi"
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> quoted"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "my comment"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "twoQuotesWithComments": {
+    "text": "> one\n\nc1\n\n> two\n> lines\n\nc2",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> one"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "c1"
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> two\n> lines"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "c2"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "quoteAtEnd": {
+    "text": "> q\n",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> q"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        }
+      ]
+    }
+  },
+  "fileInComment": {
+    "text": "> q\n\n@/x/f.txt see",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> q"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatFileReference",
+              "attrs": {
+                "token": "@/x/f.txt",
+                "path": "/x/f.txt"
+              }
+            },
+            {
+              "type": "text",
+              "text": " see"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "twoQuotesInARow": {
+    "text": "> a\n\n> b\n\nc",
+    "document": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> a"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "nativeChatQuote",
+              "attrs": {
+                "token": "> b"
+              }
+            }
+          ]
+        },
+        {
+          "type": "paragraph"
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "c"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -36,6 +36,11 @@ import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-pe
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
 import { withNativeChatAgentMentions } from './native-chat-agent-mentions'
 import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
+import {
+  NativeChatQuoteContentContext,
+  NativeChatSentQuote
+} from '../selection-quotes/NativeChatSentQuote'
+import { remarkNativeChatQuoteLines } from './native-chat-quote-lines'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -63,6 +68,8 @@ type NativeChatMarkdownProps = Omit<
   streaming?: boolean
   /** The transcript row's identity, so reader choices inside the text outlive the row's mount. */
   rowKey?: string
+  /** Show each blockquote as a quote chip that jumps to the quoted source on click. */
+  quoteChips?: boolean
   /** The content is a Slack message's drawn form: its mention links draw as mentions. */
   slackMentions?: boolean
   /** The agents a sent message mentions: each `@label` of them shows as a chip. Keep it stable. */
@@ -197,6 +204,7 @@ export function NativeChatMarkdown({
   rowKey,
   content,
   variant,
+  quoteChips = false,
   slackMentions = false,
   agentMentions,
   ...props
@@ -209,32 +217,42 @@ export function NativeChatMarkdown({
   // A Slack message's drawn form has its tokens drawn already.
   const chatSlackPeople = useContext(NativeChatSlackPeopleContext)
   const slackPeople = slackMentions ? null : chatSlackPeople
-  const extension = useMemo(
-    () =>
-      withNativeChatAgentMentions(
-        variant === 'document'
-          ? createNativeChatImageExtension(
-              visualExtension,
-              onLinkClick,
-              mentionNames,
-              everyone,
-              slackMentions,
-              slackPeople
-            )
-          : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions, slackPeople),
-        agentMentions
-      ),
-    [
-      agentMentions,
-      everyone,
-      mentionNames,
-      onLinkClick,
-      slackMentions,
-      slackPeople,
-      variant,
-      visualExtension
-    ]
-  )
+  const extension = useMemo(() => {
+    const base = withNativeChatAgentMentions(
+      variant === 'document'
+        ? createNativeChatImageExtension(
+            visualExtension,
+            onLinkClick,
+            mentionNames,
+            everyone,
+            slackMentions,
+            slackPeople
+          )
+        : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions, slackPeople),
+      agentMentions
+    )
+    return quoteChips
+      ? {
+          ...base,
+          remarkPlugins: [...base.remarkPlugins, remarkNativeChatQuoteLines],
+          sanitizeAttributes: {
+            ...base.sanitizeAttributes,
+            div: [...(base.sanitizeAttributes.div ?? []), 'dataNativeChatQuoteLine']
+          },
+          components: { ...base.components, blockquote: NativeChatSentQuote }
+        }
+      : base
+  }, [
+    agentMentions,
+    everyone,
+    mentionNames,
+    onLinkClick,
+    quoteChips,
+    slackMentions,
+    slackPeople,
+    variant,
+    visualExtension
+  ])
   const fileLinkExists = useNativeChatFileLinkExists(
     linkifyFilePaths && onLinkClick !== undefined,
     streaming
@@ -242,31 +260,33 @@ export function NativeChatMarkdown({
   const { githubRepo } = useContext(NativeChatLinkPeekContext)
   return (
     <NativeChatMarkdownRowKeyContext.Provider value={rowKey}>
-      <CommentMarkdown
-        {...props}
-        variant={variant}
-        growing={growing || streaming}
-        // Only the document variant's links can peek; bare #123 links follow it.
-        githubRepo={variant === 'document' ? githubRepo?.referenceRepo : undefined}
-        onLinkClick={onLinkClick}
-        allowFileUriLinks={onLinkClick !== undefined}
-        content={
-          visualExtension && streaming
-            ? withoutPendingNativeChatVisualDirectiveTail(content)
-            : content
-        }
-        math
-        extension={extension}
-        fileLinkExists={fileLinkExists}
-        fadeWords={fadeWords}
-        renderMermaid={!streaming}
-        keepMermaidSourceWhilePending
-        unknownHtmlAsText
-        singleTildeStrikethrough={false}
-        data-word-fade={wordFadeArmed ? '' : undefined}
-        data-block-fade={wordFadeArmed && streaming ? '' : undefined}
-        className={cn('native-chat-markdown', className)}
-      />
+      <NativeChatQuoteContentContext.Provider value={quoteChips ? content : null}>
+        <CommentMarkdown
+          {...props}
+          variant={variant}
+          growing={growing || streaming}
+          // Only the document variant's links can peek; bare #123 links follow it.
+          githubRepo={variant === 'document' ? githubRepo?.referenceRepo : undefined}
+          onLinkClick={onLinkClick}
+          allowFileUriLinks={onLinkClick !== undefined}
+          content={
+            visualExtension && streaming
+              ? withoutPendingNativeChatVisualDirectiveTail(content)
+              : content
+          }
+          math
+          extension={extension}
+          fileLinkExists={fileLinkExists}
+          fadeWords={fadeWords}
+          renderMermaid={!streaming}
+          keepMermaidSourceWhilePending
+          unknownHtmlAsText
+          singleTildeStrikethrough={false}
+          data-word-fade={wordFadeArmed ? '' : undefined}
+          data-block-fade={wordFadeArmed && streaming ? '' : undefined}
+          className={cn('native-chat-markdown', className)}
+        />
+      </NativeChatQuoteContentContext.Provider>
     </NativeChatMarkdownRowKeyContext.Provider>
   )
 }
