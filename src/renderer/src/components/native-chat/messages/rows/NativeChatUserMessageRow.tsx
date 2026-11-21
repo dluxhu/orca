@@ -1,6 +1,7 @@
 import { NativeChatSetupButton } from '../../host-access/NativeChatSetupButton'
 import { NativeChatTextAttachments } from '../../media/text/NativeChatTextAttachments'
 import { Goal } from 'lucide-react'
+import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/class-names'
 import { useTranslate } from '@/i18n/use-translate'
@@ -18,6 +19,7 @@ import { NativeChatAgentMessageCard } from './NativeChatAgentMessageCard'
 import { NativeChatDetailsDisclosure } from '../diagnostics/NativeChatProviderDetails'
 import { NativeChatImageAttachments } from '../../media/images/NativeChatImageAttachments'
 import type { deriveNativeChatRowContent } from '../../../../../../shared/native-chat/transcript/native-chat-row-content'
+import { splitAgentReferenceNotes } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
 const USER_META_REVEAL =
   'transition-opacity can-hover:pointer-events-none can-hover:opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 [.group:has(:focus-visible)_&]:pointer-events-auto [.group:has(:focus-visible)_&]:opacity-100'
@@ -86,6 +88,9 @@ export function NativeChatUserMessageRow({
   // Agent-authored input belongs to the turn but uses a left-aligned sender row instead of the person’s bubble.
   const from = message.from
   const sending = deliveryNotice?.sending === true
+  // The bubble shows what the user typed; the agent also got the routing notes.
+  const sent = useMemo(() => (from ? null : splitAgentReferenceNotes(markdown)), [from, markdown])
+  const typed = sent?.body ?? markdown
   return (
     <div
       ref={rowRef}
@@ -113,13 +118,13 @@ export function NativeChatUserMessageRow({
               />
               <NativeChatUserMessageFold
                 messageId={message.id}
-                markdown={markdown}
+                markdown={typed}
                 onRefolded={onRefolded}
                 // List numbers hang into the bubble's padding; clipping at the text edge cut them off.
                 className="-mx-3.5 px-3.5"
               >
                 <NativeChatTextAttachments
-                  content={markdown}
+                  content={typed}
                   structured={structuredAttachments}
                   runtimeContext={runtimeContext}
                   renderText={(text) => (
@@ -127,6 +132,7 @@ export function NativeChatUserMessageRow({
                       rowKey={message.id}
                       content={text}
                       variant="document"
+                      agentMentions={sent?.mentions}
                       className="text-sm"
                       renderCodeBlock={NativeChatCodeBlock}
                     />
