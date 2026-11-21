@@ -321,9 +321,11 @@ through `MAIN_RELEASE_REPO`.
 `APP_RELEASE_REPO`. Then update the test URLs:
 
 ```sh
-git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' src/renderer/src/components/UpdateCard.error-card.test.tsx \
-  | xargs sed -i '' 's#github.com/stablyai/orca/releases#github.com/dluxhu/orca/releases#g'
+git grep -lE "github.com/(repos/)?stablyai/orca/releases" -- 'src/main/updater/*' 'src/renderer/src/components/maintenance/update-card/*' \
+  | xargs sed -i '' -E 's#github.com/(repos/)?stablyai/orca/releases#github.com/\1dluxhu/orca/releases#g'
 ```
+
+The REST API URLs (`api.github.com/repos/stablyai/orca/releases`) in the tests change the same way.
 
 ### Part 3: fork documents and release script
 
