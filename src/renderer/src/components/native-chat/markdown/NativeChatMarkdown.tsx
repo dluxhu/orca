@@ -31,6 +31,8 @@ import {
 } from '../native-chat-markdown-mentions'
 import { NativeChatLinkPeekContext } from '../links/previews/native-chat-link-peek-context'
 import { useNativeChatLinkClick } from '../links/actions/native-chat-link-click-context'
+import { withNativeChatAgentMentions } from './native-chat-agent-mentions'
+import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
@@ -60,6 +62,8 @@ type NativeChatMarkdownProps = Omit<
   rowKey?: string
   /** The content is a Slack message's drawn form: its mention links draw as mentions. */
   slackMentions?: boolean
+  /** The agents a sent message mentions: each `@label` of them shows as a chip. Keep it stable. */
+  agentMentions?: readonly SentAgentMention[]
 }
 
 const NO_NAMES: readonly string[] = []
@@ -172,6 +176,7 @@ export function NativeChatMarkdown({
   content,
   variant,
   slackMentions = false,
+  agentMentions,
   ...props
 }: NativeChatMarkdownProps): React.JSX.Element {
   const onLinkClick = useNativeChatLinkClick()
@@ -181,16 +186,19 @@ export function NativeChatMarkdown({
   const everyone = useContext(NativeChatMentionEveryoneContext)
   const extension = useMemo(
     () =>
-      variant === 'document'
-        ? createNativeChatImageExtension(
-            visualExtension,
-            onLinkClick,
-            mentionNames,
-            everyone,
-            slackMentions
-          )
-        : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions),
-    [everyone, mentionNames, onLinkClick, slackMentions, variant, visualExtension]
+      withNativeChatAgentMentions(
+        variant === 'document'
+          ? createNativeChatImageExtension(
+              visualExtension,
+              onLinkClick,
+              mentionNames,
+              everyone,
+              slackMentions
+            )
+          : withFileDestinations(visualExtension, mentionNames, everyone, slackMentions),
+        agentMentions
+      ),
+    [agentMentions, everyone, mentionNames, onLinkClick, slackMentions, variant, visualExtension]
   )
   const fileLinkExists = useNativeChatFileLinkExists(
     linkifyFilePaths && onLinkClick !== undefined,
