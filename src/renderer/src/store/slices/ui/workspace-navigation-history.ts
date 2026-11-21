@@ -168,7 +168,7 @@ function getHistoryEntryKey(entry: WorktreeNavHistoryEntry): string {
 
 type WorkspaceCatalog = Pick<AppState, 'folderWorkspaces' | 'worktreesByRepo'>
 
-function isLiveEntry(entry: WorktreeNavHistoryEntry, state: WorkspaceCatalog): boolean {
+export function isLiveEntry(entry: WorktreeNavHistoryEntry, state: WorkspaceCatalog): boolean {
   if (isChatPlace(entry)) {
     // A chat place whose tab is closed still shows its workspace.
     return isLiveEntry(entry.worktreeId, state)
