@@ -39,6 +39,7 @@ Features:
 - **Send with Cmd+Enter.** An option in Settings > Chat > Behavior: Enter adds a new line, and Cmd+Enter (Ctrl+Enter off macOS) sends ([#23](https://github.com/dluxhu/orca/pull/23)).
 - **Show raw.** A "Show raw" button in a chat's title bar opens a panel with the exact messages sent to the agent and what comes back ([#33](https://github.com/dluxhu/orca/pull/33)).
 - **Plain bare #numbers in chat.** A project setting, "Link bare #numbers in chat" (on by default). Turn it off, and a bare `#123` or `PR #123` in a chat stays text; `owner/repo#123` still links ([#39](https://github.com/dluxhu/orca/pull/39)).
+- **Automatic compaction divider.** When Claude Code compacts its context on its own, the chat shows a "Context compacted automatically" divider, also after the chat is read again from the Claude transcript ([#40](https://github.com/dluxhu/orca/pull/40)).
 - **Stable and Nightly.** The release channel switcher lists Stable and Nightly. Nightly is a separate app that updates itself to newer Nightly builds; the stable app never takes a Nightly build ([#38](https://github.com/dluxhu/orca/pull/38)).
 
 Fixes:
