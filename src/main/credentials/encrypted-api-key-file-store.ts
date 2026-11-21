@@ -1,6 +1,6 @@
 import { getSecretStore } from '../../shared/secure-storage/secret-store'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
   hardenExistingSecureFile,
@@ -43,7 +43,7 @@ export function createEncryptedApiKeyFileStore({
   }
 
   function getOrcaDir(): string {
-    return join(homedir(), '.orca')
+    return orcaHomeDir()
   }
 
   function getApiKeyPath(): string {

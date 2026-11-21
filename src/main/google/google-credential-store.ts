@@ -2,7 +2,7 @@
 // files (an owner-only file where the OS keyring is missing, as for Linear). Never sent to Orca Cloud,
 // a paired phone or an SSH target.
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { join } from 'node:path'
 import { z } from 'zod'
 import {
@@ -47,7 +47,7 @@ export const GoogleAccountRecordSchema = z.object({
 
 export type GoogleAccountRecord = z.infer<typeof GoogleAccountRecordSchema>
 
-const googleDir = () => join(homedir(), '.orca', 'google')
+const googleDir = () => join(orcaHomeDir(), 'google')
 const clientPath = () => join(googleDir(), 'client.enc')
 const accountsDir = () => join(googleDir(), 'accounts')
 const accountPath = (email: string) =>

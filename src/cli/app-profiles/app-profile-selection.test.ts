@@ -41,6 +41,17 @@ describe('selectAppProfile', () => {
     expect(env.ORCA_APP_EXECUTABLE).toBe(join(root, 'Work.app', 'Contents', 'MacOS', 'Orca @dLux'))
   })
 
+  it("gives the command the profile's own home folders, and none for the default", () => {
+    const env: NodeJS.ProcessEnv = { ORCA_PROFILES_ROOT: root }
+    selectAppProfile(['--profile', 'work', 'serve'], env)
+    expect(env.ORCA_HOME_DIR).toBe(join(root, 'work', 'orca-home'))
+    expect(env.CLAUDE_CONFIG_DIR).toBe(join(root, 'work', 'orca-home', 'agents', 'claude'))
+    expect(env.CODEX_HOME).toBe(join(root, 'work', 'orca-home', 'agents', 'codex'))
+    selectAppProfile(['--profile', 'default', 'serve'], env)
+    expect(env.ORCA_HOME_DIR).toBeUndefined()
+    expect(env.CLAUDE_CONFIG_DIR).toBeUndefined()
+  })
+
   it('keeps a --profile after the command for the browser', () => {
     const env: NodeJS.ProcessEnv = { ORCA_PROFILES_ROOT: root }
     const argv = ['tab', 'open', '--profile', 'x']
@@ -78,6 +89,22 @@ describe('selectAppProfile', () => {
     }
     selectAppProfile(['serve'], other)
     expect(other.ORCA_APP_EXECUTABLE).toBeUndefined()
+  })
+
+  it('keeps an inherited executable that is not a profile app, such as the dev launcher', () => {
+    const electron = join(root, 'Electron.app')
+    mkdirSync(join(electron, 'Contents'), { recursive: true })
+    writeFileSync(
+      join(electron, 'Contents', 'Info.plist'),
+      '<dict><key>CFBundleExecutable</key>\n<string>Electron</string></dict>'
+    )
+    const executable = join(electron, 'Contents', 'MacOS', 'Electron')
+    const env: NodeJS.ProcessEnv = {
+      ORCA_USER_DATA_PATH: join(root, 'orca-dev'),
+      ORCA_APP_EXECUTABLE: executable
+    }
+    selectAppProfile(['serve'], env)
+    expect(env.ORCA_APP_EXECUTABLE).toBe(executable)
   })
 
   it('finds the executable from the marker of an inherited ORCA_USER_DATA_PATH', () => {

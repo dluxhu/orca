@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { join } from 'node:path'
 import {
   CredentialDecryptionError,
@@ -46,7 +46,7 @@ let cachedSecret: BitbucketStoredSecret | null = null
 let credentialError: string | null = null
 
 function getOrcaDir(): string {
-  return join(homedir(), '.orca')
+  return orcaHomeDir()
 }
 
 function getMetadataPath(): string {

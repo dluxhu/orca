@@ -1,4 +1,5 @@
 import { isAppProfileRuntime } from '../app-profiles/app-profile'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { access, readdir, rm, rmdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
@@ -78,7 +79,7 @@ export async function buildOrcaUninstallPlan(host: OrcaUninstallHost): Promise<O
     detail: null
   }))
   const cli = await host.getCliStatus().catch(() => null)
-  const scripts = join(host.homeDir, '.orca', 'agent-hooks')
+  const scripts = join(orcaHomeDir(host.homeDir), 'agent-hooks')
   const scriptsMissing = await access(scripts).catch(() => true)
   return {
     installKind: host.identity.installKind,
@@ -233,9 +234,9 @@ async function runHookScripts(
     return { ...entry, state: 'kept-shared', detail: `Still used by ${names}.` }
   }
   try {
-    const dir = join(host.homeDir, '.orca', 'agent-hooks')
+    const dir = join(orcaHomeDir(host.homeDir), 'agent-hooks')
     await rm(dir, { recursive: true, force: true })
-    const orcaDir = join(host.homeDir, '.orca')
+    const orcaDir = orcaHomeDir(host.homeDir)
     if ((await readdir(orcaDir).catch(() => ['?'])).length === 0) {
       await rmdir(orcaDir)
     }

@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
 import { basename, join } from 'node:path'
 import { resolveAbsoluteDirOverride } from '../../../../shared/file-access/absolute-dir-override'
 import type { AiVaultAgentSource } from '../../discovery/session-scanner-agent-sources'
@@ -11,7 +12,7 @@ export function openClawSessionDirectoryPredicate(name: string, depth: number): 
 
 const OPENCLAW_STATE_DIR = resolveAbsoluteDirOverride(
   process.env.OPENCLAW_STATE_DIR,
-  join(homedir(), '.openclaw')
+  defaultAgentHomeDir('OPENCLAW_STATE_DIR', '.openclaw')
 )
 
 export const OPENCLAW_AGENT_SOURCE: AiVaultAgentSource = {

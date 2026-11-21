@@ -1,4 +1,5 @@
 import { getSecretStore } from '../../shared/secure-storage/secret-store'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { readCredentialFileProtection } from '../credentials/credential-file-protection'
 import {
   classifyUnenvelopedCredential,
@@ -6,7 +7,6 @@ import {
   type SecretAtRestProtection
 } from '../../shared/secure-storage/secret-at-rest-protection'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 type StoredOpenAiKey = {
@@ -17,7 +17,7 @@ const OPENAI_SPEECH_TOKEN_FILE = 'openai-speech-token.enc'
 let cachedOpenAiSpeechApiKey: string | null = null
 
 function getOrcaDir(): string {
-  return join(homedir(), '.orca')
+  return orcaHomeDir()
 }
 
 function ensureOrcaDir(): void {
