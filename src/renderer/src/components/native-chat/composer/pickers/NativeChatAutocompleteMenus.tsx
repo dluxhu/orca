@@ -19,6 +19,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { PickerListbox, PickerOptionButton, PickerStatus } from './NativeChatPickerParts'
 import { NativeChatMentionChatList } from './NativeChatMentionChatList'
 import { cn } from '@/lib/class-names'
+import { NativeChatMentionLabel } from './NativeChatMentionLabel'
+import { nativeChatMentionSessionOf } from './native-chat-mentions'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
 
@@ -312,7 +314,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           ? t('components.native-chat.composer.filesLoadFailed', "Couldn't load files")
           : nativeChatMentionEmptyText(room !== null && !room.withFiles)
 
-  // The room's bots lead, then this chat's crew agents, then files, each under its heading.
+  // The room's bots lead, then this chat's crew agents, then other chats and terminals, then files,
+  // each under its heading.
   const agentValues = new Set(room?.agents?.map(nativeChatMentionValue))
   const leading = (from: number, matches: (value: string) => boolean) => {
     const end = files.findIndex((value, index) => index >= from && !matches(value))
@@ -324,7 +327,23 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
   const grouped = room?.withFiles === true && bots + room.unavailable.length > 0
   const botsHeaded = grouped || (bots > 0 && agentCount > 0)
   const headed = grouped || agentCount > 0
+  const sessionOf = (value: string) => nativeChatMentionSessionOf(mention.sessions, value)
+  const sessions = leading(listed, (value) => sessionOf(value) !== null)
   const option = (path: string, index: number) => {
+    const session = sessionOf(path)
+    if (session) {
+      return (
+        <PickerOptionButton
+          key={path}
+          id={`${listboxId}-option-${index}`}
+          selected={index === selectedIndex}
+          activeItemRef={activeItemRef}
+          onChoose={() => onChoose(path)}
+        >
+          <NativeChatMentionLabel item={session} />
+        </PickerOptionButton>
+      )
+    }
     const member = room ? memberOf(path) : undefined
     const selected = index === selectedIndex
     const opens = member?.id && chats?.picker.offers(member.id) ? member.id : null
@@ -383,9 +402,15 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
       <div className="flex flex-col gap-0.5">
         {files.slice(bots, listed).map((path, index) => option(path, index + bots))}
       </div>
-      {headed && files.length > listed ? <PickerGroupHeading kind="files" /> : null}
+      {headed && sessions > 0 ? <PickerGroupHeading kind="sessions" /> : null}
       <div className="flex flex-col gap-0.5">
-        {files.slice(listed).map((path, index) => option(path, index + listed))}
+        {files.slice(listed, listed + sessions).map((path, index) => option(path, index + listed))}
+      </div>
+      {headed && files.length > listed + sessions ? <PickerGroupHeading kind="files" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files
+          .slice(listed + sessions)
+          .map((path, index) => option(path, index + listed + sessions))}
       </div>
       {statusText ? (
         <PickerStatus>

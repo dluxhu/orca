@@ -127,6 +127,9 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
     const mentions = useNativeChatComposerMentions(room, draft, picker, {
       terminalTabId,
       structuredWorktreeId: structuredTransport?.worktreeId,
+      structuredSessionId: structuredTransport?.sessionId,
+      targetPtyId,
+      setActiveSuggestion,
       caret,
       notices
     })
