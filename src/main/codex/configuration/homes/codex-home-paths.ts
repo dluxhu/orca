@@ -11,6 +11,7 @@ import {
   unlinkSync
 } from 'node:fs'
 import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
 import { dirname, join } from 'node:path'
 import {
   clearCopiedResourceMarker,
@@ -39,7 +40,7 @@ const CODEX_SYSTEM_RESOURCE_ENTRIES = [
 ] as const
 
 export function getSystemCodexHomePath(): string {
-  return join(homedir(), '.codex')
+  return defaultAgentHomeDir('CODEX_HOME', '.codex')
 }
 
 /** Path only; use when a read-only caller must not materialize the mirror. */

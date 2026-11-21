@@ -209,10 +209,6 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   if (state.devInstanceIdentity && shouldApplyPreReadyAppName(state.devInstanceIdentity)) {
     app.setName(state.devInstanceIdentity.appName)
   }
-  // A profile has its own Keychain item ("orca-<id> Safe Storage"); userData is pinned already.
-  if (appProfile) {
-    app.setName(`orca-${appProfile.id}`)
-  }
   state.startupDiagnosticsEnabled = isStartupDiagnosticsEnabled()
   if (state.startupDiagnosticsEnabled) {
     logStartupDiagnostic('before-single-instance-lock', {

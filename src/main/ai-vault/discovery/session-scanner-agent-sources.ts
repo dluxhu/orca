@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../../shared/app-profiles/app-profile-homes'
 import { basename, dirname, join } from 'node:path'
 import { pathSegments } from './session-file-discovery'
 import { resolveAbsoluteDirOverride } from '../../../shared/file-access/absolute-dir-override'
@@ -35,14 +36,17 @@ import {
   primeAgentSessionsDirFromEnv
 } from './agent-session-directories'
 
-export const DEFAULT_CODEX_HOME_DIR = join(homedir(), '.codex')
-const GEMINI_SESSIONS_DIR = join(homedir(), '.gemini', 'tmp')
+export const DEFAULT_CODEX_HOME_DIR = defaultAgentHomeDir('CODEX_HOME', '.codex')
+const GEMINI_SESSIONS_DIR = join(defaultAgentHomeDir('GEMINI_CLI_HOME', '.gemini'), 'tmp')
 const COPILOT_SESSIONS_DIR = join(
   resolveAbsoluteDirOverride(process.env.COPILOT_HOME, join(homedir(), '.copilot')),
   'session-state'
 )
 const CURSOR_PROJECTS_DIR = join(homedir(), '.cursor', 'projects')
-const CODEBUDDY_PROJECTS_DIR = join(homedir(), '.codebuddy', 'projects')
+const CODEBUDDY_PROJECTS_DIR = join(
+  defaultAgentHomeDir('CODEBUDDY_CONFIG_DIR', '.codebuddy'),
+  'projects'
+)
 const ROVO_SESSIONS_DIR = join(homedir(), '.rovodev', 'sessions')
 export function piSessionHistorySessionsDir(): string {
   return normalizeAgentSessionsDir(
@@ -68,7 +72,8 @@ const KIRO_SESSIONS_DIR = join(resolveKiroHomeDir(), 'sessions', 'cli')
 const DROID_SESSIONS_DIR = join(homedir(), '.factory', 'sessions')
 const DROID_PROJECTS_DIR = join(homedir(), '.factory', 'projects')
 const CLINE_SESSIONS_DIR =
-  process.env.CLINE_SESSION_DATA_DIR?.trim() || join(homedir(), '.cline', 'data', 'sessions')
+  process.env.CLINE_SESSION_DATA_DIR?.trim() ||
+  join(defaultAgentHomeDir('CLINE_DIR', '.cline'), 'data', 'sessions')
 
 /** Shared discovery rules constrain which paths the delete validator accepts. */
 export type AiVaultAgentSource = {
@@ -103,7 +108,8 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   qoder: {
     rootDirs: (options, wslHomeDirs) =>
       sessionRootDirs(
-        options.qoderProjectsDir ?? join(homedir(), '.qoder', 'projects'),
+        options.qoderProjectsDir ??
+          join(defaultAgentHomeDir('QODER_CONFIG_DIR', '.qoder'), 'projects'),
         wslHomeDirs,
         ['.qoder', 'projects']
       ),

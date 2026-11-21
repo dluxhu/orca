@@ -11,6 +11,11 @@ import { resolveLaunchUserDataPath } from '../runtime/profile/launch-user-data-p
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { readAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
 import {
+  APP_PROFILE_AGENT_HOME_VARIABLES,
+  APP_PROFILE_ENV_KEYS_ENV,
+  ORCA_HOME_DIR_ENV
+} from '../../shared/app-profiles/app-profile-homes'
+import {
   clearServeSupervisorBrake,
   readServeSupervisorBrake
 } from '../runtime/serve/supervision/serve-supervisor-brake'
@@ -65,11 +70,10 @@ function resolveServeServiceBind(raw: string | null | undefined): string | null 
 // same home and agent folders as the profile's terminal, or it writes to the shared ones.
 const APP_PROFILE_SERVICE_ENV_KEYS = [
   'HOME',
-  'ORCA_HOME_DIR',
-  'CLAUDE_CONFIG_DIR',
-  'CODEX_HOME',
-  'GROK_HOME',
-  'ORCA_PROFILES_ROOT'
+  'ORCA_PROFILES_ROOT',
+  APP_PROFILE_ENV_KEYS_ENV,
+  ORCA_HOME_DIR_ENV,
+  ...Object.keys(APP_PROFILE_AGENT_HOME_VARIABLES)
 ]
 
 export function appProfileServiceEnv(

@@ -8,6 +8,7 @@ import {
   readAppProfileRegistry,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
+import { applyAppProfileHomes } from '../../shared/app-profiles/app-profile-homes'
 import { RuntimeClientError } from '../runtime/connection/types'
 
 /**
@@ -45,6 +46,8 @@ export function selectAppProfile(argv: string[], env: NodeJS.ProcessEnv = proces
   // the default app's otherwise. Never another profile's bundle.
   const userDataPath = env.ORCA_USER_DATA_PATH
   const markerId = userDataPath ? readAppProfileMarker(userDataPath) : null
+  // serve, orcad and the app that this CLI starts get the target profile's folders, or none.
+  applyAppProfileHomes(markerId ? userDataPath! : null, env)
   const target = markerId
     ? // The userData folder is <root>/<id>, so profiles.json is next to it.
       readAppProfileRegistry(dirname(userDataPath!))?.profiles.find((p) => p.id === markerId)

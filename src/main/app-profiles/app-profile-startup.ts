@@ -14,5 +14,8 @@ export function configureAppProfileStartup(isDev: boolean): AppProfile | null {
     app.setPath('userData', profile.userDataPath)
     ensureAppProfileMarker(profile.userDataPath, profile.id)
   }
+  // Electron takes the Keychain item name from this name: "orca-<id> Safe Storage".
+  // userData is pinned already, so the name does not move it.
+  app.setName(`orca-${profile.id}`)
   return profile
 }

@@ -1,5 +1,5 @@
-import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
+import { resolve } from 'node:path'
 
 // Strip inherited account pins so only the session record selects the Keychain identity.
 export function withoutInheritedClaudeConfigDir(
@@ -19,7 +19,7 @@ export function withoutInheritedClaudeConfigDir(
 }
 
 export function defaultClaudeConfigDir(env: NodeJS.ProcessEnv = process.env): string {
-  return env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
+  return env.CLAUDE_CONFIG_DIR?.trim() || defaultAgentHomeDir('CLAUDE_CONFIG_DIR', '.claude')
 }
 
 function samePath(a: string, b: string, platform: NodeJS.Platform): boolean {

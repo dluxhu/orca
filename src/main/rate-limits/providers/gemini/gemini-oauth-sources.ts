@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { getMainHttpClient } from '../../../network/http-client'
@@ -6,7 +7,10 @@ import { extractOAuthClientCredentials } from './gemini-cli-oauth-extractor'
 import { writeCredentialFileAtomic } from '../../../credentials/integration-credential-file'
 
 const API_TIMEOUT_MS = 10_000
-const OAUTH_CREDS_PATH = path.join(homedir(), '.gemini', 'oauth_creds.json')
+const OAUTH_CREDS_PATH = path.join(
+  defaultAgentHomeDir('GEMINI_CLI_HOME', '.gemini'),
+  'oauth_creds.json'
+)
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const LOAD_CODE_ASSIST_URL = 'https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist'
 
