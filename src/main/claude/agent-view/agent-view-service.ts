@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../../app-profiles/app-profile'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { getAppEnvironment } from '../../../shared/app-lifecycle/app-environment'
@@ -66,6 +67,10 @@ export class ClaudeAgentViewService {
   ) {}
 
   reconcile(settings: NavigationSettings): Promise<void> {
+    // Fork patch: ~/.claude is shared until profile isolation; a profile writes nothing there.
+    if (isAppProfileRuntime()) {
+      return Promise.resolve()
+    }
     const enabled =
       settings.claudeSubagentNavigationEnabled !== false &&
       isAgentStatusHooksEnabledForAgent(settings, 'claude')

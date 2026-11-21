@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../../app-profiles/app-profile'
 import { isAgentStatusHooksEnabledForAgent } from '../../../shared/agent-hook-listener/configuration/agent-status-hooks-setting'
 import type { ManagedHookDetectionSettings } from '../../agent-hooks/installation/managed-hook-detection-commands'
 import { openCode2HookService, openCodeHookService } from './hook-service'
@@ -6,6 +7,10 @@ import { openCode2HookService, openCodeHookService } from './hook-service'
 export function refreshInstalledOpenCodeStatusPlugins(
   settings: ManagedHookDetectionSettings
 ): void {
+  // Fork patch: the OpenCode plugin folders are shared until profile isolation.
+  if (isAppProfileRuntime()) {
+    return
+  }
   if (isAgentStatusHooksEnabledForAgent(settings, 'opencode')) {
     openCodeHookService.refreshInstalledPlugins()
   }
