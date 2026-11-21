@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from './NativeChatMessageRow'
 import { serializeNativeChatAgentReferences } from '../../composer/pickers/native-chat-agent-reference-send'
+import { AgentReferencePillContent } from '../../composer/editor/native-chat-agent-reference'
 
 afterEach(cleanup)
 
@@ -30,6 +31,17 @@ function sentText(label: string): string {
       }
     ]
   })
+}
+
+/** The text of the chip the composer shows for a chat. */
+function composerChip(label: string): string {
+  const { container, unmount } = render(
+    <AgentReferencePillContent label={label} kind="chat" selected={false} />,
+    { wrapper: TranslationScopeProvider }
+  )
+  const text = container.textContent ?? ''
+  unmount()
+  return text
 }
 
 function bubble(text: string): HTMLElement {
@@ -59,7 +71,7 @@ it('shows a sent mention as its chip and hides the routing note the agent got', 
     'ask @Tech \\"Lead\\" now\n\n[Orca chat "Tech \\"Lead\\"": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]'
   )
   const shown = bubble(text)
-  expect(shown.textContent).toBe('ask Chat Tech "Lead" now')
+  expect(shown.textContent).toBe(`ask ${composerChip('Tech "Lead"')} now`)
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Tech "Lead"')
 })
 
