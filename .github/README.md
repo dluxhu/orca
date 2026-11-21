@@ -50,8 +50,8 @@ Fixes:
 
 ## How the fork is kept
 
-`main` is a copy of upstream. Each patch is its own branch on the newest upstream stable release. Once a week at most, a
-release squash-merges the patch branches onto the newest upstream stable release.
+`main` is a copy of upstream. Each patch is its own branch on the newest upstream stable release. When a release is
+necessary, it squash-merges the patch branches onto the newest upstream stable release, with no wait.
 `release/latest` shows the newest release. Open pull requests against `upstream-stable`.
 
 [docs/fork/PATCHES.md](../docs/fork/PATCHES.md) lists every patch and the release steps.
