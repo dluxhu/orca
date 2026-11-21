@@ -265,6 +265,8 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   /** A chat on Remote Control must stay reachable from claude.ai, so the idle stop leaves it running. */
   confirmIdle = (sessionId: string) =>
     this.sessions.get(sessionId)?.remoteControl ? Promise.resolve('busy' as const) : undefined
+  noteModelPick = (input: { sessionId: string; fence: number }) =>
+    claudeOptions.noteClaudeModelPick(this.sessions, input, this.emit.bind(this))
   readOptions = (input: { sessionId: string; fence: number }) =>
     readClaudeStructuredSessionOptions(this.session(input.sessionId))
   releaseAcquisition = (input: ClaudeReleaseRequest): Promise<boolean> => {
