@@ -117,7 +117,7 @@ Mac, not changed at most updates) is the same as Chrome's.
     <name> Helper (GPU).app           copy
     <name> Helper (Plugin).app        copy
     <name> Helper (Renderer).app      copy
-    Electron Framework.framework      link -> <default app>/Contents/Frameworks/Electron Framework.framework
+    Electron Framework.framework      APFS clone (cp -c); a link stops the helpers (section 12, U4)
     Mantle.framework, ReactiveObjC.framework, Squirrel.framework   links, as above
   Resources/icon.icns                 own icon
   Resources/<each other entry>        link -> <default app>/Contents/Resources/<entry>
@@ -721,3 +721,73 @@ done only after slice 2 (isolation).
 | 6. URL | The Profile Manager as the `orca:` handler, the two modes, the chooser, forwarding of every `orca:` URL, the target's handling of every `orca:` URL. | An `orca:` link opens in the selected profile, or only the chooser shows. The default app's main window does not open. |
 
 Not in this design: Linux and Windows, a change of id after creation, "Repair" of a profile after the default app moves.
+
+## 12. Slice 1 results
+
+Measured on 2026-11-21 on one Mac with macOS 27.2 (build 26B123), Apple silicon. Branch
+`nightly/profiles`. macOS 14, 15 and 26 are not tested.
+
+**Test setup.**
+
+- The default app is a local nightly build (`1.4.264-daily.202611181832-dlux.profiles.1`, Electron
+  43.8.10). It is not a release build. electron-builder signed the app, its frameworks and its helper
+  apps with a local self-signed certificate (no team, no hardened runtime). The terminal host and the
+  notification helpers are ad hoc. A release has a Developer ID signature instead. So the profile ran
+  ad hoc on code with another identity, as in a release, but not with a Developer ID.
+- The build has no `orcad` template, so `orca serve` runs on Electron.
+- Two profiles, "Work" and "Home", in a test folder. `ORCA_PROFILES_ROOT` and
+  `ORCA_PROFILES_APPS_DIR` select the test folders; `orca profiles create` then also writes
+  `OrcaAppProfilesRoot` into the profile's `Info.plist`.
+- The apps ran with a test `HOME`. It holds one link, `Library/Keychains`, to the user's keychains.
+- No GUI input was possible in the session (no clicks), so steps that need a click are not done.
+
+**Bundle.** A profile bundle is 1.3 MB on disk with links. `codesign --verify` passes and
+`codesign --verify --strict` fails ("invalid destination for symbolic link"), as expected.
+`CodeResources` records each link as its target path. The helper copies keep their signatures.
+
+| # | Answer | Evidence |
+| --- | --- | --- |
+| U1 | Yes, on macOS 27.2: the bundle with outside links launches. Work and Home ran as two foreground apps with their own bundle ids, Dock tiles and windows titled "Work" and "Home". Notifications and TCC: not measured (the notification permission request needs a closed onboarding, which needs a click). | `lsappinfo` |
+| U2 | Yes. `open -a Work.app orca://skills/share/<id>` delivered `open-url` to Work, which does not claim `orca:`. Work moved to its Skills page. | window captures before and after |
+| U3 | Not tested. | — |
+| U4 | **No with a linked framework.** With `Electron Framework.framework` as a link, every child process (GPU, network service, renderer) stops at once with `EXC_BREAKPOINT` in `ElectronMain`, and the app exits with "GPU process isn't usable". **Yes with a cloned framework.** With an APFS clone of the framework (`cp -c`, about no extra disk) and no other change, the GPU, utility and renderer processes start and the window renders. `orca --profile work status` reaches Work. In Work's terminal, `ORCA_USER_DATA_PATH` is the profile folder, `orca` is `Work.app/Contents/Resources/bin/orca`, and `orca status` names Work's pid. The updater reports "updater-unavailable". Browser, computer use and the `orcad` template: not tested. | crash reports, process list, CLI output |
+| U5 | Yes. The default app was replaced by `…profiles.2` (same Electron, same small executables, new `app.asar`). Work's cdhash, `codesign --verify` and `CodeResources` did not change. Work started on version `.2`, used its existing Keychain item and showed no prompt. TCC grant: not measured. | cdhash, `cmp`, Keychain item dates |
+| U6 | The case with helpers of another identity than the ad-hoc browser process starts and connects (Electron 43.8.10). A Developer ID case is not tested. | process list |
+| U7 | Notification helper: each profile's helper reads its own bundle's record (Work and Home: `not-determined`; the installed stable app: `denied`). The toggle check needs a click: not done. Keychain: a profile makes its own item `orca-<id> Safe Storage` with **no prompt**. After the profile's cdhash changed (it was signed again), the item asked for the **login keychain password** ("Work wants to use your confidential information stored in "orca-work Safe Storage" in your keychain", Always Allow, Deny, Allow), and the window stayed empty until an answer. A rebuild at an Electron upgrade changes the cdhash in the same way. | dialog capture |
+
+**Changes from these results (in slice 1).**
+
+- The thin bundle clones `Electron Framework.framework` with `cp -c` (option T with one clone). The
+  other frameworks stay links. The clone changes only when Electron changes, so it is part of the
+  `templateKey` rebuild (section 7) and U5 still holds.
+- Terminal host H2 finds the default app through the real path of `Contents/Resources/app.asar`,
+  because the framework is no longer a link. With the linked framework, H2 worked: the profile ran
+  the default app's host copy under launchd from `<userData>/daemon-host/macos/`. With the cloned
+  framework and the old lookup, terminals fell back to the in-process path. The new lookup and the
+  survival of terminals over a profile restart are not tested in the app yet.
+
+**Finding: a profile's serve service wrote the shared agent configs.** `orca serve service install`
+loads the LaunchAgent at once, with `PATH` and `ORCA_USER_DATA_PATH` only. launchd gives the job the
+login `HOME`. For about 2 s, before the test changed the unit, the profile's server ran with the real
+home and installed the managed agent hooks there: `~/.claude/settings.json`, `~/.grok/hooks/orca-status.json`
+and two files in `~/.orca/agent-hooks/`. Cause: the service did not carry the profile's environment,
+and a profile app installed agent hooks into shared folders. Fix in slice 1:
+
+- `orca serve service install` for a profile (its userData has the marker) writes `HOME`,
+  `ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME` and `ORCA_PROFILES_ROOT` of the
+  caller into the unit.
+- A profile app, and every process that serves a profile's userData (also `orcad`), installs and
+  removes no managed agent hooks until the isolation slice gives each profile its own folders.
+  Agent launches still install their own hooks (for example Codex at launch): slice 2.
+
+**Other findings.**
+
+- The keybindings service and the floating workspace use Electron's native home path, not `HOME`.
+  A test `HOME` does not isolate them. Slice 2 must move them to the profile's home.
+- The profile apps show macOS "App Running in Background" notices for Work and Home (their terminal
+  host jobs).
+- The main window loads `app.asar` from the default app's real path.
+
+**Not tested.** macOS 14, 15 and 26; notification entries, banners and clicks; the notification
+toggle; TCC prompts and grants; U3; the serve service stop and restart by the app; the "Stop the
+server and open" dialog; terminals over a profile restart; the browser, computer use and `orcad`.
