@@ -51,6 +51,7 @@ import { claudePromptCancelRoute } from './journal/claude-structured-prompt-repl
 import { claudeForkForRewind } from '../transcripts/claude-rewind-fork'
 import { copyClaudeConversation } from '../transcripts/claude-conversation-copy'
 import { ClaudeConversationNaming } from '../conversation-naming/claude-conversation-naming'
+import { ClaudeRemoteControl } from './claude-structured-remote-control'
 import { syncClaudePromptSuggestionPause } from './claude-prompt-suggestion-pause'
 
 export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAdapter {
@@ -61,10 +62,12 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   private readonly endings = new AgentSessionStartEndings()
   private readonly exitLifecycle: ClaudeExitLifecycle
   private readonly naming: ClaudeConversationNaming | undefined
+  private readonly remote: ClaudeRemoteControl
   /** Sessions a reader shows prompt suggestions for; a process for any other is paused. */
   private readonly suggestionReaders = new Set<string>()
 
   constructor(private readonly deps: ClaudeStructuredSessionAdapterDeps) {
+    this.remote = new ClaudeRemoteControl(this.sessions, deps)
     const { namingInputs: snapshot, requestTimeoutMs: timeoutMs } = deps
     this.naming = snapshot && new ClaudeConversationNaming({ snapshot, timeoutMs })
     this.atRestCommands = deps.atRestCommands
@@ -246,8 +249,22 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
       endings: this.endings,
       deps: this.deps,
       emit: (session, event) => this.emit(session, event),
+      afterOpen: (session, initialization, newConversation) =>
+        this.remote.opened(session, request.sessionId, initialization, newConversation),
       promptSuggestionsWanted: (sessionId) => this.suggestionReaders.has(sessionId)
     })
+  remoteControl: NonNullable<StructuredAgentSessionAdapter['remoteControl']> = ({
+    sessionId,
+    enabled
+  }) =>
+    enabled === undefined
+      ? Promise.resolve(this.remote.state(sessionId))
+      : this.remote.set(sessionId, enabled)
+  turnOnRemoteControlAtOpen = (input: { sessionId: string; forget?: true }) =>
+    this.remote.turnOnAtOpen(input.sessionId, input.forget)
+  /** A chat on Remote Control must stay reachable from claude.ai, so the idle stop leaves it running. */
+  confirmIdle = (sessionId: string) =>
+    this.sessions.get(sessionId)?.remoteControl ? Promise.resolve('busy' as const) : undefined
   noteModelPick = (input: { sessionId: string; fence: number }) =>
     claudeOptions.noteClaudeModelPick(this.sessions, input, this.emit.bind(this))
   readOptions = (input: { sessionId: string; fence: number }) =>

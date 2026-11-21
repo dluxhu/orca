@@ -74,6 +74,8 @@ export type ClaudeStructuredSessionAdapterDeps = {
     fence: number
   }) => Promise<void>
   logger?: StructuredAgentSessionLogger
+  /** The user's setting: turn on Remote Control when a new chat starts. */
+  remoteControlForNewChats?: () => boolean
   /** Advance the durable resume point in place at a turn end; bookkeeping, never a turn failure. */
   persistResumePoint?: (input: {
     sessionId: string
@@ -181,6 +183,10 @@ export type ClaudeSession = {
   /** Set once `ended` has been emitted, so a persistence retry cannot repeat it. */
   closeEnded?: boolean
   translator: ClaudeJournalTranslator | null
+  /** Set only while the CLI confirms Remote Control is on for this process. */
+  remoteControl?: { sessionUrl: string | null }
+  /** Replay uuids already settled or shown; see `rememberClaudeReplayUuid`. */
+  seenReplayUuids?: Set<string>
   events: StructuredAgentSessionEventSink | undefined
   delivery: ClaudeJournalBoundDelivery
   unbindReadingControl?: () => void
