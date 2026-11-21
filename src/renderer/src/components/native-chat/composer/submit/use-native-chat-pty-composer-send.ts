@@ -8,6 +8,8 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import type { AgentType } from '../../../../../../shared/agent-status/contracts/agent-status-types'
 import type { NativeChatLaunchDraft } from '@/components/native-chat/drafts/native-chat-launch-prompt'
 import { translate } from '@/i18n/i18n'
+import type { NativeChatMessage } from '../../../../../../shared/native-chat/native-chat-types'
+import { shortenSameChatQuotes } from '../../selection-quotes/native-chat-quote-shortening'
 import { useAppStore } from '../../../../store/index'
 import { emitNativeChatMessageSent } from '@/components/native-chat/telemetry/native-chat-telemetry'
 import {
@@ -57,6 +59,8 @@ export function useNativeChatPtyComposerSend(args: {
   clearSkillOrigin: () => void
   clearImageAttachments: () => void
   setNotice: (notice: string | null) => void
+  /** This chat's transcript; long quotes of its replies go to the agent shortened. */
+  chatMessages?: readonly NativeChatMessage[]
 }): (retry?: { text: string; imagePaths?: string[] }) => boolean {
   return useCallback(
     (retry) => {
@@ -86,6 +90,9 @@ export function useNativeChatPtyComposerSend(args: {
       text = retry
         ? resolveNativeChatPastedText(args.draftScopeKey, text)
         : serializeNativeChatAgentReferences(text, submitted.document, submitted.pastedTextFiles)
+      if (!retry && classification === 'chat' && args.chatMessages) {
+        text = shortenSameChatQuotes(text, args.chatMessages)
+      }
       const { sendOptions: launchSendOptions } = resolveNativeChatLaunchDraftSend({
         launchDraft: args.launchDraft,
         launchDraftResolved: args.launchDraftResolved,
