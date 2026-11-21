@@ -1,6 +1,8 @@
-import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { SERVE_LAUNCHD_LABEL_PREFIX } from '../../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
+import {
+  SERVE_LAUNCHD_LABEL_PREFIX,
+  serveProfileSuffix
+} from '../../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 
 export type ServeServiceManager = 'launchd' | 'systemd'
 
@@ -51,7 +53,7 @@ export function serveServiceArgs(
 function profileSuffix(input: ServeServiceInput): string {
   return input.userDataPath === input.defaultUserDataPath
     ? ''
-    : createHash('sha256').update(input.userDataPath).digest('hex').slice(0, 8)
+    : serveProfileSuffix(input.userDataPath)
 }
 
 export function resolveServeServiceManager(platform: NodeJS.Platform): ServeServiceManager | null {
