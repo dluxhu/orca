@@ -69,7 +69,8 @@ export function useNativeChatQuoteJump({
   beginNavigation,
   readerLeavesEnd,
   startHistoryJump,
-  sessionKey
+  sessionKey,
+  unfoldTurnOf
 }: {
   slots: readonly NativeChatTranscriptSlot[]
   scrollRef: RefObject<HTMLDivElement | null>
@@ -79,6 +80,8 @@ export function useNativeChatQuoteJump({
   startHistoryJump: ReturnType<typeof useNativeChatHistoryJump>['start']
   /** This chat; a source from another chat that is not loaded here pages nothing. */
   sessionKey: string
+  /** Expands the collapsed turn that hides a loaded message; false when no turn hides it. */
+  unfoldTurnOf: (messageId: string) => boolean
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
   // "Add to chat" reads the chat of a quote from its transcript's scroller.
@@ -117,11 +120,13 @@ export function useNativeChatQuoteJump({
         }
         return Boolean(source)
       }
-      if (reveal(messageId, show, isCurrent, notifyMissing)) {
+      // A collapsed turn draws no text for its message: the history jump lands after the turn expands.
+      const folded = unfoldTurnOf(messageId)
+      if (!folded && reveal(messageId, show, isCurrent, notifyMissing)) {
         return true
       }
       // A loaded message is here whatever its chat; the chat only rules out paging this chat.
-      if (chat !== undefined && chat !== sessionKey) {
+      if (!folded && chat !== undefined && chat !== sessionKey) {
         return false
       }
       // A long chat keeps only its latest messages loaded, for example after a send. The link landing
@@ -136,6 +141,6 @@ export function useNativeChatQuoteJump({
       })
       return true
     },
-    [beginNavigation, reveal, scrollRef, sessionKey, startHistoryJump]
+    [beginNavigation, reveal, scrollRef, sessionKey, startHistoryJump, unfoldTurnOf]
   )
 }
