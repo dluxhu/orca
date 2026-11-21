@@ -146,6 +146,15 @@ export async function fetchNewerReleaseTagsWithReadiness(
   if (maxTags <= 0) {
     return { tags: [], state: 'no-newer' }
   }
+  // Fork patch: the Nightly app reads the fixed `nightly` prerelease. It holds the manifest of the
+  // newest nightly build, and electron-updater compares the versions. The update delay does not apply.
+  if (getVersionChannel(currentVersion) === 'daily') {
+    return {
+      tags: ['nightly'],
+      state: 'ready',
+      releaseDelay: { heldRelease: null, isTagOldEnough: () => true }
+    }
+  }
   const tags = await fetchReleaseFeedTags()
   if (!tags) {
     return { tags: [], state: 'unavailable', unavailableReason: 'feed' }

@@ -13526,7 +13526,7 @@
           "devOnly": "Dev only",
           "channelAriaLabel": "Update channel",
           "hourlyWarning": "Hourly builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.",
-          "dailyWarning": "Daily builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.",
+          "dailyWarning": "Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.",
           "adhocWarning": "Adhoc builds come from a branch that has not landed, and the Windows ones are unsigned. Whoever cut one may abandon it — keep a stable build handy.",
           "loadingBuilds": "Loading builds…",
           "noBuilds": "No builds found",
@@ -13539,9 +13539,7 @@
           "devChannelUnsupportedAria": "{{value0}} ({{value1}} only)",
           "devChannelUnsupported": "{{value0}} builds are produced only for {{value1}}. Linux stays on Stable or RC.",
           "downloadInstaller": "Download installer",
-          "manualInstallHint": "{{value0}} builds are unsigned on Windows, so the in-app updater cannot install one over a signed build. Run the downloaded installer once — Windows will warn about an unknown publisher — and every later switch, including back to Stable, works from here.",
-          "forkManualInstallHint": "{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel.",
-          "nightlyWarning": "Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it."
+          "manualInstallHint": "{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel."
         },
         "VoiceMicrophoneSetting": {
           "systemDefault": "System default",

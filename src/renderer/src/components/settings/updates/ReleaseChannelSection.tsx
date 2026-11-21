@@ -46,7 +46,7 @@ const DEDICATED_CHANNEL_WARNINGS: Record<DedicatedRepoChannel, { key: string; fa
         'Hourly builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.'
     },
     daily: {
-      key: 'auto.components.settings.ReleaseChannelSection.nightlyWarning',
+      key: 'auto.components.settings.ReleaseChannelSection.dailyWarning',
       fallback:
         'Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.'
     },
@@ -317,7 +317,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
         ) : needsManualInstall && selectedBuild ? (
           <p className="text-xs text-muted-foreground">
             {t(
-              'auto.components.settings.ReleaseChannelSection.forkManualInstallHint',
+              'auto.components.settings.ReleaseChannelSection.manualInstallHint',
               '{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel.',
               { value0: RELEASE_CHANNEL_LABELS[activeChannel] }
             )}

@@ -50,7 +50,9 @@ describe('fork release build lists', () => {
     const builds = await listReleaseBuilds('daily', 'darwin')
     expect(builds.map((build) => build.tag)).toEqual([NIGHTLY_TAG])
     expect(builds[0].installerUrl).toMatch(
-      new RegExp(`/releases/download/${encodeURIComponent(NIGHTLY_TAG)}/orca-nightly-macos-arm64\\.dmg$`)
+      new RegExp(
+        `/releases/download/${encodeURIComponent(NIGHTLY_TAG)}/orca-nightly-macos-arm64\\.dmg$`
+      )
     )
   })
 })

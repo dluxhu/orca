@@ -83,6 +83,23 @@ describe('fork release feed', () => {
     ).toEqual({ tags: [], state: 'no-newer' })
   })
 
+  it('gives the Nightly app the fixed nightly feed, with no update delay', async () => {
+    respond([...NIGHTLY, 'v1.4.259-dlux.8'])
+    const { fetchNewerReleaseTagsWithReadiness } = await import('./updater-prerelease-feed')
+    const { getReleaseDownloadUrl } = await import('./updater-release-readiness')
+
+    const result = await fetchNewerReleaseTagsWithReadiness(NIGHTLY[1].slice(1), 2, {
+      includePrerelease: true,
+      minReleaseAgeMs: 7 * 24 * 60 * 60 * 1000,
+      now: Date.parse('2026-11-21T00:00:00Z')
+    })
+    expect(result).toMatchObject({ tags: ['nightly'], state: 'ready' })
+    expect(result.releaseDelay?.heldRelease).toBeNull()
+    expect(result.releaseDelay?.isTagOldEnough('nightly')).toBe(true)
+    expect(netFetchMock).not.toHaveBeenCalled()
+    expect(getReleaseDownloadUrl('nightly')).toBe(`${RELEASES}/download/nightly`)
+  })
+
   it('accepts a stable fork version from /releases/latest', async () => {
     respond(NIGHTLY, 'v1.4.259-dlux.8')
     const { fetchLatestStableReleaseTag } = await import('./updater-prerelease-feed')
