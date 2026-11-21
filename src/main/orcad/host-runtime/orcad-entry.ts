@@ -1,5 +1,3 @@
-// Fork patch: first, so that every module reads an app profile's own folders.
-import './orcad-app-profile-env'
 import process from 'node:process'
 import { startBackendCore } from '../../backend/core-runtime'
 import { resolveUserDataPath } from './orcad-app-paths'

@@ -11,7 +11,10 @@ import {
   unlinkSync
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
+import {
+  agentHomeDirIn,
+  defaultAgentHomeDir
+} from '../../../../shared/app-profiles/app-profile-homes'
 import { dirname, join } from 'node:path'
 import {
   clearCopiedResourceMarker,
@@ -63,7 +66,7 @@ export function getLocalCodexTrustConfigFiles(
     join(getOrcaManagedCodexHomePath(), 'config.toml'),
     // Managed accounts launch on their own CODEX_HOME, the only config that launch reads (#27235).
     ...(launchCodexHome ? [join(launchCodexHome, 'config.toml')] : []),
-    join(agentHome, '.codex', 'config.toml')
+    join(agentHomeDirIn(agentHome, 'CODEX_HOME', '.codex'), 'config.toml')
   ]
   return [...new Set(files)]
 }

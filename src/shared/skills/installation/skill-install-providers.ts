@@ -8,6 +8,8 @@ type SkillInstallProviderEntry = {
   workspaceSegments: readonly string[] | null
   /** Env var relocating the agent's home (skills in `<home>/skills`). */
   homeEnv?: string
+  /** The skills folder under `homeEnv`, when it is not `skills`. */
+  homeEnvSkillsSegments?: readonly string[]
 }
 
 export const SKILL_INSTALL_PROVIDERS = Object.freeze([
@@ -35,7 +37,10 @@ export const SKILL_INSTALL_PROVIDERS = Object.freeze([
     id: 'gemini',
     displayName: 'Gemini CLI',
     globalSegments: ['.gemini', 'skills'],
-    workspaceSegments: null
+    workspaceSegments: null,
+    // GEMINI_CLI_HOME names the folder that holds `.gemini`.
+    homeEnv: 'GEMINI_CLI_HOME',
+    homeEnvSkillsSegments: ['.gemini', 'skills']
   },
   {
     id: 'droid',
@@ -84,7 +89,8 @@ export const SKILL_INSTALL_PROVIDERS = Object.freeze([
     id: 'codebuddy',
     displayName: 'CodeBuddy',
     globalSegments: ['.codebuddy', 'skills'],
-    workspaceSegments: ['.codebuddy', 'skills']
+    workspaceSegments: ['.codebuddy', 'skills'],
+    homeEnv: 'CODEBUDDY_CONFIG_DIR'
   },
   {
     id: 'kiro',
