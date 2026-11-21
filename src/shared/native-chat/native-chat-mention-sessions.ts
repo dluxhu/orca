@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { structuredAgentSessionTabId } from '../agent-session/view/structured-agent-session-projection'
-import { formatOrcaSessionAddress, isOrcaSessionId } from '../orca-session-address'
+import {
+  formatOrcaSessionAddress,
+  isOrcaSessionId
+} from '../agent-session/identity/orca-session-address'
 import type { AgentReferenceKind } from '../orchestration/mailbox/orchestration-agent-reference'
 
 /** Lists the chats and terminals that the agent of a chat can reach: its own host and its saved environments. */

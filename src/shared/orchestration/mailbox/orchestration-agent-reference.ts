@@ -1,5 +1,5 @@
-import { parseOrcaSessionAddress } from '../../orca-session-address'
-import { isTerminalHandle } from '../../terminal-handle-prefix'
+import { parseOrcaSessionAddress } from '../../agent-session/identity/orca-session-address'
+import { isTerminalHandle } from '../../terminal/terminal-handle-prefix'
 
 /** `kind` marks an `@` mention of a chat, a terminal agent or a plain shell; absent marks an orchestration mailbox reference. */
 export type OrchestrationAgentReference = {
@@ -9,6 +9,8 @@ export type OrchestrationAgentReference = {
   kind?: AgentReferenceKind
   /** The saved environment that reaches a mentioned chat or terminal on another host. */
   environment?: string
+  /** The agent's logo on its composer pill; never part of the sent text. */
+  agentType?: string
 }
 
 /** `terminal` is a terminal with an agent in it; `shell` is a terminal with none. */
@@ -68,10 +70,7 @@ export function agentReferenceNote(
   }
   // `--on` carries mail to a paired host; its replies come back here.
   const mail = `message it with orca orchestration send${host('on')} --to ${address}`
-  if (kind === 'chat' || kind === 'terminal') {
-    return `[Orca ${kind} "${label}": ${address} — ${mail} --subject "<topic>" --body "<message>"]`
-  }
-  return `[Orca agent "${label}": ${address} — ${mail}]`
+  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — ${mail} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {

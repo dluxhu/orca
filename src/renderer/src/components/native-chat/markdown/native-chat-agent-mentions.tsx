@@ -1,5 +1,5 @@
 import type { Parent, PhrasingContent, Root, RootContent } from 'mdast'
-import type { CommentMarkdownExtension } from '@/components/sidebar/CommentMarkdown'
+import type { CommentMarkdownExtension } from '@/components/comment-markdown/CommentMarkdown'
 import { AgentReferencePillContent } from '../composer/editor/native-chat-agent-reference'
 import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
@@ -42,7 +42,8 @@ function remarkNativeChatAgentMentions(mentions: readonly SentAgentMention[]) {
   }
   const walk = (node: Parent): void => {
     node.children = (node.children as RootContent[]).flatMap((child): RootContent[] => {
-      if (child.type === 'text') {
+      // A text node another extension made a chip keeps its chip.
+      if (child.type === 'text' && !child.data?.hName) {
         return split(child.value)
       }
       if ('children' in child) {

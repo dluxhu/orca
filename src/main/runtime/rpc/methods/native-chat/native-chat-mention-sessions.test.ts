@@ -5,7 +5,7 @@ type Remote = (method: string, params: unknown, signal: AbortSignal) => Promise<
 const remotes = vi.hoisted(() => new Map<string, Remote>())
 const calls = vi.hoisted((): { environmentId: string; method: string; options: unknown }[] => [])
 
-vi.mock('../../../../../shared/app-environment', () => ({
+vi.mock('../../../../../shared/app-lifecycle/app-environment', () => ({
   getAppEnvironment: () => ({ getPath: () => '<user-data>' })
 }))
 vi.mock('../../../../../shared/remote-runtime/host-store/runtime-environment-store', () => ({

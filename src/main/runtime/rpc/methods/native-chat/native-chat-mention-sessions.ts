@@ -1,5 +1,5 @@
 import { defineMethod } from '../../core'
-import { getAppEnvironment } from '../../../../../shared/app-environment'
+import { getAppEnvironment } from '../../../../../shared/app-lifecycle/app-environment'
 import { listEnvironments } from '../../../../../shared/remote-runtime/host-store/runtime-environment-store'
 import { callRuntimeEnvironment } from '../../../../ipc/runtime-environments/requests/runtime-environment-transport-routing'
 import { isGatedOffWslHost } from '../../../../wsl/host-lifecycle/wsl-host-gate'
@@ -97,7 +97,7 @@ export const NATIVE_CHAT_MENTION_SESSION_METHODS = [
         terminals: () =>
           runtime.listTerminals(undefined, undefined, { includeVisualLayouts: false })
       }
-      const saved = listEnvironments(userDataPath)
+      const saved = (await listEnvironments(userDataPath))
         .filter((environment) => !isGatedOffWslHost(environment))
         .map((environment): NativeChatMentionHost => ({
           environment: environment.name,
