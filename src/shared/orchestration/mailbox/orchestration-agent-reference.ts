@@ -87,6 +87,9 @@ const NOTE_KINDS: Record<string, readonly (AgentReferenceKind | null)[]> = {
   terminal: ['terminal', 'shell']
 }
 
+// The host of a note for another host: a bare word or one single-quoted shell word.
+const NOTE_HOST = / --(?:on|environment)[= ]([\w.@:+-]+|'(?:[^']|'\\'')*')/
+
 export type SentAgentMention = { label: string; kind: AgentReferenceKind | null }
 
 /** A sent message is its typed text, a blank line, and one routing note per mentioned agent.
@@ -102,9 +105,13 @@ export function splitAgentReferenceNotes(
   const mentions: SentAgentMention[] = []
   for (const line of text.slice(end + 2).split('\n')) {
     const head = NOTE_HEAD.exec(line)
+    const word = head ? NOTE_HOST.exec(line.slice(head[0].length))?.[1] : undefined
+    const environment = word?.startsWith("'") ? word.slice(1, -1).replaceAll(`'\\''`, "'") : word
     // Only a note exactly as agentReferenceNote writes it, for a mention in the text, counts.
     const kinds = head
-      ? NOTE_KINDS[head[1]].filter((kind) => agentReferenceNote(head[2], head[3], kind) === line)
+      ? NOTE_KINDS[head[1]].filter(
+          (kind) => agentReferenceNote(head[2], head[3], kind, environment) === line
+        )
       : []
     if (!head || kinds.length === 0 || !body.includes(`@${head[2]}`)) {
       return null
