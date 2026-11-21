@@ -38,7 +38,7 @@ The release build adds these branches onto the upstream stable tag, in this orde
 12. `dlux/quote-short-send` - upstream candidate: a long quote of a recent reply in the same chat goes to the agent shortened; the chat still shows it in full (#28). Stacked on `dlux/quote-chip`.
 13. `dlux/quote-jump-history` - upstream candidate: a quote chip jump joins Back and Forward (#24). Stacked on `dlux/quote-chip`.
 14. `dlux/chat-send-key` - upstream candidate: an option to send with Cmd/Ctrl+Enter, so Enter adds a new line (#22). Stacked on `dlux/session-mention`: both change the composer keydown hook.
-15. `dlux/chat-raw-view` - upstream candidate: a "Show raw" panel in a chat lists the exact messages sent to the agent and what comes back (#32).
+15. `dlux/chat-raw-view` - upstream candidate: a "Show raw" panel in a chat lists the exact messages sent to the agent and what comes back; a {} button under each reply opens it at that reply's entries (#32).
 16. `dlux/chat-bare-refs-plain` - upstream candidate: a project setting "Link bare #numbers in chat"; when it is off, a bare `#123` in a chat stays text, and `owner/repo#123` still links (fork PR #39).
 17. `dlux/chat-compaction-marker` - upstream candidate: a chat shows a "Context compacted automatically" divider when Claude Code compacts its context on its own, also in a chat read from the Claude transcript (fork PR #40).
 18. `dlux/peer-mail-sender-name` - upstream candidate: mail from a chat on another Orca names that chat in the From line, and its "Message from" card opens it on its Orca (fork PR #41).
