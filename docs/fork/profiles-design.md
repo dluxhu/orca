@@ -778,17 +778,24 @@ and a profile app installed agent hooks into shared folders. Fix in slice 1:
   caller into the unit.
 - A profile app, and every process that serves a profile's userData (also `orcad`), writes nothing
   to the shared agent folders until the isolation slice gives each profile its own folders. One
-  check, `isAppProfileRuntime()`, stops: the managed hook install, refresh and removal; the Claude
-  agent view (`~/.claude/keybindings.json` and its markers); the OpenCode status plugin refresh;
-  the Claude Code theme sync; and the uninstall of the shared hooks, plugins and
-  `~/.orca/agent-hooks` (the uninstall reports them as kept for the default app).
+  check, `isAppProfileRuntime()`, stops: the managed hook install, refresh and removal; the Codex
+  hook reconcile (`~/.codex/hooks.json`, the approvals in `config.toml` and the Codex script in
+  `~/.orca/agent-hooks`), which runs at app start, in `orcad` and for each native terminal; the
+  Claude agent view (`~/.claude/keybindings.json` and its markers); the OpenCode status plugin
+  refresh; the Claude Code theme sync; and the uninstall of the shared hooks, plugins,
+  `~/.orca/agent-hooks` and the `orca` command (the uninstall reports them as kept for the
+  default app).
+- A profile app writes its marker at start when it is missing, so `orcad` and the CLI find the
+  profile.
 - `orca profiles create` started from a profile's `orca` finds the default app through the
   profile's `app.asar` link, so it does not nest the bundle id. It writes `OrcaAppProfilesRoot`
   only with the hidden test flag `--pin-root`, never from an inherited `ORCA_PROFILES_ROOT`.
+  An id has only `a-z`, `0-9` and `-`, so two names cannot share a bundle id. It writes the
+  marker before the app is in place, and removes the app when registration fails.
 
 **Writers to the real home that stay in a profile (slice 2).**
 
-- Hooks that an agent launch installs (for example `startCodexHooks` for Codex at launch).
+- Hooks that other launch paths can install. Slice 2 checks every agent launch path.
 - The keybindings service: `app.getPath('home')`, so `~/.orca/keybindings.json` of the real home.
 - The floating workspace: Electron's native home path.
 - Every other `~/.orca` site in section 3 (credentials, API keys, MiniMax cookies, host terminal
