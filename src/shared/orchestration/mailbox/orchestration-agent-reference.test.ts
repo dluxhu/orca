@@ -1,26 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { agentReferenceNote, splitAgentReferenceNotes } from './orchestration-agent-reference'
-import { agentReferenceDeliveryText } from './orchestration-agent-reference.test-fixture'
 
 describe('splitAgentReferenceNotes', () => {
   it('splits the notes of every kind from the typed text', () => {
     const notes = [
       agentReferenceNote('Chat', 'orca_session_id:chat_aaaaaaaa', 'chat'),
       agentReferenceNote('Agent', 'term_a1', 'terminal'),
-      agentReferenceNote('Shell', 'term_b2', 'shell')
+      agentReferenceNote('Shell', 'term_b2', 'shell'),
+      agentReferenceNote('Crew (2)', 'dispatch:ctx_second')
     ]
-    expect(splitAgentReferenceNotes(`@Chat @Agent @Shell\n\n${notes.join('\n')}`)).toEqual({
-      body: '@Chat @Agent @Shell',
+    expect(
+      splitAgentReferenceNotes(`@Chat @Agent @Shell @Crew (2)\n\n${notes.join('\n')}`)
+    ).toEqual({
+      body: '@Chat @Agent @Shell @Crew (2)',
       mentions: [
         { label: 'Chat', kind: 'chat' },
         { label: 'Agent', kind: 'terminal' },
-        { label: 'Shell', kind: 'shell' }
+        { label: 'Shell', kind: 'shell' },
+        { label: 'Crew (2)', kind: null }
       ]
     })
-    expect(splitAgentReferenceNotes(agentReferenceDeliveryText)?.mentions).toEqual([
-      { label: 'Same name (2)', kind: null },
-      { label: 'Same name (3)', kind: null }
-    ])
   })
 
   it('splits the notes for sessions on another host', () => {
