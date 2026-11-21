@@ -1,11 +1,11 @@
-// Each app profile has its own `~/.orca` and agent folders. See docs/fork/profiles-design.md, section 3.
+// Each app profile has its own `~/.orca` and agent folders. See docs/fork/profiles-design.md, section 12.
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { applyAppProfileHomesCore } from './app-profile-env-core'
 
 /** Overrides `~/.orca`. Only an app profile sets it. */
 export const ORCA_HOME_DIR_ENV = 'ORCA_HOME_DIR'
-/** The variables that an app profile set, comma-separated, so another selection can replace them. */
-export const APP_PROFILE_ENV_KEYS_ENV = 'ORCA_APP_PROFILE_ENV_KEYS'
 
 /**
  * Agent CLIs that read their folder from a variable (checked in each CLI's docs or source), and the
@@ -36,51 +36,40 @@ const PARENT_FOLDER_VARIABLES: ReadonlySet<string> = new Set(['GEMINI_CLI_HOME']
 
 export type AppProfileAgentHomeVariable = keyof typeof APP_PROFILE_AGENT_HOME_VARIABLES
 
-/** The profile's home folders, all under `<userData>/orca-home`. */
-export function appProfileHomeEnv(userDataPath: string): Record<string, string> {
-  const base = join(userDataPath, 'orca-home')
-  return {
-    [ORCA_HOME_DIR_ENV]: base,
-    ...Object.fromEntries(
-      Object.entries(APP_PROFILE_AGENT_HOME_VARIABLES).map(([key, dir]) => [
-        key,
-        join(base, 'agents', dir)
-      ])
-    )
-  }
-}
+/** The variables that a profile sets: `~/.orca` and the agent folders. */
+export const APP_PROFILE_HOME_ENV_KEYS: readonly string[] = [
+  ORCA_HOME_DIR_ENV,
+  ...Object.keys(APP_PROFILE_AGENT_HOME_VARIABLES)
+]
 
-/** Removes the variables that a profile set, for example before another profile is selected. */
-export function clearAppProfileHomeEnv(env: NodeJS.ProcessEnv): void {
-  for (const key of (env[APP_PROFILE_ENV_KEYS_ENV] ?? '').split(',').filter(Boolean)) {
-    delete env[key]
-  }
-  delete env[APP_PROFILE_ENV_KEYS_ENV]
-}
+const io = { existsSync, readFileSync, homedir }
 
 /**
- * Points `~/.orca` and the agent folders at the profile. A value that the user set stays; a value
- * that another profile set is replaced. Children (terminals, serve, orcad, agents) inherit it.
+ * Points `~/.orca` and the agent folders at the profile, or with null removes the values that a
+ * profile set. A profile replaces a value that the user set; the default app keeps it. Children
+ * (terminals, serve, orcad, agents) inherit the result. Shell startup files that export these variables override them in a terminal.
  */
-export function applyAppProfileHomeEnv(userDataPath: string, env: NodeJS.ProcessEnv): void {
-  clearAppProfileHomeEnv(env)
-  const applied: string[] = []
-  for (const [key, value] of Object.entries(appProfileHomeEnv(userDataPath))) {
-    if (!env[key]) {
-      env[key] = value
-      applied.push(key)
-    }
-  }
-  env[APP_PROFILE_ENV_KEYS_ENV] = applied.join(',')
+export function applyAppProfileHomes(userDataPath: string | null, env: NodeJS.ProcessEnv): void {
+  applyAppProfileHomesCore(env, userDataPath, APP_PROFILE_AGENT_HOME_VARIABLES, io)
 }
 
-/** Applies a profile's folders, or with null clears the folders that a profile set. */
-export function applyAppProfileHomes(userDataPath: string | null, env: NodeJS.ProcessEnv): void {
-  if (userDataPath) {
-    applyAppProfileHomeEnv(userDataPath, env)
-  } else {
-    clearAppProfileHomeEnv(env)
+// Positive answers only: a profile writes its marker at start, after a first negative check.
+const profileUserData = new Set<string>()
+
+/** Whether a value lies under a profile's `orca-home` folder, that is, a profile set it. */
+export function isAppProfileHomeValue(value: string | undefined): value is string {
+  const match = value ? /^(.+)\/orca-home(?:\/|$)/.exec(value) : null
+  if (!match) {
+    return false
   }
+  if (!profileUserData.has(match[1]) && existsSync(join(match[1], 'orca-app-profile.json'))) {
+    profileUserData.add(match[1])
+  }
+  return profileUserData.has(match[1])
+}
+
+function isLocalHome(home: string): boolean {
+  return resolve(home) === resolve(homedir())
 }
 
 /** `~/.orca` of this machine's user, or the profile's. Another home (a remote host) keeps its own. */
@@ -89,7 +78,7 @@ export function orcaHomeDir(
   env: NodeJS.ProcessEnv = process.env
 ): string {
   const override = env[ORCA_HOME_DIR_ENV]?.trim()
-  return override && resolve(home) === resolve(homedir()) ? override : join(home, '.orca')
+  return isAppProfileHomeValue(override) && isLocalHome(home) ? override : join(home, '.orca')
 }
 
 /** An agent's folder that a profile set; else the folder in the user's home. */
@@ -98,17 +87,27 @@ export function defaultAgentHomeDir(
   homeRelative: string,
   env: NodeJS.ProcessEnv = process.env
 ): string {
-  const fromProfile = (env[APP_PROFILE_ENV_KEYS_ENV] ?? '').split(',').includes(variable)
-  const value = fromProfile ? env[variable]?.trim() : undefined
-  if (!value) {
+  const value = env[variable]?.trim()
+  if (!isAppProfileHomeValue(value)) {
     return join(homedir(), homeRelative)
   }
   return PARENT_FOLDER_VARIABLES.has(variable) ? join(value, homeRelative) : value
 }
 
+/** An agent's folder in `home`: the profile's when `home` is this user's home, else `home`'s own. */
+export function agentHomeDirIn(
+  home: string,
+  variable: AppProfileAgentHomeVariable,
+  homeRelative: string,
+  joinPath: (...segments: string[]) => string = join
+): string {
+  return isLocalHome(home)
+    ? defaultAgentHomeDir(variable, homeRelative)
+    : joinPath(home, homeRelative)
+}
+
 /** Claude's global state file: in CLAUDE_CONFIG_DIR when a profile set it, else `~/.claude.json`. */
 export function defaultClaudeJsonPath(env: NodeJS.ProcessEnv = process.env): string {
-  const fromProfile = (env[APP_PROFILE_ENV_KEYS_ENV] ?? '').split(',').includes('CLAUDE_CONFIG_DIR')
-  const dir = fromProfile ? env.CLAUDE_CONFIG_DIR?.trim() : undefined
-  return dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
+  const dir = env.CLAUDE_CONFIG_DIR?.trim()
+  return isAppProfileHomeValue(dir) ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
 }

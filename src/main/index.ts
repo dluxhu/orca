@@ -1,5 +1,3 @@
-// Fork patch: first, so that every module reads an app profile's own folders.
-import './app-profiles/app-profile-early-env'
 import { app, clipboard, dialog, type BrowserWindow } from 'electron'
 import { isRoutedOrcaDeepLink } from './startup/open-routing/orca-deep-link-url'
 import { createMacAppActivationHandler } from './window/activation/macos-app-activation'
