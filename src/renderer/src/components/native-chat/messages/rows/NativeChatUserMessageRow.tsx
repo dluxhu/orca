@@ -13,6 +13,7 @@ import type { NativeChatDeliveryNotice } from './NativeChatMessageRow'
 import { NativeChatRewindAction } from '../actions/NativeChatRewindAction'
 import type { NativeChatRewindSurface } from '../actions/use-native-chat-rewind-host'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
+import { plainNativeChatAgentMentions } from '../../markdown/native-chat-agent-mentions'
 import { NativeChatUserMessageFold } from './NativeChatUserMessageFold'
 import { NativeChatCodeBlock } from '../../markdown/code/NativeChatCodeBlock'
 import { NativeChatCopyButton } from '../actions/NativeChatCopyButton'
@@ -110,7 +111,7 @@ export function NativeChatUserMessageRow({
     () => (from ? null : splitAgentReferenceNotes(markdown, layout)),
     [from, layout, markdown]
   )
-  const typed = sent?.body ?? markdown
+  const typed = sent ? plainNativeChatAgentMentions(sent.body, sent.mentions) : markdown
   if (folded) {
     return <div ref={rowRef} hidden />
   }
