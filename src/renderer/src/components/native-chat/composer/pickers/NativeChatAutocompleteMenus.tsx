@@ -264,7 +264,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
 
   // A bot's chats are read once its row has been highlighted or hovered a moment.
   const memberOf = (value: string) =>
-    room?.mentions.find((mention) => nativeChatMentionValue(mention) === value)
+    room?.mentions.find((mention) => nativeChatMentionValue(mention) === value) ??
+    room?.agents?.find((mention) => nativeChatMentionValue(mention) === value)
   const [hovered, setHovered] = useState<string | null>(null)
   const highlighted = memberOf(files[selectedIndex] ?? '')?.id ?? null
   const prefetch = chats?.picker.prefetch
@@ -313,11 +314,21 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           ? t('components.native-chat.composer.filesLoadFailed', "Couldn't load files")
           : nativeChatMentionEmptyText(room !== null && !room.withFiles)
 
-  // A bot's chat lists the other bots, then chats and terminals, then files, each under its heading.
-  const bots = room?.withFiles ? files.filter((value) => memberOf(value)).length : 0
+  // The room's bots lead, then this chat's crew agents, then other chats and terminals, then files,
+  // each under its heading.
+  const agentValues = new Set(room?.agents?.map(nativeChatMentionValue))
+  const leading = (from: number, matches: (value: string) => boolean) => {
+    const end = files.findIndex((value, index) => index >= from && !matches(value))
+    return (end === -1 ? files.length : end) - from
+  }
+  const bots = room ? leading(0, (value) => !agentValues.has(value) && Boolean(memberOf(value))) : 0
+  const agentCount = leading(bots, (value) => agentValues.has(value))
+  const listed = bots + agentCount
   const grouped = room?.withFiles === true && bots + room.unavailable.length > 0
+  const botsHeaded = grouped || (bots > 0 && agentCount > 0)
+  const headed = grouped || agentCount > 0
   const sessionOf = (value: string) => nativeChatMentionSessionOf(mention.sessions, value)
-  const sessions = files.slice(bots).filter((value) => sessionOf(value)).length
+  const sessions = leading(listed, (value) => sessionOf(value) !== null)
   const option = (path: string, index: number) => {
     const session = sessionOf(path)
     if (session) {
@@ -344,7 +355,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
         activeItemRef={activeItemRef}
         onChoose={() => onChoose(path)}
         onPointerEnter={member?.id ? () => setHovered(member.id ?? null) : undefined}
-        className={opens ? 'pr-20' : undefined}
+        // Room for the Chats action; important, as the row's own px-2 comes later in the CSS.
+        className={cn(member && 'items-center', opens && '!pr-20')}
       >
         <NativeChatMentionOption value={path} member={member} />
         {opens ? (
@@ -368,7 +380,7 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => chats.drill.enter(opens)}
           className={cn(
-            'absolute top-1.5 right-2 h-6 items-center gap-0.5 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground',
+            'absolute top-1/2 right-2 h-6 -translate-y-1/2 items-center gap-0.5 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-background/60 hover:text-foreground',
             selected ? 'flex' : 'hidden group-hover/bot-row:flex'
           )}
         >
@@ -381,15 +393,25 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
 
   return (
     <PickerListbox id={listboxId}>
-      {grouped ? <PickerGroupHeading kind="bots" /> : null}
-      <div onPointerLeave={() => setHovered(null)}>{files.slice(0, bots).map(option)}</div>
+      {botsHeaded ? <PickerGroupHeading kind="bots" /> : null}
+      <div className="flex flex-col gap-0.5" onPointerLeave={() => setHovered(null)}>
+        {files.slice(0, bots).map(option)}
+      </div>
       {grouped ? <NativeChatUnavailableMentions room={room} /> : null}
-      {grouped && sessions > 0 ? <PickerGroupHeading kind="sessions" /> : null}
-      {files.slice(bots, bots + sessions).map((path, index) => option(path, index + bots))}
-      {grouped && files.length > bots + sessions ? <PickerGroupHeading kind="files" /> : null}
-      {files
-        .slice(bots + sessions)
-        .map((path, index) => option(path, index + bots + sessions))}
+      {agentCount > 0 ? <PickerGroupHeading kind="agents" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files.slice(bots, listed).map((path, index) => option(path, index + bots))}
+      </div>
+      {headed && sessions > 0 ? <PickerGroupHeading kind="sessions" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files.slice(listed, listed + sessions).map((path, index) => option(path, index + listed))}
+      </div>
+      {headed && files.length > listed + sessions ? <PickerGroupHeading kind="files" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files
+          .slice(listed + sessions)
+          .map((path, index) => option(path, index + listed + sessions))}
+      </div>
       {statusText ? (
         <PickerStatus>
           {mention.loading ? <LoadingSpinner className="size-3.5" /> : null}

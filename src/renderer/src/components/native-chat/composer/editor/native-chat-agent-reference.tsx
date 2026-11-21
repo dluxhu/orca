@@ -7,6 +7,7 @@ import {
 } from '@tiptap/react'
 import { MessageSquare, SquareTerminal, Users } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
+import { AgentTypeIcon } from '@/components/agent/icons/agent-type-icon'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   agentReferenceToken,
@@ -21,10 +22,13 @@ import { promptTextPosition } from './native-chat-prompt-document'
 export function AgentReferencePillContent({
   label,
   kind,
+  agentType = '',
   selected
 }: {
   label: string
   kind: AgentReferenceKind | null
+  /** The agent's logo, where the chip was picked from a list that knows it. */
+  agentType?: string
   selected: boolean
 }): React.JSX.Element {
   const t = useTranslate()
@@ -38,12 +42,22 @@ export function AgentReferencePillContent({
           })
         : t('components.native-chat.composer.agentPillLabel', 'Agent: {{name}}', { name: label })
   return (
-    <NativeChatPromptPill icon={icon} label={label} spokenLabel={spokenLabel} selected={selected} />
+    <NativeChatPromptPill
+      icon={icon}
+      // Older drafts keep the generic icon.
+      avatar={
+        agentType ? <AgentTypeIcon agentType={agentType} size={12} className="size-3" /> : undefined
+      }
+      label={label}
+      spokenLabel={spokenLabel}
+      selected={selected}
+    />
   )
 }
 
 function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Element {
   const { kind } = node.attrs
+  const agentType = String(node.attrs.agentType ?? '')
   return (
     <NodeViewWrapper
       as="span"
@@ -54,6 +68,7 @@ function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Elemen
       <AgentReferencePillContent
         label={String(node.attrs.label)}
         kind={isAgentReferenceKind(kind) ? kind : null}
+        agentType={agentType}
         selected={selected}
       />
     </NodeViewWrapper>
@@ -70,7 +85,8 @@ export const NativeChatAgentReference = Node.create({
     label: { default: '' },
     address: { default: '' },
     hostKey: { default: '' },
-    kind: { default: null }
+    kind: { default: null },
+    agentType: { default: '' }
   }),
   addNodeView: () => ReactNodeViewRenderer(AgentReferencePill),
   renderText: ({ node }) =>
@@ -126,7 +142,10 @@ export function insertAgentReferences(
   editor.view.dispatch(closeHistory(editor.state.tr))
   editor.commands.insertContent(
     references.flatMap((attrs, index) => [
-      { type: NativeChatAgentReference.name, attrs },
+      {
+        type: NativeChatAgentReference.name,
+        attrs: { ...attrs, agentType: attrs.agentType ?? '' }
+      },
       ...(index < references.length - 1 || !hasRightSeparator ? [{ type: 'text', text: ' ' }] : [])
     ])
   )

@@ -7,6 +7,8 @@ export type OrchestrationAgentReference = {
   address: string
   hostKey: string
   kind?: AgentReferenceKind
+  /** The agent's logo on its composer pill; never part of the sent text. */
+  agentType?: string
 }
 
 /** `terminal` is a terminal with an agent in it; `shell` is a terminal with none. */
