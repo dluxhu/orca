@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import {
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -11,7 +12,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppProfile, nextAppProfilePort, type RunTool } from './app-profile-create'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -71,9 +72,11 @@ beforeEach(() => {
     'profile variant'
   )
   calls = []
+  vi.stubEnv('HOME', dir)
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -181,6 +184,39 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(() =>
       createAppProfile({ name: 'Other', port: 6790, defaultAppPath: app, env: env(), run })
     ).toThrow('inside the port range')
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and failures', () => {
+  it('maps `_` to `-`, so `a_b` and `a-b` cannot share a bundle id', () => {
+    expect(createAppProfile({ name: 'a_b', defaultAppPath: app, env: env(), run }).bundleId).toBe(
+      'com.stablyai.orca.dlux.profile.a-b'
+    )
+    expect(() => createAppProfile({ name: 'a-b', defaultAppPath: app, env: env(), run })).toThrow(
+      'The profile "a-b" exists.'
+    )
+  })
+
+  it('refuses an app of that name that the registry does not know', () => {
+    mkdirSync(join(dir, 'apps', 'Work.app'), { recursive: true })
+    expect(() => createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })).toThrow(
+      'Work.app exists.'
+    )
+  })
+
+  it('removes the app when registration fails, so a retry works; the marker stays', () => {
+    const failing: RunTool = (program, args) => {
+      if (program.endsWith('lsregister')) {
+        throw new Error('lsregister failed')
+      }
+      return run(program, args)
+    }
+    expect(() =>
+      createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: failing })
+    ).toThrow('lsregister failed')
+    expect(existsSync(join(dir, 'apps', 'Work.app'))).toBe(false)
+    expect(existsSync(join(dir, 'data', 'work', 'orca-app-profile.json'))).toBe(true)
+    expect(createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run }).id).toBe('work')
   })
 })
 

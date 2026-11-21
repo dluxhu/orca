@@ -18,12 +18,12 @@ import {
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
-  APP_PROFILE_MARKER,
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILES_REGISTRY,
   appProfilesAppsDir,
   appProfilesRoot,
+  ensureAppProfileMarker,
   readAppProfileRegistry,
   readPlistString,
   type AppProfileEntry,
@@ -61,10 +61,13 @@ export type CreateAppProfileOptions = {
 }
 
 export function appProfileIdFromName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+  return (
+    name
+      .toLowerCase()
+      // A bundle id has no `_`, so `a_b` and `a-b` are one id.
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  )
 }
 
 /** The first port of the 6800, 6832, … series that no profile uses. */
@@ -153,7 +156,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       if (!defaultAppId || !executable) {
         throw new RuntimeClientError('invalid_argument', `${defaultApp} has no bundle id.`)
       }
-      const bundleId = `${defaultAppId}.profile.${id.replace(/_/g, '-')}`
+      const bundleId = `${defaultAppId}.profile.${id}`
 
       // No executable is a link: codesign --force could follow it and sign the default app's file.
       const helpers: string[] = []
@@ -217,12 +220,10 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
         entitlements,
         bundle
       ])
-      renameSync(bundle, appPath)
-      run(LSREGISTER, ['-f', appPath])
-
+      // The marker comes first: a launchable app always finds its profile. A later failure
+      // removes the app, so a retry with the same name works.
       const userDataPath = join(root, id)
-      mkdirSync(userDataPath, { recursive: true, mode: 0o700 })
-      writeFileSync(join(userDataPath, APP_PROFILE_MARKER), `${JSON.stringify({ id })}\n`)
+      ensureAppProfileMarker(userDataPath, id)
       const entry: AppProfileEntry = {
         id,
         name,
@@ -232,7 +233,14 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
         port,
         createdAt: (options.now ?? Date.now)()
       }
-      writeRegistry(root, { ...registry, profiles: [...registry.profiles, entry] })
+      renameSync(bundle, appPath)
+      try {
+        run(LSREGISTER, ['-f', appPath])
+        writeRegistry(root, { ...registry, profiles: [...registry.profiles, entry] })
+      } catch (error) {
+        rmSync(appPath, { recursive: true, force: true })
+        throw error
+      }
       return entry
     } finally {
       rmSync(staging, { recursive: true, force: true })

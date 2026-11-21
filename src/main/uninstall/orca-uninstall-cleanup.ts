@@ -196,6 +196,10 @@ async function runCliCommand(
   if (!entry || entry.state === 'removed') {
     return entry
   }
+  // The `orca` command links to the default app; a profile keeps it.
+  if (isAppProfileRuntime()) {
+    return { ...entry, state: 'kept-shared', detail: APP_PROFILE_SHARED }
+  }
   try {
     const status = await host.removeCli()
     return isOrcaOwnedCli(status)
