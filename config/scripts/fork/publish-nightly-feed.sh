@@ -28,11 +28,17 @@ url="https://github.com/$repo/releases/download/$tag/$zip"
 work=$(mktemp -d "${TMPDIR:-/tmp}/nightly-feed.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
+# Only a published prerelease is a nightly build that the app can download.
+read -r is_draft is_prerelease released < <(gh release view "$tag" -R "$repo" \
+  --json isDraft,isPrerelease,publishedAt -q '"\(.isDraft) \(.isPrerelease) \(.publishedAt)"')
+if [ "$is_draft $is_prerelease" != 'false true' ]; then
+  echo "$tag is not a published prerelease (draft: $is_draft, prerelease: $is_prerelease)" >&2
+  exit 1
+fi
 # The hash and size come from the published zip, the file that the app downloads.
 gh release download "$tag" -R "$repo" -p "$zip" -D "$work"
 sha512=$(openssl dgst -sha512 -binary "$work/$zip" | openssl base64 -A)
 size=$(wc -c <"$work/$zip" | tr -d ' ')
-released=$(gh release view "$tag" -R "$repo" --json publishedAt -q .publishedAt)
 cat >"$work/latest-mac.yml" <<EOF
 version: $version
 files:
@@ -48,10 +54,12 @@ if [ "$dry_run" = 1 ]; then
   cat "$work/latest-mac.yml"
   exit 0
 fi
+# A zero-width space after "@" keeps GitHub from mentioning the user "dlux".
+zwsp=$'\xe2\x80\x8b'
 if ! gh release view nightly -R "$repo" >/dev/null 2>&1; then
   gh release create nightly -R "$repo" --prerelease --latest=false \
-    --title 'Orca @dLux Nightly update feed' \
-    --notes 'The update feed of Orca @dLux Nightly. The Nightly app reads latest-mac.yml from here. Download a Nightly build from its own release.'
+    --title "Orca @${zwsp}dLux Nightly update feed" \
+    --notes "The update feed of Orca @${zwsp}dLux Nightly. The Nightly app reads latest-mac.yml from here. Download a Nightly build from its own release."
 fi
 gh release upload nightly "$work/latest-mac.yml" -R "$repo" --clobber
 echo "nightly feed: $version"

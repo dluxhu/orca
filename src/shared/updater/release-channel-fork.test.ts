@@ -7,6 +7,8 @@ import {
   requiresManualDevChannelInstall,
   type ReleaseChannel
 } from './release-channel'
+import { agentStateRulesChannelForAppVersion } from '../../main/runtime/agent-state-rules/agent-state-rules-live-update'
+import { releaseAssetPolicyChannelForAppVersion } from '../../main/remote-policies/release-asset-policy-live-update'
 
 // Fork patch dlux/fork-release-channel. See docs/fork/PATCHES.md.
 describe('fork release channels', () => {
@@ -25,6 +27,16 @@ describe('fork release channels', () => {
     expect(getVersionChannel('v1.4.268-daily.202611201835-dlux.3')).toBe('daily')
     // The fixed feed tag is not a build.
     expect(getVersionChannel('nightly')).toBeNull()
+  })
+
+  it('gives a stable fork build the stable rules and policies, and a Nightly the next ones', () => {
+    for (const channelFor of [
+      agentStateRulesChannelForAppVersion,
+      releaseAssetPolicyChannelForAppVersion
+    ]) {
+      expect(channelFor('1.4.268-dlux.1')).toBe('stable')
+      expect(channelFor('1.4.268-daily.202611201835-dlux.3')).toBe('next')
+    }
   })
 
   it('does not offer an upstream channel that a shared profile saved', () => {

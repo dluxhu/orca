@@ -68,9 +68,6 @@ export function isChannelSupportedOnPlatform(
   return DEV_CHANNEL_PLATFORMS[channel].includes(platform)
 }
 
-/** Windows signed apps reject unsigned dev installers using installed publisherName; future builds cannot fix that baked-in policy.
- * Dev apps omit the name and can switch out freely; only entry from signed builds needs manual install. Unknown running versions
- * conservatively assume signed. Signing approval takes hours and cannot fit dev cadence. */
 export function requiresManualDevChannelInstall(options: {
   platform: NodeJS.Platform
   runningChannel: ReleaseChannel | null

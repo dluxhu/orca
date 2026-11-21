@@ -158,7 +158,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
   }
 
   const isRunningBuild = selectedBuild?.version === appVersion
-  // Signed Windows builds reject unsigned dev installers through publisher validation; entry to dev requires manual download, while returns work normally.
+  // Fork patch: every pick installs by hand, except a stable build in the stable app.
   const needsManualInstall = requiresManualDevChannelInstall({
     platform,
     runningChannel,

@@ -14,7 +14,7 @@ cat >"$root/bin/gh" <<'EOF'
 echo "$*" >>"$STUB/calls"
 case "$1 $2" in
   'release download') dir=${@: -1}; printf 'zip bytes' >"$dir/$(echo "$*" | sed -E 's/.* -p ([^ ]+) .*/\1/')" ;;
-  'release view') if [ "$3" = nightly ]; then [ -f "$STUB/created" ]; else echo 2026-11-21T12:53:41Z; fi ;;
+  'release view') if [ "$3" = nightly ]; then [ -f "$STUB/created" ]; else echo "${STUB_STATE:-false true} 2026-11-21T12:53:41Z"; fi ;;
   'release create') touch "$STUB/created" ;;
   'release upload') cp "$4" "$STUB/uploaded.yml" ;;
 esac
@@ -47,11 +47,22 @@ grep -qE 'release (create|upload)' "$root/calls" && fail 'dry run changed a rele
 grep -q 'release create nightly -R dluxhu/orca --prerelease --latest=false' "$root/calls" ||
   fail 'feed release is not a prerelease'
 
+# No plain "@dLux" goes out: it mentions a GitHub user.
+grep -q '@dLux' "$root/calls" && fail 'plain @dLux in the release text'
+grep -q "Orca @$(printf '\342\200\213')dLux Nightly update feed" "$root/calls" || fail 'no feed title'
+
 # A later run replaces the manifest and does not make the release again.
 : >"$root/calls"
 "$script" "$tag" >/dev/null
 grep -q 'release create' "$root/calls" && fail 'second run made the release again'
 grep -q 'release upload nightly .* --clobber' "$root/calls" || fail 'second run did not replace the manifest'
+
+# A draft and a full release are not published nightly builds.
+for state in 'true true' 'false false'; do
+  : >"$root/calls"
+  if STUB_STATE=$state "$script" "$tag" 2>/dev/null; then fail "accepted a release with state $state"; fi
+  grep -qE 'release (download|upload)' "$root/calls" && fail "state $state: downloaded or uploaded"
+done
 
 # A stable tag and the feed tag are not nightly builds.
 for bad in v1.4.268-dlux.1 nightly; do
