@@ -21,14 +21,24 @@ afterEach(() => {
 
 const CHIP = 'CHIP'
 
+const isQuoteChip = (node: Element): boolean =>
+  node.querySelector('[data-native-chat-sent-quote]') !== null ||
+  [...node.querySelectorAll('.sr-only')].some((label) => label.textContent?.startsWith('Quote'))
+
+/** What a node shows, without the spoken labels of other pills. */
+function shownText(node: Node): string {
+  if (!(node instanceof Element)) {
+    return node.textContent ?? ''
+  }
+  const copy = node.cloneNode(true) as Element
+  copy.querySelectorAll('.sr-only').forEach((label) => label.remove())
+  return copy.textContent ?? ''
+}
+
 /** A line as a reader sees it: CHIP for each quote chip, then the text, one space apart. */
 function lineText(line: Element): string {
   return [...line.childNodes]
-    .map((node) =>
-      node instanceof Element && node.querySelector('.sr-only, [data-native-chat-sent-quote]')
-        ? CHIP
-        : (node.textContent ?? '').trim()
-    )
+    .map((node) => (node instanceof Element && isQuoteChip(node) ? CHIP : shownText(node).trim()))
     .filter((part) => part !== '')
     .join(' ')
 }

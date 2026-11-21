@@ -6,7 +6,7 @@ vi.mock('@/store/slices/editor/focus/editor-focus-reveal', () => ({
   scheduleEditorLineReveal: fake.schedule
 }))
 vi.mock('@/store/slices/editor/tabs/editor-open-target-group', () => ({}))
-vi.mock('@/components/tab-group/editor-reveal-flash', () => ({ flashRevealedEditorView: vi.fn() }))
+vi.mock('@/components/tab-group/editor-reveal/editor-reveal-flash', () => ({ flashRevealedEditorView: vi.fn() }))
 vi.mock('@/store/index', () => {
   const state = {
     unifiedTabsByWorktree: {},

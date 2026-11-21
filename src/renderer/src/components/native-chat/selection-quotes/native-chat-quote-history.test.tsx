@@ -37,7 +37,7 @@ vi.mock('@/lib/workspace/activation/worktree-activation', () => ({
 
 import { useAppStore } from '@/store/index'
 import { registerWorktreeActivation } from '@/lib/workspace/activation/worktree-activation-nav-registration'
-import { reopenClosedWorkspaceTab } from '@/components/reopen-closed-workspace-tab'
+import { reopenClosedWorkspaceTab } from '@/components/terminal/tab-lifecycle/reopen-closed-workspace-tab'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from '../messages/rows/NativeChatMessageRow'
@@ -47,7 +47,7 @@ import { NativeChatQuoteJumpContext, useNativeChatQuoteJump } from './use-native
 import { rememberNativeChatQuoteSource } from './native-chat-quote-sources'
 import { beginLinkOpenRequest } from '@/lib/links/link-open-request'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
-import type { Tab } from '../../../../../shared/tab-types'
+import type { Tab } from '../../../../../shared/workspace-layout/tab-groups/tab-types'
 import type { AppState } from '@/store/types'
 
 const issue = vi.fn()

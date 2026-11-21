@@ -1,4 +1,4 @@
-import { textHash, type QuotePlace } from './native-chat-quote-sources'
+import { textHash, type QuotePlace, type QuoteSource } from './native-chat-quote-sources'
 
 const HIGHLIGHT = 'native-chat-quote-jump'
 export const QUOTE_HIGHLIGHT_MS = 1500
@@ -48,6 +48,17 @@ export function quotePlace(source: Element, range: Range): QuotePlace {
   before.setEnd(clamped.startContainer, clamped.startOffset)
   const text = clamped.toString()
   return { offset: before.toString().length, length: text.length, hash: textHash(text) }
+}
+
+/** The reply and the place a selection in `sourceElement` quotes, or null for a reply with no id. */
+export function quoteSourceOf(sourceElement: Element, range: Range): QuoteSource | null {
+  const messageId = sourceElement.getAttribute('data-native-chat-quote-source')
+  const chat = sourceElement
+    .closest('[data-native-chat-quote-chat]')
+    ?.getAttribute('data-native-chat-quote-chat')
+  return messageId
+    ? { messageId, place: quotePlace(sourceElement, range), ...(chat ? { chat } : {}) }
+    : null
 }
 
 /** The range at `place` in the text of `root`, while the text there is still the quoted text. */
