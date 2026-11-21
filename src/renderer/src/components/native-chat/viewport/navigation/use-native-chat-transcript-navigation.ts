@@ -17,15 +17,16 @@ import { nativeChatSlotIndexOf } from '../../conversation/slots/native-chat-tran
 import type { NativeChatTranscriptSlot } from '../../conversation/slots/native-chat-transcript-slots'
 import { nativeChatRailJumpStep, useNativeChatHistoryJump } from './use-native-chat-history-jump'
 import { useNativeChatRailJumpLanding } from './use-native-chat-rail-jump-landing'
+import { useNativeChatQuoteJump } from '../../selection-quotes/use-native-chat-quote-jump'
 import type { NativeChatAlignEdge } from '../virtualization/use-native-chat-viewport-align'
 
 type NavigationRequest =
   | { kind: 'diff'; target: NativeChatDiffReveal }
-  | { kind: 'rail'; messageId: string; requestId: number }
+  | { kind: 'rail'; messageId: string; requestId: number; fromLink?: true }
 
 export type NativeChatNavigationRequest = {
   revealedDiff: NativeChatDiffReveal | null
-  railJump: { messageId: string; requestId: number } | null
+  railJump: { messageId: string; requestId: number; fromLink?: true } | null
   /** The one slot the window keeps mounted until the request lands. */
   revealIndex: number
   issue: (request: NavigationRequest | null) => void
@@ -100,6 +101,22 @@ export function useNativeChatNavigation({
   )
   const historyJump = useNativeChatHistoryJump({
     step: (target) => {
+      if (target.kind === 'item') {
+        const pending = journalItems?.find((item) => item.itemId === target.id)?.body
+        if (
+          (pending?.kind === 'approval' || pending?.kind === 'question') &&
+          pending.resolution.state === 'pending'
+        ) {
+          return 'landed'
+        }
+        const index = nativeChatSlotIndexOf(slots, target.id)
+        if (index < 0) {
+          holdHistory()
+          return 'page'
+        }
+        issue({ kind: 'rail', messageId: target.id, requestId: nextRequestId(), fromLink: true })
+        return 'landed'
+      }
       if (target.kind === 'rail') {
         return nativeChatRailJumpStep(rail.items, target.id, requestRailJump)
       }
@@ -151,12 +168,22 @@ export function useNativeChatNavigation({
     beginNavigation()
     scrollToBottom()
   }, [beginNavigation, scrollToBottom])
+  const jumpToQuote = useNativeChatQuoteJump({
+    slots,
+    scrollRef,
+    request,
+    beginNavigation,
+    readerLeavesEnd,
+    startHistoryJump,
+    sessionKey
+  })
   useNativeChatRailJumpLanding({
     railJump: request.railJump,
     slots,
     scrollRef,
     scrollMessageToTop,
     onActivate: rail.onActivate,
+    onScroll: request.railJump?.fromLink ? readerLeavesEnd : undefined,
     release: issue
   })
   return {
@@ -164,6 +191,7 @@ export function useNativeChatNavigation({
     selectRailItem,
     revealDiff,
     jumpToLatest,
+    jumpToQuote,
     pendingRailId: historyJump.pending?.kind === 'rail' ? historyJump.pending.id : null
   }
 }

@@ -1,7 +1,11 @@
+import { quotePlace } from './native-chat-quote-highlight'
+import type { QuoteSource } from './native-chat-quote-sources'
 import { markdownMathSelectionText } from '../../../../../shared/markdown-math-selection'
 
-/** Only agent-reply prose marked with this attribute may be quoted. */
-export const NATIVE_CHAT_QUOTE_SOURCE_PROPS = { 'data-native-chat-quote-source': '' } as const
+/** Only message prose marked with this attribute may be quoted; its value is the message id. */
+export function nativeChatQuoteSourceProps(messageId: string): Record<string, string> {
+  return { 'data-native-chat-quote-source': messageId }
+}
 
 const QUOTE_SOURCE_SELECTOR = '[data-native-chat-quote-source]'
 const TRANSCRIPT_SELECTOR = '[data-native-chat-scroll]'
@@ -22,7 +26,7 @@ export function readNativeChatTranscriptSelection(root: HTMLElement): string {
 
 export function readNativeChatQuotableSelection(
   root: HTMLElement
-): { text: string; range: Range } | null {
+): { text: string; range: Range; source: QuoteSource | null } | null {
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount !== 1) {
     return null
@@ -37,7 +41,15 @@ export function readNativeChatQuotableSelection(
   if (!edges || !source || !source.contains(edges.last) || text === '') {
     return null
   }
-  return { text, range }
+  const messageId = source.getAttribute('data-native-chat-quote-source')
+  // The transcript's scroller names its chat, so a quote keeps the chat of its source.
+  const chat = source
+    .closest('[data-native-chat-quote-chat]')
+    ?.getAttribute('data-native-chat-quote-chat')
+  const at = messageId
+    ? { messageId, place: quotePlace(source, range), ...(chat ? { chat } : {}) }
+    : null
+  return { text, range, source: at }
 }
 
 // Triple-click ranges can end outside the reply; check selected text edges instead of range endpoints.
@@ -71,4 +83,13 @@ function isSelectableText(node: Text): boolean {
 export function formatNativeChatQuote(text: string): string {
   const lines = text.trim().split(/\r?\n/)
   return `${lines.map((line) => (line.trim() ? `> ${line}` : '>')).join('\n')}\n\n`
+}
+
+/** The text of a quote that `formatNativeChatQuote` wrote, without its `>` marks. */
+export function quotedText(quote: string): string {
+  return quote
+    .trim()
+    .split('\n')
+    .map((line) => line.replace(/^ {0,3}> ?/, ''))
+    .join('\n')
 }
