@@ -5,7 +5,7 @@ import {
   getPlatformManifestReadiness,
   requestGitHubReleaseHead
 } from './updater-release-readiness'
-import { getVersionChannel } from '../../../shared/release-channel'
+import { getVersionChannel } from '../../../shared/updater/release-channel'
 
 import {
   applyReleaseDelay,
@@ -64,8 +64,7 @@ async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
         continue
       }
       const version = normalizeTagToVersion(tag)
-      // Fork patch: the Nightly app has its own feed. The stable app never takes a nightly build.
-      if (isValidVersion(version) && getVersionChannel(version) !== 'daily') {
+      if (isValidVersion(version)) {
         const releasedAt = Date.parse(entry[1].match(ENTRY_UPDATED_RE)?.[1] ?? '')
         tags.push({ tag, version, releasedAt: Number.isNaN(releasedAt) ? null : releasedAt })
       }
@@ -199,6 +198,8 @@ function selectChannelCandidates(
   includePrerelease: boolean,
   releaseFilter: FetchNewerReleaseTagOptions['releaseFilter']
 ): ReleaseFeedTag[] {
+  // Fork patch: the Nightly app has its own feed. The stable app never takes a nightly build.
+  tags = tags.filter(({ version }) => getVersionChannel(version) !== 'daily')
   if (releaseFilter === 'perf') {
     return tags.filter(({ tag }) => isPerfPrereleaseTag(tag))
   }
