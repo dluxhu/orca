@@ -89,7 +89,11 @@ export function NativeChatUserMessageRow({
   const from = message.from
   const sending = deliveryNotice?.sending === true
   // The bubble shows what the user typed; the agent also got the routing notes.
-  const sent = useMemo(() => (from ? null : splitAgentReferenceNotes(markdown)), [from, markdown])
+  const layout = message.sentAs === 'goal' ? 'goal' : 'message'
+  const sent = useMemo(
+    () => (from ? null : splitAgentReferenceNotes(markdown, layout)),
+    [from, layout, markdown]
+  )
   const typed = sent?.body ?? markdown
   return (
     <div
