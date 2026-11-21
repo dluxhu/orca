@@ -1,9 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
+import { ensureAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
 
 const plist = (entries: Record<string, string>): string =>
   `<plist><dict>${Object.entries(entries)
@@ -97,6 +98,24 @@ describe('isAppProfileRuntime', () => {
       expect(isAppProfileRuntime({})).toBe(false)
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('ensureAppProfileMarker', () => {
+  it('writes a missing marker, so orcad finds the profile, and keeps an existing one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-profile-marker-'))
+    try {
+      const userData = join(root, 'work')
+      ensureAppProfileMarker(userData, 'work')
+      expect(JSON.parse(readFileSync(join(userData, 'orca-app-profile.json'), 'utf8'))).toEqual({
+        id: 'work'
+      })
+      writeFileSync(join(userData, 'orca-app-profile.json'), '{"id":"work","kept":true}')
+      ensureAppProfileMarker(userData, 'work')
+      expect(readFileSync(join(userData, 'orca-app-profile.json'), 'utf8')).toContain('kept')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
   })
 })

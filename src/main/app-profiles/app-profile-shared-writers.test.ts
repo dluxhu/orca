@@ -84,4 +84,38 @@ describe('shared agent writers in an app profile', () => {
     expect(host.disableAgentStatusHooks).not.toHaveBeenCalled()
     expect(existsSync(join(scripts, 'claude-hook.sh'))).toBe(true)
   })
+
+  it('uninstall keeps the hook scripts when no agent entry is left', async () => {
+    const scripts = join(home, '.orca', 'agent-hooks')
+    mkdirSync(scripts, { recursive: true })
+    writeFileSync(join(scripts, 'codex-hook.sh'), '#!/bin/sh\n')
+    const plan = {
+      agents: [],
+      hookScripts: { location: scripts, state: 'present', detail: null },
+      otherOrcaBuildName: null
+    } as unknown as OrcaUninstallPlan
+    const host = { homeDir: home } as unknown as OrcaUninstallHost
+    const after = await runOrcaUninstallStep(plan, 'hook-scripts', host)
+    expect(after.hookScripts?.state).toBe('kept-shared')
+    expect(existsSync(join(scripts, 'codex-hook.sh'))).toBe(true)
+  })
+
+  it("uninstall keeps the default app's orca command", async () => {
+    const plan = {
+      agents: [],
+      cliCommand: {
+        location: '/usr/local/bin/orca',
+        commandName: 'orca',
+        state: 'present',
+        detail: null
+      },
+      otherOrcaBuildName: null
+    } as unknown as OrcaUninstallPlan
+    const host = { homeDir: home, removeCli: vi.fn() } as unknown as OrcaUninstallHost
+    const after = await runOrcaUninstallStep(plan, 'cli-command', host)
+    expect(after.cliCommand?.state).toBe('kept-shared')
+    expect(
+      (host as unknown as { removeCli: ReturnType<typeof vi.fn> }).removeCli
+    ).not.toHaveBeenCalled()
+  })
 })

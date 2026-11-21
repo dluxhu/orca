@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../../../app-profiles/app-profile'
 import { withTimeout } from '../../../../shared/concurrency/promise-timeout-fallback'
 import {
   CODEX_HOOK_LAUNCH_WAIT_MS,
@@ -139,6 +140,10 @@ async function runUntilSettled(): Promise<void> {
 }
 
 async function reconcileOnce(realHomeLaunch: boolean): Promise<void> {
+  // Fork patch: ~/.codex and ~/.orca are shared until profile isolation; a profile writes nothing there.
+  if (isAppProfileRuntime()) {
+    return
+  }
   const current = config
   if (!current?.isEnabled() || !(realHomeLaunch || resolveHome(current).kind === 'real')) {
     return

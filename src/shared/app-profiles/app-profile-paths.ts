@@ -1,5 +1,5 @@
 // App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -43,12 +43,23 @@ export function appProfilesAppsDir(env: NodeJS.ProcessEnv = process.env, home = 
 /** The profile id in a userData folder, or null when the folder is not a profile's. */
 export function readAppProfileMarker(userDataPath: string): string | null {
   try {
-    const id = (JSON.parse(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8')) as {
-      id?: unknown
-    }).id
+    const id = (
+      JSON.parse(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8')) as {
+        id?: unknown
+      }
+    ).id
     return typeof id === 'string' && id.length > 0 ? id : null
   } catch {
     return null
+  }
+}
+
+/** Writes the marker when it is missing. serve and orcad find the profile only through it. */
+export function ensureAppProfileMarker(userDataPath: string, id: string): void {
+  const marker = join(userDataPath, APP_PROFILE_MARKER)
+  if (!existsSync(marker)) {
+    mkdirSync(userDataPath, { recursive: true, mode: 0o700 })
+    writeFileSync(marker, `${JSON.stringify({ id })}\n`)
   }
 }
 

@@ -63,7 +63,7 @@ import {
   logSingleInstanceLockFailure
 } from './profile-startup/single-instance-lock'
 import { SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE } from '../../shared/app-lifecycle/launch/single-instance-exit-code'
-import { getAppProfile } from '../app-profiles/app-profile'
+import { configureAppProfileStartup } from '../app-profiles/app-profile-startup'
 import { takeProfileFromServer } from '../app-profiles/app-profile-serve-exclusion'
 import { setAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { ElectronAppEnvironment } from '../host/electron-app-environment'
@@ -194,11 +194,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Register before spawning so CLI/relay-shared tree killing can reach main's gate and breadcrumbs.
   installMainProcessTreeKillGate()
   configureDevUserDataPath(isDev)
-  // A profile app pins its own folder (docs/fork/profiles-design.md, section 1).
-  const appProfile = getAppProfile()
-  if (appProfile && !isDev && !app.commandLine.hasSwitch('user-data-dir')) {
-    app.setPath('userData', appProfile.userDataPath)
-  }
+  const appProfile = configureAppProfileStartup(isDev)
   configureOrcaUserDataPathEnv()
   // #16761: install the lazy environment accessor immediately after userData selection or early resolves can throw/memoize the wrong profile.
   setAppEnvironment(new ElectronAppEnvironment())
