@@ -1,13 +1,13 @@
 import { promptTextContent, QUOTE_NODE } from '../composer/editor/native-chat-prompt-document-text'
-import { quotedText } from './native-chat-quote-selection'
+import { quotedText } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import {
   nativeChatQuoteSource,
   QUOTE_SOURCE_LIMIT,
   quoteKey,
   rememberNativeChatQuoteSource
 } from './native-chat-quote-sources'
-import { isNativeChatContextClear } from '../../../../../shared/agent-session/agent-session-context-clear'
-import { orderNativeChatDisplayMessages } from '../../../../../shared/native-chat/transcript/native-chat-message-order'
+import { isNativeChatContextClear } from '../../../../../shared/agent-session/conversation-context/agent-session-context-clear'
+import { orderNativeChatDisplayMessages } from '../../../../../shared/native-chat/transcript/messages/native-chat-message-order'
 import type { NativeChatMessage } from '../../../../../shared/native-chat/native-chat-types'
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
