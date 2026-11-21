@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, MoreHorizontal, PanelLeft } from 'lucide-react'
 import logo from '../../../../../resources/logo.svg'
 import { useTranslate } from '@/i18n/use-translate'
@@ -29,6 +30,15 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
   const leftSidebarShortcutLabel = useShortcutLabel('sidebar.left.toggle')
   const historyBackShortcutLabel = useShortcutLabel('worktree.history.back')
   const historyForwardShortcutLabel = useShortcutLabel('worktree.history.forward')
+  // A profile app shows its own name; main knows it at runtime.
+  const [packagedName, setPackagedName] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.app
+      .getIdentity()
+      .then((identity) => setPackagedName(identity.isDev ? null : identity.name))
+      .catch(() => {})
+  }, [])
+  const appName = packagedName ?? withForkName(t('auto.App.5096cbbc86', 'Orca'))
 
   return (
     // Measure the whole row for tab-strip spacing. w-max prevents the collapsed w-0 wrapper shrinking Windows text to one glyph.
@@ -68,10 +78,10 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
             <ContextMenuTrigger asChild>
               <div
                 className="titlebar-app-name"
-                aria-label={withForkName(t('auto.App.5096cbbc86', 'Orca'))}
+                aria-label={appName}
               >
                 <span className="titlebar-app-name-main">
-                  {withForkName(t('auto.App.5096cbbc86', 'Orca'))}
+                  {appName}
                 </span>
               </div>
             </ContextMenuTrigger>

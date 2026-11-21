@@ -1,6 +1,8 @@
-import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { SERVE_LAUNCHD_LABEL_PREFIX } from '../../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
+import {
+  SERVE_LAUNCHD_LABEL_PREFIX,
+  serveProfileSuffix
+} from '../../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 
 export type ServeServiceManager = 'launchd' | 'systemd'
 
@@ -27,6 +29,8 @@ export type ServeServiceInput = {
   pairingAddress?: string | null
   allowPublic?: boolean
   refusePublic?: boolean
+  /** More variables for the service, for example an app profile's HOME. */
+  env?: Record<string, string>
 }
 
 /** Service logs must never contain a live pairing offer. */
@@ -51,7 +55,7 @@ export function serveServiceArgs(
 function profileSuffix(input: ServeServiceInput): string {
   return input.userDataPath === input.defaultUserDataPath
     ? ''
-    : createHash('sha256').update(input.userDataPath).digest('hex').slice(0, 8)
+    : serveProfileSuffix(input.userDataPath)
 }
 
 export function resolveServeServiceManager(platform: NodeJS.Platform): ServeServiceManager | null {
@@ -65,7 +69,11 @@ export function renderServeService(input: ServeServiceInput): ServeServiceSpec {
   }
   const suffix = profileSuffix(input)
   // The manager’s environment may resolve a different default profile.
-  const env: Record<string, string> = { PATH: input.path, ORCA_USER_DATA_PATH: input.userDataPath }
+  const env: Record<string, string> = {
+    ...input.env,
+    PATH: input.path,
+    ORCA_USER_DATA_PATH: input.userDataPath
+  }
   const argv = [input.command, ...serveServiceArgs(input)]
   if (manager === 'launchd') {
     const name = suffix ? `${SERVE_LAUNCHD_LABEL_PREFIX}.${suffix}` : SERVE_LAUNCHD_LABEL_PREFIX
