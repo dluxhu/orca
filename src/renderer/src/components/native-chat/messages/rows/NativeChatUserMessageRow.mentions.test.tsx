@@ -16,6 +16,7 @@ import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from './NativeChatMessageRow'
 import { serializeNativeChatAgentReferences } from '../../composer/pickers/native-chat-agent-reference-send'
 import { AgentReferencePillContent } from '../../composer/editor/native-chat-agent-reference'
+import { agentReferenceNote } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() } }))
 vi.mock('@/lib/agent-session/open/open-agent-message-sender', async (importOriginal) => ({
@@ -211,7 +212,8 @@ it('opens the mentioned chat on the chat host when its chip is clicked', async (
   expect(openOrchestrationDispatch).toHaveBeenCalledWith(
     'orca_session_id:chat_aaaaaaaa',
     'Tech Lead',
-    { kind: 'environment', environmentId: 'env-a' }
+    { kind: 'environment', environmentId: 'env-a' },
+    expect.anything()
   )
 })
 
@@ -226,12 +228,48 @@ it("opens a mention on another host through this window's environment of that na
   expect(openOrchestrationDispatch).toHaveBeenCalledWith(
     'orca_session_id:chat_aaaaaaaa',
     'Lead on Box (box)',
-    { kind: 'environment', environmentId: 'env-box' }
+    { kind: 'environment', environmentId: 'env-box' },
+    expect.anything()
   )
 })
 
 it('says so when this window does not know the host of the mention', async () => {
   bubble(sentText('Lead on Box (box)', 'box'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
+})
+
+it('says so in a short notice when the mentioned chat is gone', async () => {
+  bubble(sentText('Tech Lead'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
+  // The open path reports a gone chat through the feedback it is given.
+  const feedback = vi.mocked(openOrchestrationDispatch).mock.calls[0]?.[3]
+  feedback?.open?.gone('Tech Lead')
+
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('no longer on this host'))
+  expect(toast.error).not.toHaveBeenCalled()
+})
+
+it('keeps a crew mention a plain chip', () => {
+  const shown = bubble(
+    `ask @Crew now\n\n${agentReferenceNote('Crew', 'dispatch:ctx_1')}`,
+    undefined,
+    LOCAL_CHAT
+  )
+
+  expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Crew')
+  expect(screen.queryByRole('button', { name: 'Open Crew' })).toBeNull()
+})
+
+it("says so for a mention from a chat on another host, which names that host's environments", async () => {
+  useAppStore.setState({
+    runtimeEnvironments: [{ id: 'env-box', name: 'box' }] as never
+  })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, ENV_A_CHAT)
 
   await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
 

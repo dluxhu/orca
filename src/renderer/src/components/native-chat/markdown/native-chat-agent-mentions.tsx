@@ -76,14 +76,15 @@ export function plainNativeChatAgentMentions(
     )
 }
 
-/** A sent mention's chip. In a chat's transcript it is a button that opens the mentioned session. */
+/** A sent mention's chip. In a chat's transcript, a chat or terminal chip is a button that opens it. */
 function SentAgentMentionChip({ mention }: { mention: SentAgentMention }): React.JSX.Element {
   const t = useTranslate()
   const owner = useNativeChatVisualOwner()
   const pill = (
     <AgentReferencePillContent label={mention.label} kind={mention.kind} selected={false} />
   )
-  if (!owner) {
+  // A crew or Dispatch mention names work, not a session to open.
+  if (!owner || mention.kind === null) {
     return pill
   }
   return (
