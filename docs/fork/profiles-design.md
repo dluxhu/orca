@@ -793,6 +793,17 @@ and a profile app installed agent hooks into shared folders. Fix in slice 1:
   An id has only `a-z`, `0-9` and `-`, so two names cannot share a bundle id. It writes the
   marker before the app is in place, and removes the app when registration fails.
 
+- A profile app takes only its own folder. With `--user-data-dir`, the folder must carry the
+  profile's marker; else the app stops. It writes its marker only into its own folder. `orca
+  --profile <id> serve` and `orca open` start the target's own app: the profile's app, or the
+  default app for `default`.
+
+**Safety model until slice 2.** Each writer to a shared folder has its own check
+(`isAppProfileRuntime()`), and each review round found more writers. Until slice 2, these checks
+are the only guard. Slice 2 gives each profile its own home folders for the agent configs and
+`~/.orca` (`ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME`), which removes this
+class of fault.
+
 **Writers to the real home that stay in a profile (slice 2).**
 
 - Hooks that other launch paths can install. Slice 2 checks every agent launch path.
