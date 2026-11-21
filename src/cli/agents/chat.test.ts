@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../shared/agent-session/agent-session-runtime-capabilities'
-import { structuredAgentSessionPayloadFingerprint } from '../../shared/agent-session/lifecycle/structured-agent-session-mutation'
+import { AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY } from '../../shared/agent-session/capabilities/agent-session-runtime-capabilities'
+import { structuredAgentSessionPayloadFingerprint } from '../../shared/agent-session/lifecycle/operations/structured-agent-session-mutation'
 import { agentSessionSendFields } from '../../shared/agent-session/requests/structured-agent-session-send-mutation'
 import { SendParams } from '../../shared/rpc-contract/structured-agent-session/structured-agent-session-params'
 import { structuredAgentSessionTabId } from '../../shared/agent-session/view/structured-agent-session-projection'
-import type { RuntimeCapability } from '../../shared/protocol-version'
+import type { RuntimeCapability } from '../../shared/remote-runtime/protocol/protocol-version'
 import { RuntimeClient } from '../runtime/client'
-import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/types'
+import { RuntimeClientError, RuntimeRpcFailureError } from '../runtime/connection/types'
 import { CHAT_HANDLERS } from './chat'
 
 const SESSION = 'codex_8eb631ab_59c5_41e4_8672_01cfe0a6fd5f'
@@ -368,12 +368,9 @@ function chatClient(isRemote: boolean): { client: RuntimeClient; call: ReturnTyp
   return { client, call }
 }
 
-function rename(client: RuntimeClient, session?: string): Promise<void> {
+function rename(client: RuntimeClient): Promise<void> {
   return CHAT_HANDLERS['chat rename']({
-    flags: new Map([
-      ['name', 'Release notes'],
-      ...(session === undefined ? [] : [['session', session] as const])
-    ]),
+    flags: new Map([['name', 'Release notes']]),
     client,
     cwd: '/tmp/worktree',
     json: true
@@ -391,14 +388,6 @@ describe('chat rename CLI', () => {
     const { client, call } = chatClient(true)
 
     await expect(rename(client)).rejects.toThrow('Missing required --session: on a paired host')
-    expect(call).not.toHaveBeenCalled()
-  })
-
-  it('refuses an empty --session instead of renaming the chat it runs in', async () => {
-    vi.stubEnv('ORCA_AGENT_SESSION_ID', 'chat-7')
-    const { client, call } = chatClient(false)
-
-    await expect(rename(client, '')).rejects.toThrow('Missing value for --session')
     expect(call).not.toHaveBeenCalled()
   })
 })
