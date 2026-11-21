@@ -6,7 +6,10 @@ import { toast } from 'sonner'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { openOrchestrationDispatch } from '@/lib/agent-session/open/open-agent-message-sender'
-import { NativeChatVisualOwnerContext } from '../../media/visuals/native-chat-visual-owner'
+import {
+  NativeChatVisualOwnerContext,
+  type NativeChatVisualOwner
+} from '../../media/visuals/native-chat-visual-owner'
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
@@ -95,7 +98,15 @@ function composerTerminalBadge(label: string): string {
   return text
 }
 
-function bubble(text: string, sentAs?: 'goal', chatHost?: RuntimeClientTarget): HTMLElement {
+const owner = (target: RuntimeClientTarget): NativeChatVisualOwner => ({
+  target,
+  sessionId: 'this-chat',
+  worktreeId: 'workspace'
+})
+const LOCAL_CHAT = owner({ kind: 'local' })
+const ENV_A_CHAT = owner({ kind: 'environment', environmentId: 'env-a' })
+
+function bubble(text: string, sentAs?: 'goal', chat?: NativeChatVisualOwner): HTMLElement {
   const row = (
     <TooltipProvider>
       <MessageRow
@@ -113,10 +124,8 @@ function bubble(text: string, sentAs?: 'goal', chatHost?: RuntimeClientTarget): 
     </TooltipProvider>
   )
   const { container } = render(
-    chatHost ? (
-      <NativeChatVisualOwnerContext.Provider
-        value={{ target: chatHost, sessionId: 'this-chat', worktreeId: 'workspace' }}
-      >
+    chat ? (
+      <NativeChatVisualOwnerContext.Provider value={chat}>
         {row}
       </NativeChatVisualOwnerContext.Provider>
     ) : (
@@ -195,7 +204,7 @@ it('shows text that only looks like a note', () => {
 })
 
 it('opens the mentioned chat on the chat host when its chip is clicked', async () => {
-  bubble(sentText('Tech Lead'), undefined, { kind: 'environment', environmentId: 'env-a' })
+  bubble(sentText('Tech Lead'), undefined, ENV_A_CHAT)
 
   await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
 
@@ -210,7 +219,7 @@ it("opens a mention on another host through this window's environment of that na
   useAppStore.setState({
     runtimeEnvironments: [{ id: 'env-box', name: 'box' }] as never
   })
-  bubble(sentText('Lead on Box (box)', 'box'), undefined, { kind: 'local' })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, LOCAL_CHAT)
 
   await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
 
@@ -222,7 +231,7 @@ it("opens a mention on another host through this window's environment of that na
 })
 
 it('says so when this window does not know the host of the mention', async () => {
-  bubble(sentText('Lead on Box (box)', 'box'), undefined, { kind: 'local' })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, LOCAL_CHAT)
 
   await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
 
