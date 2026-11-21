@@ -81,7 +81,7 @@ const LONG_SHORT = [
   '> (70 quoted words left out; the full text is in your earlier reply)',
   '> … The agent gets the same text shape.'
 ].join('\n')
-// One sentence over the threshold: each end is cut to 80 characters at a space.
+// One long sentence: each end is cut to 80 characters at a space.
 const ONE_SENTENCE = words(100)
 const ONE_SENTENCE_SHORT = [
   `> ${words(13)} …`,
@@ -95,8 +95,8 @@ const SHORT_FIRST_SHORT = [
   '> (68 quoted words left out; the full text is in your earlier reply)',
   '> … The last sentence is here now.'
 ].join('\n')
-const CHARS_400 = `${words(66)}. abc`
-const CHARS_401 = `${words(66)}. abcd`
+// 360 characters: longer than its short shape.
+const MEDIUM = `${words(60)}.`
 const FILE_QUOTE = `src/app.ts:1-40\n\`\`\`ts\n${words(80)}\n\`\`\``
 const TERMINAL_QUOTE = `zsh\n\`\`\`\n${words(80)}\n\`\`\``
 
@@ -154,12 +154,13 @@ it.each(SHORTENED)('sends %s shortened', async (_name, quote, short) => {
   expect(await send(quote, IN_CHAT)).toBe(`${short}\n\nmy comment`)
 })
 
-it('sends a quote of 401 characters shortened, and one of 400 in full', async () => {
-  expect(CHARS_400).toHaveLength(400)
-  expect(CHARS_401).toHaveLength(401)
-  expect(await send(CHARS_401, IN_CHAT)).toMatch(/^> .* …\n> \(\d+ quoted words left out; /)
+it('sends a quote shortened whatever its length, when the short shape is shorter', async () => {
+  expect(MEDIUM).toHaveLength(360)
+  expect(await send(MEDIUM, IN_CHAT)).toMatch(/^> .* …\n> \(\d+ quoted words left out; /)
   cleanup()
-  expect(await send(CHARS_400, IN_CHAT)).toBe(`${formatNativeChatQuote(CHARS_400)}my comment`)
+  // The short shape of a short quote is longer than the quote.
+  const SHORT = 'The parser reads quoted lines as one chip.'
+  expect(await send(SHORT, IN_CHAT)).toBe(`${formatNativeChatQuote(SHORT)}my comment`)
 })
 
 // The agent has the reply only when it is in its context, and the reply holds the quote.
@@ -187,13 +188,6 @@ const IN_FULL: [string, string, typeof IN_CHAT | null, NativeChatMessage[] | und
     [reply(LONG), system('context-cleared')]
   ],
   [
-    // Literal counts: a test that reads the constant moves with a changed constant.
-    'a quote of the reply 6 back, older than the last 5 replies (an automatic compaction leaves no row)',
-    LONG,
-    IN_CHAT,
-    [reply(LONG), ...replies(5)]
-  ],
-  [
     'a quote whose reply id names a reply without the quote',
     LONG,
     IN_CHAT,
@@ -210,13 +204,14 @@ it.each(IN_FULL)('sends %s in full', async (_name, quote, source, chat) => {
 // The user's own earlier message in this chat: the agent has it as it has a reply.
 const mine = (quote: string) => reply(quote, { role: 'user' })
 const MINE_SHORT = LONG_SHORT.replace('your earlier reply', 'my earlier message')
-// A user turn and its reply: only the reply counts toward the last 5.
+// A user turn and its reply.
 const turns = (count: number) => Array.from({ length: count }, () => [user(), message({})]).flat()
 
 it.each([
   ['with no reply after it', [mine(LONG)]],
   ['with 4 replies after it', [mine(LONG), ...replies(4)]],
-  ['with 4 user turns and 4 replies after it', [mine(LONG), ...turns(4)]]
+  ['with 20 replies after it', [mine(LONG), ...replies(20)]],
+  ['with 20 user turns and 20 replies after it', [mine(LONG), ...turns(20)]]
 ])('sends a long quote of my own earlier message %s shortened', async (_name, chat) => {
   expect(await send(LONG, IN_CHAT, chat)).toBe(`${MINE_SHORT}\n\nmy comment`)
 })
@@ -224,14 +219,14 @@ it.each([
 it.each([
   ['from before /clear', [mine(LONG), user({ command: { name: 'clear' } })]],
   ['from before a compaction', [mine(LONG), system('compaction')]],
-  ['with 5 replies after it', [mine(LONG), ...replies(5)]],
   ['from a hook copy', [reply(LONG, { role: 'user', source: 'hook' })]]
 ])('sends a long quote of my own earlier message %s in full', async (_name, chat) => {
   expect(await send(LONG, IN_CHAT, chat)).toBe(`${formatNativeChatQuote(LONG)}my comment`)
 })
 
-it('sends a quote of the reply 5 back shortened', async () => {
-  expect(await send(LONG, IN_CHAT, [reply(LONG), ...replies(4)])).toBe(
+// Only a clear or a compaction that the chat shows ends what the agent has.
+it('sends a quote of the reply 21 back shortened', async () => {
+  expect(await send(LONG, IN_CHAT, [reply(LONG), ...replies(20)])).toBe(
     `${LONG_SHORT}\n\nmy comment`
   )
 })
