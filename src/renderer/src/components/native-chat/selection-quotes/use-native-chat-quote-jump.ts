@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, type RefObject } from 'react'
+import { createContext, useCallback, useEffect, useLayoutEffect, type RefObject } from 'react'
 import { nativeChatSlotIndexOf } from '../conversation/slots/native-chat-transcript-slot-selection'
 import type { NativeChatTranscriptSlot } from '../conversation/slots/native-chat-transcript-slots'
 import type { NativeChatNavigationRequest } from '../viewport/navigation/use-native-chat-transcript-navigation'
@@ -68,7 +68,8 @@ export function useNativeChatQuoteJump({
   request,
   beginNavigation,
   readerLeavesEnd,
-  startHistoryJump
+  startHistoryJump,
+  sessionKey
 }: {
   slots: readonly NativeChatTranscriptSlot[]
   scrollRef: RefObject<HTMLDivElement | null>
@@ -76,8 +77,14 @@ export function useNativeChatQuoteJump({
   beginNavigation: () => void
   readerLeavesEnd: () => void
   startHistoryJump: ReturnType<typeof useNativeChatHistoryJump>['start']
+  /** This chat; a source from another chat is not here, so its jump pages nothing. */
+  sessionKey: string
 }): NativeChatQuoteJump {
   const { issue, nextRequestId } = request
+  // "Add to chat" reads the chat of a quote from its transcript's scroller.
+  useLayoutEffect(() => {
+    scrollRef.current?.setAttribute('data-native-chat-quote-chat', sessionKey)
+  })
   const reveal = useCallback<NativeChatMessageReveal>(
     (messageId, show, isCurrent = ALWAYS_CURRENT, notifyMissing) => {
       if (nativeChatSlotIndexOf(slots, messageId) === -1) {
@@ -98,7 +105,10 @@ export function useNativeChatQuoteJump({
     }
   }, [reveal])
   return useCallback(
-    ({ messageId, place }, text, notifyMissing, isCurrent) => {
+    ({ messageId, place, chat }, text, notifyMissing, isCurrent, shown) => {
+      if (chat !== undefined && chat !== sessionKey) {
+        return false
+      }
       const show = (scroller: HTMLElement): boolean => {
         // By the message id: a tool run's member rows use data-index too.
         const source = scroller.querySelector<HTMLElement>(
@@ -106,6 +116,7 @@ export function useNativeChatQuoteJump({
         )
         if (source) {
           showQuotedText(source, text, place)
+          shown?.()
         }
         return Boolean(source)
       }
@@ -124,6 +135,6 @@ export function useNativeChatQuoteJump({
       })
       return true
     },
-    [beginNavigation, reveal, scrollRef, startHistoryJump]
+    [beginNavigation, reveal, scrollRef, sessionKey, startHistoryJump]
   )
 }

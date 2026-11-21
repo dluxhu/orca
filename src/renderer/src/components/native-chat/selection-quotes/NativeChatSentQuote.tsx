@@ -11,7 +11,7 @@ import { nativeChatFileOpenDeps } from '../links/actions/native-chat-link-target
 import { NativeChatMarkdownImageOwnerContext } from '../media/images/native-chat-markdown-image-owner'
 import { jumpToQuoteSource, type QuotedFileLocation } from './native-chat-quote-sources'
 import { NativeChatQuoteJumpContext } from './use-native-chat-quote-jump'
-import { recordNativeChatQuoteJump } from './native-chat-quote-history'
+import { nativeChatQuoteJumpRecorder } from './native-chat-quote-history'
 import { quotedText } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { CommentMarkdownBlockLineContext } from '@/components/comment-markdown/comment-markdown-code-renderers'
 
@@ -83,8 +83,7 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           size="xs"
           className="my-1 max-w-full"
           onClick={(event) => {
-            const chip = event.currentTarget
-            const jumped = jumpToQuoteSource(sourceText, {
+            jumpToQuoteSource(sourceText, {
               jumpToMessage,
               openFile: (location) => openQuotedFile(location, fileLinkContext),
               notifyMissing: () =>
@@ -93,11 +92,10 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
                     'components.native-chat.quoteSourceMissing',
                     'The source of this quote is not available.'
                   )
-                )
+                ),
+              // A jump joins Back and Forward only once it shows its source.
+              shown: nativeChatQuoteJumpRecorder(event.currentTarget, fileLinkContext)
             })
-            if (jumped !== 'missing') {
-              recordNativeChatQuoteJump(chip, fileLinkContext)
-            }
           }}
           data-native-chat-sent-quote=""
         >

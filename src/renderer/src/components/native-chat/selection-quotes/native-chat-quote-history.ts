@@ -13,13 +13,18 @@ const MESSAGE = '[data-native-chat-message-id]'
 const CHIP = '[data-native-chat-sent-quote]'
 // True while Forward clicks a chip again: that jump is in the history already.
 let replaying = false
-/** Adds the chip's place and its source to Back and Forward, after a jump from the chip. */
-export function recordNativeChatQuoteJump(
+const NO_RECORD = (): void => {}
+
+/**
+ * Reads the chip's place at the click. The returned function adds that place and its source to
+ * Back and Forward; the jump calls it once it shows its source. A replay from Forward adds nothing.
+ */
+export function nativeChatQuoteJumpRecorder(
   chip: HTMLElement,
   owner: NativeChatFileLinkContext | null
-): void {
+): () => void {
   if (replaying || !owner?.sourceTabId) {
-    return
+    return NO_RECORD
   }
   const message = chip.closest(MESSAGE)
   const messageId = message?.getAttribute('data-native-chat-message-id')
@@ -28,7 +33,7 @@ export function recordNativeChatQuoteJump(
     owner.sourceTabId
   )
   if (!message || !messageId || !tab) {
-    return
+    return NO_RECORD
   }
   const place = {
     kind: 'native-chat-quote',
@@ -37,17 +42,18 @@ export function recordNativeChatQuoteJump(
     messageId,
     chip: [...message.querySelectorAll(CHIP)].indexOf(chip)
   } as const
-  useAppStore.setState((state) => {
-    // The chip's place replaces the entry of its own workspace, so Back has no step that shows the same view.
-    const from =
-      state.worktreeNavHistory[state.worktreeNavHistoryIndex] === owner.worktreeId
-        ? { ...state, worktreeNavHistoryIndex: state.worktreeNavHistoryIndex - 1 }
-        : state
-    return appendHistoryEntry(appendHistoryEntry(from, { ...place, at: 'chip' }), {
-      ...place,
-      at: 'source'
+  return () =>
+    useAppStore.setState((state) => {
+      // The chip's place replaces the entry of its own workspace, so Back has no step that shows the same view.
+      const from =
+        state.worktreeNavHistory[state.worktreeNavHistoryIndex] === owner.worktreeId
+          ? { ...state, worktreeNavHistoryIndex: state.worktreeNavHistoryIndex - 1 }
+          : state
+      return appendHistoryEntry(appendHistoryEntry(from, { ...place, at: 'chip' }), {
+        ...place,
+        at: 'source'
+      })
     })
-  })
 }
 
 function showChip(scroller: HTMLElement, place: WorktreeNavHistoryChatQuoteEntry): void {
