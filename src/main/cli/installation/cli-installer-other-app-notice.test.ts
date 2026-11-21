@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import type * as NodeFs from 'node:fs'
+import type * as NodeFsPromises from 'node:fs/promises'
 import { mkdir, mkdtemp, readlink, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,21 +13,17 @@ vi.mock('electron', () => ({
   }
 }))
 
-// While `failing` is set, realpath throws, as when the target goes away after the check.
+// While `failing` is set, realpath rejects, as when the target goes away after the check.
 const realpathControl = vi.hoisted(() => ({ failing: false }))
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof NodeFs>()
-  const guard = <T extends (...args: never[]) => unknown>(call: T): T =>
-    ((...args: Parameters<T>) => {
-      if (realpathControl.failing) {
-        throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
-      }
-      return call(...args)
-    }) as T
-  const realpathSync = Object.assign(guard(actual.realpathSync), {
-    native: guard(actual.realpathSync.native)
-  })
-  return { ...actual, default: { ...actual, realpathSync }, realpathSync }
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFsPromises>()
+  const realpath = async (path: string): Promise<string> => {
+    if (realpathControl.failing) {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+    }
+    return actual.realpath(path)
+  }
+  return { ...actual, default: { ...actual, realpath }, realpath }
 })
 
 import { CliInstaller } from '../cli-installer'
@@ -104,19 +100,19 @@ describe('CLI link owned by another Orca app', () => {
     await mkdir(join(root, 'bin'), { recursive: true })
     await writeFile(plainFile, '', 'utf8')
 
-    expect(otherMacAppBundle(other.launcher, ours.launcher)).toBe(otherApp)
+    expect(await otherMacAppBundle(other.launcher, ours.launcher)).toBe(otherApp)
     // The bundle identifier decides, not the bundle name.
     const renamedApp = join(root, 'Renamed.app')
     const renamed = await writeLauncher(renamedApp)
-    expect(otherMacAppBundle(renamed.launcher, ours.launcher)).toBe(renamedApp)
+    expect(await otherMacAppBundle(renamed.launcher, ours.launcher)).toBe(renamedApp)
     const tool = await writeLauncher(join(root, 'Tool.app'), 'com.example.tool')
-    expect(otherMacAppBundle(tool.launcher, ours.launcher)).toBeNull()
-    expect(otherMacAppBundle(ours.launcher, ours.launcher)).toBeNull()
-    expect(otherMacAppBundle(plainFile, ours.launcher)).toBeNull()
+    expect(await otherMacAppBundle(tool.launcher, ours.launcher)).toBeNull()
+    expect(await otherMacAppBundle(ours.launcher, ours.launcher)).toBeNull()
+    expect(await otherMacAppBundle(plainFile, ours.launcher)).toBeNull()
     expect(
-      otherMacAppBundle(launcherIn(join(root, 'Gone', 'Orca.app')).launcher, ours.launcher)
+      await otherMacAppBundle(launcherIn(join(root, 'Gone', 'Orca.app')).launcher, ours.launcher)
     ).toBeNull()
-    expect(otherMacAppBundle(null, ours.launcher)).toBeNull()
+    expect(await otherMacAppBundle(null, ours.launcher)).toBeNull()
   })
 
   it.skipIf(process.platform === 'win32')(
@@ -243,7 +239,7 @@ describe('CLI link owned by another Orca app', () => {
       }
       const { installer, commandPath } = await installerLinkedTo(root, otherCase, ours)
 
-      expect(otherMacAppBundle(otherCase, ours.launcher)).toBeNull()
+      expect(await otherMacAppBundle(otherCase, ours.launcher)).toBeNull()
       const status = await installer.getStatus()
       expect(status.state).toBe('stale')
       expect(status.detail).toBe(`${commandPath} points to an older Orca launcher.`)
@@ -259,7 +255,7 @@ describe('CLI link owned by another Orca app', () => {
       const { installer, commandPath } = await installerLinkedTo(root, other.launcher, ours)
 
       realpathControl.failing = true
-      expect(otherMacAppBundle(other.launcher, ours.launcher)).toBeNull()
+      expect(await otherMacAppBundle(other.launcher, ours.launcher)).toBeNull()
       const after = await installer.install()
       realpathControl.failing = false
       expect(after.state).toBe('installed')
