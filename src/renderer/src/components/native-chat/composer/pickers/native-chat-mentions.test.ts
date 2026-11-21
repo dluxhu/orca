@@ -35,9 +35,32 @@ const ps = {
 
 const terminals = {
   terminals: [
-    { handle: 'term_one', ptyId: 'pty-1', branch: 'main', title: 'zsh', paneTitle: 'Runner' },
-    { handle: 'term_two', ptyId: 'pty-2', branch: 'main', title: 'zsh' },
-    { handle: 'term_old', ptyId: null, branch: 'main', title: 'Gone', orphaned: true }
+    {
+      handle: 'term_one',
+      ptyId: 'pty-1',
+      tabId: 'tab-1',
+      leafId: 'leaf-1',
+      branch: 'main',
+      title: 'zsh',
+      paneTitle: 'Runner'
+    },
+    {
+      handle: 'term_two',
+      ptyId: 'pty-2',
+      tabId: 'tab-2',
+      leafId: 'leaf-2',
+      branch: 'main',
+      title: 'zsh'
+    },
+    {
+      handle: 'term_old',
+      ptyId: null,
+      tabId: 'tab-3',
+      leafId: 'leaf-3',
+      branch: 'main',
+      title: 'Gone',
+      orphaned: true
+    }
   ]
 }
 
@@ -59,6 +82,17 @@ describe('listNativeChatMentionSessions', () => {
     ])
   })
 
+  it('marks a terminal with no agent row as a plain shell', () => {
+    expect(
+      listNativeChatMentionSessions(ps, terminals, 'local', {}).map((s) => [s.address, s.kind])
+    ).toEqual([
+      ['orca_session_id:chat_aaaaaaaa', 'chat'],
+      ['orca_session_id:chat_bbbbbbbb', 'chat'],
+      ['term_one', 'terminal'],
+      ['term_two', 'shell']
+    ])
+  })
+
   it('keeps the other kind when one list failed', () => {
     expect(
       listNativeChatMentionSessions(null, terminals, 'local', {}).map((s) => s.address)
@@ -72,7 +106,7 @@ describe('listNativeChatMentionSessions', () => {
 })
 
 describe('serializeNativeChatAgentReferences for @ mentions', () => {
-  it('tells the agent to use orca chat and orca terminal', () => {
+  it('tells the agent to mail a chat or a terminal agent, and to type into a plain shell', () => {
     const chat = {
       label: 'Release notes',
       address: 'orca_session_id:chat_aaaaaaaa',
@@ -85,6 +119,7 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       hostKey: 'local',
       kind: 'terminal' as const
     }
+    const shell = { label: 'Build', address: 'term_two', hostKey: 'local', kind: 'shell' as const }
     const document: JSONContent = {
       type: 'doc',
       content: [
@@ -94,18 +129,21 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
             { type: 'text', text: 'ask ' },
             { type: 'nativeChatAgentReference', attrs: chat },
             { type: 'text', text: ' and ' },
-            { type: 'nativeChatAgentReference', attrs: terminal }
+            { type: 'nativeChatAgentReference', attrs: terminal },
+            { type: 'text', text: ' and ' },
+            { type: 'nativeChatAgentReference', attrs: shell }
           ]
         }
       ]
     }
-    const text = `ask ${agentReferenceToken(chat)} and ${agentReferenceToken(terminal)}`
+    const text = `ask ${agentReferenceToken(chat)} and ${agentReferenceToken(terminal)} and ${agentReferenceToken(shell)}`
     expect(serializeNativeChatAgentReferences(text, document)).toBe(
       [
-        'ask @Release notes and @Runner',
+        'ask @Release notes and @Runner and @Build',
         '',
-        '[Orca chat "Release notes": session chat_aaaaaaaa — send it a message with orca chat send --session chat_aaaaaaaa --text <message>, and read its replies with orca chat read --session chat_aaaaaaaa]',
-        '[Orca terminal "Runner": term_one — send it input with orca terminal send --terminal term_one --text <text> --enter, and read its output with orca terminal read --terminal term_one]'
+        '[Orca chat "Release notes": orca_session_id:chat_aaaaaaaa — message it with orca orchestration send --to orca_session_id:chat_aaaaaaaa --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Runner": term_one — message it with orca orchestration send --to term_one --subject "<topic>" --body "<message>"]',
+        '[Orca terminal "Build": term_two — send it input with orca terminal send --terminal term_two --text <text> --enter, and read its output with orca terminal read --terminal term_two]'
       ].join('\n')
     )
   })
@@ -117,7 +155,7 @@ describe('serializeNativeChatAgentReferences for @ mentions', () => {
       content: [{ type: 'paragraph', content: [{ type: 'nativeChatAgentReference', attrs: crew }] }]
     }
     expect(serializeNativeChatAgentReferences(agentReferenceToken(crew), document)).toBe(
-      '@Worker\n\n[Orca agent "Worker": term_one — message it with orca orchestration send --to term_one]'
+      '@Worker\n\n[Orca agent "Worker": term_one — message it with orca orchestration send --to term_one --subject "<topic>" --body "<message>"]'
     )
   })
 })

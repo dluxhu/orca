@@ -1,12 +1,12 @@
 import { useEffect, useState, type RefObject } from 'react'
-import type { NativeChatFollowUpBehavior } from '../../../../../../shared/native-chat/input/native-chat-follow-up-behavior'
-import { createNativeChatSteerChordPreviewHook } from '../../../../../../shared/native-chat/input/use-native-chat-steer-chord-preview'
+import type { NativeChatFollowUpBehavior } from '../../../../../../shared/native-chat/input/composer/native-chat-follow-up-behavior'
+import { createNativeChatSteerChordPreviewHook } from '../../../../../../shared/native-chat/input/composer/use-native-chat-steer-chord-preview'
 
 import type { NativeChatComposerSendIntent } from '../submit/native-chat-composer-send-intent'
 import { isMacPlatform } from '../../pane/routing/native-chat-shortcut'
 import { useAppStore } from '@/store'
-import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/native-chat-composer-autocomplete'
-import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/native-chat-appearance-settings'
+import type { ComposerAutocomplete } from '../../../../../../shared/native-chat/input/composer/native-chat-composer-autocomplete'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 
 const useSteerChordPreview = createNativeChatSteerChordPreviewHook({ useEffect, useState })
 
