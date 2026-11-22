@@ -131,8 +131,8 @@ async function refreshExistingManagedScripts(options: InstallOptions): Promise<v
   }
 }
 
-// Fork patch: a profile installs no managed hooks, because the hook command forms keep
-// `${HOME-}/.orca` (docs/fork/profiles-design.md, section 12).
+// Fork patch: a profile installs no managed hooks, because the hook commands use the `.orca`
+// folder in HOME, not ORCA_HOME_DIR (docs/fork/profiles-design.md, section 12).
 function appProfileSkips(agents: readonly AgentHookTarget[]): AgentHookInstallStatus[] | null {
   return isAppProfileRuntime()
     ? agents.map((agent) =>

@@ -140,7 +140,7 @@ async function runUntilSettled(): Promise<void> {
 }
 
 async function reconcileOnce(realHomeLaunch: boolean): Promise<void> {
-  // Fork patch: a profile installs no managed hooks, because the hook command forms keep `${HOME-}/.orca`.
+  // Fork patch: a profile installs no managed hooks: the hook commands use the `.orca` folder in HOME.
   if (isAppProfileRuntime()) {
     return
   }
