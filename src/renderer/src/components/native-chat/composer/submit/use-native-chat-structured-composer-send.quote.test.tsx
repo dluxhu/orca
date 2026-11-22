@@ -18,12 +18,12 @@ vi.mock('@/store/index', () => ({
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from '../../messages/rows/NativeChatMessageRow'
-import { readNativeChatQuotableSelection } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
 import { clearNativeChatComposerDraftsForTests } from '../../drafts/native-chat-draft-reset'
 import {
   formatNativeChatQuote,
-  quotedText
+  quotedText,
+  readNativeChatQuotableSelection
 } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import {
   nativeChatQuoteSource,
