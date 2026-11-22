@@ -56,6 +56,29 @@ describe('orca serve service', () => {
     expect(existsSync(serveSupervisorBrakePath(join(home, 'profile')))).toBe(false)
   })
 
+  it("gives an app profile's LaunchAgent the caller's HOME and agent folders", async () => {
+    // launchd starts a unit with the login HOME; without these the server writes the shared configs.
+    const profile = join(home, 'profile')
+    await mkdir(profile)
+    const d = deps('darwin')
+    d.env = { ...d.env, HOME: join(home, 'test-home'), CODEX_HOME: join(home, 'codex'), USER: 'u' }
+    const plain = String((await installServeService({ command: null, dryRun: true }, d)).content)
+    expect(plain).not.toContain('<key>HOME</key>')
+    await writeFile(join(profile, 'orca-app-profile.json'), '{"id":"work"}')
+    const unit = String((await installServeService({ command: null, dryRun: true }, d)).content)
+    expect(unit).toContain(`<key>HOME</key>\n    <string>${join(home, 'test-home')}</string>`)
+    expect(unit).toContain(`<key>CODEX_HOME</key>\n    <string>${join(home, 'codex')}</string>`)
+    expect(unit).not.toContain('<key>USER</key>')
+    // The profile's own folders, as the CLI set them for its target.
+    d.env = { ...d.env, ORCA_HOME_DIR: join(profile, 'orca-home') }
+    const withHomes = String(
+      (await installServeService({ command: null, dryRun: true }, d)).content
+    )
+    expect(withHomes).toContain(
+      `<key>ORCA_HOME_DIR</key>\n    <string>${join(profile, 'orca-home')}</string>`
+    )
+  })
+
   it('uninstalls by stopping the service and removing the unit', async () => {
     const d = deps('linux')
     const result = await installServeService({ command: null, dryRun: false }, d)

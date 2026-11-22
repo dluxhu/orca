@@ -14,12 +14,14 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ProcessResult, ProcessSpec } from '@orca/process-host/process-spec'
 
-const { runProcessMock, inspectMock } = vi.hoisted(() => ({
+const { runProcessMock, inspectMock, appProfileMock } = vi.hoisted(() => ({
   runProcessMock: vi.fn<(spec: ProcessSpec) => Promise<ProcessResult>>(),
-  inspectMock: vi.fn()
+  inspectMock: vi.fn(),
+  appProfileMock: vi.fn((): unknown => null)
 }))
 vi.mock('@orca/process-host', () => ({ runProcess: runProcessMock }))
 vi.mock('../daemon-mac-code-identity', () => ({ inspectMacProcessCodeIdentity: inspectMock }))
+vi.mock('../../../../app-profiles/app-profile', () => ({ getAppProfile: appProfileMock }))
 
 import { materializeMacDaemonBundle } from '../macos-daemon-bundle'
 
@@ -93,6 +95,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  appProfileMock.mockReturnValue(null)
   await rm(root, { recursive: true, force: true })
 })
 
@@ -164,4 +167,38 @@ it('copies the app behind a symbolic link rather than retaining a link to the up
   await rm(alias)
   await rm(source, { recursive: true })
   expect(await readFile(copy.execPath, 'utf8')).toBe('signed-node')
+})
+
+it("gives a profile app the default app's host, checked against the host's own signature", async () => {
+  // The profile is ad hoc: its designated requirement is its own cdhash. Its app.asar link
+  // points into the default app.
+  const asar = join(source, 'Contents', 'Resources', 'app.asar')
+  await mkdir(join(source, 'Contents', 'Resources'), { recursive: true })
+  await writeFile(asar, 'asar')
+  const profile = join(root, 'Profiles', 'Work.app')
+  await mkdir(join(profile, 'Contents', 'Resources'), { recursive: true })
+  await mkdir(join(profile, 'Contents', 'MacOS'), { recursive: true })
+  await symlink(asar, join(profile, 'Contents', 'Resources', 'app.asar'))
+  appProfileMock.mockReturnValue({ id: 'work' })
+  inspectMock.mockResolvedValue({
+    identity: 'profile',
+    executablePath: join(profile, 'Contents', 'MacOS', 'Orca')
+  })
+  const hostRequirement = `cdhash H"${cdhash}"`
+  const signed = runProcessMock.getMockImplementation()
+  runProcessMock.mockImplementation(async (spec) => {
+    const args = spec.args ?? []
+    if (args[0] === '--display') {
+      return args.at(-1) === helper
+        ? { ...ok, stderr: `# designated => ${hostRequirement}\n` }
+        : { ...ok, stderr: '# designated => cdhash H"0000"\n' }
+    }
+    if (args[0] === '--verify') {
+      return { ...ok, code: args.includes(`=${hostRequirement}`) ? 0 : 3 }
+    }
+    return signed!(spec)
+  })
+  const copy = await materializeMacDaemonBundle(copies, signal())
+  expect(await readFile(copy.execPath, 'utf8')).toBe('signed-node')
+  expect(copy.directory).toBe(join(copies, `terminal-host-${cdhash}`))
 })

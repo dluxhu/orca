@@ -48,7 +48,7 @@ describe('markQwenWorkspaceTrusted', () => {
     expect(parse(text)).toEqual({ permissions: { trustDirectories: ['/a', workspace] } })
   })
 
-  it('writes under QWEN_CONFIG_DIR, else under QWEN_CLI_HOME', () => {
+  it('writes under QWEN_CONFIG_DIR, else under QWEN_CLI_HOME, else in QWEN_HOME', () => {
     const configDir = join(home, 'custom-config')
     markQwenWorkspaceTrusted(workspace, { QWEN_CONFIG_DIR: configDir }, home)
     expect(readJsonc(join(configDir, 'settings.json'))).toEqual({
@@ -57,6 +57,12 @@ describe('markQwenWorkspaceTrusted', () => {
     const cliHome = join(home, 'cli-home')
     markQwenWorkspaceTrusted(workspace, { QWEN_CLI_HOME: cliHome }, home)
     expect(readJsonc(join(cliHome, '.qwen', 'settings.json'))).toEqual({
+      permissions: { trustDirectories: [workspace] }
+    })
+    // Newer Qwen reads QWEN_HOME; an app profile sets it.
+    const qwenHome = join(home, 'qwen-home')
+    markQwenWorkspaceTrusted(workspace, { QWEN_HOME: qwenHome }, home)
+    expect(readJsonc(join(qwenHome, 'settings.json'))).toEqual({
       permissions: { trustDirectories: [workspace] }
     })
     expect(existsSync(join(home, '.qwen', 'settings.json'))).toBe(false)

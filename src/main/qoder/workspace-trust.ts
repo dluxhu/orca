@@ -1,5 +1,6 @@
 import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
+import { agentHomeDirIn } from '../../shared/app-profiles/app-profile-homes'
 import {
   isPlainObject,
   readHooksJson
@@ -31,7 +32,8 @@ export function withTrustDirectory(
 export function markQoderWorkspaceTrusted(
   workspacePath: string,
   home: string,
-  configDirName: '.qoder' | '.qoder-cn' = '.qoder'
+  configDirName: '.qoder' | '.qoder-cn' = '.qoder',
+  launchQoderConfigDir?: string
 ): void {
   let canonicalPath = workspacePath
   try {
@@ -39,7 +41,12 @@ export function markQoderWorkspaceTrusted(
   } catch {
     // Missing paths retain their supplied spelling.
   }
-  const configPath = join(home, configDirName, 'settings.json')
+  // Qoder reads QODER_CONFIG_DIR: the launch's, else an app profile's, else the one in `home`.
+  const configDir =
+    configDirName === '.qoder'
+      ? launchQoderConfigDir?.trim() || agentHomeDirIn(home, 'QODER_CONFIG_DIR', '.qoder')
+      : join(home, configDirName)
+  const configPath = join(configDir, 'settings.json')
   const config = readHooksJson(configPath)
   if (!config) {
     return

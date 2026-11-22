@@ -1,4 +1,8 @@
 import { homedir } from 'node:os'
+import {
+  agentHomeDirIn,
+  type AppProfileAgentHomeVariable
+} from '../../../shared/app-profiles/app-profile-homes'
 import { basename, join, type posix } from 'node:path'
 import type {
   SkillDiscoverySource,
@@ -126,6 +130,9 @@ export function buildSkillDiscoverySources(
 ): SkillScanRoot[] {
   const pathApi = args.pathApi ?? { basename, join }
   const home = args.homeDir ?? homedir()
+  // On this host, an app profile's agent folders replace the ones in the user's home.
+  const agentHome = (variable: AppProfileAgentHomeVariable, folder: string): string =>
+    args.pathApi ? pathApi.join(home, folder) : agentHomeDirIn(home, variable, folder)
   const cwd = args.cwd ?? process.cwd()
   const providerRootOverrides =
     args.providerRootOverrides ?? (args.pathApi ? {} : resolveEnvironmentSkillProviderRoots())
@@ -138,7 +145,7 @@ export function buildSkillDiscoverySources(
     source(
       'home-codex',
       'Codex home',
-      pathApi.join(home, '.codex', 'skills'),
+      pathApi.join(agentHome('CODEX_HOME', '.codex'), 'skills'),
       'home',
       ['codex'],
       'codex'
@@ -154,7 +161,7 @@ export function buildSkillDiscoverySources(
     source(
       'codex-plugin-cache',
       'Codex plugin cache',
-      pathApi.join(home, '.codex', 'plugins', 'cache'),
+      pathApi.join(agentHome('CODEX_HOME', '.codex'), 'plugins', 'cache'),
       'plugin',
       ['codex', 'agent-skills'],
       'codex'
@@ -191,7 +198,7 @@ export function buildSkillDiscoverySources(
     source(
       'home-qoder',
       'Qoder home',
-      pathApi.join(home, '.qoder', 'skills'),
+      pathApi.join(agentHome('QODER_CONFIG_DIR', '.qoder'), 'skills'),
       'home',
       ['agent-skills'],
       'qoder'
@@ -217,7 +224,7 @@ export function buildSkillDiscoverySources(
     source(
       'home-copilot',
       'Copilot home',
-      pathApi.join(home, '.copilot', 'skills'),
+      pathApi.join(agentHome('COPILOT_HOME', '.copilot'), 'skills'),
       'home',
       ['agent-skills'],
       'copilot'

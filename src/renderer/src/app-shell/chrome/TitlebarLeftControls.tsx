@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, MoreHorizontal } from 'lucide-react'
 import { SidebarToggleIcon } from '@/components/icons/SidebarToggleIcon'
 import logo from '../../../../../resources/logo.svg'
@@ -46,6 +46,15 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
       registeredToggleRef.current = null
     }
   }, [])
+  // A profile app shows its own name; main knows it at runtime.
+  const [packagedName, setPackagedName] = useState<string | null>(null)
+  useEffect(() => {
+    void window.api.app
+      .getIdentity()
+      .then((identity) => setPackagedName(identity.isDev ? null : identity.name))
+      .catch(() => {})
+  }, [])
+  const appName = packagedName ?? withForkName(t('auto.App.5096cbbc86', 'Orca'))
 
   return (
     // Measure the whole row for tab-strip spacing. w-max prevents the collapsed w-0 wrapper shrinking Windows text to one glyph.
@@ -83,13 +92,8 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
         {layout.showSidebar && !hasCustomTitleBar && layout.showTitlebarAppName && (
           <ContextMenu>
             <ContextMenuTrigger asChild>
-              <div
-                className="titlebar-app-name"
-                aria-label={withForkName(t('auto.App.5096cbbc86', 'Orca'))}
-              >
-                <span className="titlebar-app-name-main">
-                  {withForkName(t('auto.App.5096cbbc86', 'Orca'))}
-                </span>
+              <div className="titlebar-app-name" aria-label={appName}>
+                <span className="titlebar-app-name-main">{appName}</span>
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>

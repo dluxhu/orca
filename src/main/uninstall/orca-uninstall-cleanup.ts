@@ -1,3 +1,5 @@
+import { isAppProfileRuntime } from '../app-profiles/app-profile'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { access, readdir, rm, rmdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentHookInstallStatus } from '../../shared/agent-hook-listener/configuration/agent-hook-types'
@@ -77,7 +79,7 @@ export async function buildOrcaUninstallPlan(host: OrcaUninstallHost): Promise<O
     detail: null
   }))
   const cli = await host.getCliStatus().catch(() => null)
-  const scripts = join(host.homeDir, '.orca', 'agent-hooks')
+  const scripts = join(orcaHomeDir(host.homeDir), 'agent-hooks')
   const scriptsMissing = await access(scripts).catch(() => true)
   return {
     installKind: host.identity.installKind,
@@ -124,6 +126,8 @@ function registryOutcome(
   return { state: 'removed', detail: null }
 }
 
+const APP_PROFILE_SHARED = 'The default Orca app still uses them.'
+
 async function runAgentHooks(
   plan: OrcaUninstallPlan,
   host: OrcaUninstallHost,
@@ -140,6 +144,11 @@ async function runAgentHooks(
   const otherBuild = plan.otherOrcaBuildName
   if (otherBuild) {
     return update(() => ({ state: 'kept-shared', detail: `${otherBuild} still uses these hooks.` }))
+  }
+  // Fork patch: a profile installs no managed hooks; the hooks in the real home belong to the
+  // default app (profiles-design.md, section 12).
+  if (isAppProfileRuntime()) {
+    return update(() => ({ state: 'kept-shared', detail: APP_PROFILE_SHARED }))
   }
   try {
     await host.disableAgentStatusHooks()
@@ -189,6 +198,10 @@ async function runCliCommand(
   if (!entry || entry.state === 'removed') {
     return entry
   }
+  // The `orca` command links to the default app; a profile keeps it.
+  if (isAppProfileRuntime()) {
+    return { ...entry, state: 'kept-shared', detail: APP_PROFILE_SHARED }
+  }
   try {
     const status = await host.removeCli()
     return isOrcaOwnedCli(status)
@@ -210,6 +223,9 @@ async function runHookScripts(
   if (plan.otherOrcaBuildName) {
     return { ...entry, state: 'kept-shared', detail: `${plan.otherOrcaBuildName} still uses them.` }
   }
+  if (isAppProfileRuntime()) {
+    return { ...entry, state: 'kept-shared', detail: APP_PROFILE_SHARED }
+  }
   // Hook entries left in an agent's config still call these scripts on every event.
   const stillHooked = plan.agents.filter(
     (agent) => agent.state !== 'removed' && !PLUGIN_AGENTS.has(agent.agent)
@@ -219,9 +235,9 @@ async function runHookScripts(
     return { ...entry, state: 'kept-shared', detail: `Still used by ${names}.` }
   }
   try {
-    const dir = join(host.homeDir, '.orca', 'agent-hooks')
+    const dir = join(orcaHomeDir(host.homeDir), 'agent-hooks')
     await rm(dir, { recursive: true, force: true })
-    const orcaDir = join(host.homeDir, '.orca')
+    const orcaDir = orcaHomeDir(host.homeDir)
     if ((await readdir(orcaDir).catch(() => ['?'])).length === 0) {
       await rmdir(orcaDir)
     }
