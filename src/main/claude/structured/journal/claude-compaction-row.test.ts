@@ -46,6 +46,20 @@ describe('a Claude compact boundary', () => {
     ])
   })
 
+  // A /compact typed in the terminal reaches the chat with no command open.
+  it('writes the plain divider for a manual boundary with no /compact open', () => {
+    const { frame, compactions } = harness()
+    frame({
+      type: 'system',
+      subtype: 'compact_boundary',
+      compact_metadata: { trigger: 'manual', pre_tokens: 40_000 },
+      uuid: 'manual-boundary'
+    })
+    expect(compactions()).toEqual([
+      { kind: 'status', text: 'Context compacted', presentation: 'compaction' }
+    ])
+  })
+
   it('writes no divider for a subagent boundary', () => {
     const { frame, compactions } = harness()
     frame({
