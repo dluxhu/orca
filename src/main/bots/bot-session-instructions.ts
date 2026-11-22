@@ -7,7 +7,7 @@ import type { BotTurnContext } from './bot-turn-context'
 
 /** Agents that rebuild their system prompt from the instructions every start passes them (Pi's and
  *  Auggie's --append-system-prompt, Antigravity's reopen `_meta`, Copilot's instruction folders,
- *  Goose's `.goosehints`, Kilo's inline config, Gemini's GEMINI.md, Droid's
+ *  Goose's `.goosehints`, Kilo's inline config, Gemini's GEMINI.md, Qwen's QWEN.md, Droid's
  *  --append-system-prompt-file); other agents keep a resumed thread's first ones. Claude records its
  *  prompt per conversation and reuses it on resume until compaction. */
 const READS_INSTRUCTIONS_EACH_START: ReadonlySet<string> = new Set([
@@ -18,7 +18,8 @@ const READS_INSTRUCTIONS_EACH_START: ReadonlySet<string> = new Set([
   'goose',
   'kilo',
   'gemini',
-  'droid'
+  'droid',
+  'qwen-code'
 ])
 
 function startsFresh(record: BotSessionLaunch): boolean {
@@ -71,6 +72,7 @@ export async function botSessionInstructions(
       neverLinked = bot.skillProjects === undefined
       context.launched(record.sessionId, bot.id, launchDirectory, files, startsFresh(record), {
         block: botRulesBlock(agent),
+        name: bot.name,
         delivered: rulesDelivered(record),
         recorded: record.instructionsKey ?? null,
         rebuilt: READS_INSTRUCTIONS_EACH_START.has(record.provider)

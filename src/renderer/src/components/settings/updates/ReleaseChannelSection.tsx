@@ -10,52 +10,53 @@ import {
   SettingsSubsectionHeader
 } from '../form-controls/SettingsFormControls'
 import { Badge } from '../../ui/badge'
-import { useTranslate } from '@/i18n/use-translate'
-import { updaterMessageText } from '@/app-shell/updates/updater-message-copy'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
+import {
+  getReleaseChannelLabel,
+  updaterMessageText
+} from '@/app-shell/updates/updater-message-copy'
 import { errorMessage } from '../../../../../shared/errors/error-message'
 import type { UpdaterCodedMessage } from '../../../../../shared/updater/updater-failure-copy'
 import { getShortcutPlatform } from '@/lib/keyboard/shortcut-platform'
 import {
   DEV_CHANNEL_PLATFORM_LABEL,
   RELEASE_CHANNELS,
-  RELEASE_CHANNEL_LABELS,
   getVersionChannel,
   hasDedicatedReleaseRepo,
   isChannelSupportedOnPlatform,
   requiresManualDevChannelInstall,
-  type DedicatedRepoChannel,
   type ReleaseBuild,
   type ReleaseChannel
 } from '../../../../../shared/updater/release-channel'
 
 // Fork patch: Stable and Daily describe the fork's Stable and Nightly apps.
-const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, string> = {
-  stable: 'Orca @dLux releases: the fork patches on the newest upstream stable release.',
-  rc: 'Release candidates cut ahead of each stable.',
-  hourly: 'macOS and Windows. Unvetted builds from main, built every hour. No tests.',
-  daily:
-    'macOS only. Orca @dLux Nightly: the fork patches on an upstream daily build. A separate app with its own profile.',
-  adhoc: 'macOS and Windows. One-off builds cut from a branch to try a feature before it lands.'
+const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, (t: Translate) => string> = {
+  stable: (t) =>
+    t(
+      'auto.components.settings.ReleaseChannelSection.stableDescription',
+      'Orca @dLux releases: the fork patches on the newest upstream stable release.'
+    ),
+  rc: (t) =>
+    t(
+      'auto.components.settings.ReleaseChannelSection.rcDescription',
+      'Release candidates published before a stable release.'
+    ),
+  hourly: (t) =>
+    t(
+      'auto.components.settings.ReleaseChannelSection.hourlyDescription',
+      'Built every hour from main.'
+    ),
+  daily: (t) =>
+    t(
+      'auto.components.settings.ReleaseChannelSection.dailyDescription',
+      'macOS only. Orca @dLux Nightly: the fork patches on an upstream daily build. A separate app with its own profile.'
+    ),
+  adhoc: (t) =>
+    t(
+      'auto.components.settings.ReleaseChannelSection.adhocDescription',
+      'One-off builds from a branch for trying changes before they merge.'
+    )
 }
-
-const DEDICATED_CHANNEL_WARNINGS: Record<DedicatedRepoChannel, { key: string; fallback: string }> =
-  {
-    hourly: {
-      key: 'auto.components.settings.ReleaseChannelSection.hourlyWarning',
-      fallback:
-        'Hourly builds ship straight from main with no test gate, and the Windows ones are unsigned. Keep a stable build handy.'
-    },
-    daily: {
-      key: 'auto.components.settings.ReleaseChannelSection.dailyWarning',
-      fallback:
-        'Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.'
-    },
-    adhoc: {
-      key: 'auto.components.settings.ReleaseChannelSection.adhocWarning',
-      fallback:
-        'Adhoc builds come from a branch that has not landed, and the Windows ones are unsigned. Whoever cut one may abandon it — keep a stable build handy.'
-    }
-  }
 
 export function ReleaseChannelSection(): React.JSX.Element {
   const t = useTranslate()
@@ -170,7 +171,11 @@ export function ReleaseChannelSection(): React.JSX.Element {
     void window.api.shell.openUrl(build.installerUrl ?? build.releaseUrl)
   }
 
-  const title = t('auto.components.settings.ReleaseChannelSection.title', 'Release channel')
+  const title = t('auto.components.settings.ReleaseChannelSection.title', 'Update channel')
+  const platformLabel = t(
+    'auto.components.settings.ReleaseChannelSection.devChannelPlatforms',
+    DEV_CHANNEL_PLATFORM_LABEL
+  )
 
   return (
     <div data-settings-row="" className="space-y-4 py-3">
@@ -194,45 +199,59 @@ export function ReleaseChannelSection(): React.JSX.Element {
           onChange={(channel) =>
             setReleaseChannelOverride(channel === runningChannel ? null : channel)
           }
-          ariaLabel={t(
-            'auto.components.settings.ReleaseChannelSection.channelAriaLabel',
-            'Update channel'
-          )}
+          ariaLabel={title}
+          wrap
           // Show unsupported channels disabled with reasons so users can discover why they are unavailable.
           options={RELEASE_CHANNELS.map((channel) => {
             const supported = isChannelSupportedOnPlatform(channel, platform)
+            const label = getReleaseChannelLabel(channel, t)
             return {
               value: channel,
-              label: RELEASE_CHANNEL_LABELS[channel],
+              label,
               disabled: !supported,
               ariaLabel: supported
                 ? undefined
                 : t(
                     'auto.components.settings.ReleaseChannelSection.devChannelUnsupportedAria',
                     '{{value0}} ({{value1}} only)',
-                    { value0: RELEASE_CHANNEL_LABELS[channel], value1: DEV_CHANNEL_PLATFORM_LABEL }
+                    { value0: label, value1: platformLabel }
                   ),
               tooltip: supported
                 ? undefined
                 : t(
                     'auto.components.settings.ReleaseChannelSection.devChannelUnsupported',
-                    '{{value0}} builds are produced only for {{value1}}. Linux stays on Stable or RC.',
-                    { value0: RELEASE_CHANNEL_LABELS[channel], value1: DEV_CHANNEL_PLATFORM_LABEL }
+                    '{{value0}} builds are produced only for {{value1}}. Linux stays on {{stable}} or {{rc}}.',
+                    {
+                      value0: label,
+                      value1: platformLabel,
+                      stable: getReleaseChannelLabel('stable', t),
+                      rc: getReleaseChannelLabel('rc', t)
+                    }
                   )
             }
           })}
         />
-        <p className="text-xs text-muted-foreground">{CHANNEL_DESCRIPTIONS[activeChannel]}</p>
+        <p className="text-xs text-muted-foreground">{CHANNEL_DESCRIPTIONS[activeChannel](t)}</p>
       </div>
 
       {hasDedicatedReleaseRepo(activeChannel) ? (
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
           <p className="text-xs text-muted-foreground">
-            {t(
-              DEDICATED_CHANNEL_WARNINGS[activeChannel].key,
-              DEDICATED_CHANNEL_WARNINGS[activeChannel].fallback
-            )}
+            {activeChannel === 'adhoc'
+              ? t(
+                  'auto.components.settings.ReleaseChannelSection.adhocWarning',
+                  'Windows builds are unsigned. The author may stop maintaining a build, so keep a stable build handy.'
+                )
+              : activeChannel === 'daily'
+                ? t(
+                    'auto.components.settings.ReleaseChannelSection.dailyWarning',
+                    'Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.'
+                  )
+                : t(
+                    'auto.components.settings.ReleaseChannelSection.scheduledWarning',
+                    'These builds ship with no test gate. Windows builds are unsigned. Keep a stable build handy.'
+                  )}
           </p>
         </div>
       ) : null}
@@ -319,7 +338,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
             {t(
               'auto.components.settings.ReleaseChannelSection.manualInstallHint',
               '{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel.',
-              { value0: RELEASE_CHANNEL_LABELS[activeChannel] }
+              { value0: getReleaseChannelLabel(activeChannel, t) }
             )}
           </p>
         ) : isRunningBuild ? (
