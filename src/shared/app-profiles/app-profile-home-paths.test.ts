@@ -179,6 +179,11 @@ const ALLOWED: Allowed[] = [
     reason: "a managed account's own home"
   },
   {
+    file: 'src/main/mimo/mimo-acp-launch-spec.ts',
+    line: "'.mimocode', 'bin'",
+    reason: 'the mimo binary folder, not its config'
+  },
+  {
     file: 'src/main/startup/configure-process.ts',
     line: '.grok/bin',
     reason: 'the grok binary folder'
