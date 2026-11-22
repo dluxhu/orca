@@ -853,6 +853,9 @@ pane), OpenCode (`OPENCODE_CONFIG_DIR` only adds a folder; config and data follo
 `cli-config.json`), Antigravity, Devin, Factory, Rovo Dev, Amp, JCode, Zcode and DSH. For them, the
 `isAppProfileRuntime()` checks stay the only guard: a profile installs, refreshes and removes no
 hook, plugin or config of theirs.
+The one exception is workspace trust: a profile that launches Cursor or Antigravity adds the
+workspace to their trusted folders in the real home, as the default app does. The write only adds
+a trusted folder, and that agent reads the real home in a profile too.
 
 **Safety model.** The per-profile folders are the first guard. The `isAppProfileRuntime()` checks
 on each writer are the second one: a profile still installs no managed agent hooks. The hook

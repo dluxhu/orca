@@ -106,7 +106,8 @@ const markedUserData = new Map<string, boolean>()
 
 /**
  * True in a profile app, and in any process (orcad too) that serves a profile's userData.
- * Such a process must not change the shared agent configs or ~/.orca before isolation lands.
+ * Such a process installs no managed hooks (the hook command forms keep `${HOME-}/.orca`) and
+ * changes no config of the agents that stay on the real home.
  */
 export function isAppProfileRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
   const userDataPath = env.ORCA_USER_DATA_PATH

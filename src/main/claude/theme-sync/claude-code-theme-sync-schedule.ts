@@ -71,7 +71,7 @@ export function startClaudeCodeThemeSync(host: {
   onAppFocused: (listener: () => void) => unknown
   userDataPath: string
 }): void {
-  // Fork patch: the Claude config is shared until profile isolation; a profile writes nothing there.
+  // Fork patch: a profile does not sync the Claude Code theme (profiles-design.md, section 12).
   if (isAppProfileRuntime()) {
     return
   }

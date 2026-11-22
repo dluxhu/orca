@@ -90,6 +90,15 @@ describe('vitest real-agent-home write guard', () => {
     )
   })
 
+  it.each([
+    ['Library', 'Application Support', 'Orca Profiles'],
+    ['Applications', 'Orca Profiles']
+  ])('refuses a removal under the real app profiles folder %s/%s', (...segments) => {
+    expect(() => rmSync(missingRealFolder(join(...segments)), { force: true })).toThrow(
+      /real-agent-home guard/
+    )
+  })
+
   it("clears an app profile's inherited folders so tests use their own", () => {
     for (const key of APP_PROFILE_HOME_ENV_KEYS) {
       vi.stubEnv(key, `/profile/${key}`)

@@ -155,7 +155,7 @@ describe('app profile homes', () => {
     applyAppProfileHomes(work, process.env)
     const workspace = join(home, 'repo')
     mkdirSync(workspace)
-    for (const preset of ['copilot', 'qoder', 'kimi'] as const) {
+    for (const preset of ['copilot', 'qoder', 'kimi', 'qwen-code'] as const) {
       await applyWorkspaceTrustOnThisHost(preset, workspace, () => ({
         homes: [homedir()],
         agentHome: homedir(),
@@ -169,6 +169,7 @@ describe('app profile homes', () => {
     expect(readdirSync(join(agents, 'copilot'))).toEqual(['config.json'])
     expect(readdirSync(join(agents, 'qoder'))).toEqual(['settings.json'])
     expect(readdirSync(join(agents, 'kimi-code'))).toEqual(['workspace-trust'])
+    expect(readdirSync(join(agents, 'qwen'))).toEqual(['settings.json'])
     expect(readdirSync(home).filter((name) => name.startsWith('.'))).toEqual([])
   })
 

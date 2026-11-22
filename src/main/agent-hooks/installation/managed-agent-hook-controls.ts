@@ -131,8 +131,8 @@ async function refreshExistingManagedScripts(options: InstallOptions): Promise<v
   }
 }
 
-// Fork patch: the agent configs and ~/.orca are shared until profile isolation lands
-// (docs/fork/profiles-design.md, section 3). A profile app changes no managed hook there.
+// Fork patch: a profile installs no managed hooks, because the hook command forms keep
+// `${HOME-}/.orca` (docs/fork/profiles-design.md, section 12).
 function appProfileSkips(agents: readonly AgentHookTarget[]): AgentHookInstallStatus[] | null {
   return isAppProfileRuntime()
     ? agents.map((agent) =>

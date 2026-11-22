@@ -7,7 +7,7 @@ import { openCode2HookService, openCodeHookService } from './hook-service'
 export function refreshInstalledOpenCodeStatusPlugins(
   settings: ManagedHookDetectionSettings
 ): void {
-  // Fork patch: the OpenCode plugin folders are shared until profile isolation.
+  // Fork patch: OpenCode keeps its folders in the real home, also in a profile; a profile changes none.
   if (isAppProfileRuntime()) {
     return
   }

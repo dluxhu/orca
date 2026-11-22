@@ -68,7 +68,7 @@ export class ClaudeAgentViewService {
   ) {}
 
   reconcile(settings: NavigationSettings): Promise<void> {
-    // Fork patch: ~/.claude is shared until profile isolation; a profile writes nothing there.
+    // Fork patch: a profile installs no managed hooks, the agent view too (profiles-design.md, section 12).
     if (isAppProfileRuntime()) {
       return Promise.resolve()
     }

@@ -52,7 +52,7 @@ afterAll(() => {
 })
 
 describe('managed agent hooks in an app profile', () => {
-  it('installs, refreshes and removes nothing: the agent configs are shared until isolation', async () => {
+  it('installs, refreshes and removes nothing: the hook command forms keep ${HOME-}/.orca', async () => {
     const installed = await installManagedAgentHooks(null, { agents: ['claude', 'grok'] })
     expect(installed.map((status) => [status.agent, status.state])).toEqual([
       ['claude', 'skipped'],

@@ -76,6 +76,9 @@ function protectedRoots(): string[] {
   const folders = realHomes().flatMap((home) => [
     ...AGENT_HOME_ENTRIES.map((entry) => join(home, entry)),
     join(home, 'Library', 'Application Support', 'orca'),
+    // Fork patch: the app profiles' data and apps.
+    join(home, 'Library', 'Application Support', 'Orca Profiles'),
+    join(home, 'Applications', 'Orca Profiles'),
     join(home, '.config', 'orca'),
     join(home, 'AppData', 'Roaming', 'orca')
   ])

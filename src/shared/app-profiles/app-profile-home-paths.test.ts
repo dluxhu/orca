@@ -14,12 +14,14 @@ const RAW_PATTERNS = [
   new RegExp(`homedir\\(\\)[^;]{0,60}?['"\`/]\\.(${AGENT_DIRS})(?![\\w.-])`, 'g'),
   // `${HOME}/.codex`, `${HOME-}/.orca`, "$HOME/.claude"
   new RegExp(`\\$\\{?HOME-?\\}?"?\\/\\.(${AGENT_DIRS})(?![\\w-])`, 'g'),
-  // join(home, '.codex'), resolve(input.homeDir, '.claude'), join(process.env.HOME, '.grok'):
+  // join(home, '.codex'), resolve(input.homeDir, '.claude'), join(env.X || home, '.qwen'):
   // a home held in a name.
   new RegExp(
-    `(?:join|resolve)\\(\\s*[\\w.$]*[Hh](?:ome|OME)[\\w.$]*\\s*,\\s*['"\`]\\.(${AGENT_DIRS})(?![\\w.-])`,
+    `(?:join|resolve)\\(\\s*[^,()]*?[Hh](?:ome|OME)[\\w.$]*\\s*,\\s*['"\`]\\.(${AGENT_DIRS})(?![\\w.-])`,
     'g'
   ),
+  // `${home}/.grok`, `${input.homeDir}/.orca`
+  new RegExp(`\\$\\{[\\w.]*[Hh](?:ome|OME)[\\w.]*\\}\\/\\.(${AGENT_DIRS})(?![\\w-])`, 'g'),
   // app.getPath('home') + '/.claude'
   new RegExp(`getPath\\(\\s*['"]home['"]\\s*\\)[^;]{0,60}?\\.(${AGENT_DIRS})(?![\\w.-])`, 'g')
 ]
@@ -87,6 +89,27 @@ const ALLOWED: Allowed[] = [
     reason: WSL
   },
   { file: 'src/wsl-guest/plugins/overlays/claude-agent-view-plugin.ts', reason: WSL },
+  { file: 'src/main/grok/grok-hook-remote-install.ts', reason: WSL },
+  { file: 'src/main/copilot/copilot-remote-hook-install.ts', reason: WSL },
+  { file: 'src/main/codex/hooks/installation/codex-hook-remote-install.ts', reason: WSL },
+  { file: 'src/main/droid/hook-service.ts', line: 'remoteScriptPath', reason: WSL },
+  { file: 'src/main/command-code/hook-service.ts', line: 'remoteScriptPath', reason: WSL },
+  { file: 'src/main/antigravity/hook-service.ts', line: 'const remote', reason: WSL },
+  {
+    file: 'src/main/codex-accounts/managed-homes/codex-config-mirror.ts',
+    line: 'wslHome',
+    reason: WSL
+  },
+  {
+    file: 'src/main/codex/trust/hooks/codex-hook-trust-cleanup.ts',
+    line: 'linuxRuntimeHome',
+    reason: WSL
+  },
+  {
+    file: 'src/main/qwen-code/workspace-trust.ts',
+    line: 'env.QWEN_CLI_HOME',
+    reason: "Qwen 1.0's own folder variable from the launch env"
+  },
   {
     file: 'src/main/ai-vault/discovery/session-scanner-agent-sources.ts',
     line: 'wslHomeDirs',

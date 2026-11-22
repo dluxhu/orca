@@ -140,7 +140,7 @@ async function runUntilSettled(): Promise<void> {
 }
 
 async function reconcileOnce(realHomeLaunch: boolean): Promise<void> {
-  // Fork patch: ~/.codex and ~/.orca are shared until profile isolation; a profile writes nothing there.
+  // Fork patch: a profile installs no managed hooks, because the hook command forms keep `${HOME-}/.orca`.
   if (isAppProfileRuntime()) {
     return
   }
