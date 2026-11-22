@@ -25,7 +25,7 @@ const REPO: Repo = {
 }
 
 async function savedUpdates(updates: Record<string, unknown>): Promise<unknown> {
-  const updateRepo = vi.fn(() => REPO)
+  const updateRepo = vi.fn((_target: unknown, _updates: unknown) => REPO)
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler reads only these two store methods here.
   const store = { getRepo: () => REPO, updateRepo } as unknown as Store
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the notification is mocked.
