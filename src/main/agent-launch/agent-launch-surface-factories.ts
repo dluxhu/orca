@@ -13,6 +13,7 @@ import type {
 import { formatAgentTypeLabel } from '../../shared/agent-status/presentation/agent-type-label'
 import { AgentLaunchSurfaceUnavailableError } from './agent-launch-surface-refusal'
 import type { StructuredAgentId } from '../../shared/agent-session/lifecycle/provider-handles/agent-session-provider-handle'
+import type { AgentSessionAnyRefusalDetails } from '../../shared/agent-session/failures/agent-session-refusal-details'
 import type { StructuredAgentSessionFirstMessage } from '../../shared/agent-session/lifecycle/operations/structured-agent-session-create'
 import type { TuiAgent } from '../../shared/agent-launch/catalog/tui-agent'
 import type { SetupTrustMismatch } from '../../shared/worktree/create-types'
@@ -94,7 +95,9 @@ export class AgentLaunchStructuredSessionRefusedError extends Error {
     code: string,
     message: string,
     /** Refused before attach: the create started nothing. */
-    readonly beforeCommit = false
+    readonly beforeCommit = false,
+    /** The refusal's reason and facts, such as the chat that holds the conversation. */
+    readonly details?: AgentSessionAnyRefusalDetails
   ) {
     super(message)
     this.name = 'AgentLaunchStructuredSessionRefusedError'
