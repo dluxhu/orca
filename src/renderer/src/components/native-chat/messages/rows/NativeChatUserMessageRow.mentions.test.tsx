@@ -276,3 +276,20 @@ it("says so for a mention from a chat on another host, which names that host's e
   expect(openOrchestrationDispatch).not.toHaveBeenCalled()
   expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
 })
+
+it('opens the terminal of a plain shell mention', async () => {
+  bubble(
+    send(['ask ', { label: 'Shell', kind: 'shell', address: 'term_b2' }, ' now']),
+    undefined,
+    LOCAL_CHAT
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Shell' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'term_b2',
+    'Shell',
+    { kind: 'local' },
+    expect.anything()
+  )
+})
