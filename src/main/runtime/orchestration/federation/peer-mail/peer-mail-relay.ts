@@ -280,7 +280,9 @@ export class PeerMailRelay {
         notify: (handle, type) => this.runtime.notifyMessageArrived(handle, type)
       })
     }
-    const stored = this.importReply(db, environmentId, item)
+    // An unknown identity drops the sender's link, not the reply.
+    const own = await this.runtime.readStoreInstallationId().catch(() => undefined)
+    const stored = this.importReply(db, environmentId, item, own)
     return stored ? { to: stored.to_handle, type: stored.type } : undefined
   }
 
@@ -288,7 +290,8 @@ export class PeerMailRelay {
   private importReply(
     db: OrchestrationDb,
     environmentId: string,
-    item: z.infer<typeof PulledPeerMail>['items'][number]
+    item: z.infer<typeof PulledPeerMail>['items'][number],
+    ownInstallationId: string | undefined
   ): MessageRow | undefined {
     const conversation = db.getPeerMailConversation(item.conversationId)
     const payload = PeerMailRelayPayload.safeParse(safeJson(item.payload))
@@ -308,7 +311,8 @@ export class PeerMailRelay {
     const recipient = resolveBareOrchestrationRecipient({ runtime: this.runtime, db, handle })
     const { from, body, ...carried } = presentImportedPeerItem({
       kind: 'peer_mail',
-      ...payload.data
+      ...payload.data,
+      ownInstallationId
     })
     const stored = db.insertPeerMailMessage({
       conversationId: conversation.conversation_id,

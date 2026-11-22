@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { WorktreeHostContextBadge } from '@/components/sidebar/workspace-card/host/WorktreeHostContextBadge'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAgentMessageSender } from '@/lib/agent-session/open/open-agent-message-sender'
+import { openOnOrcaHost } from '@/lib/agent-session/open/open-on-orca-host'
 import { useNativeChatVisualOwner } from '../../media/visuals/native-chat-visual-owner'
 import { NATIVE_CHAT_INLINE_CHIP } from '../events/native-chat-inline-chip'
 import { cn } from '@/lib/class-names'
@@ -96,8 +97,8 @@ function SenderName({
 }): React.JSX.Element {
   const t = useTranslate()
   const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
-  if (!opens || !chatWorktreeId) {
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  if (!open) {
     return (
       <span
         className={`min-w-0 truncate ${compact ? 'max-w-fit flex-1 basis-0 px-1.5' : queued ? 'max-w-full px-2' : 'max-w-full px-2.5'}`}
@@ -118,9 +119,7 @@ function SenderName({
           ? label
           : t('components.native-chat.agentMessage.goToAgent', 'Go to agent')
       }
-      onClick={() =>
-        void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
-      }
+      onClick={open}
     >
       <span className="min-w-0 truncate">{label}</span>
       {!queued ? <ArrowUpRight className="size-3" aria-hidden /> : null}
@@ -188,8 +187,8 @@ function SenderChip({
 }): React.JSX.Element {
   const t = useTranslate()
   const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
-  if (!opens || !chatWorktreeId) {
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  if (!open) {
     return (
       <span className="min-w-0 truncate text-chat-foreground" title={label}>
         {label}
@@ -202,11 +201,29 @@ function SenderChip({
       aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', { name: label })}
       title={label}
       className={cn(NATIVE_CHAT_INLINE_CHIP, 'min-w-0')}
-      onClick={() =>
-        void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
-      }
+      onClick={open}
     >
       <span className="min-w-0 max-w-60 truncate">{label}</span>
     </button>
   )
+}
+
+/** What a click on a sender does: open it on this chat's host, or on the other Orca that sent it;
+ *  null when nothing opens. */
+function useSenderOpen(
+  from: AgentMessageSource,
+  sender: AgentMessageSender,
+  chatWorktreeId: string | null,
+  target: RuntimeClientTarget | undefined,
+  dispatchId: string | undefined,
+  label: string
+): (() => void) | null {
+  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
+  const { origin } = sender
+  if (origin) {
+    return () => void openOnOrcaHost(origin.hostId, origin.address, label)
+  }
+  return opens && chatWorktreeId
+    ? () => void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
+    : null
 }
