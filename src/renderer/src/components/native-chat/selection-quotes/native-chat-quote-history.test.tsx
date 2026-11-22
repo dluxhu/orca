@@ -282,10 +282,11 @@ it('goes Back from a quoted file to its chip, and Forward opens the file again',
   })
 })
 
+// A quote with no known source does nothing, so it shows no notice and records no step.
 it('records nothing when the source is missing', () => {
   render(<Chat content={'> typed by hand\n\nmy words'} />)
   fireEvent.click(screen.getByRole('button', { name: 'Quote: typed by hand' }))
-  expect(mocks.toast).toHaveBeenCalledWith('The source of this quote is not available.')
+  expect(mocks.toast).not.toHaveBeenCalled()
   expect(history()).toEqual({ entries: ['w0', 'w1'], index: 1 })
 })
 
