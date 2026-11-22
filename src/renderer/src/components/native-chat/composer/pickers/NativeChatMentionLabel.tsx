@@ -1,5 +1,5 @@
 import { MessageSquare, SquareTerminal } from 'lucide-react'
-import { translate } from '@/i18n/i18n'
+import { useTranslate } from '@/i18n/use-translate'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { nativeChatMentionKindLabel, type NativeChatMentionSession } from './native-chat-mentions'
 
@@ -12,9 +12,9 @@ export function NativeChatMentionLabel({
   item: NativeChatMentionSession
 }): React.JSX.Element {
   useUiLanguageRevision()
+  const t = useTranslate()
   const Icon = item.kind === 'chat' ? MessageSquare : SquareTerminal
-  const host =
-    item.environment ?? translate('components.native-chat.composer.mentionThisHost', 'This host')
+  const host = item.environment ?? t('components.native-chat.composer.mentionThisHost', 'This host')
   // The spaces between the spans keep the row's accessible name "<name> <kind> <host> <workspace>".
   return (
     <>
