@@ -84,7 +84,12 @@ export type AgentLaunchStructuredSurface = {
 export class AgentLaunchStructuredSessionRefusedError extends Error {
   readonly code: string
 
-  constructor(code: string, message: string) {
+  constructor(
+    code: string,
+    message: string,
+    /** Refused before attach: the create started nothing. */
+    readonly beforeCommit = false
+  ) {
     super(message)
     this.name = 'AgentLaunchStructuredSessionRefusedError'
     this.code = code
