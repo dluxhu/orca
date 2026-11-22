@@ -96,6 +96,7 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
     ) ?? shown
   const sourceText = nativeChatFullQuote(sentText)
   const text = sourceText === sentText ? shown : sourceText
+  const label = text.replace(/\s+/g, ' ')
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -122,8 +123,14 @@ export function NativeChatSentQuote({ node }: { node?: HastNode }): React.JSX.El
           data-native-chat-sent-quote=""
         >
           <Quote aria-hidden="true" />
-          <span className="sr-only">{t('components.native-chat.quoteChip', 'Quote')}: </span>
-          <span className="truncate">{text.replace(/\s+/g, ' ')}</span>
+          <span className="sr-only">
+            {t('components.native-chat.composer.quotePillLabel', 'Quote: {{text}}', {
+              text: label
+            })}
+          </span>
+          <span aria-hidden="true" className="truncate">
+            {label}
+          </span>
         </Button>
       </TooltipTrigger>
       <TooltipContent className="max-w-md whitespace-pre-wrap">{sourceText}</TooltipContent>
