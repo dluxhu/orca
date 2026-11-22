@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { CliInstallStatus } from '../../../../../../shared/cli-install-types'
+import type { CliInstallStatus } from '../../../../../../shared/cli/cli-install-types'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 // The key shows in the text, so the test sees which strings are localized.

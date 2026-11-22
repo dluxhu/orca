@@ -61,6 +61,7 @@ describe('Orca @dLux fork in the Electron app', () => {
       const noop = (): void => {}
       registerAppMenu({
         onOpenSettings: noop,
+        onOpenWorktreePalette: noop,
         onOpenSetupGuide: noop,
         onOpenFeatureTour: noop,
         onOpenCrashReport: noop,

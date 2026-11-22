@@ -1,6 +1,6 @@
 import { mkdir, unlink } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import type { CliInstallStatus } from '../../shared/cli-install-types'
+import type { CliInstallStatus } from '../../shared/cli/cli-install-types'
 import {
   pruneAppImageExtractedRoots,
   removeAppImageInstalledPayloads
@@ -136,6 +136,8 @@ export class CliInstaller extends CliPathRegistration {
       )
     }
 
+    // Read the other app before the link changes; later probes see the disk after Register.
+    const replacedApp = await otherMacAppBundle(status.currentTarget, status.launcherPath)
     if (status.installMethod === 'symlink') {
       await this.installSymlink(status)
       await this.removeLegacyLinuxCommandIfManaged(status.launcherPath)
@@ -159,7 +161,6 @@ export class CliInstaller extends CliPathRegistration {
     const finalStatus = await (extractedRoot
       ? this.getStatusForLauncher(extractedRoot.stableLauncherPath)
       : this.getStatus())
-    const replacedApp = otherMacAppBundle(status.currentTarget, status.launcherPath)
     return replacedApp && finalStatus.state === 'installed'
       ? {
           ...finalStatus,

@@ -5,9 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { FORK_IDENTITY, withForkName } from '../../shared/fork-identity'
 import { isOrcaAttributedPrompt } from '../macos-permissions/macos-tcc-prompt-watch'
 import { ensureWindowsAppDataPath } from './windows-startup/windows-app-data-path'
-import { RELEASE_CHANNELS, getReleaseRepoForChannel } from '../../shared/release-channel'
-import { getPlatformUserDataPath } from '../../cli/runtime/metadata'
-import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
+import { RELEASE_CHANNELS, getReleaseRepoForChannel } from '../../shared/updater/release-channel'
+import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract'
 import {
   getDevInstanceIdentity,
   shouldApplyPreReadyAppName
@@ -42,15 +41,10 @@ describe('Orca @dLux fork identity', () => {
 
   it('uses the fork appId in the local-build contract, in TS and JSON', () => {
     expect(LOCAL_BUILD_COMPATIBILITY_CONTRACT.appId).toBe(FORK_IDENTITY.appId)
-    expect(require('../../shared/local-build-compatibility-contract.json').appId).toBe(
-      FORK_IDENTITY.appId
-    )
-  })
-
-  it('gives the CLI the shared official profile folder', () => {
-    expect(getPlatformUserDataPath('darwin', '/h')).toBe(
-      join('/h', 'Library', 'Application Support', 'orca')
-    )
+    expect(
+      require('../../shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.json')
+        .appId
+    ).toBe(FORK_IDENTITY.appId)
   })
 
   it('keeps the package.json name as the packaged pre-ready name, so the Keychain item is "orca Safe Storage"', () => {

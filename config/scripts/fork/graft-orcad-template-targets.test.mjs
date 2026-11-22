@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ORCAD_TEMPLATE_MANIFEST_FILENAME,
   orcadRipgrepArtifact
-} from '../../../src/shared/orcad-artifacts.ts'
+} from '../../../src/shared/remote-runtime/orcad-distribution/orcad-artifacts.ts'
 import { writeOrcadTemplateTestFixture } from '../orcad-distribution/template/orcad-template-test-fixture.mjs'
 import { graftOrcadTemplateTargets } from './graft-orcad-template-targets.mjs'
 
