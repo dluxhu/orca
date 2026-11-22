@@ -6,6 +6,8 @@ import { join } from 'node:path'
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
 export const APP_PROFILES_REGISTRY = 'profiles.json'
+/** Settings that a new profile applies once at its first start ("Copy settings from:"). */
+export const APP_PROFILE_SETTINGS_SEED = 'orca-settings-seed.json'
 /** The Info.plist key that makes a bundle a profile app. */
 export const APP_PROFILE_PLIST_ID_KEY = 'OrcaAppProfileId'
 /** Info.plist key for a test root. `orca profiles create --pin-root` writes it. */
