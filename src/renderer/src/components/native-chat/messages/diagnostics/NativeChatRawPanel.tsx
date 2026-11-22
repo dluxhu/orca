@@ -112,12 +112,13 @@ export function NativeChatRawLink({ messageId }: { messageId: string }): React.J
 type SentBlocks = Extract<AgentJournalItemBody, { kind: 'message' }>['blocks']
 
 /** Claude's dispatch: images go first, then the non-empty text blocks joined by one newline. */
-function sentParts(blocks: SentBlocks): { images: string[]; text: string } {
-  const images: string[] = []
+function sentParts(blocks: SentBlocks): { images: { key: string; name: string }[]; text: string } {
+  const images: { key: string; name: string }[] = []
   const texts: string[] = []
-  for (const block of blocks) {
+  // The record never reorders, so a block's place is its stable key.
+  for (const [place, block] of blocks.entries()) {
     if (block.type === 'image-ref') {
-      images.push(block.path ?? block.url ?? block.alt ?? '')
+      images.push({ key: `block-${place}`, name: block.path ?? block.url ?? block.alt ?? '' })
     } else if (block.type === 'text' && block.text.length > 0) {
       texts.push(block.text)
     }
@@ -173,9 +174,9 @@ const RawEntry = memo(
         </div>
         {parts && parts.images.length > 0 ? (
           <ul className="text-chat-foreground-faint">
-            {parts.images.map((image, index) => (
-              <li key={index}>
-                {t('components.native-chat.rawPanel.image', 'Image:')} {image}
+            {parts.images.map((image) => (
+              <li key={image.key}>
+                {t('components.native-chat.rawPanel.image', 'Image:')} {image.name}
               </li>
             ))}
           </ul>

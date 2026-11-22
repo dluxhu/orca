@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NativeChatPaneHeader } from '../../pane/actions/NativeChatPaneHeader'
 import { MessageRow } from '../rows/NativeChatMessageRow'
+import type { NativeChatComposerHandle } from '../../composer/native-chat-composer-types'
 import { routeNativeChatRootKeyToInput } from '../../composer/focus/native-chat-root-key-routing'
 import type {
   AgentJournalItemBody,
@@ -195,6 +196,16 @@ describe('Space in the panel', () => {
     expect(panel).toHaveAttribute('tabindex', '0')
     panel.focus()
     const insertTypedText = vi.fn(() => true)
+    const composer: NativeChatComposerHandle = {
+      focus: () => true,
+      insertAgentReferences: () => false,
+      insertTypedText,
+      appendText: () => {},
+      acceptsText: () => true,
+      handlePasteEvent: () => {},
+      pasteFromClipboard: () => {},
+      contains: () => false
+    }
     routeNativeChatRootKeyToInput(
       {
         key: ' ',
@@ -205,7 +216,7 @@ describe('Space in the panel', () => {
         preventDefault: vi.fn(),
         stopPropagation: vi.fn()
       },
-      { insertTypedText, focus: vi.fn() } as never,
+      composer,
       null
     )
     expect(document.activeElement).toBe(panel)
@@ -225,7 +236,7 @@ describe('the panel scroll', () => {
       restore.push(() =>
         before
           ? Object.defineProperty(HTMLElement.prototype, name, before)
-          : delete (HTMLElement.prototype as unknown as Record<string, unknown>)[name]
+          : Reflect.deleteProperty(HTMLElement.prototype, name)
       )
     }
     define('clientHeight', { get: () => viewport.clientHeight })
