@@ -43,6 +43,7 @@ Features:
 - **Automatic compaction divider.** When Claude Code compacts its context on its own, the chat shows a "Context compacted automatically" divider, also after the chat is read again from the Claude transcript ([#40](https://github.com/dluxhu/orca/pull/40)).
 - **Sender names across Orcas.** Mail from a chat on another Orca shows that chat's name to the agent, and a click on the "Message from" card opens the chat on its Orca ([#41](https://github.com/dluxhu/orca/pull/41)).
 - **Stable and Nightly.** The release channel switcher lists Stable and Nightly. Nightly is a separate app that updates itself to newer Nightly builds; the stable app never takes a Nightly build ([#38](https://github.com/dluxhu/orca/pull/38)).
+- **App profiles.** `orca profiles create <name>` makes a separate app with its own data, sign-ins, `~/.orca` and agent folders, beside the default app ([#43](https://github.com/dluxhu/orca/pull/43)).
 
 Fixes:
 
