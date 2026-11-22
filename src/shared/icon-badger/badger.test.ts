@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
-import { normalizeIcon, renderBadgedIcon, type IconStyle } from './badger'
+import { Logo, normalizeIcon, pageCurl, renderBadgedIcon, type IconStyle } from './badger'
 import { type Img, resize } from './raster'
 
 const fixture = (name: string): Img => {
@@ -55,9 +55,30 @@ describe('icon badger golden tests', () => {
     expect(normalizeIcon(fixture('swirl-app.png')).kind).toBe('macOS-shaped')
   })
 
+  // The reference badge came from beta.svg (cairo at 4096 px); the test uses beta.png. For
+  // ref-match that moves the badge across the 16 % overlap limit of the size search (326 px here,
+  // 322 px in the reference). So the test fixes the reference's height, and the search has its own test.
+  const referenceHeights: Record<IconStyle, number | undefined> = {
+    'ref-match': 322,
+    'ref-match-bigger': undefined
+  }
+
+  it('finds the badge size with the overlap search', { timeout: 120_000 }, () => {
+    const flat = normalizeIcon(fixture('swirl-app.png')).flat
+    const fit = pageCurl(flat, new Logo(fixture('beta-badge.png')))
+    expect(fit.h).toBe(326)
+    expect(fit.c).toBeGreaterThanOrEqual(0.08)
+    expect(fit.c).toBeLessThanOrEqual(0.16)
+  })
+
   for (const style of ['ref-match', 'ref-match-bigger'] as IconStyle[]) {
     it(`matches dock-icon-badger ${style}`, { timeout: 120_000 }, () => {
-      const out = renderBadgedIcon(fixture('swirl-app.png'), fixture('beta-badge.png'), style)
+      const out = renderBadgedIcon(
+        fixture('swirl-app.png'),
+        fixture('beta-badge.png'),
+        style,
+        referenceHeights[style]
+      )
       const stats = compare(resize(out, 192, 192), fixture(`swirl-beta-${style}-192.png`), style)
       console.log(style, stats)
       expect(stats.within8).toBeGreaterThanOrEqual(0.995)

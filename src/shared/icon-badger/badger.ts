@@ -422,8 +422,19 @@ function paper(L: number, top: number, fall: number): Img {
   })
 }
 
-/** ref-match: concave page edge (circular arc) and teardrop flap; the badge tucked under the curl. */
-export function pageCurl(flat: Img, logo: Logo, L = 700, k = 0.78, drop = 0.04): Img {
+/**
+ * ref-match: concave page edge (circular arc) and teardrop flap; the badge tucked under the curl.
+ * `height` fixes the badge height instead of the search. Returns the image, the badge height and
+ * the part of the badge under the curl.
+ */
+export function pageCurl(
+  flat: Img,
+  logo: Logo,
+  L = 700,
+  k = 0.78,
+  drop = 0.04,
+  height?: number
+): { img: Img; h: number; c: number } {
   const { bodyMask } = masks()
   const body = (i: number): number => bodyMask.data[i] / 255
   const xy = (dd: number, vv: number): Pt => [C - (dd - vv) / R2, C - (dd + vv) / R2]
@@ -472,9 +483,10 @@ export function pageCurl(flat: Img, logo: Logo, L = 700, k = 0.78, drop = 0.04):
   // paper and logo
   const pap = paper(L, PAPER_TOP, PAPER_FALL)
   const bodyIn = minFilter(bodyMask, LOGO_BODY_MARGIN).data.map((v) => (v > 128 ? 1 : 0))
-  let best: { lg: Img; x: number; y: number } | null = null
-  let fallback: { lg: Img; x: number; y: number } | null = null
-  for (let h = Math.trunc(L * LOGO_MAX); h > 150; h -= 4) {
+  type Fit = { lg: Img; x: number; y: number; h: number; c: number }
+  let best: Fit | null = null
+  let fallback: Fit | null = null
+  for (let h = height ?? Math.trunc(L * LOGO_MAX); h >= (height ?? 151); h -= 4) {
     const lg = logo.onWhite(h)
     const la = channel(lg, 3).data.map((v) => (v > 20 ? 1 : 0))
     const tot = la.reduce((s, v) => s + v, 0)
@@ -498,8 +510,8 @@ export function pageCurl(flat: Img, logo: Logo, L = 700, k = 0.78, drop = 0.04):
       if (outside) continue
       const c = hidden / tot
       if (c <= OVERLAP[1]) {
-        if (c >= OVERLAP[0]) best = { lg, x, y }
-        else fallback ??= { lg, x, y }
+        if (c >= OVERLAP[0]) best = { lg, x, y, h, c }
+        else fallback ??= { lg, x, y, h, c }
         break
       }
     }
@@ -546,7 +558,7 @@ export function pageCurl(flat: Img, logo: Logo, L = 700, k = 0.78, drop = 0.04):
     })
   )
   alphaComposite(out, edgeRing(fl, ...FLAP_EDGE))
-  return out
+  return { img: out, h: chosen.h, c: chosen.c }
 }
 
 // ---------------------------------------------------------------- styles
@@ -554,9 +566,18 @@ export function pageCurl(flat: Img, logo: Logo, L = 700, k = 0.78, drop = 0.04):
 export const ICON_STYLES = ['ref-match', 'ref-match-bigger'] as const
 export type IconStyle = (typeof ICON_STYLES)[number]
 
+const CURLS: Record<IconStyle, [number, number]> = {
+  'ref-match': [700, 0.78],
+  'ref-match-bigger': [760, 0.84]
+}
+
 /** One badged icon, 1024 x 1024 RGBA. `app` is the app icon, `badge` the badge image. */
-export function renderBadgedIcon(app: Img, badge: Img, style: IconStyle = 'ref-match'): Img {
-  const { flat } = normalizeIcon(app)
-  const logo = new Logo(badge)
-  return style === 'ref-match-bigger' ? pageCurl(flat, logo, 760, 0.84) : pageCurl(flat, logo, 700, 0.78)
+export function renderBadgedIcon(
+  app: Img,
+  badge: Img,
+  style: IconStyle = 'ref-match',
+  badgeHeight?: number
+): Img {
+  const [L, k] = CURLS[style]
+  return pageCurl(normalizeIcon(app).flat, new Logo(badge), L, k, 0.04, badgeHeight).img
 }
