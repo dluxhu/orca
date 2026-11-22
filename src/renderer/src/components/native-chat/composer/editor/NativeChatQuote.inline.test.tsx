@@ -104,9 +104,10 @@ const TABLE: [string, string, string[]][] = [
 ]
 
 // Drafts that the build with chips on their own lines saved, from its serializer.
+// The blank line that an old "Add to chat" wrote above a quote shows as an empty line.
 const OLD_DRAFTS: [keyof typeof oldDrafts, string[]][] = [
-  ['textAboveQuoteAndComment', ['hi', `${CHIP} my comment`]],
-  ['twoQuotesWithComments', [`${CHIP} c1`, `${CHIP} c2`]],
+  ['textAboveQuoteAndComment', ['hi', '', `${CHIP} my comment`]],
+  ['twoQuotesWithComments', [`${CHIP} c1`, '', `${CHIP} c2`]],
   ['twoQuotesInARow', [`${CHIP} ${CHIP} c`]],
   ['fileInComment', [`${CHIP} f.txt see`]]
 ]
