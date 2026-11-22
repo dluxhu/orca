@@ -27,6 +27,7 @@ const NO_CARDS: NativeChatDirectiveBotCard[] = []
 export type MobileMarkdownTreeLinks = {
   fileLinkExists: FileLinkExists | undefined
   githubRepo: GitHubRepoReference | null | undefined
+  linkBareGitHubReferences?: boolean
   slackMentions?: boolean
   slackPeople?: SlackPeople | null
 }
@@ -41,7 +42,13 @@ export function useMobileMarkdownTree(
   visuals: boolean,
   growing: boolean,
   chatMath: boolean,
-  { fileLinkExists, githubRepo, slackMentions = false, slackPeople = null }: MobileMarkdownTreeLinks
+  {
+    fileLinkExists,
+    githubRepo,
+    linkBareGitHubReferences = true,
+    slackMentions = false,
+    slackPeople = null
+  }: MobileMarkdownTreeLinks
 ): {
   root: Root
   directives: NativeChatVisualDirective[]
@@ -64,10 +71,10 @@ export function useMobileMarkdownTree(
         linkNativeChatFilePaths(tree, fileLinkExists)
       }
       if (githubRepo) {
-        linkGitHubReferences(tree, githubRepo)
+        linkGitHubReferences(tree, linkBareGitHubReferences ? githubRepo : null)
       }
     },
-    [fileLinkExists, githubRepo, slackMentions, slackPeople]
+    [fileLinkExists, githubRepo, linkBareGitHubReferences, slackMentions, slackPeople]
   )
   // Streaming text grows a little each frame; blocks it finished earlier are not parsed again.
   const cache = useRef<MobileMarkdownTreeCache | null>(null)
