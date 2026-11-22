@@ -19401,6 +19401,7 @@
         "optionUpdateFailed": "Impossible de mettre à jour l'option",
         "optionValue": {
           "none": "Aucun",
+          "off": "Désactivé",
           "fast": "Rapide",
           "minimal": "Minimal",
           "low": "Basse",
@@ -23336,6 +23337,9 @@
     "linkedMessageMissing": "Impossible de trouver ce message.",
     "math": {
       "scrollDisplayEquation": "Faire défiler l'équation affichée"
+    },
+    "messageTime": {
+      "yesterday": "Hier {{time}}"
     }
   },
   "runtime": {

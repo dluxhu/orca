@@ -20658,6 +20658,7 @@
         "optionUpdateFailed": "Não foi possível atualizar a opção",
         "optionValue": {
           "none": "Nenhum",
+          "off": "Desativado",
           "fast": "Rápido",
           "minimal": "Mínimo",
           "low": "Baixo",
@@ -23871,6 +23872,9 @@
     "linkedMessageMissing": "Não foi possível encontrar essa mensagem.",
     "math": {
       "scrollDisplayEquation": "Rolar equação em bloco"
+    },
+    "messageTime": {
+      "yesterday": "Ontem {{time}}"
     }
   },
   "runtime": {
