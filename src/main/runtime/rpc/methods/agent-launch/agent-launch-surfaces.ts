@@ -11,6 +11,7 @@ import {
   AgentLaunchStructuredSessionRefusedError,
   type AgentLaunchSurfaceFactory
 } from '../../../../agent-launch/agent-launch-surface-factories'
+import { openReleasedHolder } from './agent-launch-resume-holder'
 import { getStructuredAgentSessionHost } from '../../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import type { StructuredAgentSessionHost } from '../../../../native-chat/agent-session-wire/host/structured-agent-session-host'
 import type { RpcContext } from '../../core'
@@ -92,6 +93,9 @@ export function agentLaunchSurfaceFactory(
           )
         }
       }
+      const activate =
+        !callerPresentsSurface &&
+        (presentation === undefined || (presentation === 'focused' && movesHostWindow))
       const created = await createStructuredAgentSessionForWorktree({
         runtime: context.runtime,
         ensureHost: async () => {
@@ -118,9 +122,7 @@ export function agentLaunchSurfaceFactory(
         ...(firstMessage ? { firstMessage } : {}),
         ...(resumeFrom ? { resumeFrom } : {}),
         ...(signal ? { signal } : {}),
-        activate:
-          !callerPresentsSurface &&
-          (presentation === undefined || (presentation === 'focused' && movesHostWindow))
+        activate
       })
       if (!created.ok) {
         // Forget the Remote Control choice only when the refusal proves that no chat exists; an
@@ -135,6 +137,18 @@ export function agentLaunchSurfaceFactory(
             agent,
             forget: true
           })
+        }
+        const holder = resumeFrom
+          ? await openReleasedHolder(context, created.refusal, {
+              beforeCommit: createRefusedBeforeCommit(created),
+              worktreeId,
+              agent,
+              remoteControl,
+              activate
+            })
+          : null
+        if (holder) {
+          return holder
         }
         // A caller-named session conflict must surface to that caller, never downgrade to terminal.
         if (requested && created.refusal.code === 'agent_session_conflict') {
