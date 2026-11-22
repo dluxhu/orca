@@ -38,6 +38,7 @@ import { RepositoryAgentTrustSection } from './RepositoryAgentTrustSection'
 import { RepositoryBrowserProfileSection } from './RepositoryBrowserProfileSection'
 import type { RepositoryPaneRepoUpdate } from './repository-pane-repo-update'
 import { RepositoryGitHubAccountSection } from './source-control/RepositoryGitHubAccountSection'
+import { RepositoryChatReferenceLinksSection } from './source-control/RepositoryChatReferenceLinksSection'
 import { useTranslate } from '@/i18n/use-translate'
 import { RepositoryWindowsRuntimeSection } from './runtime/RepositoryWindowsRuntimeSection'
 import { matchesRepositoryIdentitySearch } from './identity/repository-identity-search'
@@ -46,10 +47,8 @@ import { RepositoryJiraProjectSection } from './RepositoryJiraProjectSection'
 import { RepositoryWorkspaceCleanupSection } from './workspace-cleanup/RepositoryWorkspaceCleanupSection'
 import { getProjectRuntimeSessionSummary } from './runtime/repository-runtime-session-summary'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../store/slices/worktrees/listing/worktree-visibility-defaults-by-host'
-import {
-  RepositoryFormatterSection,
-  getRepositoryFormatterSearchEntry
-} from './RepositoryFormatterSection'
+// oxfmt-ignore
+import { RepositoryFormatterSection, getRepositoryFormatterSearchEntry } from './RepositoryFormatterSection'
 
 const EMPTY_WSL_DISTROS: string[] = []
 const EMPTY_REMOVAL_SETUPS: ProjectHostSetup[] = []
@@ -344,6 +343,8 @@ export function RepositoryPane({
               updateRepo={updateSelectedRepo}
               forceVisible={forceFullPaneForRepoMatch}
             />
+
+            <RepositoryChatReferenceLinksSection repo={repo} updateRepo={updateSelectedRepo} />
 
             <RepositoryWorktreeDefaultsSection
               repo={repo}
