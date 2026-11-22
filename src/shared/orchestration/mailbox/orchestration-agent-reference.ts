@@ -7,6 +7,8 @@ export type OrchestrationAgentReference = {
   address: string
   hostKey: string
   kind?: AgentReferenceKind
+  /** The saved environment that reaches a mentioned chat or terminal on another host. */
+  environment?: string
   /** The agent's logo on its composer pill; never part of the sent text. */
   agentType?: string
 }
@@ -45,18 +47,30 @@ export function agentReferenceToken(reference: OrchestrationAgentReference): str
   return `@${reference.label}${AGENT_REFERENCE_MARK}${reference.address})`
 }
 
+// A plain name stays bare; any other name is one single-quoted shell word.
+function shellWord(value: string): string {
+  return /^[\w.@:+-]+$/.test(value) ? value : `'${value.replace(/'/g, `'\\''`)}'`
+}
+
 /** The routing line a sent message ends with, one per mentioned agent. A chat or a terminal agent
  *  gets Orca mail, as a bot does. A chat shows the mail as a card from the sender. A plain shell reads
- *  no mail, so it gets typed input. */
+ *  no mail, so it gets typed input. `environment` names the host of a session on another host. */
 export function agentReferenceNote(
   label: string,
   address: string,
-  kind?: AgentReferenceKind | null
+  kind?: AgentReferenceKind | null,
+  environment?: string | null
 ): string {
+  const name = environment ? printableAgentLabel(environment) : ''
+  // Shell quotes do not stop the CLI from reading a leading `-` as a flag; `--flag=value` does.
+  const host = (flag: string) =>
+    name ? ` --${flag}${name.startsWith('-') ? '=' : ' '}${shellWord(name)}` : ''
   if (kind === 'shell' && isTerminalHandle(address)) {
-    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send --terminal ${address} --text <text> --enter, and read its output with orca terminal read --terminal ${address}]`
+    return `[Orca terminal "${label}": ${address} — send it input with orca terminal send${host('environment')} --terminal ${address} --text <text> --enter, and read its output with orca terminal read${host('environment')} --terminal ${address}]`
   }
-  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — message it with orca orchestration send --to ${address} --subject "<topic>" --body "<message>"]`
+  // `--on` carries mail to a paired host; its replies come back here.
+  const mail = `message it with orca orchestration send${host('on')} --to ${address}`
+  return `[Orca ${kind ?? 'agent'} "${label}": ${address} — ${mail} --subject "<topic>" --body "<message>"]`
 }
 
 export function terminalAgentReference(reference: OrchestrationAgentReference): string | null {
@@ -72,21 +86,40 @@ const NOTE_KINDS: Record<string, readonly (AgentReferenceKind | null)[]> = {
   terminal: ['terminal', 'shell']
 }
 
-export type SentAgentMention = { label: string; kind: AgentReferenceKind | null }
+// The host of a note for another host: a bare word or one single-quoted shell word.
+const NOTE_HOST = / --(?:on|environment)[= ]([\w.@:+-]+|'(?:[^']|'\\'')*')/
+
+/** `address` and `environment` are the note's: they open the mentioned session. */
+export type SentAgentMention = {
+  label: string
+  kind: AgentReferenceKind | null
+  address: string
+  environment?: string
+}
 
 /** The mention of a note exactly as agentReferenceNote writes it, with the label as the note frames it. */
 function noteMention(note: string): { framed: string; mention: SentAgentMention } | null {
   const head = NOTE_HEAD.exec(note)
+  const word = head ? NOTE_HOST.exec(note.slice(head[0].length))?.[1] : undefined
+  const environment = word?.startsWith("'") ? word.slice(1, -1).replaceAll(`'\\''`, "'") : word
   const kind = head
     ? NOTE_KINDS[head[1]].find(
-        (candidate) => agentReferenceNote(head[2], head[3], candidate) === note
+        (candidate) => agentReferenceNote(head[2], head[3], candidate, environment) === note
       )
     : undefined
   if (!head || kind === undefined) {
     return null
   }
   // The note escapes `\ " [ ]` as Markdown does; the shown label has no escapes.
-  return { framed: head[2], mention: { label: head[2].replace(/\\(.)/g, '$1'), kind } }
+  return {
+    framed: head[2],
+    mention: {
+      label: head[2].replace(/\\(.)/g, '$1'),
+      kind,
+      address: head[3],
+      ...(environment ? { environment } : {})
+    }
+  }
 }
 
 /** A sent message is its typed text, then one routing note per mentioned agent: after a blank line

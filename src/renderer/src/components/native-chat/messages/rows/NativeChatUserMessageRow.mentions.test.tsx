@@ -1,7 +1,16 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { afterEach, expect, it, vi } from 'vitest'
+import { useAppStore } from '@/store'
+import { openOrchestrationDispatch } from '@/lib/agent-session/open/open-agent-message-sender'
+import {
+  NativeChatVisualOwnerContext,
+  type NativeChatVisualOwner
+} from '../../media/visuals/native-chat-visual-owner'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from './NativeChatMessageRow'
@@ -10,19 +19,30 @@ import { AgentReferencePillContent } from '../../composer/editor/native-chat-age
 import { NativeChatQuoteJumpContext } from '../../selection-quotes/use-native-chat-quote-jump'
 import { rememberNativeChatQuoteSource } from '../../selection-quotes/native-chat-quote-sources'
 import { formatNativeChatQuote } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
+import { agentReferenceNote } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
+
+vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() } }))
+vi.mock('@/lib/agent-session/open/open-agent-message-sender', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  openOrchestrationDispatch: vi.fn(async () => {})
+}))
+
+const initialStore = useAppStore.getState()
 
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  vi.clearAllMocks()
+  useAppStore.setState(initialStore, true)
 })
 
-const chip = (label: string, kind: string) => ({
+const chip = (label: string, kind: string, environment?: string) => ({
   type: 'nativeChatAgentReference',
-  attrs: { label, address: 'orca_session_id:chat_aaaaaaaa', hostKey: 'local', kind }
+  attrs: { label, address: 'orca_session_id:chat_aaaaaaaa', hostKey: 'local', kind, environment }
 })
 
 /** The text a send delivers for "ask <chip> now", made by the real serializer. */
-function sentText(label: string): string {
+function sentText(label: string, environment?: string): string {
   const token = `@${label} (Orca agent orca_session_id:chat_aaaaaaaa)`
   return serializeNativeChatAgentReferences(`ask ${token} now`, {
     type: 'doc',
@@ -31,7 +51,7 @@ function sentText(label: string): string {
         type: 'paragraph',
         content: [
           { type: 'text', text: 'ask ' },
-          chip(label, 'chat'),
+          chip(label, 'chat', environment),
           { type: 'text', text: ' now' }
         ]
       }
@@ -83,8 +103,16 @@ function composerTerminalBadge(label: string): string {
   return text
 }
 
-function bubble(text: string, sentAs?: 'goal'): HTMLElement {
-  const { container } = render(
+const owner = (target: RuntimeClientTarget): NativeChatVisualOwner => ({
+  target,
+  sessionId: 'this-chat',
+  worktreeId: 'workspace'
+})
+const LOCAL_CHAT = owner({ kind: 'local' })
+const ENV_A_CHAT = owner({ kind: 'environment', environmentId: 'env-a' })
+
+function bubble(text: string, sentAs?: 'goal', chat?: NativeChatVisualOwner): HTMLElement {
+  const row = (
     <TooltipProvider>
       <MessageRow
         message={{
@@ -98,7 +126,16 @@ function bubble(text: string, sentAs?: 'goal'): HTMLElement {
         expandSignal={false}
         onScrollMessageToTop={vi.fn()}
       />
-    </TooltipProvider>,
+    </TooltipProvider>
+  )
+  const { container } = render(
+    chat ? (
+      <NativeChatVisualOwnerContext.Provider value={chat}>
+        {row}
+      </NativeChatVisualOwnerContext.Provider>
+    ) : (
+      row
+    ),
     { wrapper: TranslationScopeProvider }
   )
   return container.querySelector<HTMLElement>('.native-chat-markdown')!
@@ -113,6 +150,14 @@ it('shows a sent mention as its chip and hides the routing note the agent got', 
   const shown = bubble(text)
   expect(shown.textContent).toBe(`ask ${composerChip('Tech "Lead"')} now`)
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Tech "Lead"')
+})
+
+it('shows a mention of a chat on another host as its chip, with no note', () => {
+  const text = sentText('Lead on Box (box)', 'box')
+  expect(text).toContain(' — message it with orca orchestration send --on box --to ')
+  const shown = bubble(text)
+  expect(shown.textContent).toBe(`ask ${composerChip('Lead on Box (box)')} now`)
+  expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Lead on Box (box)')
 })
 
 it('hides the notes of a goal, which follow the text on the same line', () => {
@@ -198,5 +243,95 @@ it('draws a quote chip and a mention chip in one sent message, and the quote sti
     'the quoted words',
     expect.any(Function),
     expect.any(Function)
+  )
+})
+
+it('opens the mentioned chat on the chat host when its chip is clicked', async () => {
+  bubble(sentText('Tech Lead'), undefined, ENV_A_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'orca_session_id:chat_aaaaaaaa',
+    'Tech Lead',
+    { kind: 'environment', environmentId: 'env-a' },
+    expect.anything()
+  )
+})
+
+it("opens a mention on another host through this window's environment of that name", async () => {
+  useAppStore.setState({
+    runtimeEnvironments: [{ id: 'env-box', name: 'box' }] as never
+  })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'orca_session_id:chat_aaaaaaaa',
+    'Lead on Box (box)',
+    { kind: 'environment', environmentId: 'env-box' },
+    expect.anything()
+  )
+})
+
+it('says so when this window does not know the host of the mention', async () => {
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
+})
+
+it('says so in a short notice when the mentioned chat is gone', async () => {
+  bubble(sentText('Tech Lead'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
+  // The open path reports a gone chat through the feedback it is given.
+  const feedback = vi.mocked(openOrchestrationDispatch).mock.calls[0]?.[3]
+  feedback?.open?.gone('Tech Lead')
+
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('no longer on this host'))
+  expect(toast.error).not.toHaveBeenCalled()
+})
+
+it('keeps a crew mention a plain chip', () => {
+  const shown = bubble(
+    `ask @Crew now\n\n${agentReferenceNote('Crew', 'dispatch:ctx_1')}`,
+    undefined,
+    LOCAL_CHAT
+  )
+
+  expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Crew')
+  expect(screen.queryByRole('button', { name: 'Open Crew' })).toBeNull()
+})
+
+it("says so for a mention from a chat on another host, which names that host's environments", async () => {
+  useAppStore.setState({
+    runtimeEnvironments: [{ id: 'env-box', name: 'box' }] as never
+  })
+  bubble(sentText('Lead on Box (box)', 'box'), undefined, ENV_A_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Lead on Box (box)' }))
+
+  expect(openOrchestrationDispatch).not.toHaveBeenCalled()
+  expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
+})
+
+it('opens the terminal of a plain shell mention', async () => {
+  bubble(
+    send(['ask ', { label: 'Shell', kind: 'shell', address: 'term_b2' }, ' now']),
+    undefined,
+    LOCAL_CHAT
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Shell' }))
+
+  expect(openOrchestrationDispatch).toHaveBeenCalledWith(
+    'term_b2',
+    'Shell',
+    { kind: 'local' },
+    expect.anything()
   )
 })
