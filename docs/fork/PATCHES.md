@@ -379,7 +379,7 @@ tests change only their expected literals to the fork values:
 pnpm install
 pnpm run typecheck
 pnpm run lint
-pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork src/main/orcad/browser-providers/orcad-browser-provider.test.ts
+pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork src/main/orcad/browser-providers/orcad-browser-provider.test.ts src/cli/runtime/profile/metadata.fork.test.ts
 ```
 
 By hand, on macOS, with official Orca signed in first:
@@ -392,7 +392,7 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (21): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+Source and config (22): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
 `config/scripts/fork/graft-orcad-template-targets.mjs` (new),
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
@@ -406,9 +406,11 @@ Source and config (21): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `src/shared/release-channel.ts`, `src/main/updater/lifecycle/updater-setup.ts`,
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`,
-`src/main/orcad/browser-providers/orcad-browser-provider.ts`.
+`src/main/orcad/browser-providers/orcad-browser-provider.ts`, `.github/workflows/pr.yml`
+(the package job reads the Linux `/opt` folder from `productName`).
 
-Tests (19): `src/main/startup/fork-identity.test.ts` (new),
+Tests (20): `src/main/startup/fork-identity.test.ts` (new),
+`src/cli/runtime/profile/metadata.fork.test.ts` (new),
 `config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
 `config/scripts/fork/build-release.test.sh` (new),
 `src/main/startup/fork-identity-electron.test.ts` (new),
