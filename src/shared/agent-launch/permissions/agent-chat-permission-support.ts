@@ -1,4 +1,7 @@
-import type { AgentChatPermissionMode } from './agent-chat-permission-mode'
+import type {
+  AgentChatPermissionChoice,
+  AgentChatPermissionMode
+} from './agent-chat-permission-mode'
 /** The modes one agent's chats offer. */
 export type AgentChatPermissionModeSupport = {
   modes: readonly AgentChatPermissionMode[]
@@ -47,7 +50,8 @@ export const NATIVE_CHAT_AGENTS = [
   'kilo',
   'mimo-code',
   'gemini',
-  'droid'
+  'droid',
+  'qwen-code'
 ] as const
 
 export type NativeChatAgent = (typeof NATIVE_CHAT_AGENTS)[number]
@@ -76,7 +80,9 @@ const AGENT_CHAT_PERMISSION_MODES_BY_AGENT: Record<
   aug: null,
   kilo: ACP_CHAT_PERMISSION_MODES,
   'mimo-code': ACP_CHAT_PERMISSION_MODES,
-  gemini: ACP_CHAT_PERMISSION_MODES
+  gemini: ACP_CHAT_PERMISSION_MODES,
+  // Qwen's own modes: Auto Edit approves edits, and Auto has a model approve what is safe.
+  'qwen-code': CLAUDE_CHAT_PERMISSION_MODES
 }
 
 export function isNativeChatAgent(agent: string): agent is NativeChatAgent {
@@ -91,4 +97,23 @@ export function chatAsksNoApprovals(agent: string): boolean {
 /** The one table of which agents' chats offer which modes; null keeps following Agent Permissions. */
 export function agentChatPermissionModes(agent: string): AgentChatPermissionModeSupport | null {
   return isNativeChatAgent(agent) ? AGENT_CHAT_PERMISSION_MODES_BY_AGENT[agent] : null
+}
+
+/** The saved choice if this agent offers it; anything else asks, never grants more access. */
+export function savedChatPermissionMode(
+  support: AgentChatPermissionModeSupport,
+  intent: AgentChatPermissionMode
+): AgentChatPermissionMode
+export function savedChatPermissionMode(
+  support: AgentChatPermissionModeSupport,
+  intent: unknown
+): AgentChatPermissionChoice
+export function savedChatPermissionMode(
+  support: AgentChatPermissionModeSupport,
+  intent: unknown
+): AgentChatPermissionChoice {
+  if (intent === 'own') {
+    return 'own'
+  }
+  return support.modes.find((mode) => mode === intent) ?? 'ask'
 }
