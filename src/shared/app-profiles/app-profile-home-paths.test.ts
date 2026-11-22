@@ -107,7 +107,7 @@ const ALLOWED: Allowed[] = [
   },
   {
     file: 'src/main/qwen-code/workspace-trust.ts',
-    line: 'env.QWEN_CLI_HOME',
+    line: "join(env.QWEN_CLI_HOME, '.qwen')",
     reason: "Qwen 1.0's own folder variable from the launch env"
   },
   {

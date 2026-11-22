@@ -839,7 +839,7 @@ It also flags a home held in a name (`join(home, '.codex')`) and `app.getPath('h
 allow-list names each exception and its reason (WSL guest and other hosts' homes, Antigravity,
 test harnesses, binary folders, `orcad`'s data folder, the frozen hook command forms). Skill
 discovery, skill install roots (Gemini through `GEMINI_CLI_HOME`, CodeBuddy through
-`CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi) take the
+`CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi, Qwen) take the
 launch's variable, else the profile's folder.
 
 The Keychain item is per profile: the profile start sets the name `orca-<id>` before ready, so
@@ -854,8 +854,9 @@ pane), OpenCode (`OPENCODE_CONFIG_DIR` only adds a folder; config and data follo
 `isAppProfileRuntime()` checks stay the only guard: a profile installs, refreshes and removes no
 hook, plugin or config of theirs.
 The one exception is workspace trust: a profile that launches Cursor or Antigravity adds the
-workspace to their trusted folders in the real home, as the default app does. The write only adds
-a trusted folder, and that agent reads the real home in a profile too.
+workspace to their trusted folders in the real home, as the default app does. The write adds a
+trusted folder, and on worktree removal removes only the entries it added. That agent reads the
+real home in a profile too.
 
 **Safety model.** The per-profile folders are the first guard. The `isAppProfileRuntime()` checks
 on each writer are the second one: a profile still installs no managed agent hooks. The hook

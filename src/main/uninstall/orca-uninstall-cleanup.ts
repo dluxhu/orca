@@ -145,7 +145,8 @@ async function runAgentHooks(
   if (otherBuild) {
     return update(() => ({ state: 'kept-shared', detail: `${otherBuild} still uses these hooks.` }))
   }
-  // Fork patch: an app profile shares the agent configs with the default app until isolation.
+  // Fork patch: a profile installs no managed hooks; the hooks in the real home belong to the
+  // default app (profiles-design.md, section 12).
   if (isAppProfileRuntime()) {
     return update(() => ({ state: 'kept-shared', detail: APP_PROFILE_SHARED }))
   }
