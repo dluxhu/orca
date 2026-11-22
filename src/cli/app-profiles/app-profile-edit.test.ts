@@ -1,0 +1,283 @@
+import { execFileSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
+import { createAppProfile, type RunTool } from './app-profile-create'
+import { removeAppProfile, renameAppProfile, setAppProfilePort } from './app-profile-edit'
+import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
+
+const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string>
+  <key>CFBundleExecutable</key><string>Orca</string>
+  <key>CFBundleName</key><string>Orca</string>
+  <key>CFBundleDisplayName</key><string>Orca @dLux</string>
+</dict>
+</plist>
+`
+
+let dir: string
+let app: string
+let calls: string[][]
+/** The pid of the loaded serve service job, or null when launchctl knows no job. */
+let servicePid: number | null
+let failVerify: boolean
+
+// Real ditto, plutil and cp; codesign, lsregister, launchctl, tccutil and security are recorded.
+const run: RunTool = (program, args) => {
+  calls.push([program, ...args])
+  if (program.endsWith('codesign')) {
+    if (args[0] === '--verify' && failVerify) {
+      throw new Error('codesign --verify failed')
+    }
+    return args[0] === '-d' ? '<plist><dict/></plist>' : ''
+  }
+  if (/(lsregister|launchctl|tccutil|security)$/.test(program)) {
+    return ''
+  }
+  return execFileSync(program, args, { encoding: 'utf8' })
+}
+
+const serviceRun: ServeServiceRun = async (_program, args) =>
+  servicePid !== null && args[0] === 'print'
+    ? { code: 0, out: `state = running\n\tpid = ${servicePid}\n` }
+    : { code: 113, out: 'Could not find service' }
+
+function file(path: string, content: string): void {
+  mkdirSync(join(path, '..'), { recursive: true })
+  writeFileSync(path, content, { mode: 0o755 })
+}
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'orca-profile-edit-'))
+  app = join(dir, 'Orca.app')
+  const contents = join(app, 'Contents')
+  file(join(contents, 'Info.plist'), DEFAULT_PLIST)
+  file(join(contents, 'MacOS', 'Orca'), 'main')
+  file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
+  file(join(contents, 'Resources', 'app.asar'), 'asar')
+  file(join(contents, 'Resources', 'profile-template', 'orca-notification-status'), 'variant')
+  file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
+  calls = []
+  servicePid = null
+  failVerify = false
+  vi.stubEnv('HOME', dir)
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  rmSync(dir, { recursive: true, force: true })
+})
+
+const env = (): NodeJS.ProcessEnv => ({
+  ORCA_PROFILES_ROOT: join(dir, 'data'),
+  ORCA_PROFILES_APPS_DIR: join(dir, 'apps')
+})
+const registry = (): {
+  urlHandler: unknown
+  profiles: { id: string; name: string; appPath: string; port: number }[]
+} => JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))
+const deps = () => ({ env: env(), home: dir, uid: 501, run, serviceRun, isAlive: () => true })
+const plistValue = (path: string, key: string): string =>
+  execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', path], { encoding: 'utf8' }).trim()
+
+function makeProfile(name = 'Orca - Work', id?: string) {
+  const entry = createAppProfile({ name, id, defaultAppPath: app, env: env(), run })
+  calls = []
+  return entry
+}
+
+function writeRuntimePid(userDataPath: string, pid: number): void {
+  writeFileSync(join(userDataPath, 'orca-runtime.json'), JSON.stringify({ pid }))
+}
+
+describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
+  it('renames the app and the registry name; the id, bundle id and data folder stay', async () => {
+    const work = makeProfile()
+    const result = await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
+    const newPath = join(dir, 'apps', 'Orca - Job.app')
+    expect(result).toMatchObject({
+      id: 'work',
+      name: 'Orca - Job',
+      bundleId: work.bundleId,
+      userDataPath: work.userDataPath,
+      appPath: newPath,
+      serveService: 'none'
+    })
+    expect(existsSync(work.appPath)).toBe(false)
+    expect(plistValue(join(newPath, 'Contents', 'Info.plist'), 'CFBundleDisplayName')).toBe(
+      'Orca - Job'
+    )
+    expect(plistValue(join(newPath, 'Contents', 'Info.plist'), 'CFBundleIdentifier')).toBe(
+      work.bundleId
+    )
+    expect(registry().profiles).toEqual([
+      expect.objectContaining({ id: 'work', name: 'Orca - Job', appPath: newPath })
+    ])
+    const sign = calls.find((call) => call[0].endsWith('codesign') && call[1] === '--force')
+    expect(sign).toEqual(
+      expect.arrayContaining(['-s', '-', '-i', work.bundleId, '--entitlements', newPath])
+    )
+    expect(sign).not.toContain('--deep')
+    expect(calls).toContainEqual(['/usr/bin/codesign', '--verify', newPath])
+    const lsregister = calls.filter((call) => call[0].endsWith('lsregister'))
+    expect(lsregister.map((call) => call.slice(1))).toEqual([
+      ['-u', work.appPath],
+      ['-f', newPath]
+    ])
+  })
+
+  it('refuses while the profile app runs, and changes nothing', async () => {
+    const work = makeProfile()
+    writeRuntimePid(work.userDataPath, 4242)
+    await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
+      '"Orca - Work" runs.'
+    )
+    expect(existsSync(work.appPath)).toBe(true)
+    expect(registry().profiles[0].name).toBe('Orca - Work')
+  })
+
+  it('updates the app path in the serve unit, and stops and starts a running service', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(
+      unit.unitPath,
+      `<string>${work.appPath}/Contents/MacOS/Orca</string><string>${work.userDataPath}</string>`
+    )
+    servicePid = 777
+    writeRuntimePid(work.userDataPath, 777)
+    const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('restarted')
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${join(dir, 'apps', 'Job.app')}/Contents/MacOS/Orca</string><string>${work.userDataPath}</string>`
+    )
+    const launchctl = calls.filter((call) => call[0].endsWith('launchctl')).map((c) => c[1])
+    expect(launchctl).toEqual(['bootout', 'bootstrap'])
+    // The service never gets a new unit of its own.
+    expect(calls.some((call) => call.includes('install'))).toBe(false)
+  })
+
+  it('puts the app back under its old name when a step fails', async () => {
+    const work = makeProfile()
+    failVerify = true
+    await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
+      'codesign --verify failed'
+    )
+    expect(existsSync(work.appPath)).toBe(true)
+    expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
+    expect(plistValue(join(work.appPath, 'Contents', 'Info.plist'), 'CFBundleDisplayName')).toBe(
+      'Orca - Work'
+    )
+    expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Work', appPath: work.appPath })
+  })
+
+  it('refuses a name that another profile has', async () => {
+    makeProfile()
+    makeProfile('Home')
+    await expect(renameAppProfile({ id: 'work', name: 'home', ...deps() })).rejects.toThrow(
+      'A profile with the name "home" exists.'
+    )
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
+  it('writes a valid port and refuses the range of another profile', async () => {
+    makeProfile()
+    makeProfile('Home')
+    await expect(setAppProfilePort({ id: 'home', port: 6810, ...deps() })).rejects.toThrow(
+      'inside the port range'
+    )
+    const result = await setAppProfilePort({ id: 'home', port: 7000, ...deps() })
+    expect(result).toMatchObject({ port: 7000, serveServiceInstalled: false })
+    expect(registry().profiles.map((p) => p.port)).toEqual([6800, 7000])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
+  const trashed: string[] = []
+  const trash = (path: string): void => {
+    trashed.push(path)
+    renameSync(path, join(dir, `trash-${trashed.length}`))
+  }
+  beforeEach(() => {
+    trashed.length = 0
+  })
+
+  it('moves the app and its data to the Trash and forgets the profile', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, 'unit')
+    const data = JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))
+    data.urlHandler = { mode: 'profile', profileId: 'work' }
+    writeFileSync(join(dir, 'data', 'profiles.json'), JSON.stringify(data))
+    const result = await removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    expect(result).toEqual({ id: 'work', keptData: false, serveService: 'removed' })
+    expect(trashed).toEqual([work.appPath, work.userDataPath])
+    expect(existsSync(unit.unitPath)).toBe(false)
+    expect(registry()).toMatchObject({ urlHandler: { mode: 'ask' }, profiles: [] })
+    expect(calls).toContainEqual(['/usr/bin/tccutil', 'reset', 'All', work.bundleId])
+    expect(calls).toContainEqual([
+      '/usr/bin/security',
+      'delete-generic-password',
+      '-s',
+      'orca-work Safe Storage'
+    ])
+  })
+
+  it('keeps the data folder and the Keychain item with keepData', async () => {
+    const work = makeProfile()
+    await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
+    expect(trashed).toEqual([work.appPath])
+    expect(existsSync(join(work.userDataPath, 'orca-app-profile.json'))).toBe(true)
+    expect(calls.some((call) => call[0].endsWith('security'))).toBe(false)
+  })
+
+  it('refuses while the profile app runs', async () => {
+    const work = makeProfile()
+    writeRuntimePid(work.userDataPath, 4242)
+    await expect(removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })).rejects.toThrow(
+      'runs'
+    )
+    expect(trashed).toEqual([])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
+  it('lists the default app first with the state of each profile', async () => {
+    const work = makeProfile()
+    const home = makeProfile('Home')
+    makeProfile('Client')
+    writeRuntimePid(work.userDataPath, 10)
+    // Only the serve service runs for Home.
+    writeRuntimePid(home.userDataPath, 20)
+    servicePid = 20
+    const defaultUserData = join(dir, 'default-data')
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: defaultUserData,
+      ...deps(),
+      serviceRun: async (_program, args) =>
+        args[1].endsWith(serveServiceUnitOf(home.userDataPath, false, dir).label)
+          ? { code: 0, out: 'pid = 20' }
+          : { code: 113, out: '' }
+    })
+    expect(rows.map((row) => [row.id, row.name, row.state])).toEqual([
+      ['default', 'Orca @dLux', 'stopped'],
+      ['work', 'Orca - Work', 'running'],
+      ['home', 'Home', 'background'],
+      ['client', 'Client', 'stopped']
+    ])
+  })
+})

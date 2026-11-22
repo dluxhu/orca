@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAppProfile, nextAppProfilePort, type RunTool } from './app-profile-create'
+import { createAppProfile, type RunTool } from './app-profile-create'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -108,11 +108,11 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     })
     const contents = join(entry.appPath, 'Contents')
     expect(entry).toEqual({
-      id: 'orca-work',
+      id: 'work',
       name: 'Orca - Work',
-      bundleId: 'com.stablyai.orca.dlux.profile.orca-work',
+      bundleId: 'com.stablyai.orca.dlux.profile.work',
       appPath: join(dir, 'apps', 'Orca - Work.app'),
-      userDataPath: join(dir, 'data', 'orca-work'),
+      userDataPath: join(dir, 'data', 'work'),
       port: 6800,
       createdAt: 1
     })
@@ -143,7 +143,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(plistValue(plist, 'CFBundleIdentifier')).toBe(entry.bundleId)
     expect(plistValue(plist, 'CFBundleDisplayName')).toBe('Orca - Work')
     expect(plistValue(plist, 'CFBundleName')).toBe('Orca')
-    expect(plistValue(plist, 'OrcaAppProfileId')).toBe('orca-work')
+    expect(plistValue(plist, 'OrcaAppProfileId')).toBe('work')
     expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBe(join(dir, 'data'))
     expect(plistValue(plist, 'CFBundleURLTypes')).toBeNull()
     expect(plistValue(plist, 'ElectronAsarIntegrity')).toBeNull()
@@ -166,18 +166,21 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(
       JSON.parse(readFileSync(join(entry.userDataPath, 'orca-app-profile.json'), 'utf8'))
     ).toEqual({
-      id: 'orca-work'
+      id: 'work'
     })
     const registry = JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))
     expect(registry).toMatchObject({ version: 1, defaultAppPath: app, profiles: [entry] })
   })
 
-  it('gives the next profile the next port and refuses a taken id or port', () => {
+  it('gives the next profile the next port and refuses a taken name, id or port', () => {
     createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
     expect(createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).port).toBe(6832)
     expect(() => createAppProfile({ name: 'work', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "work" exists.'
+      'A profile with the name "work" exists.'
     )
+    expect(() =>
+      createAppProfile({ name: 'Other', id: 'WORK', defaultAppPath: app, env: env(), run })
+    ).toThrow('A profile with the id "WORK" exists.')
     expect(() =>
       createAppProfile({ name: 'Other', port: 6810, defaultAppPath: app, env: env(), run })
     ).toThrow('inside the port range')
@@ -193,7 +196,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and fa
       'com.stablyai.orca.dlux.profile.a-b'
     )
     expect(() => createAppProfile({ name: 'a-b', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "a-b" exists.'
+      'A profile with the id "a-b" exists.'
     )
   })
 
@@ -247,11 +250,34 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
   })
 })
 
-describe('nextAppProfilePort', () => {
-  it('skips the ports of other profiles', () => {
-    const profile = (port: number) => ({ port }) as never
-    expect(nextAppProfilePort([])).toBe(6800)
-    expect(nextAppProfilePort([profile(6800), profile(6864)])).toBe(6832)
-    expect(nextAppProfilePort([profile(6801)])).toBe(6864)
+describe.skipIf(process.platform !== 'darwin')('createAppProfile with --id and settings', () => {
+  it('uses the given id for the data folder and the bundle id, and seeds the settings', () => {
+    const settings = join(dir, 'settings.json')
+    writeFileSync(settings, '{"theme":"dark"}')
+    const entry = createAppProfile({
+      name: 'Orca @dLux - Todo-Dodo',
+      id: 'todo-dodo',
+      settingsFile: settings,
+      defaultAppPath: app,
+      env: env(),
+      run
+    })
+    expect(entry).toMatchObject({
+      id: 'todo-dodo',
+      bundleId: 'com.stablyai.orca.dlux.profile.todo-dodo',
+      userDataPath: join(dir, 'data', 'todo-dodo')
+    })
+    expect(readFileSync(join(entry.userDataPath, 'orca-settings-seed.json'), 'utf8')).toBe(
+      '{"theme":"dark"}'
+    )
+  })
+
+  it('refuses an id that is not valid or is reserved', () => {
+    expect(() =>
+      createAppProfile({ name: 'A', id: 'a_b', defaultAppPath: app, env: env(), run })
+    ).toThrow('letters, digits and -')
+    expect(() =>
+      createAppProfile({ name: 'A', id: 'Manager', defaultAppPath: app, env: env(), run })
+    ).toThrow('reserved')
   })
 })

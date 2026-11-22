@@ -24,7 +24,7 @@ import { printHelp } from './discovery/help'
 import type { RuntimeClient } from './runtime/client'
 import { COMMAND_SPECS } from './specs'
 import { selectAppProfile } from './app-profiles/app-profile-selection'
-import { runProfilesCreate } from './app-profiles/app-profile-create'
+import { runProfilesCommand } from './app-profiles/app-profile-commands'
 import { resolveOrchestrationCliExecutable } from './orchestration/recovery/orchestration-recovery-command'
 import { refuseConflictingSessionCallerFlags } from './orchestration/identity/session-caller-flags'
 import { ignoresRemoteSelection } from './dispatch/remote-selection-scope'
@@ -56,15 +56,15 @@ export async function main(
   configureExecutable?: (commandPath: readonly string[]) => void
 ): Promise<void> {
   // `--profile <id>` before the command selects an app profile, before any parse or check.
-  // `orca profiles create` is a hidden local command while profiles are a prototype.
+  // `orca profiles …` are local commands outside the command specs.
   try {
     argv = selectAppProfile(argv)
-    if (argv[0] === 'profiles' && argv[1] === 'create') {
-      runProfilesCreate(argv.slice(2))
+    if (argv[0] === 'profiles') {
+      await runProfilesCommand(argv.slice(1))
       return
     }
   } catch (error) {
-    reportCliError(error, false)
+    reportCliError(error, argv.includes('--json'))
     process.exitCode = 1
     return
   }
