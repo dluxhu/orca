@@ -336,6 +336,7 @@
     },
     "notice": {
       "compaction": "コンテキストを圧縮しました",
+      "compactionAutomatic": "コンテキストを自動的に圧縮しました",
       "contextCleared": "コンテキストをクリアしました",
       "plan": "プラン",
       "stoppedManually": "手動で停止しました",

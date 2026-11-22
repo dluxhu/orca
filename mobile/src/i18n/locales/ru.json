@@ -344,6 +344,7 @@
     },
     "notice": {
       "compaction": "Контекст сокращён",
+      "compactionAutomatic": "Контекст сокращён автоматически",
       "contextCleared": "Контекст очищен",
       "plan": "План",
       "stoppedManually": "Остановлено вручную",
