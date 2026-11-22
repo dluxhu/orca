@@ -1,14 +1,20 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
 import { MessageRow } from './NativeChatMessageRow'
 import { serializeNativeChatAgentReferences } from '../../composer/pickers/native-chat-agent-reference-send'
 import { AgentReferencePillContent } from '../../composer/editor/native-chat-agent-reference'
+import { NativeChatQuoteJumpContext } from '../../selection-quotes/use-native-chat-quote-jump'
+import { rememberNativeChatQuoteSource } from '../../selection-quotes/native-chat-quote-sources'
+import { formatNativeChatQuote } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
 
 const chip = (label: string, kind: string) => ({
   type: 'nativeChatAgentReference',
@@ -155,4 +161,42 @@ it('shows text that only looks like a note', () => {
   // A real note for an agent the text does not mention is not a send note either.
   const unmentioned = sentText('Tech Lead').replace('ask @Tech Lead now', 'ask now')
   expect(bubble(unmentioned).textContent).toContain('[Orca chat "Tech Lead"')
+})
+
+// Both chips draw in one sent message: the mention from its routing note, the quote from its lines.
+it('draws a quote chip and a mention chip in one sent message, and the quote still jumps', () => {
+  rememberNativeChatQuoteSource('the quoted words', { messageId: 'reply-1', place: null })
+  const text = `${formatNativeChatQuote('the quoted words')}${send([
+    'ask ',
+    { label: 'A', kind: 'chat', address: 'orca_session_id:chat_aaaaaaaa' },
+    ' now'
+  ])}`
+  const jump = vi.fn(() => true)
+  render(
+    <TooltipProvider>
+      <NativeChatQuoteJumpContext.Provider value={jump}>
+        <MessageRow
+          message={{
+            id: 'sent',
+            role: 'user',
+            timestamp: 0,
+            source: 'transcript',
+            blocks: [{ type: 'text', text }]
+          }}
+          expandSignal={false}
+          onScrollMessageToTop={vi.fn()}
+        />
+      </NativeChatQuoteJumpContext.Provider>
+    </TooltipProvider>,
+    { wrapper: TranslationScopeProvider }
+  )
+  const shown = document.querySelector<HTMLElement>('.native-chat-markdown')!
+  expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('A')
+  fireEvent.click(screen.getByRole('button', { name: /^Quote: the quoted words/ }))
+  expect(jump).toHaveBeenCalledWith(
+    { messageId: 'reply-1', place: null },
+    'the quoted words',
+    expect.any(Function),
+    expect.any(Function)
+  )
 })
