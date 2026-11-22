@@ -5,6 +5,7 @@ import {
   getPlatformManifestReadiness,
   requestGitHubReleaseHead
 } from './updater-release-readiness'
+import { getVersionChannel } from '../../../shared/updater/release-channel'
 
 import {
   applyReleaseDelay,
@@ -91,7 +92,8 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
     }
     const tag = decodeURIComponent(match[1])
     const version = normalizeTagToVersion(tag)
-    if (!isValidVersion(version) || isPrereleaseVersion(version)) {
+    // Fork patch: a stable fork version (`-dlux.N`) is a semver prerelease, but it is the stable channel.
+    if (getVersionChannel(version) !== 'stable') {
       return null
     }
     return (await getPlatformManifestReadiness(tag)) === 'ready' ? tag : null
@@ -143,6 +145,15 @@ export async function fetchNewerReleaseTagsWithReadiness(
   if (maxTags <= 0) {
     return { tags: [], state: 'no-newer' }
   }
+  // Fork patch: the Nightly app reads the fixed `nightly` prerelease. It holds the manifest of the
+  // newest nightly build, and electron-updater compares the versions. The update delay does not apply.
+  if (getVersionChannel(currentVersion) === 'daily') {
+    return {
+      tags: ['nightly'],
+      state: 'ready',
+      releaseDelay: { heldRelease: null, isTagOldEnough: () => true }
+    }
+  }
   const tags = await fetchReleaseFeedTags()
   if (!tags) {
     return { tags: [], state: 'unavailable', unavailableReason: 'feed' }
@@ -187,6 +198,8 @@ function selectChannelCandidates(
   includePrerelease: boolean,
   releaseFilter: FetchNewerReleaseTagOptions['releaseFilter']
 ): ReleaseFeedTag[] {
+  // Fork patch: the Nightly app has its own feed. The stable app never takes a nightly build.
+  tags = tags.filter(({ version }) => getVersionChannel(version) !== 'daily')
   if (releaseFilter === 'perf') {
     return tags.filter(({ tag }) => isPerfPrereleaseTag(tag))
   }
