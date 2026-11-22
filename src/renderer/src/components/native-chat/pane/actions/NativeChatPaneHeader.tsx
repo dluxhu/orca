@@ -72,6 +72,7 @@ export function NativeChatPaneHeader({
   )
   const rawPanel = useNativeChatRawPanel(tabId)
   const showRaw = t('components.native-chat.rawPanel.toggle', 'Show raw')
+  const homeBot = hostedChat && homeRule && bot?.chatSessionId === nativeChat.sessionId ? bot : null
   return (
     <div
       className="pane-title-bar z-20"
@@ -80,7 +81,7 @@ export function NativeChatPaneHeader({
       data-pane-title-surface={light ? 'light' : 'dark'}
       style={HEADER_STYLE}
     >
-      {hostedChat && homeRule && bot ? <BotHomeBanner bot={bot} /> : null}
+      {homeBot ? <BotHomeBanner bot={homeBot} /> : null}
       <div className="pane-title-actions ml-auto flex shrink-0 items-center gap-0">
         {handOff && focused ? (
           <Tooltip>
