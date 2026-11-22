@@ -126,6 +126,16 @@ const ALLOWED: Allowed[] = [
     file: 'src/main/ai-vault/scanners/antigravity/session-scanner-antigravity-sources.ts',
     reason: ANTIGRAVITY
   },
+  {
+    file: 'src/main/antigravity/agy-credential-presence.ts',
+    line: 'antigravity-cli',
+    reason: ANTIGRAVITY
+  },
+  {
+    file: 'src/main/avatar-generation/avatar-image-agent-run.ts',
+    line: 'antigravity-cli',
+    reason: ANTIGRAVITY
+  },
   { file: 'src/main/antigravity/antigravity-chat-user-skills.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-host-acp.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-transcript-import.ts', reason: ANTIGRAVITY },

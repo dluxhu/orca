@@ -49,10 +49,22 @@ function build(plist, output) {
     ? [process.arch === 'arm64' ? 'arm64-apple-macosx' : 'x86_64-apple-macosx']
     : ['arm64-apple-macosx', 'x86_64-apple-macosx']
   const embed = plist
-    ? ['-Xlinker', '-sectcreate', '-Xlinker', '__TEXT', '-Xlinker', '__info_plist', '-Xlinker', plist]
+    ? [
+        '-Xlinker',
+        '-sectcreate',
+        '-Xlinker',
+        '__TEXT',
+        '-Xlinker',
+        '__info_plist',
+        '-Xlinker',
+        plist
+      ]
     : []
   const builtBinaries = triples.map((triple) => {
-    const binary = path.join(workDir, `orca-notification-status-${plist ? '' : 'profile-'}${triple}`)
+    const binary = path.join(
+      workDir,
+      `orca-notification-status-${plist ? '' : 'profile-'}${triple}`
+    )
     execFileSync(
       'swiftc',
       [

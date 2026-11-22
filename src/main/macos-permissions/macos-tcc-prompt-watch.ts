@@ -54,8 +54,7 @@ export function parseTccPromptEvent(line: string): TccPromptEvent | null {
 
 export function isOrcaAttributedPrompt(event: TccPromptEvent): boolean {
   return (
-    isOrcaResponsibleIdentifier(event.responsibleIdentifier) &&
-    WATCHED_SERVICES.has(event.service)
+    isOrcaResponsibleIdentifier(event.responsibleIdentifier) && WATCHED_SERVICES.has(event.service)
   )
 }
 
