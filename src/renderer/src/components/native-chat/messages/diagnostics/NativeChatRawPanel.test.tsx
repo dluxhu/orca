@@ -197,7 +197,8 @@ describe('Space in the panel', () => {
     expect(panel).toHaveAttribute('tabindex', '0')
     panel.focus()
     const insertTypedText = vi.fn(() => true)
-    const composer: NativeChatComposerHandle = {
+    // The test needs only the members the key route calls, not the whole handle.
+    const composer: Partial<NativeChatComposerHandle> = {
       focus: () => true,
       insertAgentReferences: () => false,
       insertTypedText,
@@ -217,7 +218,7 @@ describe('Space in the panel', () => {
         preventDefault: vi.fn(),
         stopPropagation: vi.fn()
       },
-      composer,
+      composer as NativeChatComposerHandle,
       null
     )
     expect(document.activeElement).toBe(panel)
