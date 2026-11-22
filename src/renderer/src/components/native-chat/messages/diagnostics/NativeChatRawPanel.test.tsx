@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
+import { Profiler } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -402,5 +403,43 @@ describe('the {} link under a reply', () => {
       })
     )
     expect(markedEntries()).toEqual(['t2', 'reply-2'])
+  })
+
+  it('moves focus to the panel, so a screen reader names it', () => {
+    render(<Transcript tabId="link-focus" />)
+    const link = within(screen.getByRole('region', { name: 'reply-2' })).getByRole('button', {
+      name: REPLY_LINK
+    })
+    link.focus()
+    fireEvent.click(link)
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Raw messages' }))
+  })
+
+  it('does not draw the links again on a journal update', () => {
+    const onRender = vi.fn()
+    // One element for both renders: only a context change can draw the reply again.
+    const reply = (
+      <TooltipProvider>
+        <Profiler id="reply" onRender={onRender}>
+          <Reply id="reply-2" />
+        </Profiler>
+      </TooltipProvider>
+    )
+    const view = render(
+      <NativeChatRawFrame tabId="link-stable" items={TURNS}>
+        {reply}
+      </NativeChatRawFrame>
+    )
+    expect(screen.getByRole('button', { name: REPLY_LINK })).toBeInTheDocument()
+    onRender.mockClear()
+    view.rerender(
+      <NativeChatRawFrame
+        tabId="link-stable"
+        items={[...TURNS, item('reply-3', 9, said('assistant', 'reply-3'))]}
+      >
+        {reply}
+      </NativeChatRawFrame>
+    )
+    expect(onRender).not.toHaveBeenCalled()
   })
 })

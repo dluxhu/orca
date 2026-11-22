@@ -235,10 +235,13 @@ export function NativeChatRawPanel({
     [items, focus]
   )
   // A marked reply stops the follow. A scroll back to the end starts it again.
+  // The panel takes focus, so a screen reader names it and Space pages it.
   useLayoutEffect(() => {
-    if (focus) {
+    const panel = scrollRef.current
+    if (focus && panel) {
       followingRef.current = false
-      scrollRef.current?.querySelector('[data-current]')?.scrollIntoView({ block: 'start' })
+      panel.focus({ preventScroll: true })
+      panel.querySelector('[data-current]')?.scrollIntoView({ block: 'start' })
     }
   }, [focus])
   return (
@@ -276,17 +279,20 @@ export function NativeChatRawFrame({
 }): React.JSX.Element {
   const { open } = useNativeChatRawPanel(tabId)
   const focus = useSyncExternalStore(subscribe, () => focusedTabs.get(tabId))
-  const links = useMemo((): RawLinkSource => {
-    const ids = new Set(items.map((item) => item.itemId))
-    return {
-      has: (messageId) => ids.has(messageId),
+  // A journal update must not draw the links again. They read the newest rows from this ref.
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  const links = useMemo(
+    (): RawLinkSource => ({
+      has: (messageId) => itemsRef.current.some((item) => item.itemId === messageId),
       show: (messageId) => {
         openTabs.add(tabId)
         focusedTabs.set(tabId, { messageId })
         notify()
       }
-    }
-  }, [items, tabId])
+    }),
+    [tabId]
+  )
   return (
     <div className="flex min-h-0 flex-1">
       <NativeChatRawLinkContext.Provider value={links}>
