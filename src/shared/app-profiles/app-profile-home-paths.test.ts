@@ -129,12 +129,12 @@ const ALLOWED: Allowed[] = [
   {
     file: 'src/main/antigravity/agy-credential-presence.ts',
     line: 'antigravity-cli',
-    reason: ANTIGRAVITY
+    reason: "read only: a stat of agy's token file; agy has no folder variable"
   },
   {
     file: 'src/main/avatar-generation/avatar-image-agent-run.ts',
     line: 'antigravity-cli',
-    reason: ANTIGRAVITY
+    reason: 'the files of the run that Orca started; agy has no folder variable, so it writes there'
   },
   { file: 'src/main/antigravity/antigravity-chat-user-skills.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-host-acp.ts', reason: ANTIGRAVITY },
