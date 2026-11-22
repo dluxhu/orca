@@ -352,6 +352,10 @@ git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' src/ren
 file that does not match upstream's manifest. Its test is
 `config/scripts/fork/graft-orcad-template-targets.test.mjs`.
 
+The phone page fence (`MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES` in
+`config/scripts/build/mobile-web-app/verify-mobile-web-app-bundle.mjs`) has 32 KiB more for the
+phone page code of the fork patches. Re-apply: keep upstream's new value and add `+ 32 * 1024`.
+
 ### Part 4: headless orcad Electron fallback
 
 **What.** On macOS, `installedElectronCandidates` in
