@@ -10,13 +10,13 @@ import { AgentReferencePillContent } from '../../composer/editor/native-chat-age
 
 afterEach(cleanup)
 
-const chip = (label: string, kind: string) => ({
+const chip = (label: string, kind: string, environment?: string) => ({
   type: 'nativeChatAgentReference',
-  attrs: { label, address: 'orca_session_id:chat_aaaaaaaa', hostKey: 'local', kind }
+  attrs: { label, address: 'orca_session_id:chat_aaaaaaaa', hostKey: 'local', kind, environment }
 })
 
 /** The text a send delivers for "ask <chip> now", made by the real serializer. */
-function sentText(label: string): string {
+function sentText(label: string, environment?: string): string {
   const token = `@${label} (Orca agent orca_session_id:chat_aaaaaaaa)`
   return serializeNativeChatAgentReferences(`ask ${token} now`, {
     type: 'doc',
@@ -25,7 +25,7 @@ function sentText(label: string): string {
         type: 'paragraph',
         content: [
           { type: 'text', text: 'ask ' },
-          chip(label, 'chat'),
+          chip(label, 'chat', environment),
           { type: 'text', text: ' now' }
         ]
       }
@@ -107,6 +107,14 @@ it('shows a sent mention as its chip and hides the routing note the agent got', 
   const shown = bubble(text)
   expect(shown.textContent).toBe(`ask ${composerChip('Tech "Lead"')} now`)
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Tech "Lead"')
+})
+
+it('shows a mention of a chat on another host as its chip, with no note', () => {
+  const text = sentText('Lead on Box (box)', 'box')
+  expect(text).toContain(' — message it with orca orchestration send --on box --to ')
+  const shown = bubble(text)
+  expect(shown.textContent).toBe(`ask ${composerChip('Lead on Box (box)')} now`)
+  expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('Lead on Box (box)')
 })
 
 it('hides the notes of a goal, which follow the text on the same line', () => {
