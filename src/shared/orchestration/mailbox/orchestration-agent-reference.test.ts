@@ -14,10 +14,10 @@ describe('splitAgentReferenceNotes', () => {
     ).toEqual({
       body: '@Chat @Agent @Shell @Crew (2)',
       mentions: [
-        { label: 'Chat', kind: 'chat' },
-        { label: 'Agent', kind: 'terminal' },
-        { label: 'Shell', kind: 'shell' },
-        { label: 'Crew (2)', kind: null }
+        { label: 'Chat', kind: 'chat', address: 'orca_session_id:chat_aaaaaaaa' },
+        { label: 'Agent', kind: 'terminal', address: 'term_a1' },
+        { label: 'Shell', kind: 'shell', address: 'term_b2' },
+        { label: 'Crew (2)', kind: null, address: 'dispatch:ctx_second' }
       ]
     })
   })
@@ -33,9 +33,14 @@ describe('splitAgentReferenceNotes', () => {
     ).toEqual({
       body: 'to @Lead on Box (box), @Shell @Agent',
       mentions: [
-        { label: 'Lead on Box (box)', kind: 'chat' },
-        { label: 'Shell', kind: 'shell' },
-        { label: 'Agent', kind: 'terminal' }
+        {
+          label: 'Lead on Box (box)',
+          kind: 'chat',
+          address: 'orca_session_id:chat_aaaaaaaa',
+          environment: 'box'
+        },
+        { label: 'Shell', kind: 'shell', address: 'term_b2', environment: "it's mine" },
+        { label: 'Agent', kind: 'terminal', address: 'term_a1', environment: '-dash' }
       ]
     })
     const note = agentReferenceNote('A', 'term_a1', 'terminal', 'box')
@@ -48,7 +53,7 @@ describe('splitAgentReferenceNotes', () => {
     const note = agentReferenceNote('A', 'term_a1', 'terminal')
     expect(splitAgentReferenceNotes(`p1\n\np2 @A\n\n${note}`)).toEqual({
       body: 'p1\n\np2 @A',
-      mentions: [{ label: 'A', kind: 'terminal' }]
+      mentions: [{ label: 'A', kind: 'terminal', address: 'term_a1' }]
     })
   })
 
@@ -58,8 +63,8 @@ describe('splitAgentReferenceNotes', () => {
     expect(splitAgentReferenceNotes(`do @A [x] and @B ${a} ${b}`, 'goal')).toEqual({
       body: 'do @A [x] and @B',
       mentions: [
-        { label: 'A', kind: 'terminal' },
-        { label: 'B', kind: 'chat' }
+        { label: 'A', kind: 'terminal', address: 'term_a1' },
+        { label: 'B', kind: 'chat', address: 'orca_session_id:chat_aaaaaaaa' }
       ]
     })
     expect(splitAgentReferenceNotes(`do @A ${a}`)).toBeNull()
