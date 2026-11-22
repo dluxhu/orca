@@ -36,7 +36,7 @@ export function NativeChatSelectionQuote({
         composerRef.current?.acceptsText() ? readNativeChatQuotableSelection(root) : null
       }
       onSelectionSettled={copyTranscriptSelectionOnSelect}
-      onAdd={(text) => composerRef.current?.appendText(formatNativeChatQuote(text))}
+      onAdd={(text) => composerRef.current?.insertQuote(formatNativeChatQuote(text))}
     />
   )
 }
