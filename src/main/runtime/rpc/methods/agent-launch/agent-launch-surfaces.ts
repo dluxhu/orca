@@ -111,7 +111,8 @@ export function agentLaunchSurfaceFactory(
         throw new AgentLaunchStructuredSessionRefusedError(
           created.refusal.code,
           created.refusal.message,
-          createRefusedBeforeCommit(created)
+          createRefusedBeforeCommit(created),
+          created.refusal.details
         )
       }
       return {
