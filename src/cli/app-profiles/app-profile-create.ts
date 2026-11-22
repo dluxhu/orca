@@ -23,6 +23,7 @@ import {
   appProfilesAppsDir,
   appProfilesRoot,
   ensureAppProfileMarker,
+  readAppProfileMarker,
   readAppProfileRegistry,
   readPlistString,
   type AppProfileEntry,
@@ -65,8 +66,13 @@ export type CreateAppProfileOptions = {
   now?: () => number
 }
 
-/** Builds and signs the profile app, writes its marker and adds it to profiles.json. */
-export function createAppProfile(options: CreateAppProfileOptions): AppProfileEntry {
+/**
+ * Builds and signs the profile app, writes its marker and adds it to profiles.json. A data folder
+ * that "Keep data" left for this id stays, and the new app uses it (adoptedData).
+ */
+export function createAppProfile(
+  options: CreateAppProfileOptions
+): AppProfileEntry & { adoptedData: boolean } {
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
   const run = options.run ?? runTool
@@ -100,6 +106,15 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       appProfilePortError(port, ports)
     if (error) {
       throw new RuntimeClientError('invalid_argument', error)
+    }
+    const userDataPath = join(root, id)
+    // On a volume that ignores case, the folder of "Work" is also the folder of "work".
+    const keptId = readAppProfileMarker(userDataPath)
+    if (keptId !== null && keptId !== id) {
+      throw new RuntimeClientError(
+        'invalid_argument',
+        `${userDataPath} is the data folder of the profile "${keptId}". Use the id "${keptId}".`
+      )
     }
     const appPath = join(appsDir, `${name}.app`)
     if (existsSync(appPath)) {
@@ -199,7 +214,6 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       ])
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
-      const userDataPath = join(root, id)
       ensureAppProfileMarker(userDataPath, id)
       if (options.settingsFile) {
         copyFileSync(options.settingsFile, join(userDataPath, APP_PROFILE_SETTINGS_SEED))
@@ -221,7 +235,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
         rmSync(appPath, { recursive: true, force: true })
         throw error
       }
-      return entry
+      return { ...entry, adoptedData: keptId !== null }
     } finally {
       rmSync(staging, { recursive: true, force: true })
     }

@@ -244,6 +244,22 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     expect(calls.some((call) => call[0].endsWith('security'))).toBe(false)
   })
 
+  it('gives the kept data back to a new profile with the same id', async () => {
+    const work = makeProfile()
+    writeFileSync(join(work.userDataPath, 'orca-data.json'), 'old chats')
+    await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
+    const again = createAppProfile({
+      name: 'Orca - Work again',
+      id: 'work',
+      defaultAppPath: app,
+      env: env(),
+      run
+    })
+    expect(again).toMatchObject({ userDataPath: work.userDataPath, adoptedData: true })
+    expect(readFileSync(join(work.userDataPath, 'orca-data.json'), 'utf8')).toBe('old chats')
+    expect(registry().profiles.map((p) => p.id)).toEqual(['work'])
+  })
+
   it('refuses while the profile app runs', async () => {
     const work = makeProfile()
     writeRuntimePid(work.userDataPath, 4242)

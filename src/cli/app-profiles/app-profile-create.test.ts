@@ -98,7 +98,7 @@ function plistValue(path: string, key: string): string | null {
 
 describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
   it('builds the thin bundle: copied executables and helpers, linked frameworks and resources', () => {
-    const entry = createAppProfile({
+    const { adoptedData, ...entry } = createAppProfile({
       name: 'Orca - Work',
       defaultAppPath: app,
       env: env(),
@@ -106,6 +106,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       now: () => 1,
       pinRoot: true
     })
+    expect(adoptedData).toBe(false)
     const contents = join(entry.appPath, 'Contents')
     expect(entry).toEqual({
       id: 'work',
@@ -279,5 +280,30 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile with --id and s
     expect(() =>
       createAppProfile({ name: 'A', id: 'Manager', defaultAppPath: app, env: env(), run })
     ).toThrow('reserved')
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('createAppProfile on kept data', () => {
+  it('adopts the data folder that a removal with "Keep data" left for this id', () => {
+    const userDataPath = join(dir, 'data', 'work')
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}\n')
+    writeFileSync(join(userDataPath, 'orca-data.json'), 'old chats')
+    const entry = createAppProfile({ name: 'Job', id: 'work', defaultAppPath: app, env: env(), run })
+    expect(entry).toMatchObject({ id: 'work', userDataPath, adoptedData: true })
+    expect(readFileSync(join(userDataPath, 'orca-data.json'), 'utf8')).toBe('old chats')
+    expect(
+      createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).adoptedData
+    ).toBe(false)
+  })
+
+  it('refuses a data folder whose marker names another profile', () => {
+    const userDataPath = join(dir, 'data', 'work')
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"Work"}\n')
+    expect(() =>
+      createAppProfile({ name: 'Job', id: 'work', defaultAppPath: app, env: env(), run })
+    ).toThrow('is the data folder of the profile "Work"')
+    expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
   })
 })
