@@ -62,6 +62,7 @@ import { isAgentStatusHooksEnabled } from '../../shared/agent-hook-listener/conf
 import { reportProfileStateWriteFailure } from './profile-startup/profile-state-write-failure'
 import { reportProfileStateSaveDelay } from './profile-startup/profile-state-save-delay'
 import { preloadSsh2 } from '../ssh/authentication/ssh2-module-load'
+import { applyAppProfileSettingsSeed } from '../app-profiles/app-profile-startup'
 
 export async function initializeReadyFoundation(): Promise<void> {
   logStartupMilestone('app-ready')
@@ -177,6 +178,7 @@ export async function initializeReadyFoundation(): Promise<void> {
   }
   const store = profileState.store
   state.store = store
+  applyAppProfileSettingsSeed(getAppEnvironment().getPath('userData'), store)
   const nativeSettings = createStoreNativeSettingsProjection(store)
   state.nativeSettings = nativeSettings
   hangWatchdog?.setMenuBarIconSetting(nativeSettings.getSettings().showMenuBarIcon !== false)

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +12,7 @@ const { setPath, setName, hasSwitch, profile } = vi.hoisted(() => ({
 vi.mock('electron', () => ({ app: { setPath, setName, commandLine: { hasSwitch } } }))
 vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
 
-import { configureAppProfileStartup } from './app-profile-startup'
+import { applyAppProfileSettingsSeed, configureAppProfileStartup } from './app-profile-startup'
 
 let home: string
 
@@ -56,5 +56,19 @@ describe('configureAppProfileStartup', () => {
     expect(configureAppProfileStartup(false)).toBeNull()
     expect(setPath).not.toHaveBeenCalled()
     expect(setName).not.toHaveBeenCalled()
+  })
+})
+
+describe('applyAppProfileSettingsSeed', () => {
+  it('applies the copied settings once and removes the seed', () => {
+    const folder = join(home, 'seeded')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 'orca-settings-seed.json'), JSON.stringify({ theme: 'dark' }))
+    const updateSettings = vi.fn()
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    expect(updateSettings).toHaveBeenCalledTimes(1)
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
+    expect(existsSync(join(folder, 'orca-settings-seed.json'))).toBe(false)
   })
 })
