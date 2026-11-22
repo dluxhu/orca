@@ -88,7 +88,8 @@ function Chat({
     beginNavigation: () => {},
     readerLeavesEnd: () => {},
     startHistoryJump,
-    sessionKey: 'claude:chat'
+    sessionKey: 'claude:chat',
+    unfoldTurnOf: () => false
   })
   return (
     <TooltipProvider delayDuration={0}>
