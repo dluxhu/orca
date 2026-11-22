@@ -169,3 +169,10 @@ it('shows the quoted text with its Markdown marks in the tooltip', async () => {
   fireEvent.focus(screen.getByRole('button', { name: /^Quote: / }))
   expect(await screen.findByRole('tooltip')).toHaveTextContent(/^- removed$/)
 })
+
+// One spoken phrase: the button's name is the translated "Quote: …", and the shown text is not read twice.
+it('names the chip with one spoken phrase', () => {
+  sent(`${formatNativeChatQuote('the quoted words')}reply`)
+  const chip = screen.getByRole('button', { name: 'Quote: the quoted words' })
+  expect(chip.querySelector('.truncate')).toHaveAttribute('aria-hidden', 'true')
+})
