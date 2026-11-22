@@ -2,7 +2,7 @@ import {
   hasAgentSenderPublication,
   selectAgentSenderAssociation
 } from '@/runtime/native-chat/agent-senders/agent-sender-associations'
-import { useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import {
   useLeasedSenderSelector,
   useStableSenderTarget
@@ -29,6 +29,11 @@ import type { AgentMessageSender } from '../../../../../../shared/agent-session/
 import type { Tab } from '../../../../../../shared/workspace-layout/tab-groups/tab-types'
 import { useBotForWorkspace } from '@/components/bots/bot-workspace'
 import { runtimeTargetForInstallation } from '@/runtime/hosts/selection/runtime-target-for-installation'
+import {
+  appRuntimeStatusSubscriptions,
+  readRuntimeStatuses,
+  type RuntimeStatuses
+} from '@/store/slices/runtime-status/views/runtime-status-owner'
 import { parseOrcaSessionAddress } from '../../../../../../shared/agent-session/identity/orca-session-address'
 import type { Bot } from '../../../../../../shared/bot-types'
 
@@ -154,20 +159,19 @@ function labelSourceSelector(
 }
 
 /** A chat on another Orca, by the host this window reaches that Orca through. */
-function originSourceSelector(hostId: string, sessionId: string): (state: AppState) => LabelSource {
+function originSourceSelector(
+  hostId: string,
+  sessionId: string,
+  statuses: RuntimeStatuses
+): (state: AppState) => LabelSource {
   let previous: LabelSource = { host: null, worktreeId: null }
   let hostInputs: unknown[] = []
   let host: string | null = null
   return (state) => {
-    // The host lookup reads every host status, so it runs only when those inputs change.
-    const inputs = [
-      state.runtimeStatusByEnvironmentId,
-      state.ownLineageInstallationId,
-      state.removedRuntimeEnvironmentIds
-    ]
+    const inputs = [state.ownLineageInstallationId, state.removedRuntimeEnvironmentIds]
     if (inputs.some((value, index) => value !== hostInputs[index])) {
       hostInputs = inputs
-      const target = runtimeTargetForInstallation(state, state.runtimeStatusByEnvironmentId, hostId)
+      const target = runtimeTargetForInstallation(state, statuses, hostId)
       host = target ? executionHostIdForStructuredTarget(target) : null
     }
     const tab = host ? findAgentMessageSenderChatTab(state, sessionId, host) : undefined
@@ -183,6 +187,20 @@ function originSourceSelector(hostId: string, sessionId: string): (state: AppSta
   }
 }
 
+const subscribeStatuses = (listener: () => void) =>
+  appRuntimeStatusSubscriptions().subscribeStatuses(listener)
+const subscribeNothing = () => () => {}
+const readNoStatuses = () => null
+
+/** The host statuses, only for a sender on another Orca: other cards do not wake on host changes. */
+function useOriginHostStatuses(origin: boolean): RuntimeStatuses | null {
+  return useSyncExternalStore(
+    origin ? subscribeStatuses : subscribeNothing,
+    origin ? readRuntimeStatuses : readNoStatuses,
+    origin ? readRuntimeStatuses : readNoStatuses
+  )
+}
+
 function useAgentMessageSenderChat(
   sender: AgentMessageSender | undefined,
   chatWorktreeId: string | null,
@@ -192,12 +210,13 @@ function useAgentMessageSenderChat(
   const { address, orcaSessionId, terminalHandle } = sender?.party ?? {}
   const originHost = sender?.origin?.hostId
   const originSession = sender?.origin ? parseOrcaSessionAddress(sender.origin.address) : null
+  const statuses = useOriginHostStatuses(Boolean(originHost && originSession))
   const stableTarget = useStableSenderTarget(target)
   const select = useMemo(
     () =>
       // A chat on another Orca is named from that Orca, when this window reaches it.
-      originHost && originSession
-        ? originSourceSelector(originHost, originSession)
+      originHost && originSession && statuses
+        ? originSourceSelector(originHost, originSession, statuses)
         : labelSourceSelector(
             address !== undefined
               ? {
@@ -218,7 +237,8 @@ function useAgentMessageSenderChat(
       stableTarget,
       dispatchId,
       originHost,
-      originSession
+      originSession,
+      statuses
     ]
   )
   return useLeasedSenderSelector(NO_ROWS, select)

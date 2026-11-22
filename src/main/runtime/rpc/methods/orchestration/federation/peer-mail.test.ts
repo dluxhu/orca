@@ -323,7 +323,8 @@ describe('agent mail between paired Orca servers', () => {
     expect(formatMessageBanner(back!)).toContain(`From: Build doctor (${CHAT_ON_B} on Build Box)`)
   })
 
-  it('drops the link of mail that claims to come from a chat of this Orca', async () => {
+  it('drops the link of mail and of a reply that claim to come from a chat of the receiving Orca', async () => {
+    // Both servers read the same id, so each one's mail names the other's own id.
     vi.spyOn(a.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
     vi.spyOn(b.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
     const send = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.send')!
@@ -339,6 +340,15 @@ describe('agent mail between paired Orca servers', () => {
     } as unknown as RpcContext)
     const [onB] = mailFor(b, 'term_b')
     expect(readAnswerSenderSnapshot(onB!.answer_sender_snapshot)?.origin).toBeUndefined()
+
+    await chatReply(b, CHAT_ON_B, { id: onB!.id, body: 'Plan attached.' })
+    a.runtime.ensureOrchestrationFederationRelay()
+    await vi.waitFor(() => expect(mailFor(a, CHAT_ON_A)).toHaveLength(1))
+    const [back] = mailFor(a, CHAT_ON_A)
+    expect(readAnswerSenderSnapshot(back!.answer_sender_snapshot)).toMatchObject({
+      name: expect.any(String)
+    })
+    expect(readAnswerSenderSnapshot(back!.answer_sender_snapshot)?.origin).toBeUndefined()
   })
 
   it('keeps the sender label of mail whose Orca sent no name or location', async () => {

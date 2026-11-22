@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, screen } from '@testing-library/react'
+import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -87,7 +87,12 @@ function connectOrcaB(): void {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the lookup reads only the installation id of the status.
     runtimeStatusByEnvironmentId: new Map([
       ['env-b', { status: { hostDescriptor: { installationId: 'install-b' } } }]
-    ]) as unknown as ReturnType<typeof useAppStore.getState>['runtimeStatusByEnvironmentId'],
+    ]) as unknown as ReturnType<typeof useAppStore.getState>['runtimeStatusByEnvironmentId']
+  })
+}
+
+function openChatOnOrcaB(): void {
+  useAppStore.setState({
     unifiedTabsByWorktree: {
       remote: [
         makeUnifiedTab({
@@ -105,6 +110,7 @@ function connectOrcaB(): void {
 }
 
 it('names a chat on another Orca from that Orca, and opens it there', async () => {
+  openChatOnOrcaB()
   connectOrcaB()
   renderPeerMail({ name: 'Sent name', agent: 'claude', origin })
 
@@ -126,4 +132,14 @@ it('uses the sent name, and says so when this window is not connected to its Orc
 
   expect(openOrchestrationDispatch).not.toHaveBeenCalled()
   expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('not connected'))
+})
+
+it('renames the card when its Orca connects after the card shows', async () => {
+  openChatOnOrcaB()
+  renderPeerMail({ name: 'Sent name', agent: 'claude', origin })
+  expect(screen.getByRole('button', { name: 'Open Sent name' })).toBeInTheDocument()
+
+  act(() => connectOrcaB())
+
+  expect(await screen.findByRole('button', { name: 'Open Live name' })).toBeInTheDocument()
 })
