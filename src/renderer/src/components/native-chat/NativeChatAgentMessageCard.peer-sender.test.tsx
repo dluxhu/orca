@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { act, cleanup, screen } from '@testing-library/react'
+import { act, cleanup, renderHook, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import {
   resetSenderStore
 } from './messages/agent-senders/native-chat-agent-sender.test-fixture'
 import { MessageRow } from './messages/rows/NativeChatMessageRow'
+import { useAgentMessageSenderLabel } from './messages/agent-senders/native-chat-agent-message-sender-label'
 import { readAgentMessageSource } from '../../../../shared/agent-session/journal/agent-session-message-source'
 import { toRuntimeExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import { makeUnifiedTab } from '@/store/slices/tabs/tab-group.test-fixture'
@@ -142,4 +143,23 @@ it('renames the card when its Orca connects after the card shows', async () => {
   act(() => connectOrcaB())
 
   expect(await screen.findByRole('button', { name: 'Open Live name' })).toBeInTheDocument()
+})
+
+it('does not wake a sender without an origin on host status changes', () => {
+  const [sender] = readAgentMessageSource({
+    kind: 'agent',
+    senders: [
+      { party: { address: 'term_1', terminalHandle: 'term_1', orcaSessionId: null }, name: 'Local' }
+    ]
+  })!.senders
+  let renders = 0
+  renderHook(() => {
+    renders += 1
+    return useAgentMessageSenderLabel(sender!, 'workspace', { kind: 'local' })
+  })
+  const before = renders
+
+  act(() => connectOrcaB())
+
+  expect(renders).toBe(before)
 })
