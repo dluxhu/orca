@@ -1,5 +1,9 @@
-import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
-import { resolve } from 'node:path'
+import {
+  defaultAgentHomeDir,
+  isAppProfileHomeValue
+} from '../../../../shared/app-profiles/app-profile-homes'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 
 // Strip inherited account pins so only the session record selects the Keychain identity.
 export function withoutInheritedClaudeConfigDir(
@@ -37,7 +41,10 @@ export function claudeConfigDirEnvPatch(
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
   const resolved = accountHome.trim()
-  if (!resolved || samePath(resolved, defaultClaudeConfigDir(env), platform)) {
+  const fallback = defaultClaudeConfigDir(env)
+  // A child env can drop a profile's folder. Without the variable, the CLI uses ~/.claude.
+  const cliDefault = isAppProfileHomeValue(fallback) ? join(homedir(), '.claude') : fallback
+  if (!resolved || samePath(resolved, cliDefault, platform)) {
     return {}
   }
   return { CLAUDE_CONFIG_DIR: resolved }
