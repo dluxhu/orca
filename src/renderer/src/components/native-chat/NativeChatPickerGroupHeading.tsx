@@ -5,6 +5,8 @@ const GROUP_HEADINGS = {
   skills: (t: Translate) => t('components.native-chat.composer.skills', 'Skills'),
   agents: (t: Translate) => t('components.native-chat.composer.agents', 'Agents'),
   bots: (t: Translate) => t('components.native-chat.composer.bots', 'Bots'),
+  sessions: (t: Translate) =>
+    t('components.native-chat.composer.chatsAndTerminals', 'Chats and terminals'),
   files: (t: Translate) => t('components.native-chat.composer.files', 'Files')
 }
 

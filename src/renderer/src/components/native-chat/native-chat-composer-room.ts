@@ -17,7 +17,8 @@ import {
 } from './native-chat-room-context'
 import {
   useNativeChatMentionFiles,
-  type NativeChatMentionFiles
+  type NativeChatMentionFiles,
+  type NativeChatMentionScope
 } from './composer/pickers/use-native-chat-mention-files'
 import { useNativeChatMentionChatDrill } from './composer/pickers/use-native-chat-mention-chat-drill'
 import { useSpacedMemberQuery } from './composer/pickers/use-native-chat-spaced-mention'
@@ -31,6 +32,10 @@ import {
   NO_CREW_AGENT_MENTIONS
 } from '../orchestration-crew/native-chat-crew-mentions'
 import type { NativeChatMentionToken } from './composer/editor/native-chat-composer-input'
+import {
+  useNativeChatSessionMentionPick,
+  type NativeChatSessionMentionPicker
+} from './composer/pickers/use-native-chat-session-mention-pick'
 
 const memberOf = (room: NativeChatComposerRoom | undefined, value: string) =>
   room?.mentions.find((mention) => nativeChatMentionValue(mention) === value)
@@ -45,7 +50,7 @@ const NO_MEMBERS: NativeChatComposerRoom['mentions'] = []
 export function useNativeChatComposerMentions(
   ownRoom: NativeChatComposerRoom | undefined,
   draft: string,
-  picker: {
+  picker: NativeChatSessionMentionPicker & {
     autocomplete: ComposerAutocomplete
     completeMention: (path: string, token?: NativeChatMentionToken, from?: number) => void
   },
@@ -53,7 +58,7 @@ export function useNativeChatComposerMentions(
     caret: caretAt,
     notices = NO_NOTICES,
     ...files
-  }: {
+  }: NativeChatMentionScope & {
     terminalTabId: string
     structuredWorktreeId: string | undefined
     caret?: number
@@ -92,6 +97,10 @@ export function useNativeChatComposerMentions(
   }, [opened])
   const workspaceFiles = useNativeChatMentionFiles({
     ...files,
+    draft,
+    caret,
+    withSessions: picker.completeSessionMention !== undefined,
+    setActiveSuggestion: picker.navigateSuggestion,
     query: room && !room.withFiles ? null : query
   })
   // The strip's own crew subscription: rows only while `@` is open, never a read per keystroke.
@@ -137,7 +146,7 @@ export function useNativeChatComposerMentions(
       : { files: [...pickable, ...agents], loading: false, failed: false }
   }, [room, query, agents, pickable, workspaceFiles])
   const botIdOf = useCallback((value: string) => memberOf(room, value)?.id ?? null, [room])
-  const chooseMention = useCallback(
+  const chooseOther = useCallback(
     (value: string) => {
       const agent = crewAgents.references.get(value)
       if (agent) {
@@ -163,6 +172,7 @@ export function useNativeChatComposerMentions(
     },
     [botIdOf, drillPicker, drill, completeMention, room, ownRoom, botChatRoom, crewAgents, spaced]
   )
+  const chooseMention = useNativeChatSessionMentionPick(mentionFiles.sessions, picker, chooseOther)
 
   const chosen = useBotChatPillChecks(draft, chatPicker)
   const roomContext = useMemo(
