@@ -285,6 +285,7 @@ export async function createStructuredAgentSessionForWorktree(args: {
   /** False publishes no tab; use `createBackgroundStructuredAgentSession`, which also keeps a restart from restoring one. */
   publishTab?: false
   firstMessage?: StructuredAgentSessionFirstMessage
+  resumeFrom?: StructuredAgentSessionResumeSource
   signal?: AbortSignal
   beforeFirstMessage?: () => void | Promise<void>
   beforeDelivery?: () => boolean

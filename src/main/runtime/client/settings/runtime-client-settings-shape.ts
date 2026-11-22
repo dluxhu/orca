@@ -19,6 +19,7 @@ export type RuntimeClientSettings = Pick<
   | 'agentDefaultEnv'
   | 'agentStatusHooksEnabled'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'terminalCopyTrimsGutter'
   | 'terminalScrollbackRows'
   | 'terminalWordSeparator'
@@ -81,6 +82,7 @@ export type RuntimeClientSettingsUpdate = Pick<
   Partial<GlobalSettings>,
   | 'agentStatusHooksEnabled'
   | 'claudeSubagentNavigationEnabled'
+  | 'claudeRemoteControlForNewChats'
   | 'botsEnabled'
   | 'defaultTuiAgent'
   | 'disabledTuiAgents'

@@ -43,6 +43,7 @@ import type {
 /** `unknown` (no timely, correlated answer) skips this idle stop and asks again later. */
 export type AgentSessionIdleConfirmation = 'idle' | 'busy' | 'unknown'
 
+import type { AgentSessionRemoteControlState } from '../../../../shared/rpc-contract/structured-agent-session/structured-agent-session-remote-control-params'
 import type { AgentJournalDispatchRejection } from '../../../../shared/agent-session/failures/agent-session-failure-words'
 import type { AgentSessionExecutionOptions } from '../../../../shared/agent-session/options/protocol/agent-session-execution-options'
 import type { AgentSessionPromptResponse } from '../../../../shared/agent-session/requests/prompts/agent-session-question-answer'
@@ -267,6 +268,14 @@ export type StructuredAgentSessionAdapter = AdapterControls & {
   }): Promise<{ ok: true } | { ok: false; rejected: string }>
   /** Derive unanswered retained work from the live child; false without one. */
   holdsDispatch?(sessionId: string): boolean
+  /** Turn Remote Control on when this new chat opens, as a Turn On does; false when the agent has none.
+   *  `forget` drops that choice for a chat whose create was refused. */
+  turnOnRemoteControlAtOpen?(input: { sessionId: string; agent: string; forget?: true }): boolean
+  /** Read Remote Control without `enabled`, else turn it on or off; null where the live child has none. */
+  remoteControl?(input: {
+    sessionId: string
+    enabled?: boolean
+  }): Promise<AgentSessionRemoteControlState | null>
   /** Fresh answer before an idle stop: provider-declared work keeps the child; undefined has none to ask. */
   confirmIdle?(sessionId: string): Promise<AgentSessionIdleConfirmation> | undefined
   /** The root turn the live child is running, null when idle; absent when the agent cannot say. */
