@@ -66,6 +66,9 @@ export async function assertAdoptedSourceIdentity(
   }
 }
 
+// shortcut: keeps the first 256 directories a Claude conversation ran in; raise it if longer histories matter.
+const MAX_CLAUDE_CWDS = 256
+
 // Observe metadata from the same lines imported into the journal.
 export function adoptedTranscriptSourceObserver(input: {
   agent: AgentType
@@ -79,6 +82,8 @@ export function adoptedTranscriptSourceObserver(input: {
       ? sessionIdFromFileName(input.filePath)
       : null
   let cwd: string | null = null
+  // A resumed Claude conversation records each directory it ran in; one of them is this workspace.
+  const claudeCwds = new Set<string>()
   let sawCodexMetadata = false
   return {
     observe(line: string) {
@@ -88,7 +93,11 @@ export function adoptedTranscriptSourceObserver(input: {
       }
       if (input.agent === 'claude') {
         sessionId = extractString(record.sessionId) ?? sessionId
-        cwd ??= extractString(record.cwd)
+        const recorded = extractString(record.cwd)
+        if (recorded && claudeCwds.size < MAX_CLAUDE_CWDS) {
+          claudeCwds.add(recorded)
+        }
+        cwd ??= recorded
       } else if (input.agent === 'codex' && record.type === 'session_meta' && !sawCodexMetadata) {
         sawCodexMetadata = true
         const payload = asRecord(record.payload)
@@ -111,6 +120,12 @@ export function adoptedTranscriptSourceObserver(input: {
         sessionId = extractString(summary?.id) ?? sessionIdFromFileName(dirname(input.filePath))
         cwd = extractString(summary?.cwd)
       }
+      const workspace = normalizeRuntimePathForComparison(input.source.workspaceCwd.trim())
+      // A miss probes the first directory so a symlinked path still matches.
+      cwd =
+        [...claudeCwds].find(
+          (recorded) => normalizeRuntimePathForComparison(recorded.trim()) === workspace
+        ) ?? cwd
       if (input.agent === 'pi' && sessionIdFromFileName(input.filePath) !== sessionId) {
         throw new Error('The saved conversation header does not match its file identity.')
       }
