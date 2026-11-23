@@ -6,14 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { bbox, newImg } from '../../shared/icon-badger/raster'
 import {
   appProfileIconSourceFromFlags,
-  decodePng,
-  encodePng,
-  largestIcnsPng,
   makeAppProfileIcon,
   nextBadgeText,
-  rasterizeWithAppKit,
-  writeIcns
+  rasterizeWithAppKit
 } from './app-profile-icon'
+import { decodePng, encodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
 
 let dir: string
 beforeEach(() => {
@@ -62,10 +59,13 @@ describe('profile icon sources', () => {
     )
   })
 
-  it('refuses a badge that is not one character, and a missing file', () => {
+  it('refuses a badge that is not one visible character, and a missing file', () => {
     const app = join(dir, 'none.app')
-    expect(() => makeAppProfileIcon(app, { kind: 'badge', text: ' ' })).toThrow('one character')
-    expect(() => makeAppProfileIcon(app, { kind: 'badge', text: 'AB' })).toThrow('one character')
+    for (const text of ['', ' ', 'AB', '\u200b', '\u0007', '\u00a0']) {
+      expect(() => makeAppProfileIcon(app, { kind: 'badge', text })).toThrow(
+        'A badge has one visible character'
+      )
+    }
     expect(() => makeAppProfileIcon(app, { kind: 'file', path: join(dir, 'x.png') })).toThrow(
       'No file'
     )
@@ -79,10 +79,30 @@ describe('PNG and .icns', () => {
     expect(decodePng(encodePng(img))).toEqual(img)
   })
 
-  it('writes the ten iconset sizes; the largest is 1024 px', () => {
+  it('writes the ten iconset sizes, each with its OSType; the largest is 1024 px', () => {
     const icns = writeIcns(newImg(1024, 1024, 4, [10, 20, 30, 255]))
     expect(icns.toString('latin1', 0, 4)).toBe('icns')
     expect(icns.readUInt32BE(4)).toBe(icns.length)
+    const entries: [string, number][] = []
+    for (let offset = 8; offset < icns.length; offset += icns.readUInt32BE(offset + 4)) {
+      // The PNG width is in IHDR, 16 bytes into the PNG.
+      entries.push([
+        icns.toString('latin1', offset, offset + 4),
+        icns.readUInt32BE(offset + 8 + 16)
+      ])
+    }
+    expect(entries).toEqual([
+      ['icp4', 16],
+      ['ic11', 32],
+      ['icp5', 32],
+      ['ic12', 64],
+      ['ic07', 128],
+      ['ic13', 256],
+      ['ic08', 256],
+      ['ic14', 512],
+      ['ic09', 512],
+      ['ic10', 1024]
+    ])
     const largest = decodePng(largestIcnsPng(icns)!)!
     expect([largest.width, largest.height]).toEqual([1024, 1024])
     expect([...largest.data.subarray(0, 4)]).toEqual([10, 20, 30, 255])
@@ -91,6 +111,19 @@ describe('PNG and .icns', () => {
 
 describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () => {
   // The text is drawn by AppKit, not by Pillow, so only the glyph box is checked (design, section 8).
+  it('names the file, not the script, when AppKit cannot read an image', () => {
+    const path = join(dir, 'not-an-image.png')
+    writeFileSync(path, 'text')
+    let message = ''
+    try {
+      rasterizeWithAppKit('file', path)
+    } catch (error) {
+      message = (error as Error).message
+    }
+    expect(message).toContain(`Cannot read the image ${path}`)
+    expect(message).not.toContain('ObjC.import')
+  })
+
   it('draws the badge character in the middle of a 1024 px image', () => {
     const box = bbox(rasterizeWithAppKit('text', '2'))!
     const [x0, y0, x1, y1] = box

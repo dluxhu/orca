@@ -16,7 +16,7 @@ export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
-/** How the profile icon was made: a badge character, an uploaded badge image or an uploaded icon. */
+/** The source of the profile icon: a badge character, an uploaded badge image or an uploaded icon. */
 export type AppProfileIcon =
   | { kind: 'badge'; text: string; style: IconStyle }
   | { kind: 'image'; style: IconStyle }
