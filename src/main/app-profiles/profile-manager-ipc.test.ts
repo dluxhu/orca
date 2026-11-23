@@ -96,7 +96,9 @@ describe('Profile Manager IPC', () => {
     for (const [channel, arg] of [
       ['appProfiles:state', undefined],
       ['appProfiles:change', change],
-      ['appProfiles:open', 'work']
+      ['appProfiles:open', 'work'],
+      ['appProfiles:iconPreview', { kind: 'badge' }],
+      ['appProfiles:chooseIconFile', 'image']
     ] as const) {
       await expect(h.handlers.get(channel)?.(other, arg)).rejects.toThrow(
         'Only the Profile Manager window'
@@ -110,6 +112,30 @@ describe('Profile Manager IPC', () => {
     expect(h.execFileCalls).toEqual([])
     await h.handlers.get('appProfiles:change')?.(manager, change)
     expect(h.execFileCalls).toHaveLength(1)
+  })
+
+  it('makes the icon preview in the CLI, not in the window', async () => {
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    h.stdout = '{"ok":true,"result":{"png":"UE5H"}}'
+    const reply = await h.handlers.get('appProfiles:iconPreview')?.(
+      manager,
+      { kind: 'image', path: '/logo.svg', style: 'ref-match' },
+      'work'
+    )
+    expect(reply).toEqual({ ok: true, result: { png: 'UE5H' } })
+    expect(h.execFileCalls[0].args.slice(1)).toEqual([
+      'profiles',
+      'icon-preview',
+      '--id',
+      'work',
+      '--icon-image',
+      '/logo.svg',
+      '--icon-style',
+      'ref-match',
+      '--json'
+    ])
   })
 
   it('runs the CLI as Node with the name as one argument, without a shell', async () => {

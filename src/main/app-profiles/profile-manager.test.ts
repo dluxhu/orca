@@ -142,6 +142,37 @@ describe('profileCommandArgs', () => {
   })
 })
 
+describe('profileCommandArgs for icons', () => {
+  it('gives create and set-icon the --icon flags of the chosen icon', () => {
+    expect(
+      profileCommandArgs({
+        kind: 'create',
+        name: 'Orca - Work',
+        id: 'work',
+        port: 6800,
+        copySettings: false,
+        icon: { kind: 'badge', text: 'W', style: 'ref-match-bigger' }
+      })
+    ).toEqual([
+      'profiles',
+      'create',
+      'Orca - Work',
+      '--id',
+      'work',
+      '--port',
+      '6800',
+      '--icon-badge',
+      'W',
+      '--icon-style',
+      'ref-match-bigger',
+      '--json'
+    ])
+    expect(
+      profileCommandArgs({ kind: 'set-icon', id: 'work', icon: { kind: 'file', path: '/i.icns' } })
+    ).toEqual(['profiles', 'set-icon', 'work', '--icon-file', '/i.icns', '--json'])
+  })
+})
+
 describe('profileCommandArgs for Start at login', () => {
   it("installs and removes that profile's own serve service, on its port", () => {
     const service = { port: 6832, command: '/Apps/Orca.app/Contents/Resources/bin/orca' }
@@ -198,6 +229,8 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:state',
       'appProfiles:change',
       'appProfiles:open',
+      'appProfiles:iconPreview',
+      'appProfiles:chooseIconFile',
       'appProfiles:ownStartAtLogin',
       'appProfiles:setOwnStartAtLogin'
     ])
@@ -205,7 +238,13 @@ describe('registerProfileManagerIpc', () => {
       currentId: 'default'
     })
     isManager.current = false
-    for (const channel of ['appProfiles:state', 'appProfiles:change', 'appProfiles:open']) {
+    for (const channel of [
+      'appProfiles:state',
+      'appProfiles:change',
+      'appProfiles:open',
+      'appProfiles:iconPreview',
+      'appProfiles:chooseIconFile'
+    ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, 'work')).rejects.toThrow(
         'Only the Profile Manager window'
       )

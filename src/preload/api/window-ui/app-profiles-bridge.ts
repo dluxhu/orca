@@ -2,6 +2,7 @@
 import { ipcRenderer } from 'electron'
 import type {
   AppProfileChange,
+  AppProfileIconSource,
   AppProfileReply,
   AppProfilesState
 } from '../../../shared/app-profiles/app-profile-rules'
@@ -11,6 +12,11 @@ export const appProfilesApi = {
   change: (change: AppProfileChange): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:change', change),
   open: (id: string): Promise<AppProfileReply> => ipcRenderer.invoke('appProfiles:open', id),
+  /** The reply's result is `{ png: <base64 PNG>, icon }`. */
+  iconPreview: (icon: AppProfileIconSource, id?: string | null): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:iconPreview', icon, id),
+  chooseIconFile: (kind: 'image' | 'file'): Promise<string | null> =>
+    ipcRenderer.invoke('appProfiles:chooseIconFile', kind),
   /** "Start at login" of this app's own profile (Settings). */
   getOwnStartAtLogin: (): Promise<{ id: string; enabled: boolean }> =>
     ipcRenderer.invoke('appProfiles:ownStartAtLogin'),
