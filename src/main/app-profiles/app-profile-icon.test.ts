@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { bbox, newImg } from '../../shared/icon-badger/raster'
 import {
+  appProfileIconFlags,
   appProfileIconSourceFromFlags,
   makeAppProfileIcon,
   nextBadgeText,
@@ -57,6 +58,20 @@ describe('profile icon sources', () => {
     expect(() => flags({ '--icon-file': 'a.png', '--icon-style': 'ref-match' })).toThrow(
       'does not apply'
     )
+  })
+
+  it('writes the --icon flags that it reads back', () => {
+    for (const source of [
+      { kind: 'badge', text: 'Q', style: 'ref-match-bigger' },
+      { kind: 'badge', text: undefined, style: 'ref-match' },
+      { kind: 'image', path: '/x/logo.svg', style: 'ref-match' },
+      { kind: 'file', path: '/x/icon.icns' }
+    ] as const) {
+      const args = appProfileIconFlags(source)
+      const values = new Map(args.flatMap((arg, i) => (i % 2 === 0 ? [[arg, args[i + 1]]] : [])))
+      expect(flags(Object.fromEntries(values))).toEqual(source)
+    }
+    expect(appProfileIconFlags(undefined)).toEqual([])
   })
 
   it('refuses a badge that is not one visible character, and a missing file', () => {

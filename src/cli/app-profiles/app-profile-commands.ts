@@ -1,4 +1,4 @@
-// `orca profiles create|rename|set-port|remove|list|manager`: local commands, no runtime needed.
+// `orca profiles create|rename|set-icon|icon-preview|set-port|remove|list|manager`: local commands.
 // See docs/fork/profiles-design.md, section 6.
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -13,7 +13,12 @@ import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cl
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
-import { appProfileIconSourceFromFlags } from '../../main/app-profiles/app-profile-icon'
+import {
+  appProfileIconSourceFromFlags,
+  makeAppProfileIcon
+} from '../../main/app-profiles/app-profile-icon'
+import { largestIcnsPng } from '../../main/app-profiles/app-profile-icns'
+import { setAppProfileIcon } from './app-profile-set-icon'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles } from './app-profile-list'
@@ -22,6 +27,9 @@ const USAGE = `Usage:
   orca profiles create <name> [--id <id>] [--port <port>] [--icon-badge <char>] [--icon-style <style>]
       [--icon-image <file>] [--icon-file <file>]
   orca profiles rename <id> --name <name>
+  orca profiles set-icon <id> [--icon-badge <char>] [--icon-style <style>] [--icon-image <file>]
+      [--icon-file <file>]
+  orca profiles icon-preview [--id <id>] [--icon-…] --json
   orca profiles set-port <id> --port <port>
   orca profiles remove <id> [--keep-data]
   orca profiles list [--json]
@@ -82,6 +90,10 @@ function print(result: unknown, json: boolean, text: string): void {
   process.stdout.write(json ? `${JSON.stringify({ ok: true, result }, null, 2)}\n` : `${text}\n`)
 }
 
+function iconOf(parsed: Parsed): ReturnType<typeof appProfileIconSourceFromFlags> {
+  return appProfileIconSourceFromFlags((flag) => parsed.values.get(flag))
+}
+
 function oneId(parsed: Parsed): string {
   if (parsed.positional.length !== 1) {
     throw new RuntimeClientError('invalid_argument', USAGE)
@@ -119,7 +131,7 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
         id: parsed.values.get('--id'),
         port: portOf(parsed),
         settingsFile: parsed.values.get('--settings-file'),
-        icon: appProfileIconSourceFromFlags((flag) => parsed.values.get(flag)),
+        icon: iconOf(parsed),
         defaultAppPath: runningDefaultApp(),
         // --pin-root: test runs with ORCA_PROFILES_ROOT; an inherited root must not stick in a bundle.
         pinRoot: parsed.flags.has('--pin-root')
@@ -140,6 +152,24 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
         removed: ''
       }[entry.serveService]
       print(entry, json, `Renamed "${entry.id}" to "${entry.name}": ${entry.appPath}\n${service}`)
+      return
+    }
+    case 'set-icon': {
+      const entry = await setAppProfileIcon(oneId(parsed), iconOf(parsed) ?? { kind: 'badge' })
+      print(entry, json, `The icon of "${entry.id}" is new.`)
+      return
+    }
+    case 'icon-preview': {
+      // The Profile Manager's preview. The profile of --id does not block its own badge.
+      const registry = readAppProfileRegistry(appProfilesRoot())
+      const id = parsed.values.get('--id')
+      const made = makeAppProfileIcon(
+        registry?.defaultAppPath ?? runningDefaultApp(),
+        iconOf(parsed) ?? { kind: 'badge' },
+        (registry?.profiles ?? []).filter((p) => p.id !== id).map((p) => p.icon)
+      )
+      const png = largestIcnsPng(made.icns)?.toString('base64') ?? ''
+      print({ png, icon: made.icon }, json, JSON.stringify(made.icon))
       return
     }
     case 'set-port': {

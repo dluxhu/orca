@@ -1,5 +1,7 @@
 // Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
+import type { IconStyle } from '../icon-badger/badger'
+import type { AppProfileIcon } from './app-profile-paths'
 
 // The default app uses 6768 and its fallback ladder up to 6799.
 const DEFAULT_APP_PORTS = { first: 6768, last: 6799 }
@@ -20,6 +22,23 @@ export type AppProfileRow = {
   state: AppProfileState
   /** The profile's own serve service is installed (`orca serve service install`). */
   startAtLogin: boolean
+  /** The registry `icon` field. The default app has none. */
+  icon?: AppProfileIcon
+}
+
+/** What makes a profile icon: a badge character, a badge image file or a full icon file. */
+export type AppProfileIconSource =
+  // No text: the first free character (nextBadgeText).
+  | { kind: 'badge'; text?: string; style?: IconStyle }
+  | { kind: 'image'; path: string; style?: IconStyle }
+  | { kind: 'file'; path: string }
+
+const BADGE_CHARACTERS = [...'23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+
+/** The first of 2 to 9, then A to Z, that no profile uses as its badge. */
+export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): string {
+  const used = new Set(icons.map((icon) => (icon?.kind === 'badge' ? icon.text : null)))
+  return BADGE_CHARACTERS.find((text) => !used.has(text)) ?? '2'
 }
 
 /** What the Profile Manager window gets from the main process. */
@@ -33,7 +52,16 @@ export type AppProfilesState = {
 
 /** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
 export type AppProfileChange =
-  | { kind: 'create'; name: string; id: string; port: number; copySettings: boolean }
+  | {
+      kind: 'create'
+      name: string
+      id: string
+      port: number
+      copySettings: boolean
+      /** No icon: the next free badge character. */
+      icon?: AppProfileIconSource
+    }
+  | { kind: 'set-icon'; id: string; icon: AppProfileIconSource }
   | { kind: 'rename'; id: string; name: string }
   | { kind: 'set-port'; id: string; port: number }
   | { kind: 'remove'; id: string; keepData: boolean }

@@ -7,13 +7,12 @@ import { ICON_STYLES, renderBadgedIcon, type IconStyle } from '../../shared/icon
 import type { Img } from '../../shared/icon-badger/raster'
 import { decodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
 import { readPlistString, type AppProfileIcon } from '../../shared/app-profiles/app-profile-paths'
+import {
+  nextBadgeText,
+  type AppProfileIconSource
+} from '../../shared/app-profiles/app-profile-rules'
 
-/** What makes a profile icon: a badge character, a badge image file or a full icon file. */
-export type AppProfileIconSource =
-  // No text: the first free character (nextBadgeText).
-  | { kind: 'badge'; text?: string; style?: IconStyle }
-  | { kind: 'image'; path: string; style?: IconStyle }
-  | { kind: 'file'; path: string }
+export { nextBadgeText, type AppProfileIconSource }
 
 type RunTool = (program: string, args: string[]) => string
 
@@ -23,14 +22,6 @@ const runTool: RunTool = (program, args) =>
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 64 * 1024 * 1024
   })
-
-const BADGE_CHARACTERS = [...'23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
-
-/** The first of 2 to 9, then A to Z, that no profile uses as its badge. */
-export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): string {
-  const used = new Set(icons.map((icon) => (icon?.kind === 'badge' ? icon.text : null)))
-  return BADGE_CHARACTERS.find((text) => !used.has(text)) ?? '2'
-}
 
 export function isIconStyle(value: string): value is IconStyle {
   return (ICON_STYLES as readonly string[]).includes(value)
@@ -63,6 +54,22 @@ export function appProfileIconSourceFromFlags(
     return { kind: 'badge', text, style }
   }
   return undefined
+}
+
+/** The `--icon-*` flags of an icon source; the inverse of appProfileIconSourceFromFlags. */
+export function appProfileIconFlags(source: AppProfileIconSource | undefined): string[] {
+  if (!source) {
+    return []
+  }
+  const style = source.kind !== 'file' && source.style ? ['--icon-style', source.style] : []
+  if (source.kind === 'file') {
+    return ['--icon-file', source.path]
+  }
+  if (source.kind === 'image') {
+    return ['--icon-image', source.path, ...style]
+  }
+  // No text and no style still means a badge: the CLI makes the default one.
+  return [...(source.text ? ['--icon-badge', source.text] : []), ...style]
 }
 
 const graphemes = (text: string): number =>
