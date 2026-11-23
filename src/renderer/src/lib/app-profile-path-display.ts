@@ -18,3 +18,8 @@ export function profilePathDisplay(path: string, profileDir = appProfileDir()): 
 export function orcaHomeDisplay(profileDir = appProfileDir()): string {
   return profileDir ? `${APP_PROFILE_PATH_ROOT}/orca-home` : '~/.orca'
 }
+
+/** Orca's data folder on this computer. Null where this window cannot open local files, as in the web client. */
+export function localOrcaHomeDir(): string | null {
+  return window.api?.platform?.get().orcaHomeDir ?? null
+}

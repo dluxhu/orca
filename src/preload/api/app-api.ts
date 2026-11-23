@@ -95,6 +95,8 @@ export type PlatformApi = {
     windowMaterial: WindowMaterial
     /** The app profile's folder; null in the default app. Absent in the web client. */
     appProfileDir?: string | null
+    /** Orca's data folder on this computer; null or absent where this window cannot open local files. */
+    orcaHomeDir?: string | null
   }
 }
 

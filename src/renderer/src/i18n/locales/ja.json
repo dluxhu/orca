@@ -8406,7 +8406,7 @@
           "05f5c5ab50": "Agent が入力を求めている"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "ローカルランタイムキーは、利用可能な場合は Electron 暗号化ストレージを使用して {{root}} に保存されます。",
+          "d246b2bdb3": "ローカルランタイムキーは、利用可能な場合は Electron 暗号化ストレージを使用して <path>{{root}}</path> に保存されます。",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "APIキーが設定されました",
           "07ed3e512e": "音声は、OpenAI 音声モデルが選択されている場合にのみ OpenAI に送信されます。",
@@ -25383,7 +25383,7 @@
       "computerAccountHint": "ボットの実行場所です。Orca には {{account}} としてサインインしています。",
       "useChatDefaults": "チャットのデフォルトを使用",
       "agent": "Agent",
-      "folder": "フォルダー: {{path}}"
+      "folder": "フォルダー: <path>{{path}}</path>"
     },
     "googleSetup": {
       "otherAccount": "アカウントを切り替え",

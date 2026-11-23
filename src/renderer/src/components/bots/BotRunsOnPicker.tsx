@@ -21,7 +21,8 @@ import {
   type BotCreateHostChoice
 } from './bot-create-hosts'
 import { BotComputerPicker } from './BotComputerPicker'
-import { botAgentLabel, botFolderDisplay } from './bot-presentation'
+import { botAgentLabel, botFolderDisplay, localBotFolderPath } from './bot-presentation'
+import { LocalPathLink } from '../file-actions/LocalPathLink'
 import type { BotPermissionIntent } from './use-bot-agent-setup'
 import { nativeChatSessionChoiceShortLabel } from '../../../../shared/native-chat/input/session-options/native-chat-session-option-labels'
 import { sayNativeChatSessionOptionTranslated } from '../native-chat/session/options/controls/native-chat-session-option-labels-text'
@@ -41,9 +42,21 @@ function BotFolderPreview({ name, host }: { name: string; host: BotCreateHostCho
   const bots = useHostBots(host.hostId)
   return (
     <p className="text-2xs text-muted-foreground">
-      {t('bots.new.folder', 'Folder: {{path}}', {
-        path: botFolderPreview(name, bots, host.hostId, host.windows)
-      })}
+      <Trans
+        i18n={i18n}
+        defaults={t('bots.new.folder', 'Folder: <path>{{path}}</path>')}
+        values={{ path: botFolderPreview(name, bots, host.hostId, host.windows) }}
+        components={{
+          path: (
+            <LocalPathLink
+              label={botFolderPreview(name, bots, host.hostId, host.windows)}
+              path={localBotFolderPath(botFolderName(newBotName(name, bots)), host.windows)}
+              hostId={host.hostId}
+              kind="folder"
+            />
+          )
+        }}
+      />
     </p>
   )
 }

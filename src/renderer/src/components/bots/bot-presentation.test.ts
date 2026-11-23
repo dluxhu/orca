@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { botFolderPreview } from './BotRunsOnPicker'
-import { botFolderDisplay } from './bot-presentation'
+import { botFolderDisplay, localBotFolderPath } from './bot-presentation'
 
 const PROFILE = '/Users/me/Library/Application Support/Orca Profiles/work'
 
@@ -25,5 +25,18 @@ describe('bot Folder text', () => {
     expect(botFolderDisplay('reviewer', 'local', true)).toBe('%USERPROFILE%\\.orca\\bots\\reviewer')
     stubProfileDir(PROFILE)
     expect(botFolderDisplay('reviewer', 'runtime:env-1', false)).toBe('~/.orca/bots/reviewer')
+  })
+
+  it('opens the real bot folder on this computer, and none in the web client', () => {
+    expect(localBotFolderPath('reviewer', false, PROFILE, `${PROFILE}/orca-home`)).toBe(
+      `${PROFILE}/bots/reviewer`
+    )
+    expect(localBotFolderPath('reviewer', false, null, '/Users/me/.orca')).toBe(
+      '/Users/me/.orca/bots/reviewer'
+    )
+    expect(localBotFolderPath('reviewer', true, null, 'C:\\Users\\me\\.orca')).toBe(
+      'C:\\Users\\me\\.orca\\bots\\reviewer'
+    )
+    expect(localBotFolderPath('reviewer', false, null, null)).toBeNull()
   })
 })

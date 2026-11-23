@@ -8372,7 +8372,7 @@
           "38e3bbeb25": "Choisir un fichier personnalisé"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Les clés locales d'exécution sont stockées dans {{root}} via le stockage chiffré d'Electron quand celui-ci est disponible.",
+          "d246b2bdb3": "Les clés locales d'exécution sont stockées dans <path>{{root}}</path> via le stockage chiffré d'Electron quand celui-ci est disponible.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "Clé API configurée",
           "07ed3e512e": "L'audio n'est envoyé à OpenAI que lorsqu'un modèle vocal OpenAI est sélectionné.",
@@ -24505,7 +24505,7 @@
       "computerAccountHint": "Où le bot s’exécute, connecté à Orca en tant que {{account}}.",
       "useChatDefaults": "Utiliser les réglages par défaut du chat",
       "agent": "Agent",
-      "folder": "Dossier : {{path}}"
+      "folder": "Dossier : <path>{{path}}</path>"
     },
     "googleSetup": {
       "otherAccount": "Changer de compte",
