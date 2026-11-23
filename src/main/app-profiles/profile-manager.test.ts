@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile } = vi.hoisted(() => ({
+const { handlers, rows, isManager, profile, appOn, launchctl } = vi.hoisted(() => ({
+  appOn: vi.fn(),
+  launchctl: vi.fn(async () => ({ code: 113, out: '' })),
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
   rows: { current: [] as AppProfileRow[] },
   isManager: { current: true },
@@ -12,7 +14,7 @@ const { handlers, rows, isManager, profile } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({
-  app: { isPackaged: true, getPath: () => '/default-data', on: vi.fn() },
+  app: { isPackaged: true, getPath: () => '/default-data', on: appOn },
   ipcMain: {
     handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
       handlers.set(channel, handler)
@@ -26,7 +28,16 @@ vi.mock('./profile-manager-window', () => ({
   openProfileManagerWindow: vi.fn()
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
-  listAppProfiles: async () => rows.current
+  // One service read per list, as the real list does for each profile.
+  listAppProfiles: async (options: {
+    serviceRun?: (program: string, args: string[]) => Promise<unknown>
+  }) => {
+    await (options.serviceRun ?? launchctl)('launchctl', ['print', 'gui/501/x'])
+    return rows.current
+  }
+}))
+vi.mock('../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal', () => ({
+  runServeServiceManager: launchctl
 }))
 
 import {
@@ -114,7 +125,9 @@ describe('readAppProfilesState', () => {
     for (const [folder, marker] of [
       ['work', 'work'],
       ['client', 'client'],
-      ['stray', 'other']
+      ['stray', 'other'],
+      // Ids ignore case: the folder of "home" can be "Home".
+      ['Home', 'home']
     ]) {
       mkdirSync(join(root, folder))
       writeFileSync(join(root, folder, 'orca-app-profile.json'), JSON.stringify({ id: marker }))
@@ -122,7 +135,7 @@ describe('readAppProfilesState', () => {
     mkdirSync(join(root, 'no-marker'))
     const state = await readAppProfilesState()
     expect(state.currentId).toBe('default')
-    expect(state.keptIds).toEqual(['client'])
+    expect([...state.keptIds].sort()).toEqual(['client', 'home'])
   })
 })
 
@@ -167,5 +180,29 @@ describe('profilesMenuItems', () => {
       [undefined, undefined],
       ['Profile Manager…', undefined]
     ])
+  })
+})
+
+describe('Profiles menu refresh on activation', () => {
+  it('reads the service states again only after a minute', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const rebuild = vi.fn()
+      startProfilesMenu(rebuild)
+      await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(1))
+      launchctl.mockClear()
+      const activate = appOn.mock.calls
+        .filter(([event]) => event === 'did-become-active')
+        .at(-1)?.[1]
+      activate()
+      await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(2))
+      expect(launchctl).not.toHaveBeenCalled()
+      vi.setSystemTime(Date.now() + 61_000)
+      activate()
+      await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(3))
+      expect(launchctl).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

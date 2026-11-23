@@ -18,6 +18,10 @@ import type {
   AppProfilesState
 } from '../../shared/app-profiles/app-profile-rules'
 import { listAppProfiles } from '../../cli/app-profiles/app-profile-list'
+import {
+  runServeServiceManager,
+  type ServeServiceRun
+} from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { translateMain } from '../i18n/main-i18n'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile } from './app-profile'
@@ -33,10 +37,13 @@ function profilesEnv(): NodeJS.ProcessEnv {
   return { ...process.env, [APP_PROFILES_ROOT_ENV]: profilesRoot() }
 }
 
-export async function readAppProfilesState(): Promise<AppProfilesState> {
+export async function readAppProfilesState(
+  options: { serviceRun?: ServeServiceRun } = {}
+): Promise<AppProfilesState> {
   const profile = getAppProfile()
   const rows = await listAppProfiles({
     env: profilesEnv(),
+    serviceRun: options.serviceRun,
     // Without profiles.json there are no profiles, and this app is the default app.
     defaultAppPath: resolve(process.execPath, '..', '..', '..'),
     // The default app's userData, as the CLI's getPlatformUserDataPath gives it on macOS.
@@ -45,10 +52,13 @@ export async function readAppProfilesState(): Promise<AppProfilesState> {
   const taken = new Set(rows.map((row) => row.id.toLowerCase()))
   let keptIds: string[] = []
   try {
-    keptIds = readdirSync(profilesRoot()).filter(
-      (name) =>
-        !taken.has(name.toLowerCase()) && readAppProfileMarker(join(profilesRoot(), name)) === name
-    )
+    // Ids ignore case, as appProfileIdError does.
+    keptIds = readdirSync(profilesRoot()).flatMap((name) => {
+      const marker = readAppProfileMarker(join(profilesRoot(), name))
+      return marker && marker.toLowerCase() === name.toLowerCase() && !taken.has(name.toLowerCase())
+        ? [marker]
+        : []
+    })
   } catch {
     // No root yet: no kept data.
   }
@@ -154,7 +164,10 @@ function fromProfileManager<T extends unknown[], R>(
 }
 
 export function registerProfileManagerIpc(): void {
-  ipcMain.handle('appProfiles:state', fromProfileManager(readAppProfilesState))
+  ipcMain.handle(
+    'appProfiles:state',
+    fromProfileManager(() => readAppProfilesState())
+  )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
 }
@@ -163,12 +176,31 @@ export function registerProfileManagerIpc(): void {
 let menuRows: AppProfileRow[] = []
 let rebuildMenu: (() => void) | null = null
 
-async function refreshProfilesMenu(): Promise<void> {
+// One launchctl print per profile is slow. A refresh on app activation reads only the runtime pids
+// again; it reuses the service states for up to a minute.
+const SERVICE_STATE_TTL_MS = 60_000
+let serviceStates = new Map<string, ReturnType<ServeServiceRun>>()
+let serviceStatesAt = 0
+const cachedServiceRun: ServeServiceRun = (program, args) => {
+  const key = [program, ...args].join('\0')
+  let result = serviceStates.get(key)
+  if (!result) {
+    result = runServeServiceManager(program, args)
+    serviceStates.set(key, result)
+  }
+  return result
+}
+
+async function refreshProfilesMenu(full = true): Promise<void> {
   if (!rebuildMenu) {
     return
   }
+  if (full || Date.now() - serviceStatesAt > SERVICE_STATE_TTL_MS) {
+    serviceStates = new Map()
+    serviceStatesAt = Date.now()
+  }
   try {
-    menuRows = (await readAppProfilesState()).rows
+    menuRows = (await readAppProfilesState({ serviceRun: cachedServiceRun })).rows
     rebuildMenu()
   } catch (error) {
     console.warn('[profiles] menu refresh failed:', error)
@@ -183,17 +215,22 @@ export function startProfilesMenu(rebuild: () => void): void {
   try {
     mkdirSync(root, { recursive: true })
     let timer: ReturnType<typeof setTimeout> | null = null
-    watch(root, () => {
+    const watcher = watch(root, () => {
       if (timer) {
         clearTimeout(timer)
       }
       timer = setTimeout(() => void refreshProfilesMenu(), 300)
-    }).unref()
+    })
+    // A removed or unreadable folder stops the watch; the menu still refreshes on activation.
+    watcher.on('error', (error) =>
+      console.warn('[profiles] the profiles folder watch stopped:', error)
+    )
+    watcher.unref()
   } catch (error) {
     console.warn('[profiles] cannot watch the profiles folder:', error)
   }
   // Other apps start and stop without a change of profiles.json.
-  app.on('did-become-active', () => void refreshProfilesMenu())
+  app.on('did-become-active', () => void refreshProfilesMenu(false))
 }
 
 export function profilesMenuItems(): MenuItemConstructorOptions[] {
