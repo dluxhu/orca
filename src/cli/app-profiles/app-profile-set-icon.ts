@@ -1,7 +1,16 @@
 // Changes the icon of a profile app: docs/fork/profiles-design.md, section 8.
 // The Profile Manager and the CLI call setAppProfileIcon. Icon state goes by the profile id.
-import { readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import {
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync
+} from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
   APP_PROFILE_ICON_FILE,
@@ -54,40 +63,73 @@ export function setAppProfileIcon(
     if (!registry || !entry) {
       throw new RuntimeClientError('invalid_argument', `No profile "${id}".`)
     }
-    if (runs(entry.userDataPath, options.isAlive ?? isProcessAlive)) {
-      throw new RuntimeClientError(
-        'profile_running',
-        `"${entry.name}" runs. Quit it, and stop its server, before you change its icon.`
-      )
+    const refuseWhileRunning = (): void => {
+      if (runs(entry.userDataPath, options.isAlive ?? isProcessAlive)) {
+        throw new RuntimeClientError(
+          'profile_running',
+          `"${entry.name}" runs. Quit it, and stop its server, before you change its icon.`
+        )
+      }
     }
+    refuseWhileRunning()
     const made = (options.makeIcon ?? makeAppProfileIcon)(
       registry.defaultAppPath,
       icon,
       registry.profiles.filter((profile) => profile.id !== id).map((profile) => profile.icon)
     )
+    // The icon takes seconds to make. The app can start in that time.
+    refuseWhileRunning()
     const contents = join(entry.appPath, 'Contents')
     const plist = readFileSync(join(contents, 'Info.plist'), 'utf8')
     const iconPath = join(contents, 'Resources', appIconFileName(plist))
-    rmSync(iconPath, { force: true })
-    writeFileSync(iconPath, made.icns)
+    // A profile made before icons has a link to the default app's icon.
+    const old = lstatSync(iconPath).isSymbolicLink()
+      ? { link: readlinkSync(iconPath) }
+      : { bytes: readFileSync(iconPath) }
+    const temporary = mkdtempSync(join(tmpdir(), 'orca-profile-icon-'))
+    try {
+      // Sign as create does: ad hoc, the profile's bundle id, the default app's entitlements.
+      const entitlements = join(temporary, 'entitlements.plist')
+      writeFileSync(
+        entitlements,
+        run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', registry.defaultAppPath])
+      )
+      rmSync(iconPath, { force: true })
+      writeFileSync(iconPath, made.icns)
+      try {
+        run('/usr/bin/codesign', [
+          '--force',
+          '-s',
+          '-',
+          '-i',
+          entry.bundleId,
+          '--entitlements',
+          entitlements,
+          entry.appPath
+        ])
+      } catch (error) {
+        // The old icon matches the old seal again.
+        rmSync(iconPath, { force: true })
+        if ('link' in old) {
+          symlinkSync(old.link, iconPath)
+        } else {
+          writeFileSync(iconPath, old.bytes)
+        }
+        throw error
+      }
+    } finally {
+      rmSync(temporary, { recursive: true, force: true })
+    }
     writeFileSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), made.icns)
-    // The seal covers the icon. Ad hoc as at create: same identifier and entitlements, no --deep.
-    run('/usr/bin/codesign', [
-      '--force',
-      '-s',
-      '-',
-      '--preserve-metadata=identifier,entitlements',
-      entry.appPath
-    ])
-    // The Dock and Finder read the icon again after a touch and a new registration.
-    const now = new Date()
-    utimesSync(entry.appPath, now, now)
-    run(LSREGISTER, ['-f', entry.appPath])
     const changed = { ...entry, icon: made.icon }
     writeRegistry(root, {
       ...registry,
       profiles: registry.profiles.map((profile) => (profile.id === id ? changed : profile))
     })
+    // The Dock and Finder read the icon again after a touch and a new registration.
+    const now = new Date()
+    utimesSync(entry.appPath, now, now)
+    run(LSREGISTER, ['-f', entry.appPath])
     return changed
   })
 }

@@ -8,6 +8,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -58,6 +59,14 @@ const makeIcon = ((
 const run: RunTool = (program, args) => {
   calls.push([program, ...args])
   if (program.endsWith('codesign')) {
+    const target = args.at(-1) ?? ''
+    // The seal must cover the new icon: a real file with the new bytes when the bundle is signed.
+    if (args[0] === '--force' && target.endsWith('.app')) {
+      const icon = join(target, 'Contents', 'Resources', 'icon.icns')
+      if (lstatSync(icon).isSymbolicLink() || !readFileSync(icon, 'utf8').startsWith('icns ')) {
+        throw new Error(`codesign before the icon is written: ${icon}`)
+      }
+    }
     return args[0] === '-d' ? '<plist><dict/></plist>' : ''
   }
   if (program.endsWith('lsregister')) {
@@ -306,23 +315,39 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
 describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
   const read = (path: string): string => readFileSync(path, 'utf8')
 
+  const icon = (entry: { appPath: string }): string =>
+    join(entry.appPath, 'Contents', 'Resources', 'icon.icns')
+  const defaultIcon = (): string => join(app, 'Contents', 'Resources', 'icon.icns')
+  // A profile made before icons has a link to the default app's icon.
+  const linkIcon = (entry: { appPath: string }): void => {
+    rmSync(icon(entry))
+    symlinkSync(defaultIcon(), icon(entry))
+  }
+
   it('writes the icon by profile id, signs again, registers again and records it', () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run, makeIcon })
+    linkIcon(work)
     calls = []
     // The automatic character skips the badges of the other profiles, not the own one.
     const changed = setAppProfileIcon('work', { kind: 'badge' }, { env: env(), run, makeIcon })
     expect(changed.icon).toEqual({ kind: 'badge', text: '2', style: 'ref-match' })
     setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, { env: env(), run, makeIcon })
-    expect(read(join(work.appPath, 'Contents', 'Resources', 'icon.icns'))).toBe('icns Q')
+    expect(lstatSync(icon(work)).isSymbolicLink()).toBe(false)
+    expect(read(icon(work))).toBe('icns Q')
+    expect(read(defaultIcon())).toBe('default icon')
     expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
-    expect(calls.slice(-2)).toEqual([
+    expect(calls.slice(-3)).toEqual([
+      ['/usr/bin/codesign', '-d', '--entitlements', '-', '--xml', app],
       [
         '/usr/bin/codesign',
         '--force',
         '-s',
         '-',
-        '--preserve-metadata=identifier,entitlements',
+        '-i',
+        work.bundleId,
+        '--entitlements',
+        expect.stringMatching(/entitlements\.plist$/),
         work.appPath
       ],
       [expect.stringMatching(/lsregister$/), '-f', work.appPath]
@@ -343,7 +368,51 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     expect(() =>
       setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, { env: env(), run, makeIcon })
     ).toThrow('"Work" runs.')
-    expect(read(join(work.appPath, 'Contents', 'Resources', 'icon.icns'))).toBe('icns 2')
+    expect(read(icon(work))).toBe('icns 2')
+  })
+
+  it('refuses when the app starts while the icon is made', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    const starting = ((...args: Parameters<typeof makeIcon>) => {
+      writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
+      return (makeIcon as (...a: unknown[]) => unknown)(...args)
+    }) as never
+    expect(() =>
+      setAppProfileIcon(
+        'work',
+        { kind: 'badge', text: 'Q' },
+        { env: env(), run, makeIcon: starting }
+      )
+    ).toThrow('"Work" runs.')
+    expect(read(icon(work))).toBe('icns 2')
+  })
+
+  it('puts the old icon back and records nothing when codesign fails', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    const failing: RunTool = (program, args) => {
+      if (program.endsWith('codesign') && args[0] === '--force') {
+        throw new Error('codesign failed')
+      }
+      return run(program, args)
+    }
+    for (const before of ['file', 'link']) {
+      if (before === 'link') {
+        linkIcon(work)
+      }
+      expect(() =>
+        setAppProfileIcon(
+          'work',
+          { kind: 'badge', text: 'Q' },
+          { env: env(), run: failing, makeIcon }
+        )
+      ).toThrow('codesign failed')
+      expect(lstatSync(icon(work)).isSymbolicLink()).toBe(before === 'link')
+      expect(read(icon(work))).toBe(before === 'link' ? 'default icon' : 'icns 2')
+      expect(read(defaultIcon())).toBe('default icon')
+      expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
+      const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
+      expect(registry.profiles[0].icon.text).toBe('2')
+    }
   })
 })
 
