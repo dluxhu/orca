@@ -107,6 +107,7 @@ export class RepoUpdatePersistenceOperations {
         | 'symlinkPaths'
         | 'dictationTerms'
         | 'issueSourcePreference'
+        | 'linkBareReferencesInChat'
         | 'defaultJiraProject'
         | 'forkSyncMode'
         | 'agentWorkspaceTrust'

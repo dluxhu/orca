@@ -63,6 +63,7 @@ export function createRepoUpdateSchema<T extends Readonly<Record<string, z.ZodTy
       symlinkPaths: z.array(z.string()).optional(),
       dictationTerms: z.unknown().transform(normalizeDictationTerms).optional(),
       issueSourcePreference: z.enum(['auto', 'upstream', 'origin']).optional(),
+      linkBareReferencesInChat: z.boolean().optional(),
       defaultJiraProject: z.unknown().optional().transform(normalizeJiraProjectReference),
       ghAccount: z
         .unknown()
