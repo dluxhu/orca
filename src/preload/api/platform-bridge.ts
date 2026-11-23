@@ -1,6 +1,9 @@
 import { getLinuxDisplayServer } from '../renderer/renderer-runtime'
 import { parseWindowMaterialArgument } from '../../shared/app-lifecycle/windows/window-material'
-import { readAppProfileDirArgument } from '../../shared/app-profiles/app-profile-dir-argument'
+import {
+  readAppProfileDirArgument,
+  readOrcaHomeDirArgument
+} from '../../shared/app-profiles/app-profile-dir-argument'
 import type { PreloadApi } from '../api-types'
 
 type PlatformInfo = ReturnType<PreloadApi['platform']['get']>
@@ -18,7 +21,8 @@ function resolvePlatformInfo(): PlatformInfo {
     shell: process.env.SHELL?.trim() || process.env.ComSpec?.trim() || '',
     displayServer: getLinuxDisplayServer(),
     windowMaterial: parseWindowMaterialArgument(process.argv),
-    appProfileDir: readAppProfileDirArgument(process.argv)
+    appProfileDir: readAppProfileDirArgument(process.argv),
+    orcaHomeDir: readOrcaHomeDirArgument(process.argv)
   })
 }
 

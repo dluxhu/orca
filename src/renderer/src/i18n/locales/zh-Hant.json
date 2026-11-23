@@ -8313,7 +8313,7 @@
           "38e3bbeb25": "選擇自訂檔案"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "本機執行階段金鑰使用 Electron 加密儲存（如果可用）儲存在 {{root}} 中。",
+          "d246b2bdb3": "本機執行階段金鑰使用 Electron 加密儲存（如果可用）儲存在 <path>{{root}}</path> 中。",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API 金鑰已設定",
           "07ed3e512e": "僅當選擇 OpenAI 語音模型時，音訊才會傳送到 OpenAI。",
@@ -23582,7 +23582,7 @@
       "computerAccountHint": "機器人執行的位置，以 {{account}} 身份登入 Orca。",
       "useChatDefaults": "使用聊天預設設定",
       "agent": "代理程式",
-      "folder": "資料夾：{{path}}"
+      "folder": "資料夾：<path>{{path}}</path>"
     },
     "apps": {
       "paste": {

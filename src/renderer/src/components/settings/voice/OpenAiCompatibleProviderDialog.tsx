@@ -13,7 +13,7 @@ import {
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { useTranslate } from '@/i18n/use-translate'
-import { orcaHomeDisplay } from '@/lib/app-profile-path-display'
+import { KeyStoreNote } from './KeyStoreNote'
 import { readIpcErrorMessage } from '@/runtime/errors/ipc-error'
 import type { OpenAiCompatibleSpeechProviderSummary } from '../../../../../shared/speech/speech-types'
 
@@ -151,11 +151,7 @@ export function OpenAiCompatibleProviderDialog({
           </div>
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
             <Lock className="size-3 shrink-0" />
-            {t(
-              'auto.components.settings.OpenAiTranscriptionKeyDialog.d246b2bdb3',
-              'Local runtime keys are stored in {{root}} using Electron encrypted storage when available.',
-              { root: orcaHomeDisplay() }
-            )}
+            <KeyStoreNote />
           </p>
           <DialogFooter>
             <Button type="submit" disabled={!canSave}>

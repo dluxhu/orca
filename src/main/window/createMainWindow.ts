@@ -2,7 +2,11 @@ import { app, BrowserWindow, nativeTheme, powerMonitor, screen } from 'electron'
 import { release } from 'node:os'
 import { join } from 'node:path'
 import { getAppProfile, runtimeAppIdentity } from '../app-profiles/app-profile'
-import { formatAppProfileDirArgument } from '../../shared/app-profiles/app-profile-dir-argument'
+import {
+  formatAppProfileDirArgument,
+  formatOrcaHomeDirArgument
+} from '../../shared/app-profiles/app-profile-dir-argument'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { pathToFileURL } from 'node:url'
 import { installRendererHangStackPolicy } from '../hang-watchdog/renderer-hang-stack-policy'
 import { getAppIconPath } from './desktop-integration/app-icon'
@@ -172,6 +176,7 @@ export function createMainWindow(
         ...(windowMaterial === 'off' ? [] : [formatWindowMaterialArgument(windowMaterial)]),
         ...(pumpHiddenFrames ? [formatHiddenWindowFramePumpArgument()] : []),
         ...(appProfile ? [formatAppProfileDirArgument(appProfile.userDataPath)] : []),
+        formatOrcaHomeDirArgument(orcaHomeDir()),
         ...wslHostsWindowArguments()
       ]
     }

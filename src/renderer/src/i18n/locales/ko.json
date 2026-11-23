@@ -7779,7 +7779,7 @@
           "38e3bbeb25": "사용자 정의 파일 선택"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "로컬 런타임 키는 가능한 경우 Electron 암호화 저장소를 사용하여 {{root}}에 저장됩니다.",
+          "d246b2bdb3": "로컬 런타임 키는 가능한 경우 Electron 암호화 저장소를 사용하여 <path>{{root}}</path>에 저장됩니다.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API 키가 구성됨",
           "07ed3e512e": "OpenAI 음성 모델이 선택된 경우에만 오디오가 OpenAI로 전송됩니다.",
@@ -23782,7 +23782,7 @@
       "computerAccountHint": "Orca에 {{account}}(으)로 로그인한 상태에서 봇이 실행되는 위치입니다.",
       "useChatDefaults": "채팅 기본값 사용",
       "agent": "에이전트",
-      "folder": "폴더: {{path}}"
+      "folder": "폴더: <path>{{path}}</path>"
     },
     "googleSetup": {
       "otherAccount": "계정 전환",

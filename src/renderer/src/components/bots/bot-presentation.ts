@@ -1,6 +1,10 @@
 import { getAgentLabel } from '@/lib/agent-catalog/agent-catalog'
 import { translate } from '@/i18n/i18n'
-import { APP_PROFILE_PATH_ROOT, appProfileDir } from '@/lib/app-profile-path-display'
+import {
+  APP_PROFILE_PATH_ROOT,
+  appProfileDir,
+  localOrcaHomeDir
+} from '@/lib/app-profile-path-display'
 import { isLocalExecutionHost } from '../../../../shared/execution-host/execution-host'
 import type { TerminalAgent } from '../../../../shared/agent-status/identity/terminal-agent'
 import { UNSAVED_DRAFTS_REMOVAL_REFUSAL } from '../../../../shared/worktree/removal/removal'
@@ -25,6 +29,17 @@ export function botFolderDisplay(
     return `${APP_PROFILE_PATH_ROOT}/bots/${folder}`
   }
   return windows ? `%USERPROFILE%\\.orca\\bots\\${folder}` : `~/.orca/bots/${folder}`
+}
+
+/** A bot's home on this computer, or null where this window cannot open local files. */
+export function localBotFolderPath(
+  folder: string,
+  windows = IS_WINDOWS,
+  profileDir = appProfileDir(),
+  orcaHome = localOrcaHomeDir()
+): string | null {
+  // shortcut: an isolated data folder (dev runs) keeps bots in <userData>/bots, so the link opens ~/.orca/bots there; pass the bots root from main when that matters.
+  return orcaHome ? [profileDir ?? orcaHome, 'bots', folder].join(windows ? '\\' : '/') : null
 }
 
 export function botErrorMessage(error: unknown): string {
