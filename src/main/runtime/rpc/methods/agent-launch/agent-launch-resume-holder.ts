@@ -6,7 +6,7 @@ import { structuredAgentSessionTabId } from '../../../../../shared/agent-session
 import { getStructuredAgentSessionHost } from '../../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
 
 /** A resume whose conversation a chat without a live owner holds opens that chat, so one chat
- *  holds each conversation. A live owner or another workspace keeps the refusal. */
+ *  holds each conversation. A live owner, another workspace or another agent keeps the refusal. */
 export async function openReleasedHolder(
   context: RpcContext,
   refusal: AgentSessionWireRefusal,

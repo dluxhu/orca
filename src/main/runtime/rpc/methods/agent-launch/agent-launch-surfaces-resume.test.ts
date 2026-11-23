@@ -6,7 +6,7 @@ import { structuredAgentSessionTabId } from '../../../../../shared/agent-session
 const { createMock, host } = vi.hoisted(() => ({
   createMock: vi.fn(),
   host: {
-    sessionAgent: vi.fn(() => 'claude'),
+    sessionAgent: vi.fn((_sessionId: string): string | null => 'claude'),
     revealSession: vi.fn(async (sessionId: string) => ({
       sessionId,
       workspaceId: 'wt-1',
@@ -31,18 +31,22 @@ vi.mock(
 
 import { agentLaunchSurfaceFactory } from './agent-launch-surfaces'
 
-function factory() {
+function factory(presentation?: 'background') {
   const publishStructuredAgentSessionTab = vi.fn(async () => {})
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stubbed host and create read nothing else from the runtime.
   const context = {
     runtime: { ensureStructuredAgentSessionHost: async () => {}, publishStructuredAgentSessionTab },
     clientKind: 'runtime'
   } as unknown as RpcContext
-  return { surfaces: agentLaunchSurfaceFactory(context), publishStructuredAgentSessionTab }
+  const surfaces = agentLaunchSurfaceFactory(context, undefined, undefined, false, undefined, {
+    early: null,
+    presentation
+  })
+  return { surfaces, publishStructuredAgentSessionTab }
 }
 
 /** The pre-commit refusal of a resume whose conversation the chat `claude_old` holds. */
-function heldElsewhere(code: string, workspaceId = 'wt-1') {
+function heldElsewhere(code: string, workspaceId = 'wt-1', beforeCommit = true) {
   createMock.mockReset().mockResolvedValue({
     ok: false,
     refusal: {
@@ -53,9 +57,10 @@ function heldElsewhere(code: string, workspaceId = 'wt-1') {
         owner: { sessionId: 'claude_old', workspaceId }
       }
     },
-    beforeCommit: true
+    beforeCommit
   })
   host.revealSession.mockClear()
+  host.sessionAgent.mockClear().mockReturnValue('claude')
   host.deps.adapter.turnOnRemoteControlAtOpen.mockClear()
 }
 
@@ -109,6 +114,44 @@ describe('agent launch chat surface', () => {
     heldElsewhere('agent_session_ownership_unknown', 'wt-2')
     const error = await factory()
       .surfaces.createStructuredSession(RESUME)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: 'agent_session_ownership_unknown' })
+    expect(host.revealSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps the refusal when a chat of another agent holds the conversation', async () => {
+    heldElsewhere('agent_session_ownership_unknown')
+    host.sessionAgent.mockReturnValue('codex')
+    const error = await factory()
+      .surfaces.createStructuredSession(RESUME)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: 'agent_session_ownership_unknown' })
+    expect(host.revealSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps the refusal when the create cannot prove that it changed nothing', async () => {
+    heldElsewhere('agent_session_ownership_unknown', 'wt-1', false)
+    const error = await factory()
+      .surfaces.createStructuredSession(RESUME)
+      .catch((caught: unknown) => caught)
+    expect(error).toMatchObject({ code: 'agent_session_ownership_unknown' })
+    expect(host.revealSession).not.toHaveBeenCalled()
+  })
+
+  it('opens the holding chat without focus for a background launch', async () => {
+    heldElsewhere('agent_session_ownership_unknown')
+    const { surfaces, publishStructuredAgentSessionTab } = factory('background')
+    await surfaces.createStructuredSession(RESUME)
+    expect(publishStructuredAgentSessionTab).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'claude_old', activate: false })
+    )
+  })
+
+  it('keeps the refusal for a create that resumes nothing', async () => {
+    heldElsewhere('agent_session_ownership_unknown')
+    const { resumeFrom: _resume, ...fresh } = RESUME
+    const error = await factory()
+      .surfaces.createStructuredSession(fresh)
       .catch((caught: unknown) => caught)
     expect(error).toMatchObject({ code: 'agent_session_ownership_unknown' })
     expect(host.revealSession).not.toHaveBeenCalled()

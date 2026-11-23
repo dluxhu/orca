@@ -117,7 +117,7 @@ export const AgentLaunchFields = z.object({
   remoteControl: z.literal(true).optional()
 })
 
-/** A resume stays a chat; Remote Control needs a new host-minted chat. */
+/** A resume stays a chat; Remote Control needs a chat that the host picks, not the caller. */
 function refuseInconsistentLaunch(
   launch: z.infer<typeof AgentLaunchFields>,
   ctx: z.RefinementCtx
@@ -133,7 +133,8 @@ function refuseInconsistentLaunch(
       message: 'A resume needs surface chat, an existing workspace and no prompt'
     })
   }
-  // A caller-named session could name a chat that exists; only a new host-minted chat takes the choice.
+  // A caller-named session could name any chat that exists. Only the chat that the host picks takes
+  // the choice: a new chat, or the chat that already holds a resumed conversation.
   if (launch.remoteControl && (launch.surface !== 'chat' || launch.sessionId)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
