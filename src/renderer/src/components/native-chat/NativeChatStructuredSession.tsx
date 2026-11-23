@@ -3,6 +3,7 @@ import {
   NativeChatCrewContext,
   useNativeChatCrewSource
 } from '../orchestration-crew/use-native-chat-crew'
+import { NativeChatRawFrame } from './messages/diagnostics/NativeChatRawPanel'
 import { NativeChatUsageLimitActionsProvider } from './usage/NativeChatUsageLimitActions'
 import { useNativeChatHandOff } from './pane/actions/use-native-chat-hand-off'
 import { useNativeChatStructuredPaneNotices } from '@/components/native-chat/messages/notices/use-native-chat-structured-pane-notices'
@@ -193,7 +194,6 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
     composerRef,
     canMention
   })
-  const cancelPrompt = () => cancelStructuredPrompt(controller, prompt)
   const surface = useNativeChatSurface({
     tabId: props.tabId,
     sessionId: props.sessionId,
@@ -261,7 +261,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
         <NativeChatCrewContext.Provider value={crew}>
           <NativeChatSurface surface={surface} working={controller.isWorking}>
             {nativeChatPaneHeader(props, ownerWorktreeId, surface.appearance.colorScheme, handOff)}
-            <div className="relative flex min-h-0 flex-1 flex-col">
+            <NativeChatRawFrame tabId={props.tabId} items={controller.journalItems}>
               <NativeChatContextClearFade
                 // A read failure stays in view: no divider may come to end the fade.
                 clearing={controller.contextClear.clearing && viewState.kind !== 'error'}
@@ -330,7 +330,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
                   </NativeChatRowActionsProvider>
                 )}
               </NativeChatContextClearFade>
-            </div>
+            </NativeChatRawFrame>
             {readFailure?.final ? null : (
               <>
                 {/* Keep queued drafts outside the transcript and above the background-task dock. */}
@@ -371,7 +371,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
                   key={prompt ? `${prompt.itemId}:${prompt.revision}` : undefined}
                   prompt={prompt}
                   promptResponse={promptResponse}
-                  onCancel={cancelPrompt}
+                  onCancel={() => cancelStructuredPrompt(controller, prompt)}
                   shouldFocus={!promptsUnanswerable && props.isVisible && props.isFocusedGroup}
                   answerInputRef={questionAnswerInputRef}
                 />
