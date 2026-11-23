@@ -29921,6 +29921,7 @@
       "note": "Orca moves the app to the Trash. Quit the profile first.",
       "keepData": "Keep data (a new profile with the id \"{{id}}\" gets it back)",
       "confirm": "Remove profile"
-    }
+    },
+    "cancel": "Cancel"
   }
 }

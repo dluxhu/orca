@@ -224,7 +224,7 @@ export function ProfileManager(): React.JSX.Element {
             {t('profileManager.new.create', 'Create profile')}
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => setForm(null)}>
-            Cancel
+            {t('profileManager.cancel', 'Cancel')}
           </Button>
         </div>
       </section>
@@ -280,7 +280,7 @@ export function ProfileManager(): React.JSX.Element {
             {t('profileManager.edit.save', 'Save')}
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => setForm(null)}>
-            Cancel
+            {t('profileManager.cancel', 'Cancel')}
           </Button>
         </div>
       </section>
@@ -323,7 +323,7 @@ export function ProfileManager(): React.JSX.Element {
             {t('profileManager.remove.confirm', 'Remove profile')}
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => setForm(null)}>
-            Cancel
+            {t('profileManager.cancel', 'Cancel')}
           </Button>
         </div>
       </section>

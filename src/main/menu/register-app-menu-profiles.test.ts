@@ -36,7 +36,7 @@ const handlers = {
 }
 
 const labels = (): unknown[] =>
-  (setMenu.mock.calls.at(-1)?.[0] as { label?: string }[]).map((menu) => menu.label)
+  ((setMenu.mock.calls.at(-1)?.[0] ?? []) as { label?: string }[]).map((menu) => menu.label)
 
 describe('registerAppMenu Profiles menu', () => {
   const platform = process.platform
