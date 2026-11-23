@@ -131,7 +131,7 @@ export async function acquireClaudeSession({
           settlements.push(settlement)
         )
       : null
-    const startsTurn = turnOrigin !== null
+    const startsTurn = turnOrigin !== null && !turnOrigin.folded
     // Use host time for turn endpoints; provider timestamps may use a different clock.
     const observedAt =
       startsTurn || message.type === 'result' ? { observedAt: deps.now?.() ?? Date.now() } : {}
@@ -159,6 +159,7 @@ export async function acquireClaudeSession({
             sessionId,
             message,
             ...(startsTurn ? { startsTurn: true } : {}),
+            ...(turnOrigin?.remote ? { remotePrompt: true } : {}),
             ...(requestedAt === null || requestedAt === undefined ? {} : { requestedAt }),
             ...(turnOrigin?.clientMessageId ? { clientMessageId: turnOrigin.clientMessageId } : {}),
             ...sendFacts,

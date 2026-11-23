@@ -947,6 +947,7 @@ import {
   QueuedMessageMoveParams,
   QueuedMessageUpdateParams
 } from './structured-agent-session/structured-agent-session-queued-edit-params'
+import { RemoteControlParams } from './structured-agent-session/structured-agent-session-remote-control-params'
 import { RenameParams } from './structured-agent-session/structured-agent-session-rename-params'
 import { SendRecordedParams } from './structured-agent-session/structured-agent-session-send-recorded-params'
 import { SubscribeParams } from './structured-agent-session/structured-agent-session-subscribe-params'
@@ -1177,6 +1178,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'agentSession.readVisual': ReadVisualParams,
   'agentSession.regenerateName': OptionsParams,
   'agentSession.release': HoldParams,
+  'agentSession.remoteControl': RemoteControlParams,
   'agentSession.rename': RenameParams,
   'agentSession.respondToApproval': RespondParams,
   'agentSession.respondToQuestion': RespondToQuestionParams,
