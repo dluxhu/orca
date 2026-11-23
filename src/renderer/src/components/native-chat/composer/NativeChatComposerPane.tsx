@@ -233,7 +233,8 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       isComposing: imeEnterGesture.isComposing,
       clearSkillOrigin,
       setDraft,
-      setCaret
+      setCaret,
+      chatMessages: recallSource?.messages
     })
 
     const ptyCommandRouting = {
@@ -245,7 +246,8 @@ export const NativeChatComposerPane = forwardRef<ComposerHandle, C.NativeChatCom
       setCaret,
       clearSkillOrigin,
       clearImageAttachments,
-      setNotice
+      setNotice,
+      chatMessages: recallSource?.messages
     }
     const sendPty = useNativeChatPtyComposerSend({
       draftScopeKey,
