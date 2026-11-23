@@ -9713,7 +9713,7 @@
           "05f5c5ab50": "Agent needs input"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Local runtime keys are stored in ~/.orca using Electron encrypted storage when available.",
+          "d246b2bdb3": "Local runtime keys are stored in <path>{{root}}</path> using Electron encrypted storage when available.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API key configured",
           "07ed3e512e": "Audio is sent to OpenAI only when an OpenAI speech model is selected.",
@@ -10326,7 +10326,7 @@
           "25b0004fbf": "Terminal active",
           "781cb74d22": "Runs from terminal panes.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "Shortcut is no longer available.",
           "9a3a3ca03d": "Keyboard shortcuts"
         },
@@ -20815,6 +20815,10 @@
     }
   },
   "components": {
+    "localPathLink": {
+      "openFolder": "Open folder {{path}}",
+      "showFile": "Show {{path}} in its folder"
+    },
     "onboarding": {
       "flow": {
         "stepTooltip": {
@@ -27448,7 +27452,7 @@
       "useChatDefaults": "Use chat defaults",
       "usingChatDefault": "Using your chat default. Background runs use your Agents setting.",
       "agent": "Agent",
-      "folder": "Folder: {{path}}",
+      "folder": "Folder: <path>{{path}}</path>",
       "cancel": "Cancel",
       "creating": "Creating…",
       "create": "Create",
