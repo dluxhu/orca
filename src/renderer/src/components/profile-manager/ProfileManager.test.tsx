@@ -120,4 +120,18 @@ describe('ProfileManager', () => {
       expect(change).toHaveBeenCalledWith({ kind: 'start-at-login', id: 'default', enabled: true })
     )
   })
+
+  it('offers "Copy settings" only in an app that has settings, not in the Profile Manager app', async () => {
+    render(<ProfileManager />)
+    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    expect(screen.getByLabelText('Copy settings from this app')).toBeTruthy()
+    cleanup()
+    appState = { ...appState, currentId: null }
+    render(<ProfileManager />)
+    // The state is loaded before the form opens.
+    expect(await screen.findByText('Running in background')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    expect(screen.queryByLabelText('Copy settings from this app')).toBeNull()
+    expect(screen.queryByText('· this app')).toBeNull()
+  })
 })
