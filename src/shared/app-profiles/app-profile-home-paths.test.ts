@@ -54,6 +54,10 @@ const ALLOWED: Allowed[] = [
     reason: "orcad's data folder, not ~/.orca"
   },
   {
+    file: 'src/main/codebuddy/codebuddy-acp-launch-spec.ts',
+    reason: 'used only when CODEBUDDY_CONFIG_DIR is unset; a profile sets it'
+  },
+  {
     file: 'src/main/hermes/hermes-default-home.ts',
     reason: 'used only when HERMES_HOME is unset; a profile sets it'
   },
