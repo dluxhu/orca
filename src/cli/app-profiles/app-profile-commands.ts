@@ -13,12 +13,14 @@ import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cl
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
+import { appProfileIconSourceFromFlags } from '../../main/app-profiles/app-profile-icon'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles } from './app-profile-list'
 
 const USAGE = `Usage:
-  orca profiles create <name> [--id <id>] [--port <port>]
+  orca profiles create <name> [--id <id>] [--port <port>] [--icon-badge <char>] [--icon-style <style>]
+      [--icon-image <file>] [--icon-file <file>]
   orca profiles rename <id> --name <name>
   orca profiles set-port <id> --port <port>
   orca profiles remove <id> [--keep-data]
@@ -27,7 +29,16 @@ const USAGE = `Usage:
 
 type Parsed = { positional: string[]; values: Map<string, string>; flags: Set<string> }
 
-const VALUE_FLAGS = new Set(['--id', '--port', '--name', '--settings-file'])
+const VALUE_FLAGS = new Set([
+  '--id',
+  '--port',
+  '--name',
+  '--settings-file',
+  '--icon-badge',
+  '--icon-style',
+  '--icon-image',
+  '--icon-file'
+])
 
 function parse(argv: string[]): Parsed {
   const parsed: Parsed = { positional: [], values: new Map(), flags: new Set() }
@@ -108,6 +119,7 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
         id: parsed.values.get('--id'),
         port: portOf(parsed),
         settingsFile: parsed.values.get('--settings-file'),
+        icon: appProfileIconSourceFromFlags((flag) => parsed.values.get(flag)),
         defaultAppPath: runningDefaultApp(),
         // --pin-root: test runs with ORCA_PROFILES_ROOT; an inherited root must not stick in a bundle.
         pinRoot: parsed.flags.has('--pin-root')

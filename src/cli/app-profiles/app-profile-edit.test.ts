@@ -15,6 +15,12 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { createAppProfile, type RunTool } from './app-profile-create'
+
+// Icons have their own tests; a profile here gets a fixed one.
+const makeIcon = (() => ({
+  icns: Buffer.from('icns 2'),
+  icon: { kind: 'badge', text: '2', style: 'ref-match' }
+})) as never
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
@@ -100,7 +106,7 @@ const plistValue = (path: string, key: string): string =>
   execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', path], { encoding: 'utf8' }).trim()
 
 function makeProfile(name = 'Orca - Work', id?: string) {
-  const entry = createAppProfile({ name, id, defaultAppPath: app, env: env(), run })
+  const entry = createAppProfile({ makeIcon, name, id, defaultAppPath: app, env: env(), run })
   calls = []
   return entry
 }
@@ -353,6 +359,7 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     writeFileSync(join(work.userDataPath, 'orca-data.json'), 'old chats')
     await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
     const again = createAppProfile({
+      makeIcon,
       name: 'Orca - Work again',
       id: 'work',
       defaultAppPath: app,

@@ -18,6 +18,7 @@ import {
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
+  APP_PROFILE_ICON_FILE,
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILE_SETTINGS_SEED,
@@ -40,6 +41,11 @@ import {
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
+import {
+  appIconFileName,
+  makeAppProfileIcon,
+  type AppProfileIconSource
+} from '../../main/app-profiles/app-profile-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
@@ -59,12 +65,16 @@ export type CreateAppProfileOptions = {
   port?: number
   /** A JSON file of settings. The profile applies them at its first start. */
   settingsFile?: string
+  /** The default: a badge with the first free character, in the ref-match style. */
+  icon?: AppProfileIconSource
   defaultAppPath: string
   /** Test runs only: write the profiles root into Info.plist, so a Dock launch finds a test root. */
   pinRoot?: boolean
   env?: NodeJS.ProcessEnv
   home?: string
   run?: RunTool
+  /** Tests only: the icon renderer. */
+  makeIcon?: typeof makeAppProfileIcon
   now?: () => number
 }
 
@@ -170,6 +180,15 @@ export function createAppProfile(
       for (const entry of readdirSync(join(source, 'Resources'))) {
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }
+      // The icon is a real file, so the seal covers it and the Dock shows it.
+      const made = (options.makeIcon ?? makeAppProfileIcon)(
+        defaultApp,
+        options.icon ?? { kind: 'badge' },
+        registry.profiles.map((profile) => profile.icon)
+      )
+      const iconPath = join(contents, 'Resources', appIconFileName(defaultPlist))
+      rmSync(iconPath, { force: true })
+      writeFileSync(iconPath, made.icns)
 
       const plutil = (...args: string[]): void => {
         run('/usr/bin/plutil', [...args, plistPath])
@@ -217,6 +236,7 @@ export function createAppProfile(
         // Kept data can hold a seed of an earlier create; this create copies no settings.
         rmSync(seed, { force: true })
       }
+      writeFileSync(join(userDataPath, APP_PROFILE_ICON_FILE), made.icns)
       const entry: AppProfileEntry = {
         id,
         name,
@@ -224,6 +244,7 @@ export function createAppProfile(
         appPath,
         userDataPath,
         port,
+        icon: made.icon,
         createdAt: (options.now ?? Date.now)()
       }
       renameSync(bundle, appPath)

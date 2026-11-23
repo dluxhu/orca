@@ -559,11 +559,11 @@ So:
 | Layer | Tool | Why |
 | --- | --- | --- |
 | Raster core: masks, blur, resize, polygons, compositing, the styles | **plain TypeScript** on `Float32Array` / `Uint8ClampedArray` RGBA buffers (1024 x 1024) | Deterministic, so golden tests can compare it with the Python output. It runs in Node (vitest) and in the renderer. No new dependency. |
-| Character badge (text to image) | **`OffscreenCanvas` in the Profile Manager renderer**, `fillText` with a bold system font | Text needs a font rasterizer. Chromium has one. |
-| Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `createImageBitmap` / `<img>` in the renderer, then `getImageData` | Chromium decodes all four. SVG needs no cairo. |
-| Decode an uploaded ICNS icon | `sips -s format png` (part of macOS) | Chromium does not decode ICNS. |
-| Encode PNG | `nativeImage.createFromBitmap(buf, { width, height }).toPNG()` in main | Electron built-in. |
-| Live preview | the same core, called from the renderer | One code path for preview and output. |
+| Character badge (text to image) | **AppKit through `osascript -l JavaScript`** (`NSString` drawing, heavy system font, 1024 px sRGB bitmap) | Text needs a font rasterizer. AppKit has one, with emoji, and the CLI has no Chromium. |
+| Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `NSImage` in the same AppKit script | AppKit decodes all four. SVG needs no cairo. |
+| Decode an uploaded ICNS icon | used as it is; the default app's `.icns` is read by its largest PNG entry, else by `NSImage` | No conversion needed. |
+| Encode PNG | a small writer on `node:zlib` (`src/main/app-profiles/app-profile-icon.ts`) | Runs in the CLI and in main. |
+| Live preview | `makeAppProfileIcon` in main; the preview is the largest PNG of its `.icns` | One code path for the CLI, the preview and the output. |
 
 Do not use Canvas 2D drawing (`filter: blur()`, `drawImage` scaling, path fill) inside the core.
 Their anti-aliasing and blur differ from Pillow, and they can differ between GPU and CPU. The core
@@ -610,7 +610,7 @@ must now supply:
 
 Estimate: about 700 lines of TypeScript for `ref-match` with the primitives, and about 1,200 for
 all 14 styles. Put the core in `src/shared/icon-badger/` (no Electron import), the PNG and `.icns`
-I/O in `src/main/app-profiles/`, and the text badge in the Profile Manager renderer. Keep the MIT
+I/O and the AppKit text badge in `src/main/app-profiles/`. Keep the MIT
 notice of dock-icon-badger in the ported files.
 
 ### Tests against dock-icon-badger's own output
@@ -630,7 +630,7 @@ notice of dock-icon-badger in the ported files.
   against Pillow output, so a failure points to one primitive and not to the whole style.
 - **Mutants:** change one curl constant (for example `ARC_MID`) or the blur sigma; the golden test
   must turn red.
-- The character text itself is drawn by Chromium and is not compared with Python. Its test checks
+- The character text itself is drawn by AppKit and is not compared with Python. Its test checks
   only the size and position of the glyph box.
 
 ### Inputs and defaults
