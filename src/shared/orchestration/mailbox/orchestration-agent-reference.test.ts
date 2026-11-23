@@ -22,6 +22,28 @@ describe('splitAgentReferenceNotes', () => {
     })
   })
 
+  it('splits the notes for sessions on another host', () => {
+    const notes = [
+      agentReferenceNote('Lead on Box (box)', 'orca_session_id:chat_aaaaaaaa', 'chat', 'box'),
+      agentReferenceNote('Shell', 'term_b2', 'shell', "it's mine"),
+      agentReferenceNote('Agent', 'term_a1', 'terminal', '-dash')
+    ]
+    expect(
+      splitAgentReferenceNotes(`to @Lead on Box (box), @Shell @Agent\n\n${notes.join('\n')}`)
+    ).toEqual({
+      body: 'to @Lead on Box (box), @Shell @Agent',
+      mentions: [
+        { label: 'Lead on Box (box)', kind: 'chat' },
+        { label: 'Shell', kind: 'shell' },
+        { label: 'Agent', kind: 'terminal' }
+      ]
+    })
+    const note = agentReferenceNote('A', 'term_a1', 'terminal', 'box')
+    expect(
+      splitAgentReferenceNotes(`@A\n\n${note.replace('--on box', '--on other box')}`)
+    ).toBeNull()
+  })
+
   it('splits only the last blank line from the notes', () => {
     const note = agentReferenceNote('A', 'term_a1', 'terminal')
     expect(splitAgentReferenceNotes(`p1\n\np2 @A\n\n${note}`)).toEqual({
