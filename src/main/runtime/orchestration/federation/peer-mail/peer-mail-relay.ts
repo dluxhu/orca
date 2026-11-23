@@ -309,7 +309,7 @@ export class PeerMailRelay {
     db: OrchestrationDb,
     environmentId: string,
     item: z.infer<typeof PulledPeerMail>['items'][number],
-    ownInstallationId: string | undefined
+    own: string | undefined
   ): MessageRow | undefined {
     const conversation = db.getPeerMailConversation(item.conversationId)
     const payload = PeerMailRelayPayload.safeParse(safeJson(item.payload))
@@ -324,14 +324,7 @@ export class PeerMailRelay {
       )
       return undefined
     }
-    return storePeerReply(
-      this.runtime,
-      db,
-      conversation,
-      item.messageId,
-      payload.data,
-      ownInstallationId
-    )
+    return storePeerReply(this.runtime, db, conversation, item.messageId, payload.data, own)
   }
 }
 
