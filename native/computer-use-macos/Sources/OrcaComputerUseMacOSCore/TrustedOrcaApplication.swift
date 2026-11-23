@@ -6,6 +6,9 @@ public enum TrustedOrcaApplication {
         bundleId == "com.stablyai.orca" ||
             bundleId == "com.stablyai.orca.dev" ||
             bundleId.hasPrefix("com.stablyai.orca.dev.") ||
-            bundleId == "com.github.Electron"
+            bundleId == "com.github.Electron" ||
+            // Fork patch: Orca @dLux, its Nightly and its profile apps (see docs/fork/PATCHES.md).
+            bundleId == "com.stablyai.orca.dlux" ||
+            bundleId.hasPrefix("com.stablyai.orca.dlux.")
     }
 }
