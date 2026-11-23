@@ -5,9 +5,9 @@ import type { MessageRow } from '../../../../orchestration/db/orchestration-reco
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import {
   deliverPeerMail,
+  locatedPeerMailSender,
   peerMailMessageId,
   peerMailPairing,
-  peerMailSender,
   peerMailSenderLabel,
   queuePeerMailReply,
   requirePeerMailServer
@@ -44,6 +44,7 @@ export async function replyOverPeerMail(args: {
   const subject = original.subject.startsWith('Re: ') ? original.subject : `Re: ${original.subject}`
   const threadId = original.thread_id ?? original.id
   const senderLabel = peerMailSenderLabel(runtime, replier)
+  const sender = await locatedPeerMailSender(runtime, replier)
 
   if (params.on !== undefined) {
     throw new OrchestrationError(
@@ -54,7 +55,6 @@ export async function replyOverPeerMail(args: {
   }
 
   if (conversation.role === 'peer') {
-    const sender = peerMailSender(runtime, replier)
     // The answer's record and its queued reply commit together.
     runLifecycleWriteTransaction(db.db, 'peer_reply_with_answer', () => {
       queuePeerMailReply(db, conversation.conversation_id, id, {
@@ -100,7 +100,7 @@ export async function replyOverPeerMail(args: {
     subject,
     body: params.body,
     threadId,
-    sender: peerMailSender(runtime, replier)
+    sender
   })
   db.markAsRead([original.id], { kind: 'reply' })
   return recordReceiptBeforeNudge(

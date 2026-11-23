@@ -2,6 +2,7 @@ import type { MessageRow } from '../../db/orchestration-records'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../../../shared/orchestration/orchestration-rpc-contract'
 import type { OrchestrationCliCommand } from '../../workers/launch/orchestration-cli-command'
 import type { OrchestrationMailContent } from '../../../../../shared/agent-session/journal/agent-session-message-source'
+import { readAnswerSenderSnapshot } from '../../../../../shared/agent-session/journal/answer-sender-snapshot'
 import {
   formatReportFollowUpLine,
   type ReportFollowUpAction
@@ -66,6 +67,14 @@ function appendLegacyGuidance(
   }
 }
 
+/** The name the message saved for its sender, such as the chat name another Orca sent with its mail. */
+function savedSenderName(msg: MessageRow): string | null {
+  const saved = readAnswerSenderSnapshot(msg.answer_sender_snapshot)
+  return saved?.party.address === msg.from_handle && saved.name !== msg.from_handle
+    ? saved.name
+    : null
+}
+
 export function formatMessageBanner(msg: MessageRow, options: MessageFormattingOptions): string
 export function formatMessageBanner(msg: MessageRow): string
 export function formatMessageBanner(
@@ -90,7 +99,7 @@ export function formatMessageBannerWithContent(
         : authority === 'legacy_read_only'
           ? ' [LEGACY READ-ONLY]'
           : ''
-  const senderName = msg.from_handle.toUpperCase()
+  const senderName = savedSenderName(msg) ?? msg.from_handle.toUpperCase()
 
   const header = `──── From: ${senderName} (${msg.from_handle})${priorityTag}${authorityTag} (${msg.type}) ────`
 

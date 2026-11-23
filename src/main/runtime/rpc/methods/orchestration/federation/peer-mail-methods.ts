@@ -121,7 +121,12 @@ export const ORCHESTRATION_PEER_MAIL_METHODS = [
       if (replayed) {
         return replayed
       }
-      const senderSnapshot = peerMailSenderSnapshot(params.senderLabel, params.sender)
+      const senderSnapshot = peerMailSenderSnapshot(
+        params.senderLabel,
+        params.sender,
+        // An unknown identity drops the sender's link, not the mail.
+        await runtime.readStoreInstallationId().catch(() => undefined)
+      )
       const routed = await deliverPeerMailToBot(runtime, params, peerFingerprint, senderSnapshot)
       if (routed === 'delivered') {
         return { message: { id: params.messageId, to: params.to } }

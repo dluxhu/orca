@@ -20,6 +20,8 @@ import { ORCHESTRATION_REPLY_METHOD } from '../messaging/reply-method'
 import { notifyPeerMailQueued } from '../../../../orchestration/federation/peer-mail/peer-mail-waiters'
 import { OrcaRuntimeRpcServer } from '../../../server/runtime-rpc'
 import { STATUS_METHODS } from '../../host-management/status'
+import { readAnswerSenderSnapshot } from '../../../../../../shared/agent-session/journal/answer-sender-snapshot'
+import { formatMessageBanner } from '../../../../orchestration/mailbox/formatting/message-formatting'
 import { TERMINAL_QUERY_METHODS } from '../../terminal/terminal-query-methods'
 
 // Retries run at once so a recovering pull loop is observable without waiting out its backoff.
@@ -276,6 +278,94 @@ describe('agent mail between paired Orca servers', () => {
       body: 'Plan attached.'
     })
     expect(a.db.getPeerMailMessage(mailFor(a, CHAT_ON_A)[0]!.id)?.remote_party).toBe(CHAT_ON_B)
+  })
+
+  it('names a chat on the other server by what that server sent, and says where it runs', async () => {
+    const named = (side: Side, name: string, installationId: string) => {
+      vi.spyOn(side.runtime.orchestrationSenderNames, 'snapshotOf').mockReturnValue({
+        name,
+        agent: 'claude'
+      })
+      vi.spyOn(side.runtime, 'readStoreInstallationId').mockResolvedValue(installationId)
+    }
+    named(a, 'Release notes', 'install-a')
+    named(b, 'Build doctor', 'install-b')
+    const send = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.send')!
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test double carrying only the fields the code under test reads.
+    await send.handler({ from: CHAT_ON_A, on: 'devB', to: 'term_b', subject: 'Plan?' }, {
+      runtime: a.runtime,
+      orchestrationCaller: {
+        address: CHAT_ON_A,
+        terminalHandle: null,
+        orcaSessionId: CHAT_ON_A.slice(16),
+        paneKey: null
+      }
+    } as unknown as RpcContext)
+    const [onB] = mailFor(b, 'term_b')
+    expect(readAnswerSenderSnapshot(onB!.answer_sender_snapshot)).toMatchObject({
+      name: 'Release notes',
+      agent: 'claude',
+      host: "Jinwoo's Mac",
+      origin: { hostId: 'install-a', address: CHAT_ON_A }
+    })
+    expect(formatMessageBanner(onB!)).toContain(
+      `From: Release notes (${CHAT_ON_A} on Jinwoo's Mac)`
+    )
+
+    await chatReply(b, CHAT_ON_B, { id: onB!.id, body: 'Plan attached.' })
+    a.runtime.ensureOrchestrationFederationRelay()
+    await vi.waitFor(() => expect(mailFor(a, CHAT_ON_A)).toHaveLength(1))
+    const [back] = mailFor(a, CHAT_ON_A)
+    expect(readAnswerSenderSnapshot(back!.answer_sender_snapshot)).toMatchObject({
+      name: 'Build doctor',
+      origin: { hostId: 'install-b', address: CHAT_ON_B }
+    })
+    expect(formatMessageBanner(back!)).toContain(`From: Build doctor (${CHAT_ON_B} on Build Box)`)
+  })
+
+  it('drops the link of mail and of a reply that claim to come from a chat of the receiving Orca', async () => {
+    // Both servers read the same id, so each one's mail names the other's own id.
+    vi.spyOn(a.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
+    vi.spyOn(b.runtime, 'readStoreInstallationId').mockResolvedValue('install-b')
+    const send = ORCHESTRATION_METHODS.find((method) => method.name === 'orchestration.send')!
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a test double carrying only the fields the code under test reads.
+    await send.handler({ from: CHAT_ON_A, on: 'devB', to: 'term_b', subject: 'Plan?' }, {
+      runtime: a.runtime,
+      orchestrationCaller: {
+        address: CHAT_ON_A,
+        terminalHandle: null,
+        orcaSessionId: CHAT_ON_A.slice(16),
+        paneKey: null
+      }
+    } as unknown as RpcContext)
+    const [onB] = mailFor(b, 'term_b')
+    expect(readAnswerSenderSnapshot(onB!.answer_sender_snapshot)?.origin).toBeUndefined()
+
+    await chatReply(b, CHAT_ON_B, { id: onB!.id, body: 'Plan attached.' })
+    a.runtime.ensureOrchestrationFederationRelay()
+    await vi.waitFor(() => expect(mailFor(a, CHAT_ON_A)).toHaveLength(1))
+    const [back] = mailFor(a, CHAT_ON_A)
+    expect(readAnswerSenderSnapshot(back!.answer_sender_snapshot)).toMatchObject({
+      name: expect.any(String)
+    })
+    expect(readAnswerSenderSnapshot(back!.answer_sender_snapshot)?.origin).toBeUndefined()
+  })
+
+  it('keeps the sender label of mail whose Orca sent no name or location', async () => {
+    vi.spyOn(a.runtime, 'readStoreInstallationId').mockRejectedValue(new Error('no profile'))
+    await mutation(a, 'orchestration.send', {
+      from: 'term_a',
+      on: 'devB',
+      to: 'term_b',
+      subject: 'Long job'
+    })
+    const [onB] = mailFor(b, 'term_b')
+    const saved = readAnswerSenderSnapshot(onB!.answer_sender_snapshot)
+    expect(saved?.name).toBe("term_a on Jinwoo's Mac")
+    expect(saved?.origin).toBeUndefined()
+    expect(formatMessageBanner(onB!)).toContain(
+      "From: TERM_A ON JINWOO'S MAC (term_a on Jinwoo's Mac)"
+    )
   })
 
   it('delivers a reply queued before both servers restart exactly once', async () => {

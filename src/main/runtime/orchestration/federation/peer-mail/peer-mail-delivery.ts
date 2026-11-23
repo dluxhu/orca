@@ -10,7 +10,11 @@ import type {
   PeerMailRelayPayload,
   PeerMailSender
 } from '../../../../../shared/rpc-contract/orchestration/orchestration-peer-mail-params'
-import { parseOrcaSessionAddress } from '../../../../../shared/agent-session/identity/orca-session-address'
+import {
+  formatOrcaSessionAddress,
+  parseOrcaSessionAddress
+} from '../../../../../shared/agent-session/identity/orca-session-address'
+import { isTerminalHandle } from '../../../../../shared/terminal/terminal-handle-prefix'
 import { botOfSession } from '../../../../bots/bot-session-tabs'
 import { z } from 'zod'
 import type { OrcaRuntimeService } from '../../../orca-runtime'
@@ -46,12 +50,28 @@ export function peerMailSender(runtime: PeerMailRuntime, address: string): PeerM
   const named = runtime.orchestrationSenderNames.sender(address)
   const sessionId = named.party.orcaSessionId ?? parseOrcaSessionAddress(address)
   const bot = sessionId ? botOfSession(runtime.bots, sessionId) : null
+  const opens = sessionId
+    ? formatOrcaSessionAddress(sessionId)
+    : isTerminalHandle(address)
+      ? address
+      : null
   return {
     name: named.name,
     ...(named.agent ? { agent: named.agent } : {}),
     computer: runtime.readMachineName(),
-    ...(bot ? { bot: { id: bot.id, name: bot.name, avatar: bot.avatar } } : {})
+    ...(bot ? { bot: { id: bot.id, name: bot.name, avatar: bot.avatar } } : {}),
+    ...(opens ? { address: opens } : {})
   }
+}
+
+/** The sender with this Orca's installation id, so a viewer connected to this Orca can open it. */
+export async function locatedPeerMailSender(
+  runtime: PeerMailRuntime & Pick<OrcaRuntimeService, 'readStoreInstallationId'>,
+  address: string
+): Promise<PeerMailSender> {
+  // An unknown identity only leaves the sender without a link.
+  const hostId = await runtime.readStoreInstallationId().catch(() => undefined)
+  return { ...peerMailSender(runtime, address), ...(hostId ? { hostId } : {}) }
 }
 
 /** A retried mutation reuses its message id, so the server stores the mail once. */
