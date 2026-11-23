@@ -86,7 +86,7 @@ export function BotComputerPage({
       <SettingsInsetRow
         icon={<Folder />}
         title={t('bots.settingsView.folder', 'Folder')}
-        detail={botFolderDisplay(bot.folder)}
+        detail={botFolderDisplay(bot.folder, bot.hostId)}
         end={
           folderPath ? (
             <Button
