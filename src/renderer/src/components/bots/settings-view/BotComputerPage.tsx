@@ -11,11 +11,15 @@ import { getLocalExecutionHostLabel } from '../../../../../shared/execution-host
 import { botFolderDisplay, localBotFolderPath } from '../bot-presentation'
 import { LocalPathLink } from '../../file-actions/LocalPathLink'
 import { useBotHostLabel } from '../use-bot-host-label'
+import { translateLocalExecutionHostLabel } from '@/runtime/hosts/display/execution-host-label'
 import { SettingsInsetGroup, SettingsInsetRow } from './BotSettingsRows'
 
 /** This computer's label, as Settings › Bots names its group; the server's name for a paired one. */
 export function useBotComputerName(bot: Pick<Bot, 'hostId'>): string {
-  return useBotHostLabel(bot.hostId) ?? getLocalExecutionHostLabel()
+  const t = useTranslate()
+  return (
+    useBotHostLabel(bot.hostId) ?? translateLocalExecutionHostLabel(getLocalExecutionHostLabel(), t)
+  )
 }
 
 export function BotComputerPage({
