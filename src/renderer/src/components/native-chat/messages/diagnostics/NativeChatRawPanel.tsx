@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
+import { NativeChatDockTranscript } from '../../pane/dock/NativeChatDock'
 import {
   geometryOf,
   isNearBottom,
@@ -300,5 +301,18 @@ export function NativeChatRawFrame({
       </NativeChatRawLinkContext.Provider>
       {open ? <NativeChatRawPanel items={items} focus={focus} /> : null}
     </div>
+  )
+}
+
+/** The chat's dock transcript with the raw panel beside it. */
+export function NativeChatRawDockTranscript(props: {
+  tabId: string
+  items: readonly AgentJournalRenderItem[]
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <NativeChatDockTranscript>
+      <NativeChatRawFrame {...props} />
+    </NativeChatDockTranscript>
   )
 }
