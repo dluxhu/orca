@@ -1,10 +1,12 @@
 // Rename, port change and removal of a profile: docs/fork/profiles-design.md, section 9.
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import {
+  appProfilesAppsDir,
   appProfilesRoot,
   locateAppProfileApp,
+  readAppProfileMarker,
   readAppProfileRegistry,
   type AppProfileEntry,
   type AppProfileRegistry
@@ -17,7 +19,12 @@ import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervis
 import { RuntimeClientError } from '../runtime/connection/types'
 import { defaultAppOf, LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
-import { rewriteServeUnitAppPath, withRegistryLock, writeRegistry } from './app-profile-registry'
+import {
+  isInside,
+  rewriteServeUnitAppPath,
+  withRegistryLockAsync,
+  writeRegistry
+} from './app-profile-registry'
 
 export type EditAppProfileOptions = {
   id: string
@@ -35,20 +42,30 @@ export type ServeServiceChange = 'none' | 'updated' | 'restarted' | 'removed'
 
 type Context = {
   root: string
+  appsDir: string
   home: string
   uid: number
   run: RunTool
   entry: AppProfileEntry
+  /** The app with this profile's embedded id, or null when it is missing. */
+  located: string | null
   registry: AppProfileRegistry
   /** True when the serve service runs and the app does not. */
   inBackground: boolean
 }
 
-/** Finds the profile and refuses while its app (or a serve that is not the service) runs. */
+function rootOf(options: EditAppProfileOptions): string {
+  return appProfilesRoot(options.env ?? process.env, options.home ?? homedir())
+}
+
+/**
+ * Finds the profile and refuses while its app (or a serve that is not the service) runs. The
+ * caller holds the registry lock and changes nothing between this check and its change.
+ */
 async function prepare(options: EditAppProfileOptions, action: string): Promise<Context> {
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
-  const root = appProfilesRoot(env, home)
+  const root = rootOf(options)
   const registry = readAppProfileRegistry(root)
   const found = registry?.profiles.find((profile) => profile.id === options.id)
   if (!registry || !found) {
@@ -59,7 +76,8 @@ async function prepare(options: EditAppProfileOptions, action: string): Promise<
     )
   }
   // A rename in Finder leaves the registry path behind; the embedded id finds the app.
-  const entry = { ...found, appPath: locateAppProfileApp(found) ?? found.appPath }
+  const located = locateAppProfileApp(found)
+  const entry = { ...found, appPath: located ?? found.appPath }
   const state = await readAppProfileState(entry.userDataPath, false, {
     home,
     uid: options.uid,
@@ -74,10 +92,12 @@ async function prepare(options: EditAppProfileOptions, action: string): Promise<
   }
   return {
     root,
+    appsDir: resolve(appProfilesAppsDir(env, home)),
     home,
     uid: options.uid ?? process.getuid?.() ?? 0,
     run: options.run ?? runTool,
     entry,
+    located,
     registry,
     inBackground: state === 'background'
   }
@@ -108,9 +128,18 @@ function updateEntry(
 export async function renameAppProfile(
   options: EditAppProfileOptions & { name: string }
 ): Promise<AppProfileEntry & { serveService: ServeServiceChange }> {
-  const context = await prepare(options, 'rename')
+  return withRegistryLockAsync(rootOf(options), async () => {
+    const context = await prepare(options, 'rename')
+    return renameLocked(context, options.name)
+  })
+}
+
+function renameLocked(
+  context: Context,
+  newName: string
+): AppProfileEntry & { serveService: ServeServiceChange } {
   const { entry, run } = context
-  const name = options.name.trim()
+  const name = newName.trim()
   const error = appProfileNameError(
     name,
     context.registry.profiles.filter((p) => p.id !== entry.id).map((p) => p.name)
@@ -127,21 +156,76 @@ export async function renameAppProfile(
   if (newPath.toLowerCase() !== oldPath.toLowerCase() && existsSync(newPath)) {
     throw new RuntimeClientError('invalid_argument', `${newPath} exists.`)
   }
-  if (!existsSync(oldPath)) {
+  if (!context.located) {
     throw new RuntimeClientError('invalid_argument', `The app is missing: ${oldPath}`)
   }
 
-  return withRegistryLock(context.root, () => {
-    const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
-    const target = `gui/${context.uid}/${unit.label}`
-    if (context.inBackground) {
-      run('/bin/launchctl', ['bootout', target])
-    }
-    const plistPath = (app: string): string => join(app, 'Contents', 'Info.plist')
-    const entitlements = `${dirname(oldPath)}/.${entry.id}.entitlements.plist`
-    const sign = (app: string): void => {
-      // Ad hoc, no --deep, as `orca profiles create` signs.
-      run('/usr/bin/codesign', [
+  const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
+  const target = `gui/${context.uid}/${unit.label}`
+  if (context.inBackground) {
+    run('/bin/launchctl', ['bootout', target])
+  }
+  const plistPath = (app: string): string => join(app, 'Contents', 'Info.plist')
+  const entitlements = `${dirname(oldPath)}/.${entry.id}.entitlements.plist`
+  const sign = (app: string): void => {
+    // Ad hoc, no --deep, as `orca profiles create` signs.
+    run('/usr/bin/codesign', [
+      '--force',
+      '-s',
+      '-',
+      '-i',
+      entry.bundleId,
+      '--entitlements',
+      entitlements,
+      app
+    ])
+  }
+  let serveService: ServeServiceChange = 'none'
+  try {
+    writeFileSync(
+      entitlements,
+      run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', defaultAppOf(oldPath)])
+    )
+    const originalPlist = readFileSync(plistPath(oldPath))
+    renameSync(oldPath, newPath)
+    try {
+      run('/usr/bin/plutil', [
+        '-replace',
+        'CFBundleDisplayName',
+        '-string',
+        name,
+        plistPath(newPath)
+      ])
+      sign(newPath)
+      // No --strict: the bundle links to the default app's files, and --strict refuses them.
+      run('/usr/bin/codesign', ['--verify', newPath])
+      tryRun(run, LSREGISTER, ['-u', oldPath])
+      run(LSREGISTER, ['-f', newPath])
+      // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
+      if (rewriteServeUnitAppPath(unit.unitPath, oldPath, newPath)) {
+        serveService = 'updated'
+      }
+      updateEntry(context, (registry) => ({
+        ...registry,
+        profiles: registry.profiles.map((profile) =>
+          profile.id === entry.id ? { ...profile, name, appPath: newPath } : profile
+        )
+      }))
+    } catch (failure) {
+      // Put everything back: the unit, Launch Services, the old name, Info.plist, a valid signature.
+      if (serveService === 'updated') {
+        try {
+          rewriteServeUnitAppPath(unit.unitPath, newPath, oldPath)
+        } catch {
+          // The error below names the failed step; the unit keeps the new path.
+        }
+        serveService = 'none'
+      }
+      tryRun(run, LSREGISTER, ['-u', newPath])
+      tryRun(run, LSREGISTER, ['-f', oldPath])
+      renameSync(newPath, oldPath)
+      writeFileSync(plistPath(oldPath), originalPlist)
+      tryRun(run, '/usr/bin/codesign', [
         '--force',
         '-s',
         '-',
@@ -149,74 +233,36 @@ export async function renameAppProfile(
         entry.bundleId,
         '--entitlements',
         entitlements,
-        app
+        oldPath
       ])
+      throw failure
     }
-    let serveService: ServeServiceChange = 'none'
-    try {
-      writeFileSync(
-        entitlements,
-        run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', defaultAppOf(oldPath)])
-      )
-      const originalPlist = readFileSync(plistPath(oldPath))
-      renameSync(oldPath, newPath)
-      try {
-        run('/usr/bin/plutil', [
-          '-replace',
-          'CFBundleDisplayName',
-          '-string',
-          name,
-          plistPath(newPath)
-        ])
-        sign(newPath)
-        // No --strict: the bundle links to the default app's files, and --strict refuses them.
-        run('/usr/bin/codesign', ['--verify', newPath])
-        tryRun(run, LSREGISTER, ['-u', oldPath])
-        run(LSREGISTER, ['-f', newPath])
-        updateEntry(context, (registry) => ({
-          ...registry,
-          profiles: registry.profiles.map((profile) =>
-            profile.id === entry.id ? { ...profile, name, appPath: newPath } : profile
-          )
-        }))
-      } catch (failure) {
-        // Put the app back under its old name, with its old Info.plist and a valid signature.
-        renameSync(newPath, oldPath)
-        writeFileSync(plistPath(oldPath), originalPlist)
-        tryRun(run, '/usr/bin/codesign', [
-          '--force',
-          '-s',
-          '-',
-          '-i',
-          entry.bundleId,
-          '--entitlements',
-          entitlements,
-          oldPath
-        ])
-        throw failure
-      }
-      // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
-      if (rewriteServeUnitAppPath(unit.unitPath, oldPath, newPath)) {
-        serveService = 'updated'
-      }
-    } finally {
-      rmSync(entitlements, { force: true })
-      if (context.inBackground) {
-        tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
-      }
-    }
+  } finally {
+    rmSync(entitlements, { force: true })
     if (context.inBackground) {
-      serveService = 'restarted'
+      tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
     }
-    return { ...entry, name, appPath: newPath, serveService }
-  })
+  }
+  if (context.inBackground) {
+    serveService = 'restarted'
+  }
+  return { ...entry, name, appPath: newPath, serveService }
 }
 
 /** Changes the port of the profile's desktop endpoint and server. */
 export async function setAppProfilePort(
   options: EditAppProfileOptions & { port: number }
 ): Promise<AppProfileEntry & { serveServiceInstalled: boolean }> {
-  const context = await prepare(options, 'edit')
+  return withRegistryLockAsync(rootOf(options), async () => {
+    const context = await prepare(options, 'edit')
+    return setPortLocked(context, options.port)
+  })
+}
+
+function setPortLocked(
+  context: Context,
+  port: number
+): AppProfileEntry & { serveServiceInstalled: boolean } {
   if (context.inBackground) {
     throw new RuntimeClientError(
       'profile_running',
@@ -224,26 +270,20 @@ export async function setAppProfilePort(
     )
   }
   const error = appProfilePortError(
-    options.port,
-    context.registry.profiles.filter((p) => p.id !== options.id).map((p) => p.port)
+    port,
+    context.registry.profiles.filter((p) => p.id !== context.entry.id).map((p) => p.port)
   )
   if (error) {
     throw new RuntimeClientError('invalid_argument', error)
   }
-  return withRegistryLock(context.root, () => {
-    updateEntry(context, (registry) => ({
-      ...registry,
-      profiles: registry.profiles.map((profile) =>
-        profile.id === options.id ? { ...profile, port: options.port } : profile
-      )
-    }))
-    const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
-    return {
-      ...context.entry,
-      port: options.port,
-      serveServiceInstalled: existsSync(unit.unitPath)
-    }
-  })
+  updateEntry(context, (registry) => ({
+    ...registry,
+    profiles: registry.profiles.map((profile) =>
+      profile.id === context.entry.id ? { ...profile, port } : profile
+    )
+  }))
+  const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
+  return { ...context.entry, port, serveServiceInstalled: existsSync(unit.unitPath) }
 }
 
 /** Moves a file or folder to the Trash. */
@@ -266,38 +306,88 @@ function moveToTrash(run: RunTool, path: string, home: string): void {
 export async function removeAppProfile(
   options: EditAppProfileOptions & { keepData: boolean; trash?: (path: string) => void }
 ): Promise<{ id: string; keptData: boolean; serveService: ServeServiceChange }> {
-  const context = await prepare(options, 'remove')
+  return withRegistryLockAsync(rootOf(options), async () => {
+    const context = await prepare(options, 'remove')
+    return removeLocked(context, options)
+  })
+}
+
+/**
+ * The app and data folder that remove may move to the Trash. profiles.json is plain data, so
+ * remove moves only what is Orca's: the app in the apps folder with this profile's id, and the
+ * folder <root>/<id> with this profile's marker. Anything else stops the remove.
+ */
+function removalTargets(
+  context: Context,
+  keepData: boolean
+): { app: string | null; data: string | null } {
+  const { entry } = context
+  const refuse = (path: string): never => {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `profiles.json names ${path} for "${entry.id}", which is not a folder of this profile. Orca does not move it.`
+    )
+  }
+  const app = context.located
+  if (
+    app &&
+    (dirname(resolve(app)) !== context.appsDir ||
+      lstatSync(app).isSymbolicLink() ||
+      !isInside(app, context.appsDir))
+  ) {
+    refuse(app)
+  }
+  const dataPath = join(context.root, entry.id)
+  if (keepData || !existsSync(entry.userDataPath)) {
+    return { app, data: null }
+  }
+  if (
+    resolve(entry.userDataPath) !== resolve(dataPath) ||
+    lstatSync(dataPath).isSymbolicLink() ||
+    !isInside(dataPath, context.root) ||
+    readAppProfileMarker(dataPath) !== entry.id
+  ) {
+    refuse(entry.userDataPath)
+  }
+  return { app, data: dataPath }
+}
+
+function removeLocked(
+  context: Context,
+  options: { keepData: boolean; trash?: (path: string) => void }
+): { id: string; keptData: boolean; serveService: ServeServiceChange } {
   const { entry, run } = context
   const trash = options.trash ?? ((path: string) => moveToTrash(run, path, context.home))
-  return withRegistryLock(context.root, () => {
-    const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
-    let serveService: ServeServiceChange = 'none'
-    if (context.inBackground || existsSync(unit.unitPath)) {
-      tryRun(run, '/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
-      rmSync(unit.unitPath, { force: true })
-      serveService = 'removed'
-    }
-    tryRun(run, LSREGISTER, ['-u', entry.appPath])
-    trash(entry.appPath)
-    if (!options.keepData) {
-      trash(entry.userDataPath)
-    }
-    updateEntry(context, (registry) => ({
-      ...registry,
-      urlHandler:
-        registry.urlHandler.mode === 'profile' && registry.urlHandler.profileId === entry.id
-          ? { mode: 'ask' }
-          : registry.urlHandler,
-      profiles: registry.profiles.filter((profile) => profile.id !== entry.id)
-    }))
-    tryRun(run, '/usr/bin/tccutil', ['reset', 'All', entry.bundleId])
-    if (!options.keepData) {
-      tryRun(run, '/usr/bin/security', [
-        'delete-generic-password',
-        '-s',
-        `orca-${entry.id} Safe Storage`
-      ])
-    }
-    return { id: entry.id, keptData: options.keepData, serveService }
-  })
+  const targets = removalTargets(context, options.keepData)
+  const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
+  let serveService: ServeServiceChange = 'none'
+  if (context.inBackground || existsSync(unit.unitPath)) {
+    tryRun(run, '/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
+    rmSync(unit.unitPath, { force: true })
+    serveService = 'removed'
+  }
+  if (targets.app) {
+    tryRun(run, LSREGISTER, ['-u', targets.app])
+    trash(targets.app)
+  }
+  if (targets.data) {
+    trash(targets.data)
+  }
+  updateEntry(context, (registry) => ({
+    ...registry,
+    urlHandler:
+      registry.urlHandler.mode === 'profile' && registry.urlHandler.profileId === entry.id
+        ? { mode: 'ask' }
+        : registry.urlHandler,
+    profiles: registry.profiles.filter((profile) => profile.id !== entry.id)
+  }))
+  tryRun(run, '/usr/bin/tccutil', ['reset', 'All', entry.bundleId])
+  if (!options.keepData) {
+    tryRun(run, '/usr/bin/security', [
+      'delete-generic-password',
+      '-s',
+      `orca-${entry.id} Safe Storage`
+    ])
+  }
+  return { id: entry.id, keptData: options.keepData, serveService }
 }

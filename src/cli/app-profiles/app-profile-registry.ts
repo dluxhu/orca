@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync
 } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, join, sep } from 'node:path'
 import {
   APP_PROFILES_REGISTRY,
   readAppProfileRegistry,
@@ -33,8 +33,7 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
-/** Runs body while this process holds the lock file. A lock of a dead process is removed. */
-export function withRegistryLock<T>(root: string, body: () => T): T {
+function acquireRegistryLock(root: string): number {
   const lock = join(root, `${APP_PROFILES_REGISTRY}.lock`)
   const take = (): number | null => {
     try {
@@ -64,11 +63,31 @@ export function withRegistryLock<T>(root: string, body: () => T): T {
       `Another process changes the profiles now (${lock}). Try again later.`
     )
   }
+  return fd
+}
+
+function releaseRegistryLock(root: string, fd: number): void {
+  closeSync(fd)
+  rmSync(join(root, `${APP_PROFILES_REGISTRY}.lock`), { force: true })
+}
+
+/** Runs body while this process holds the lock file. A lock of a dead process is removed. */
+export function withRegistryLock<T>(root: string, body: () => T): T {
+  const fd = acquireRegistryLock(root)
   try {
     return body()
   } finally {
-    closeSync(fd)
-    rmSync(lock, { force: true })
+    releaseRegistryLock(root, fd)
+  }
+}
+
+/** withRegistryLock for a body that awaits, for example a state check before a change. */
+export async function withRegistryLockAsync<T>(root: string, body: () => Promise<T>): Promise<T> {
+  const fd = acquireRegistryLock(root)
+  try {
+    return await body()
+  } finally {
+    releaseRegistryLock(root, fd)
   }
 }
 
@@ -92,6 +111,15 @@ export function rewriteServeUnitAppPath(
   }
   writeFileSync(unitPath, updated)
   return true
+}
+
+/** True when path is inside parent after both resolve their links. */
+export function isInside(path: string, parent: string): boolean {
+  try {
+    return realpathSync(path).startsWith(`${realpathSync(parent)}${sep}`)
+  } catch {
+    return false
+  }
 }
 
 function samePath(left: string, right: string): boolean {

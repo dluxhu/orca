@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
+  symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -347,5 +349,110 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
     const result = await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
     expect(result.appPath).toBe(join(dir, 'apps', 'Orca - Job.app'))
     expect(existsSync(finderPath())).toBe(false)
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')("remove moves only what is the profile's", () => {
+  const trashed: string[] = []
+  const trash = (path: string): void => {
+    trashed.push(path)
+  }
+  beforeEach(() => {
+    trashed.length = 0
+  })
+  const tamper = (change: (profile: Record<string, unknown>) => void): void => {
+    const path = join(dir, 'data', 'profiles.json')
+    const data = JSON.parse(readFileSync(path, 'utf8'))
+    change(data.profiles[0])
+    writeFileSync(path, JSON.stringify(data))
+  }
+
+  it('refuses a profiles.json that names a folder outside the profiles root', async () => {
+    makeProfile()
+    const outside = join(dir, 'outside')
+    mkdirSync(outside)
+    writeFileSync(join(outside, 'orca-app-profile.json'), '{"id":"work"}')
+    tamper((profile) => {
+      profile.userDataPath = outside
+    })
+    await expect(
+      removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    ).rejects.toThrow('Orca does not move it')
+    expect(trashed).toEqual([])
+    expect(registry().profiles).toHaveLength(1)
+  })
+
+  it('refuses a data folder that is a link', async () => {
+    const work = makeProfile()
+    const outside = join(dir, 'outside')
+    renameSync(work.userDataPath, outside)
+    symlinkSync(outside, work.userDataPath)
+    await expect(
+      removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    ).rejects.toThrow('Orca does not move it')
+    expect(trashed).toEqual([])
+  })
+
+  it('refuses an app outside the apps folder', async () => {
+    const work = makeProfile()
+    const elsewhere = join(dir, 'elsewhere')
+    mkdirSync(elsewhere)
+    renameSync(work.appPath, join(elsewhere, 'Orca - Work.app'))
+    tamper((profile) => {
+      profile.appPath = join(elsewhere, 'Orca - Work.app')
+    })
+    await expect(
+      removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
+    ).rejects.toThrow('Orca does not move it')
+    expect(trashed).toEqual([])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('edits hold the registry lock', () => {
+  it('checks the running state while it holds the lock', async () => {
+    makeProfile()
+    const lock = join(dir, 'data', 'profiles.json.lock')
+    const locked: boolean[] = []
+    const checking: ServeServiceRun = async (program, args) => {
+      locked.push(existsSync(lock))
+      return serviceRun(program, args)
+    }
+    await removeAppProfile({
+      id: 'work',
+      keepData: true,
+      trash: () => {},
+      ...deps(),
+      serviceRun: checking
+    })
+    expect(locked).toEqual([true])
+    expect(existsSync(lock)).toBe(false)
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('rename rolls back a failed unit rewrite', () => {
+  it('puts the app, Launch Services and the registry back', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, `<string>${work.appPath}/Contents/MacOS/Orca</string>`)
+    chmodSync(unit.unitPath, 0o444)
+    try {
+      await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
+        'EACCES'
+      )
+    } finally {
+      chmodSync(unit.unitPath, 0o644)
+    }
+    const newPath = join(dir, 'apps', 'Job.app')
+    expect(existsSync(work.appPath)).toBe(true)
+    expect(existsSync(newPath)).toBe(false)
+    expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Work', appPath: work.appPath })
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${work.appPath}/Contents/MacOS/Orca</string>`
+    )
+    const lsregister = calls.filter((call) => call[0].endsWith('lsregister')).map((c) => c.slice(1))
+    expect(lsregister.slice(-2)).toEqual([
+      ['-u', newPath],
+      ['-f', work.appPath]
+    ])
   })
 })

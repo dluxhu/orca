@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -15,7 +16,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
@@ -37,7 +38,7 @@ import {
   nextAppProfilePort
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
-import { withRegistryLock, writeRegistry } from './app-profile-registry'
+import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
@@ -108,14 +109,7 @@ export function createAppProfile(
       throw new RuntimeClientError('invalid_argument', error)
     }
     const userDataPath = join(root, id)
-    // On a volume that ignores case, the folder of "Work" is also the folder of "work".
-    const keptId = readAppProfileMarker(userDataPath)
-    if (keptId !== null && keptId !== id) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `${userDataPath} is the data folder of the profile "${keptId}". Use the id "${keptId}".`
-      )
-    }
+    const keptId = keptDataFolderId(userDataPath, root, id, home)
     const appPath = join(appsDir, `${name}.app`)
     if (existsSync(appPath)) {
       throw new RuntimeClientError('invalid_argument', `${appPath} exists.`)
@@ -215,8 +209,12 @@ export function createAppProfile(
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
       ensureAppProfileMarker(userDataPath, id)
+      const seed = join(userDataPath, APP_PROFILE_SETTINGS_SEED)
       if (options.settingsFile) {
-        copyFileSync(options.settingsFile, join(userDataPath, APP_PROFILE_SETTINGS_SEED))
+        copyFileSync(options.settingsFile, seed)
+      } else {
+        // Kept data can hold a seed of an earlier create; this create copies no settings.
+        rmSync(seed, { force: true })
       }
       const entry: AppProfileEntry = {
         id,
@@ -240,6 +238,49 @@ export function createAppProfile(
       rmSync(staging, { recursive: true, force: true })
     }
   })
+}
+
+/**
+ * Null for a new data folder. An existing <root>/<id> must be a real folder, inside the root, with
+ * this profile's marker: the folder that "Keep data" left. The default app's data is never a
+ * profile's data.
+ */
+function keptDataFolderId(
+  userDataPath: string,
+  root: string,
+  id: string,
+  home: string
+): string | null {
+  const refuse = (reason: string): never => {
+    throw new RuntimeClientError('invalid_argument', `${userDataPath} ${reason} Use another id.`)
+  }
+  const real = (path: string): string => (existsSync(path) ? realpathSync(path) : path)
+  const defaultData = real(join(home, 'Library', 'Application Support', 'orca')).toLowerCase()
+  const target = join(real(root), id).toLowerCase()
+  if (target === defaultData || target.startsWith(`${defaultData}${sep}`)) {
+    refuse("is the default app's data.")
+  }
+  let stat: ReturnType<typeof lstatSync>
+  try {
+    stat = lstatSync(userDataPath)
+  } catch {
+    return null
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory() || !isInside(userDataPath, root)) {
+    refuse('exists and is not a profile data folder.')
+  }
+  // On a volume that ignores case, the folder of "Work" is also the folder of "work".
+  const keptId = readAppProfileMarker(userDataPath)
+  if (keptId === null) {
+    refuse('exists and has no profile marker.')
+  }
+  if (keptId !== id) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `${userDataPath} is the data folder of the profile "${keptId}". Use the id "${keptId}".`
+    )
+  }
+  return keptId
 }
 
 /** A profile's `orca` runs in the profile app; its app.asar link points into the default app. */

@@ -8,6 +8,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -256,17 +257,17 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile with --id and s
     const settings = join(dir, 'settings.json')
     writeFileSync(settings, '{"theme":"dark"}')
     const entry = createAppProfile({
-      name: 'Orca @dLux - Todo-Dodo',
-      id: 'todo-dodo',
+      name: 'Orca - Client',
+      id: 'client',
       settingsFile: settings,
       defaultAppPath: app,
       env: env(),
       run
     })
     expect(entry).toMatchObject({
-      id: 'todo-dodo',
-      bundleId: 'com.stablyai.orca.dlux.profile.todo-dodo',
-      userDataPath: join(dir, 'data', 'todo-dodo')
+      id: 'client',
+      bundleId: 'com.stablyai.orca.dlux.profile.client',
+      userDataPath: join(dir, 'data', 'client')
     })
     expect(readFileSync(join(entry.userDataPath, 'orca-settings-seed.json'), 'utf8')).toBe(
       '{"theme":"dark"}'
@@ -313,3 +314,53 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile on kept data', 
     expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
   })
 })
+
+describe.skipIf(process.platform !== 'darwin')(
+  'createAppProfile refuses a data folder that is not its own',
+  () => {
+    const create = (id: string) =>
+      createAppProfile({ name: 'Job', id, defaultAppPath: app, env: env(), run })
+
+    it('refuses a folder without a marker, also under another case of the id', () => {
+      mkdirSync(join(dir, 'data', 'work'), { recursive: true })
+      writeFileSync(join(dir, 'data', 'work', 'notes.txt'), 'mine')
+      expect(() => create('work')).toThrow('has no profile marker')
+      expect(() => create('Work')).toThrow('has no profile marker')
+      expect(existsSync(join(dir, 'data', 'work', 'orca-app-profile.json'))).toBe(false)
+      expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
+    })
+
+    it('refuses a link, also a link to a folder with the right marker', () => {
+      const outside = join(dir, 'outside')
+      mkdirSync(outside)
+      writeFileSync(join(outside, 'orca-app-profile.json'), '{"id":"work"}')
+      mkdirSync(join(dir, 'data'), { recursive: true })
+      symlinkSync(outside, join(dir, 'data', 'work'))
+      expect(() => create('work')).toThrow('is not a profile data folder')
+    })
+
+    it("refuses the default app's data folder", () => {
+      const appSupport = join(dir, 'Library', 'Application Support')
+      mkdirSync(join(appSupport, 'orca'), { recursive: true })
+      expect(() =>
+        createAppProfile({
+          name: 'Job',
+          id: 'orca',
+          defaultAppPath: app,
+          env: { ...env(), ORCA_PROFILES_ROOT: appSupport },
+          home: dir,
+          run
+        })
+      ).toThrow("is the default app's data")
+    })
+
+    it('removes a seed that kept data holds when this create copies no settings', () => {
+      const userDataPath = join(dir, 'data', 'work')
+      mkdirSync(userDataPath, { recursive: true })
+      writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}')
+      writeFileSync(join(userDataPath, 'orca-settings-seed.json'), '{"theme":"dark"}')
+      create('work')
+      expect(existsSync(join(userDataPath, 'orca-settings-seed.json'))).toBe(false)
+    })
+  }
+)
