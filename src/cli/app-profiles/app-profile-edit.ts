@@ -284,19 +284,21 @@ function setPortLocked(
   if (error) {
     throw new RuntimeClientError('invalid_argument', error)
   }
-  updateEntry(context, (registry) => ({
-    ...registry,
-    profiles: registry.profiles.map((profile) =>
-      profile.id === context.entry.id ? { ...profile, port } : profile
-    )
-  }))
   // Start at login keeps the profile's port. A loaded job restarts on it; others read it at load.
+  // A failed bootout stops here. The unit comes before the registry, so a failed unit write
+  // leaves both on the old port.
   const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
   if (loaded) {
-    tryRun(context.run, '/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
+    context.run('/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
   }
   try {
     const updated = rewriteServeUnitPort(unit.unitPath, port)
+    updateEntry(context, (registry) => ({
+      ...registry,
+      profiles: registry.profiles.map((profile) =>
+        profile.id === context.entry.id ? { ...profile, port } : profile
+      )
+    }))
     const serveService: ServeServiceChange = loaded ? 'restarted' : updated ? 'updated' : 'none'
     return {
       ...context.entry,

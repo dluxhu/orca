@@ -20,6 +20,7 @@ import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
+import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -174,6 +175,18 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     expect(calls.some((call) => call.includes('install'))).toBe(false)
   })
 
+  it('updates a unit whose app path has a double quote, as the unit renderer escapes it', async () => {
+    const bob = makeProfile('Bob "B"', 'bob')
+    const unit = serveServiceUnitOf(bob.userDataPath, false, dir)
+    const escaped = (path: string) => path.replace(/"/g, '&quot;')
+    file(unit.unitPath, `<string>${escaped(bob.appPath)}/Contents/Resources/bin/orca</string>`)
+    const result = await renameAppProfile({ id: 'bob', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('updated')
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${join(dir, 'apps', 'Job.app')}/Contents/Resources/bin/orca</string>`
+    )
+  })
+
   it('puts the app back under its old name when a step fails', async () => {
     const work = makeProfile()
     failVerify = true
@@ -222,6 +235,45 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
       '<string>--port</string>\n    <string>7000</string>'
     )
     expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
+  it('keeps the registry and the unit on the old port when the unit write fails', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    chmodSync(unit.unitPath, 0o444)
+    try {
+      await expect(setAppProfilePort({ id: 'work', port: 7000, ...deps() })).rejects.toThrow(
+        'EACCES'
+      )
+    } finally {
+      chmodSync(unit.unitPath, 0o644)
+    }
+    expect(registry().profiles[0].port).toBe(6800)
+    // The job runs again on the old unit.
+    expect(calls.filter((call) => call[0].endsWith('launchctl')).map((call) => call[1])).toEqual([
+      'bootout',
+      'bootstrap'
+    ])
+  })
+
+  it('stops before any change when the bootout fails', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    const failing: RunTool = (program, args) => {
+      if (args[0] === 'bootout') {
+        throw new Error('bootout failed')
+      }
+      return run(program, args)
+    }
+    await expect(
+      setAppProfilePort({ id: 'work', port: 7000, ...deps(), run: failing })
+    ).rejects.toThrow('bootout failed')
+    expect(readFileSync(unit.unitPath, 'utf8')).toContain('<string>6800</string>')
+    expect(registry().profiles[0].port).toBe(6800)
   })
 
   it('restarts a loaded service on the new port, so the server keeps running', async () => {
@@ -398,7 +450,9 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
     expect(heal(copy)).toBe('unchanged')
     // The original is gone, but two apps have the id: Orca does not guess.
     renameSync(work.appPath, finderPath())
+    expect(locateAppProfileApp({ id: 'work', appPath: work.appPath })).toBeNull()
     expect(heal(finderPath())).toBe('unchanged')
+    expect(console.warn).toHaveBeenCalledTimes(2)
     expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Work', appPath: work.appPath })
     expect(readFileSync(unit.unitPath, 'utf8')).toBe(
       `<string>${work.appPath}/Contents/Resources/bin</string>`
