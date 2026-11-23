@@ -36,7 +36,7 @@ import {
   appProfileIconSourceFromFlags,
   makeAppProfileIcon,
   type AppProfileIconSource
-} from '../../main/app-profiles/app-profile-icon'
+} from './app-profile-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'

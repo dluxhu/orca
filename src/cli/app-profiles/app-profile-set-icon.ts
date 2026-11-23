@@ -19,11 +19,7 @@ import {
   type AppProfileEntry
 } from '../../shared/app-profiles/app-profile-paths'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
-import {
-  appIconFileName,
-  makeAppProfileIcon,
-  type AppProfileIconSource
-} from '../../main/app-profiles/app-profile-icon'
+import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { isProcessAlive, withRegistryLock, writeRegistry } from './app-profile-registry'

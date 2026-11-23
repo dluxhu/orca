@@ -1,5 +1,6 @@
 // Profile icons: the default app's icon with a badge, or an uploaded icon, written as .icns.
-// See docs/fork/profiles-design.md, section 8. Runs in Node (the CLI and the main process).
+// See docs/fork/profiles-design.md, section 8. The CLI runs it; electron-vite does not keep
+// src/main modules for the CLI.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
