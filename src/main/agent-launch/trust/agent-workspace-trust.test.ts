@@ -220,6 +220,7 @@ describe('applyAgentWorkspaceTrustToSpawn for qwen-code', () => {
     // The spawn merges process.env, so a developer's Qwen config overrides must not leak in.
     vi.stubEnv('QWEN_CONFIG_DIR', '')
     vi.stubEnv('QWEN_CLI_HOME', '')
+    vi.stubEnv('QWEN_HOME', '')
   })
 
   afterEach(() => {

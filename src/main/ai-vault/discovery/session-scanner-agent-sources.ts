@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../../shared/app-profiles/app-profile-homes'
 import { basename, dirname, join } from 'node:path'
 import { pathSegments } from './session-file-discovery'
 import { resolveAbsoluteDirOverride } from '../../../shared/file-access/absolute-dir-override'
@@ -35,14 +36,17 @@ import {
   primeAgentSessionsDirFromEnv
 } from './agent-session-directories'
 
-export const DEFAULT_CODEX_HOME_DIR = join(homedir(), '.codex')
-const GEMINI_SESSIONS_DIR = join(homedir(), '.gemini', 'tmp')
-const COPILOT_SESSIONS_DIR = join(
-  resolveAbsoluteDirOverride(process.env.COPILOT_HOME, join(homedir(), '.copilot')),
-  'session-state'
-)
+export const defaultCodexHomeDir = (): string => defaultAgentHomeDir('CODEX_HOME', '.codex')
+const geminiSessionsDir = (): string =>
+  join(defaultAgentHomeDir('GEMINI_CLI_HOME', '.gemini'), 'tmp')
+const copilotSessionsDir = (): string =>
+  join(
+    resolveAbsoluteDirOverride(process.env.COPILOT_HOME, join(homedir(), '.copilot')),
+    'session-state'
+  )
 const CURSOR_PROJECTS_DIR = join(homedir(), '.cursor', 'projects')
-const CODEBUDDY_PROJECTS_DIR = join(homedir(), '.codebuddy', 'projects')
+const codebuddyProjectsDir = (): string =>
+  join(defaultAgentHomeDir('CODEBUDDY_CONFIG_DIR', '.codebuddy'), 'projects')
 const ROVO_SESSIONS_DIR = join(homedir(), '.rovodev', 'sessions')
 export function piSessionHistorySessionsDir(): string {
   return normalizeAgentSessionsDir(
@@ -64,11 +68,12 @@ const DEVIN_TRANSCRIPTS_DIR = join(
   ),
   'transcripts'
 )
-const KIRO_SESSIONS_DIR = join(resolveKiroHomeDir(), 'sessions', 'cli')
+const kiroSessionsDir = (): string => join(resolveKiroHomeDir(), 'sessions', 'cli')
 const DROID_SESSIONS_DIR = join(homedir(), '.factory', 'sessions')
 const DROID_PROJECTS_DIR = join(homedir(), '.factory', 'projects')
-const CLINE_SESSIONS_DIR =
-  process.env.CLINE_SESSION_DATA_DIR?.trim() || join(homedir(), '.cline', 'data', 'sessions')
+const clineSessionsDir = (): string =>
+  process.env.CLINE_SESSION_DATA_DIR?.trim() ||
+  join(defaultAgentHomeDir('CLINE_DIR', '.cline'), 'data', 'sessions')
 
 /** Shared discovery rules constrain which paths the delete validator accepts. */
 export type AiVaultAgentSource = {
@@ -103,7 +108,8 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   qoder: {
     rootDirs: (options, wslHomeDirs) =>
       sessionRootDirs(
-        options.qoderProjectsDir ?? join(homedir(), '.qoder', 'projects'),
+        options.qoderProjectsDir ??
+          join(defaultAgentHomeDir('QODER_CONFIG_DIR', '.qoder'), 'projects'),
         wslHomeDirs,
         ['.qoder', 'projects']
       ),
@@ -112,7 +118,7 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   },
   codebuddy: {
     rootDirs: (options, wslHomeDirs) => [
-      options.codebuddyProjectsDir ?? CODEBUDDY_PROJECTS_DIR,
+      options.codebuddyProjectsDir ?? codebuddyProjectsDir(),
       ...wslHomeDirs.map((homeDir) => join(homeDir, '.codebuddy', 'projects'))
     ],
     extensions: ['.jsonl'],
@@ -134,7 +140,7 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   },
   gemini: {
     rootDirs: (options, wslHomeDirs) =>
-      sessionRootDirs(options.geminiSessionsDir ?? GEMINI_SESSIONS_DIR, wslHomeDirs, [
+      sessionRootDirs(options.geminiSessionsDir ?? geminiSessionsDir(), wslHomeDirs, [
         '.gemini',
         'tmp'
       ]),
@@ -142,7 +148,7 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   },
   copilot: {
     rootDirs: (options, wslHomeDirs) =>
-      sessionRootDirs(options.copilotSessionsDir ?? COPILOT_SESSIONS_DIR, wslHomeDirs, [
+      sessionRootDirs(options.copilotSessionsDir ?? copilotSessionsDir(), wslHomeDirs, [
         '.copilot',
         'session-state'
       ]),
@@ -200,7 +206,7 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   },
   kiro: {
     rootDirs: (options, wslHomeDirs) =>
-      sessionRootDirs(options.kiroSessionsDir ?? KIRO_SESSIONS_DIR, wslHomeDirs, [
+      sessionRootDirs(options.kiroSessionsDir ?? kiroSessionsDir(), wslHomeDirs, [
         '.kiro',
         'sessions',
         'cli'
@@ -263,7 +269,7 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
   },
   cline: {
     rootDirs: (options, wslHomeDirs) =>
-      sessionRootDirs(options.clineSessionsDir ?? CLINE_SESSIONS_DIR, wslHomeDirs, [
+      sessionRootDirs(options.clineSessionsDir ?? clineSessionsDir(), wslHomeDirs, [
         '.cline',
         'data',
         'sessions'

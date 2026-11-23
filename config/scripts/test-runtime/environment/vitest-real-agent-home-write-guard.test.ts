@@ -5,7 +5,11 @@ import { homedir, tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { takeRealAgentHomeWriteViolations } from './vitest-real-agent-home-write-guard'
+import { APP_PROFILE_HOME_ENV_KEYS } from '../../../../src/shared/app-profiles/app-profile-homes'
+import {
+  clearInheritedAgentStateEnv,
+  takeRealAgentHomeWriteViolations
+} from './vitest-real-agent-home-write-guard'
 
 // Use missing-parent/no-op paths so guard ablation never writes real home either.
 const missingRealFolder = (entry: string) =>
@@ -77,6 +81,30 @@ describe('vitest real-agent-home write guard', () => {
     } finally {
       rmSync(tempHome, { recursive: true, force: true })
     }
+  })
+
+  // Fork patch: an app profile's agent folders and Grok Build's home.
+  it('refuses a removal under the real ~/.grok', () => {
+    expect(() => rmSync(missingRealFolder('.grok'), { force: true })).toThrow(
+      /real-agent-home guard/
+    )
+  })
+
+  it.each([
+    ['Library', 'Application Support', 'Orca Profiles'],
+    ['Applications', 'Orca Profiles']
+  ])('refuses a removal under the real app profiles folder %s/%s', (...segments) => {
+    expect(() => rmSync(missingRealFolder(join(...segments)), { force: true })).toThrow(
+      /real-agent-home guard/
+    )
+  })
+
+  it("clears an app profile's inherited folders so tests use their own", () => {
+    for (const key of APP_PROFILE_HOME_ENV_KEYS) {
+      vi.stubEnv(key, `/profile/${key}`)
+    }
+    clearInheritedAgentStateEnv()
+    expect(APP_PROFILE_HOME_ENV_KEYS.filter((key) => process.env[key] !== undefined)).toEqual([])
   })
 
   it('leaves a sibling that only shares an agent folder prefix alone', () => {

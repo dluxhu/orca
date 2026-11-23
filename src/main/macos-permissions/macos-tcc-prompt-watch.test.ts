@@ -3,6 +3,7 @@ import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MacosTccPromptWatch,
+  isOrcaAttributedPrompt,
   type LogStreamChild,
   parseTccPromptEvent
 } from './macos-tcc-prompt-watch'
@@ -34,6 +35,23 @@ describe('parseTccPromptEvent', () => {
     expect(event?.responsibleIdentifier).toBe('com.stablyai.orca')
     expect(event?.accessingIdentifier).toBe('node-5555494487fbc7467d473fd8b0a397018cbf954b')
     expect(event?.binaryPath).toBe('/opt/homebrew/Cellar/node/26.5.0/bin/node')
+  })
+})
+
+describe('isOrcaAttributedPrompt', () => {
+  const prompt = (responsibleIdentifier: string) =>
+    isOrcaAttributedPrompt({
+      service: 'kTCCServiceSystemPolicyAppData',
+      accessingIdentifier: 'node',
+      responsibleIdentifier
+    })
+
+  it('accepts Orca, the fork, its app profiles and their helpers', () => {
+    expect(prompt('com.stablyai.orca')).toBe(true)
+    expect(prompt('com.stablyai.orca.dlux.helper')).toBe(true)
+    expect(prompt('com.stablyai.orca.dlux.nightly.profile.work')).toBe(true)
+    expect(prompt('com.stablyai.orcaother')).toBe(false)
+    expect(prompt('com.example.app')).toBe(false)
   })
 })
 
