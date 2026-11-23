@@ -236,6 +236,8 @@ export function createAppProfile(
         // Kept data can hold a seed of an earlier create; this create copies no settings.
         rmSync(seed, { force: true })
       }
+      // Kept data can hold a link here; the write must not follow it.
+      rmSync(join(userDataPath, APP_PROFILE_ICON_FILE), { force: true })
       writeFileSync(join(userDataPath, APP_PROFILE_ICON_FILE), made.icns)
       const entry: AppProfileEntry = {
         id,

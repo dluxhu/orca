@@ -26,6 +26,7 @@ import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
+import { setAppProfileIcon } from './app-profile-set-icon'
 import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -496,7 +497,37 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
       defaultUserDataPath: join(dir, 'default-data'),
       ...deps()
     })
-    expect(rows[1]).toMatchObject({ id: 'work', name: 'Orca - Finder', appPath: finderPath() })
+    expect(rows[1]).toMatchObject({
+      id: 'work',
+      name: 'Orca - Finder',
+      appPath: finderPath(),
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    })
+  })
+
+  it('set-icon writes the icon into the renamed app, also after a rename while the icon is made', async () => {
+    renameInFinder()
+    const later = join(dir, 'apps', 'Orca - Later.app')
+    const icon = (path: string): string =>
+      readFileSync(join(path, 'Contents', 'Resources', 'icon.icns'), 'utf8')
+    const made = (text: string, move?: () => void) =>
+      (() => {
+        move?.()
+        return {
+          icns: Buffer.from(`icns ${text}`),
+          icon: { kind: 'badge', text, style: 'ref-match' }
+        }
+      }) as never
+    await setAppProfileIcon('work', { kind: 'badge' }, { ...deps(), makeIcon: made('Q') })
+    expect(icon(finderPath())).toBe('icns Q')
+    await setAppProfileIcon(
+      'work',
+      { kind: 'badge' },
+      { ...deps(), makeIcon: made('R', () => renameSync(finderPath(), later)) }
+    )
+    expect(icon(later)).toBe('icns R')
+    // The last bundle signature is on the app at its new place.
+    expect(calls.findLast((call) => call[1] === '--force')?.at(-1)).toBe(later)
   })
 
   it('serve, open and rename find the renamed app', async () => {

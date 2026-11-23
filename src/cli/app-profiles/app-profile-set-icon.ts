@@ -39,14 +39,15 @@ export async function setAppProfileIcon(
   const edit = { ...options, id }
   return withRegistryLockAsync(rootOf(edit, 'edit'), async () => {
     const context = await prepare(edit, 'edit')
-    const { entry, registry, run } = context
+    const { registry, run } = context
     const made = (options.makeIcon ?? makeAppProfileIcon)(
       registry.defaultAppPath,
       icon,
       registry.profiles.filter((profile) => profile.id !== id).map((profile) => profile.icon)
     )
-    // The icon takes seconds to make. The app can start in that time.
-    await prepare(edit, 'edit')
+    // The icon takes seconds to make. The app can start, or move in Finder, in that time.
+    const refreshed = await prepare(edit, 'edit')
+    const { entry } = refreshed
     const contents = join(entry.appPath, 'Contents')
     const plist = readFileSync(join(contents, 'Info.plist'), 'utf8')
     const iconPath = join(contents, 'Resources', appIconFileName(plist))
@@ -88,8 +89,10 @@ export async function setAppProfileIcon(
     } finally {
       rmSync(temporary, { recursive: true, force: true })
     }
+    // The write must not follow a link in the data folder.
+    rmSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), { force: true })
     writeFileSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), made.icns)
-    updateEntry(context, (current) => ({
+    updateEntry(refreshed, (current) => ({
       ...current,
       profiles: current.profiles.map((profile) =>
         profile.id === id ? { ...profile, icon: made.icon } : profile

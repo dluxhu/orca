@@ -174,6 +174,10 @@ export function makeAppProfileIcon(
       extname(source.path).toLowerCase() === '.icns'
         ? readFileSync(source.path)
         : writeIcns(rasterizeWithAppKit('file', source.path, run))
+    // The preview and the Dock need a PNG entry.
+    if (icns.toString('latin1', 0, 4) !== 'icns' || !largestIcnsPng(icns)) {
+      throw new Error(`Not an .icns file with a PNG image: ${source.path}`)
+    }
     return { icns, icon: { kind: 'file' } }
   }
   const style = source.style ?? 'ref-match'

@@ -84,6 +84,19 @@ describe('profile icon sources', () => {
     expect(() => makeAppProfileIcon(app, { kind: 'file', path: join(dir, 'x.png') })).toThrow(
       'No file'
     )
+    // An own .icns must be one, with a PNG entry for the preview and the Dock.
+    const text = join(dir, 'text.icns')
+    writeFileSync(text, 'hello, I am text')
+    const empty = join(dir, 'empty.icns')
+    writeFileSync(empty, Buffer.from([0x69, 0x63, 0x6e, 0x73, 0, 0, 0, 8]))
+    for (const path of [text, empty]) {
+      expect(() => makeAppProfileIcon(app, { kind: 'file', path })).toThrow(
+        'Not an .icns file with a PNG image'
+      )
+    }
+    const good = join(dir, 'good.icns')
+    writeFileSync(good, writeIcns(newImg(1024, 1024, 4, [1, 2, 3, 255])))
+    expect(makeAppProfileIcon(app, { kind: 'file', path: good }).icon).toEqual({ kind: 'file' })
   })
 })
 

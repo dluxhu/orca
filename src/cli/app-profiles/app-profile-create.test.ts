@@ -481,6 +481,19 @@ describe.skipIf(process.platform !== 'darwin')(
       create('work')
       expect(existsSync(join(userDataPath, 'orca-settings-seed.json'))).toBe(false)
     })
+
+    it('replaces a link at the icon copy of kept data, and leaves its target alone', () => {
+      const userDataPath = join(dir, 'data', 'work')
+      mkdirSync(userDataPath, { recursive: true })
+      writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}')
+      const outside = join(dir, 'outside.txt')
+      writeFileSync(outside, 'outside')
+      symlinkSync(outside, join(userDataPath, 'profile-icon.icns'))
+      create('work')
+      expect(readFileSync(outside, 'utf8')).toBe('outside')
+      expect(lstatSync(join(userDataPath, 'profile-icon.icns')).isSymbolicLink()).toBe(false)
+      expect(readFileSync(join(userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns 2')
+    })
   }
 )
 
@@ -551,6 +564,18 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
       '"Work" runs.'
     )
     expect(read(icon(work))).toBe('icns 2')
+  })
+
+  it('replaces a link at the icon copy in the data folder, and leaves its target alone', async () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    const outside = join(dir, 'outside.txt')
+    writeFileSync(outside, 'outside')
+    rmSync(join(work.userDataPath, 'profile-icon.icns'))
+    symlinkSync(outside, join(work.userDataPath, 'profile-icon.icns'))
+    await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
+    expect(read(outside)).toBe('outside')
+    expect(lstatSync(join(work.userDataPath, 'profile-icon.icns')).isSymbolicLink()).toBe(false)
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
   })
 
   it('refuses when the app starts while the icon is made', async () => {
