@@ -55,7 +55,7 @@ The release build adds these branches onto the upstream stable tag, in this orde
 | `dlux/chat-cli`               | `upstream-stable`                                                     | upstream candidate | not offered: upstream issue [#40664](https://github.com/stablyai/orca/issues/40664) has open PRs [#43057](https://github.com/stablyai/orca/pull/43057) and [#41850](https://github.com/stablyai/orca/pull/41850) | see "Branch dlux/chat-cli"                            | `pnpm exec vitest run --config config/vitest.config.ts src/cli/agents/chat.test.ts src/main/runtime/rpc/methods/structured-sessions/creation/structured-agent-session-gate.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `dlux/launch-refusal-cause`   | `upstream-stable`                                                     | upstream candidate | planned, together with `dlux/remote-control` (only its resume reaches this refusal)                                                                                                                              | fork PR [#14](https://github.com/dluxhu/orca/pull/14) | `pnpm exec vitest run --config config/vitest.config.ts src/main/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-create-refusal.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-refusal.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `dlux/claude-adopt-cwd`       | `upstream-stable`                                                     | upstream candidate | not offered: upstream fixed the main case in [#43325](https://github.com/stablyai/orca/pull/43325)                                                                                                               | fork PR [#17](https://github.com/dluxhu/orca/pull/17) | `pnpm exec vitest run --config config/vitest.config.ts src/main/native-chat/agent-session-journal/history-import/adopted-transcript-source.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `dlux/cli-wrapper-exec`       | `upstream-stable`                                                     | upstream candidate | not offered: the same fix is in open upstream PR [#35382](https://github.com/stablyai/orca/pull/35382)                                                                                                           | fork PR [#18](https://github.com/dluxhu/orca/pull/18) | `pnpm exec vitest run --config config/vitest.config.ts src/main/cli/packaged-assets/packaged-cli-assets.test.ts src/main/cli/packaged-assets/packaged-mac-cli-interpreter.test.ts src/main/cli/cli-launcher-session-handoff.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `dlux/cli-wrapper-exec`       | `upstream-stable`                                                     | upstream candidate | not offered: the same fix is in open upstream PR [#35382](https://github.com/stablyai/orca/pull/35382)                                                                                                           | fork PR [#18](https://github.com/dluxhu/orca/pull/18) | `pnpm exec vitest run --config config/vitest.config.ts src/main/cli/packaged-assets/packaged-cli-assets.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `dlux/cli-link-notice`        | `upstream-stable`                                                     | upstream candidate | issue [#43460](https://github.com/stablyai/orca/issues/43460); PR [#43876](https://github.com/stablyai/orca/pull/43876) (async realpath for upstream lint)                                                       | fork PR [#19](https://github.com/dluxhu/orca/pull/19) | `pnpm exec vitest run --config config/vitest.config.ts src/main/cli/installation/cli-installer-other-app-notice.test.ts src/renderer/src/components/settings/cli/install/use-cli-registration-actions.test.ts src/renderer/src/lib/cli/cli-user-facing-detail.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `dlux/remote-control`         | `dlux/launch-refusal-cause`                                           | upstream candidate | planned; links upstream issues [#37502](https://github.com/stablyai/orca/issues/37502) and [#37143](https://github.com/stablyai/orca/issues/37143)                                                               | fork PR [#3](https://github.com/dluxhu/orca/pull/3)   | `pnpm exec vitest run --config config/vitest.config.ts src/main/claude/structured/claude-structured-remote-control.test.ts src/main/native-chat/agent-session-wire/providers/structured-agent-session-adapter-router-remote-control.test.ts src/main/agent-launch/agent-launch-resume.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-resume.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-resume-unknown-cause.test.ts src/main/runtime/rpc/methods/agent-launch/agent-launch-surfaces-remote-control.test.ts src/shared/rpc-contract/agent-launch/agent-launch-params.test.ts src/cli/agents/agent-launch-request.test.ts src/cli/index-agent-launch.test.ts` |
 | `dlux/session-mention`        | `upstream-stable`                                                     | upstream candidate | issue [#43462](https://github.com/stablyai/orca/issues/43462); planned                                                                                                                                           | fork PR [#10](https://github.com/dluxhu/orca/pull/10) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/composer src/shared/orchestration/mailbox`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -273,18 +273,18 @@ do not change.
 **Single source.** `src/shared/fork-identity.ts` holds every fork value. The other files only
 read `FORK_IDENTITY`.
 
-| Identity point                                                                          | Official Orca               | Orca @dLux                                  | File                                                                                                                    |
-| --------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Product name (bundle name, Finder)                                                      | `Orca`                      | `Orca @dLux`                                | `config/electron-builder.config.cjs`                                                                                    |
-| Bundle id / appId                                                                       | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `config/electron-builder.config.cjs`                                                                                    |
-| Local-build contract appId (ShipIt cache, launchd `AssociatedBundleIdentifiers`)        | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `src/shared/local-build-compatibility-contract.json`, `src/shared/local-build-compatibility-contract.ts`                |
-| Notification status helper bundle id (default)                                          | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `config/scripts/native-build/macos/build-notification-status-macos.mjs`                                                 |
-| Notification settings link                                                              | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `src/main/ipc/notification-system-settings-link.ts`                                                                     |
-| Name after ready (app name, About panel, menu title, Quit item), Windows AppUserModelId | `Orca`, `com.stablyai.orca` | `Orca @dLux`, `com.stablyai.orca.dlux`      | `src/main/startup/profile-startup/dev-instance-identity.ts`                                                             |
-| "About Orca" and "Hide Orca" menu items                                                 | `Orca`                      | `Orca @dLux`                                | `src/main/menu/register-app-menu.ts` (`withForkName` from `src/shared/fork-identity.ts`)                                |
-| Window title, in-app titlebar name                                                      | `Orca`                      | `Orca @dLux`                                | `src/main/window/createMainWindow.ts`, `src/renderer/index.html`, `src/renderer/src/app-shell/TitlebarLeftControls.tsx` |
-| TCC prompt watch: responsible bundle ids                                                | official ids                | adds `com.stablyai.orca.dlux` and `.helper` | `src/main/macos-permissions/macos-tcc-prompt-watch.ts`                                                                  |
-| Computer Use helper: trusted agent apps                                                 | official ids                | adds `com.stablyai.orca.dlux` and `.dlux.*` | `native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift`                               |
+| Identity point                                                                          | Official Orca               | Orca @dLux                                  | File                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product name (bundle name, Finder)                                                      | `Orca`                      | `Orca @dLux`                                | `config/electron-builder.config.cjs`                                                                                                                                         |
+| Bundle id / appId                                                                       | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `config/electron-builder.config.cjs`                                                                                                                                         |
+| Local-build contract appId (ShipIt cache, launchd `AssociatedBundleIdentifiers`)        | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.json`, `src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.ts` |
+| Notification status helper bundle id (default)                                          | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `config/scripts/native-build/macos/build-notification-status-macos.mjs`                                                                                                      |
+| Notification settings link                                                              | `com.stablyai.orca`         | `com.stablyai.orca.dlux`                    | `src/main/ipc/notifications/notification-system-settings-link.ts`                                                                                                            |
+| Name after ready (app name, About panel, menu title, Quit item), Windows AppUserModelId | `Orca`, `com.stablyai.orca` | `Orca @dLux`, `com.stablyai.orca.dlux`      | `src/main/startup/profile-startup/dev-instance-identity.ts`                                                                                                                  |
+| "About Orca" and "Hide Orca" menu items                                                 | `Orca`                      | `Orca @dLux`                                | `src/main/menu/register-app-menu.ts` (`withForkName` from `src/shared/fork-identity.ts`)                                                                                     |
+| Window title, in-app titlebar name                                                      | `Orca`                      | `Orca @dLux`                                | `src/main/window/createMainWindow.ts`, `src/renderer/index.html`, `src/renderer/src/app-shell/chrome/TitlebarLeftControls.tsx`                                               |
+| TCC prompt watch: responsible bundle ids                                                | official ids                | adds `com.stablyai.orca.dlux` and `.helper` | `src/main/macos-permissions/macos-tcc-prompt-watch.ts`                                                                                                                       |
+| Computer Use helper: trusted agent apps                                                 | official ids                | adds `com.stablyai.orca.dlux` and `.dlux.*` | `native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift`                                                                                    |
 
 **Keychain.** Electron takes the safeStorage Keychain item from the app name before
 `ready`. A packaged build has no `productName` in its `package.json`, so that name is the
@@ -345,7 +345,7 @@ through `MAIN_RELEASE_REPO`.
 
 **Files.**
 
-- `src/shared/release-channel.ts` (`APP_RELEASE_REPO`, the channel map, the release-notes link)
+- `src/shared/updater/release-channel.ts` (`APP_RELEASE_REPO`, the channel map, the release-notes link)
 - `src/main/updater/lifecycle/updater-setup.ts`
 - `src/main/updater/releases/updater-prerelease-feed.ts`
 - `src/main/updater/releases/updater-release-readiness.ts`
@@ -356,7 +356,7 @@ through `MAIN_RELEASE_REPO`.
 `APP_RELEASE_REPO`. Then update the test URLs:
 
 ```sh
-git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' src/renderer/src/components/UpdateCard.error-card.test.tsx \
+git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' \
   | xargs sed -i '' 's#github.com/stablyai/orca/releases#github.com/dluxhu/orca/releases#g'
 ```
 
@@ -388,23 +388,8 @@ fork installed, it finds no Electron. The Windows and Linux paths stay upstream'
 
 ### Test changes
 
-`src/main/startup/fork-identity.test.ts` checks the fork values end to end. These upstream
-tests change only their expected literals to the fork values:
-
-- Update URLs: `src/main/updater/testing/updater-test-harness.ts`,
-  `src/main/updater/updater.build-channel-selection.test.ts`,
-  `src/main/updater/updater.check-failure.test.ts`,
-  `src/main/updater/updater.check-preflight.test.ts`,
-  `src/main/updater/updater.install-failure-cause.test.ts`,
-  `src/main/updater/updater.publishing-window-feed.test.ts`,
-  `src/main/updater/updater.feed-attempt-lifetime.test.ts`,
-  `src/main/updater/mac-install/updater.mac-install.test.ts`,
-  `src/main/updater/releases/updater-prerelease-feed.test.ts`,
-  `src/main/updater/releases/updater-prerelease-feed-readiness.test.ts`,
-  `src/renderer/src/components/UpdateCard.error-card.test.tsx`
-- appId: `src/shared/local-build-compatibility.test.ts`,
-  `src/main/local-builds/local-build-candidate.test.ts`,
-  `src/main/daemon/executable-host/macos/testing/macos-daemon-launchd.test.ts`
+`src/main/startup/fork-identity.test.ts` checks the fork values end to end. Upstream v1.4.272
+deleted the upstream tests that this branch changed only for their expected fork literals.
 
 ### Check
 
@@ -432,12 +417,12 @@ Source and config (23): `src/shared/fork-identity.ts` (new), `config/scripts/for
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
 `src/main/startup/profile-startup/dev-instance-identity.ts`, `src/main/menu/register-app-menu.ts`,
 `src/main/window/createMainWindow.ts`, `src/renderer/index.html`,
-`src/renderer/src/app-shell/TitlebarLeftControls.tsx`,
+`src/renderer/src/app-shell/chrome/TitlebarLeftControls.tsx`,
 `src/main/macos-permissions/macos-tcc-prompt-watch.ts`,
-`src/shared/local-build-compatibility-contract.json`,
-`src/shared/local-build-compatibility-contract.ts`,
-`src/main/ipc/notification-system-settings-link.ts`,
-`src/shared/release-channel.ts`, `src/main/updater/lifecycle/updater-setup.ts`,
+`src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.json`,
+`src/shared/remote-runtime/orcad-distribution/local-build-compatibility-contract.ts`,
+`src/main/ipc/notifications/notification-system-settings-link.ts`,
+`src/shared/updater/release-channel.ts`, `src/main/updater/lifecycle/updater-setup.ts`,
 `src/main/updater/releases/updater-prerelease-feed.ts`,
 `src/main/updater/releases/updater-release-readiness.ts`,
 `src/main/orcad/browser-providers/orcad-browser-provider.ts`, `.github/workflows/pr.yml`
