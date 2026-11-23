@@ -9,8 +9,11 @@ export function appProfileDir(): string | null {
 
 /** A path in the profile's folder as `$PROFILE/...`. Other paths stay as they are. */
 export function profilePathDisplay(path: string, profileDir = appProfileDir()): string {
-  return profileDir && path.startsWith(`${profileDir}/`)
-    ? `${APP_PROFILE_PATH_ROOT}${path.slice(profileDir.length)}`
+  // Windows paths use `\`. Compare with `/` on both sides.
+  const shown = path.replace(/\\/g, '/')
+  const root = profileDir?.replace(/\\/g, '/')
+  return root && shown.startsWith(`${root}/`)
+    ? `${APP_PROFILE_PATH_ROOT}${shown.slice(root.length)}`
     : path
 }
 

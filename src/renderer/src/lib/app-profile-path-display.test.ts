@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   formatAppProfileDirArgument,
-  readAppProfileDirArgument
+  formatOrcaHomeDirArgument,
+  readAppProfileDirArgument,
+  readOrcaHomeDirArgument
 } from '../../../shared/app-profiles/app-profile-dir-argument'
 import { appProfileDir, orcaHomeDisplay, profilePathDisplay } from './app-profile-path-display'
 
@@ -19,6 +21,24 @@ describe('app profile path display', () => {
   it('reads the profile folder that main puts in the window argv', () => {
     expect(readAppProfileDirArgument(['orca', formatAppProfileDirArgument(PROFILE)])).toBe(PROFILE)
     expect(readAppProfileDirArgument(['orca'])).toBeNull()
+  })
+
+  it('reads the Orca data folder, with spaces and "=", from the window argv', () => {
+    const home = '/Users/me/Orca Data/a=b/orca-home'
+    const argv = ['orca', formatAppProfileDirArgument(PROFILE), formatOrcaHomeDirArgument(home)]
+    expect(readOrcaHomeDirArgument(argv)).toBe(home)
+    expect(readAppProfileDirArgument(argv)).toBe(PROFILE)
+    expect(readOrcaHomeDirArgument(['orca'])).toBeNull()
+  })
+
+  it('shows a Windows path in the profile folder from $PROFILE', () => {
+    const windowsProfile = 'C:\\Users\\me\\Orca Profiles\\work'
+    expect(
+      profilePathDisplay(`${windowsProfile}\\orca-home\\keybindings.json`, windowsProfile)
+    ).toBe('$PROFILE/orca-home/keybindings.json')
+    expect(profilePathDisplay('C:\\Users\\me\\.orca\\keybindings.json', windowsProfile)).toBe(
+      'C:\\Users\\me\\.orca\\keybindings.json'
+    )
   })
 
   it('shows a path in the profile folder from $PROFILE', () => {
