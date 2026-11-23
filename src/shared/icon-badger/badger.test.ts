@@ -9,8 +9,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PNG } from 'pngjs'
 import { describe, expect, it } from 'vitest'
-import { Logo, normalizeIcon, pageCurl, renderBadgedIcon, type IconStyle } from './badger'
-import { type Img, resize } from './raster'
+import { pageCurl, renderBadgedIcon, type IconStyle } from './badger'
+import { normalizeIcon } from './normalize'
+import { Logo } from './logo'
+import type { Img } from './raster'
+import { resize } from './resample'
 
 const fixture = (name: string): Img => {
   const png = PNG.sync.read(readFileSync(join(__dirname, '__fixtures__', name)))
@@ -34,7 +37,9 @@ function compare(a: Img, b: Img, label: string) {
       worst = Math.max(worst, d)
     }
     max = Math.max(max, worst)
-    if (worst <= 8) within++
+    if (worst <= 8) {
+      within++
+    }
     diff.data.set([Math.min(255, worst * 8), 0, 0, 255], p * 4)
   }
   const stats = {
@@ -42,7 +47,7 @@ function compare(a: Img, b: Img, label: string) {
     mean: sum / (a.width * a.height * 4),
     max: Math.round(max)
   }
-  if (stats.within8 < 0.995 || stats.mean > 1.0 || stats.max > 48) {
+  if (stats.within8 < 0.995 || stats.mean > 1 || stats.max > 48) {
     const path = join(tmpdir(), `icon-badger-diff-${label}.png`)
     writeFileSync(path, PNG.sync.write(diff))
     console.log(`difference image: ${path}`)
@@ -82,7 +87,7 @@ describe('icon badger golden tests', () => {
       const stats = compare(resize(out, 192, 192), fixture(`swirl-beta-${style}-192.png`), style)
       console.log(style, stats)
       expect(stats.within8).toBeGreaterThanOrEqual(0.995)
-      expect(stats.mean).toBeLessThanOrEqual(1.0)
+      expect(stats.mean).toBeLessThanOrEqual(1)
       expect(stats.max).toBeLessThanOrEqual(48)
     })
   }
