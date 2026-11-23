@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Field } from './ProfileField'
+import { editIcon, iconChoiceReady, ProfileIconPicker } from './ProfileIconPicker'
+import { ProfileRemoveForm } from './ProfileRemoveForm'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import {
   appProfileIdError,
@@ -11,7 +13,9 @@ import {
   appProfileNameError,
   appProfilePortError,
   nextAppProfilePort,
+  nextBadgeText,
   type AppProfileChange,
+  type AppProfileIconSource as IconSource,
   type AppProfileRow,
   type AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
@@ -32,8 +36,9 @@ type Form =
       idEdited: boolean
       port: string
       copySettings: boolean
+      icon: IconSource
     }
-  | { mode: 'edit'; row: AppProfileRow; name: string; port: string }
+  | { mode: 'edit'; row: AppProfileRow; name: string; port: string; icon: IconSource }
   | { mode: 'remove'; row: AppProfileRow; keepData: boolean }
 
 function newProfileName(t: Translate, taken: readonly string[]): string {
@@ -72,6 +77,8 @@ export function ProfileManager(): React.JSX.Element {
   const profiles = state?.rows.filter((row) => row.id !== 'default') ?? []
   const others = (row: AppProfileRow | null): AppProfileRow[] =>
     profiles.filter((profile) => profile.id !== row?.id)
+  const badgeFor = (row: AppProfileRow | null): string =>
+    nextBadgeText(others(row).map((profile) => profile.icon))
 
   /** Runs the changes in order and stops at the first error. */
   const run = (changes: AppProfileChange[]): Promise<void> => {
@@ -105,7 +112,8 @@ export function ProfileManager(): React.JSX.Element {
       id: appProfileIdFromName(name),
       idEdited: false,
       port: String(nextAppProfilePort(profiles.map((row) => row.port))),
-      copySettings: false
+      copySettings: false,
+      icon: editIcon(undefined, badgeFor(null))
     })
     setMessage(null)
   }
@@ -173,7 +181,11 @@ export function ProfileManager(): React.JSX.Element {
           error={portError}
           onChange={(port) => setForm({ ...form, port })}
         />
-        {/* Hook point: the icon picker of the profile icons work goes here. */}
+        <ProfileIconPicker
+          value={form.icon}
+          defaultText={badgeFor(null)}
+          onChange={(icon) => setForm({ ...form, icon })}
+        />
         {/* The Profile Manager app has no settings of its own to copy. */}
         {state?.currentId === null ? null : (
           <div className="flex items-center gap-2">
@@ -189,7 +201,9 @@ export function ProfileManager(): React.JSX.Element {
         )}
         <div className="flex gap-2">
           <Button
-            disabled={busy || Boolean(nameError ?? idError ?? portError)}
+            disabled={
+              busy || Boolean(nameError ?? idError ?? portError) || !iconChoiceReady(form.icon)
+            }
             onClick={() =>
               void run([
                 {
@@ -197,7 +211,8 @@ export function ProfileManager(): React.JSX.Element {
                   name: form.name.trim(),
                   id: form.id,
                   port: Number(form.port),
-                  copySettings: form.copySettings
+                  copySettings: form.copySettings,
+                  icon: form.icon
                 }
               ])
             }
@@ -227,6 +242,9 @@ export function ProfileManager(): React.JSX.Element {
         : []),
       ...(Number(form.port) !== form.row.port
         ? [{ kind: 'set-port' as const, id: form.row.id, port: Number(form.port) }]
+        : []),
+      ...(JSON.stringify(form.icon) !== JSON.stringify(editIcon(form.row.icon, badgeFor(form.row)))
+        ? [{ kind: 'set-icon' as const, id: form.row.id, icon: form.icon }]
         : [])
     ]
     formView = (
@@ -255,9 +273,20 @@ export function ProfileManager(): React.JSX.Element {
           error={portError}
           onChange={(port) => setForm({ ...form, port })}
         />
+        <ProfileIconPicker
+          value={form.icon}
+          defaultText={badgeFor(form.row)}
+          profileId={form.row.id}
+          onChange={(icon) => setForm({ ...form, icon })}
+        />
         <div className="flex gap-2">
           <Button
-            disabled={busy || changes.length === 0 || Boolean(nameError ?? portError)}
+            disabled={
+              busy ||
+              changes.length === 0 ||
+              Boolean(nameError ?? portError) ||
+              !iconChoiceReady(form.icon)
+            }
             onClick={() => void run(changes)}
           >
             {t('profileManager.edit.save', 'Save')}
@@ -270,46 +299,14 @@ export function ProfileManager(): React.JSX.Element {
     )
   } else if (form?.mode === 'remove') {
     formView = (
-      <section
-        aria-label={t('profileManager.remove.label', 'Remove profile')}
-        className="flex flex-col gap-3 rounded-lg border p-4"
-      >
-        <h2 className="text-base font-semibold">
-          {t('profileManager.remove.title', 'Remove {{name}}?', { name: form.row.name })}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {t(
-            'profileManager.remove.note',
-            'Orca moves the app to the Trash. Quit the profile first.'
-          )}
-        </p>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="profile-keep-data"
-            checked={form.keepData}
-            onCheckedChange={(checked) => setForm({ ...form, keepData: checked === true })}
-          />
-          <Label htmlFor="profile-keep-data">
-            {t(
-              'profileManager.remove.keepData',
-              'Keep data (a new profile with the id "{{id}}" gets it back)',
-              { id: form.row.id }
-            )}
-          </Label>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="destructive"
-            disabled={busy}
-            onClick={() => void run([{ kind: 'remove', id: form.row.id, keepData: form.keepData }])}
-          >
-            {t('profileManager.remove.confirm', 'Remove profile')}
-          </Button>
-          <Button variant="outline" disabled={busy} onClick={() => setForm(null)}>
-            {t('profileManager.cancel', 'Cancel')}
-          </Button>
-        </div>
-      </section>
+      <ProfileRemoveForm
+        row={form.row}
+        keepData={form.keepData}
+        busy={busy}
+        onKeepData={(keepData) => setForm({ ...form, keepData })}
+        onRemove={() => void run([{ kind: 'remove', id: form.row.id, keepData: form.keepData }])}
+        onCancel={() => setForm(null)}
+      />
     )
   }
 
@@ -381,7 +378,13 @@ export function ProfileManager(): React.JSX.Element {
                   variant="outline"
                   disabled={busy}
                   onClick={() =>
-                    setForm({ mode: 'edit', row, name: row.name, port: String(row.port) })
+                    setForm({
+                      mode: 'edit',
+                      row,
+                      name: row.name,
+                      port: String(row.port),
+                      icon: editIcon(row.icon, badgeFor(row))
+                    })
                   }
                 >
                   {t('profileManager.edit.button', 'Edit')}

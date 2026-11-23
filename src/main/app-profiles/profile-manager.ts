@@ -1,15 +1,13 @@
 // The Profile Manager in the main process: the list, the changes and the Profiles menu.
 // See docs/fork/profiles-design.md, section 4. Changes run `orca profiles`, so the CLI and this
 // window share one writer of profiles.json.
-import { execFile } from 'node:child_process'
 import { mkdirSync, watch } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import {
   APP_PROFILE_MARKER,
-  APP_PROFILES_ROOT_ENV,
   appProfilesRoot,
   parseAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
@@ -28,21 +26,14 @@ import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
+import { appProfileIconFlags } from '../../shared/app-profiles/app-profile-rules'
+import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
+import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
-
-/** The root of this app's profiles. A profile app with a test root keeps it. */
-function profilesRoot(): string {
-  const profile = getAppProfile()
-  return profile ? dirname(profile.userDataPath) : appProfilesRoot()
-}
 
 /** The id of this app's row: null in the Profile Manager app, which is no row. */
 function currentAppId(): string | null {
   return isProfileManagerApp() ? null : (getAppProfile()?.id ?? 'default')
-}
-
-function profilesEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, [APP_PROFILES_ROOT_ENV]: profilesRoot() }
 }
 
 export async function readAppProfilesState(
@@ -97,8 +88,11 @@ export function profileCommandArgs(
         String(change.port),
         ...(extra.settingsFile ? ['--settings-file', extra.settingsFile] : []),
         ...(extra.pinRoot ? ['--pin-root'] : []),
+        ...appProfileIconFlags(change.icon),
         '--json'
       ]
+    case 'set-icon':
+      return ['profiles', 'set-icon', change.id, ...appProfileIconFlags(change.icon), '--json']
     case 'rename':
       return ['profiles', 'rename', change.id, '--name', change.name, '--json']
     case 'set-port':
@@ -131,25 +125,6 @@ export function profileCommandArgs(
       ]
     }
   }
-}
-
-/** Runs the CLI of this app as Node. The reply is the CLI's `--json` output. */
-function runCli(args: string[]): Promise<AppProfileReply> {
-  const cli = join(process.resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
-  return new Promise((done) => {
-    execFile(
-      process.execPath,
-      [cli, ...args],
-      { env: { ...profilesEnv(), ELECTRON_RUN_AS_NODE: '1' } },
-      (error, stdout) => {
-        try {
-          done(JSON.parse(stdout) as AppProfileReply)
-        } catch {
-          done({ ok: false, error: { message: error?.message ?? 'orca failed.' } })
-        }
-      }
-    )
-  })
 }
 
 export async function changeAppProfile(change: AppProfileChange): Promise<AppProfileReply> {
@@ -224,6 +199,12 @@ export function registerProfileManagerIpc(): void {
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
+  ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
+  ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
+    fromProfileManager(async () =>
+      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
+    )(event)
+  )
   // Settings in the main window changes only this app's own profile.
   const fromSettings =
     <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
