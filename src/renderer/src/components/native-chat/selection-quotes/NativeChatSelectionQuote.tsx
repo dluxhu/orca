@@ -21,16 +21,36 @@ function copyTranscriptSelectionOnSelect(root: HTMLElement): void {
   }
 }
 
-/** Adds a transcript quote to the composer, and remembers its message for the sent quote's jump. */
+/** A box a selection is quoted into: chat's composer, or an item's comment box. */
+export type NativeChatQuoteTarget = Pick<NativeChatComposerHandle, 'acceptsText' | 'appendText'> &
+  Partial<Pick<NativeChatComposerHandle, 'insertQuote'>>
+
+/** The quote target of a box built on chat's composer. */
+export function composerQuoteTarget(
+  composer: RefObject<NativeChatComposerHandle | null>
+): NativeChatQuoteTarget {
+  return {
+    acceptsText: () => composer.current?.acceptsText() === true,
+    appendText: (text, options) => composer.current?.appendText(text, options)
+  }
+}
+
+/** Adds a transcript quote to the box, and remembers its message for the sent quote's jump.
+ *  A box without `insertQuote` gets the quote as text. */
 export function addTranscriptQuote(
-  composer: NativeChatComposerHandle | null,
+  composer: NativeChatQuoteTarget | null,
   text: string,
   source: QuoteSource | null
 ): void {
   if (source) {
     rememberNativeChatQuoteSource(text, source)
   }
-  composer?.insertQuote(formatNativeChatQuote(text))
+  const quote = formatNativeChatQuote(text)
+  if (composer?.insertQuote) {
+    composer.insertQuote(quote)
+  } else {
+    composer?.appendText(quote)
+  }
 }
 
 export function NativeChatSelectionQuote({
@@ -39,7 +59,7 @@ export function NativeChatSelectionQuote({
   enabled
 }: {
   rootRef: RefObject<HTMLElement | null>
-  composerRef: RefObject<NativeChatComposerHandle | null>
+  composerRef: RefObject<NativeChatQuoteTarget | null>
   enabled: boolean
 }): React.JSX.Element {
   const offeredSource = useRef<QuoteSource | null>(null)
