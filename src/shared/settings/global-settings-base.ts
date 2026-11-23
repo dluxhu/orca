@@ -8,6 +8,7 @@ import type { BrowserPasswordsGlobalSettings } from '../browser/passwords/browse
 import type { BrowserMemorySaverGlobalSettings } from '../browser/guest-lifecycle/browser-memory-saver'
 import type { PerfNoticeGlobalSettings } from '../perf-notices/perf-notice-settings'
 import type { ClaudeAccountSwitchSettings } from '../agent-accounts/claude/claude-account-switch-settings'
+import type { ClaudeRemoteControlSettings } from '../claude-remote-control-settings'
 import type { NativeChatGlobalSettings } from '../native-chat/settings/native-chat-appearance-settings'
 import type { NativeChatIdleStopSettings } from '../native-chat/settings/native-chat-idle-stop'
 import type { NativeChatUsageLimitAutoContinueSettings } from '../native-chat/settings/native-chat-usage-limit-auto-continue'
@@ -54,6 +55,7 @@ export type GlobalSettingsBase = AntigravityChatAuthSettings &
   WorktreeDeletionPreferences &
   WorktreeCardDisplaySettings &
   ClaudeAccountSwitchSettings &
+  ClaudeRemoteControlSettings &
   AgentPermissionGlobalSettings &
   BrowserLinkOpeningSettings &
   BrowserExtensionGlobalSettings &
