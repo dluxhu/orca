@@ -10,6 +10,7 @@ import {
   APP_ROLE_PLIST_KEY,
   appProfilesRoot,
   PROFILE_MANAGER_ROLE,
+  profileManagerAppPath,
   readAppProfileMarker,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
@@ -146,17 +147,27 @@ export function getAppProfile(): AppProfile | null {
   return resolved
 }
 
+/**
+ * True for the Profile Manager app: its Info.plist role, or its place in a default app. The place
+ * alone is enough, so a copy of Orca in that place never takes the default app's data.
+ */
+export function isProfileManagerBundle(plist: string | null, bundlePath: string): boolean {
+  return (
+    (plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE) ||
+    bundlePath === profileManagerAppPath(resolve(bundlePath, '..', '..', '..'))
+  )
+}
+
 let profileManagerApp: boolean | undefined
 
 /** True in the Profile Manager app, the nested bundle that the release build makes. */
 export function isProfileManagerApp(): boolean {
   if (profileManagerApp === undefined) {
-    const plist =
-      process.platform === 'darwin' && process.versions.electron && !process.defaultApp
-        ? readOwnInfoPlist()
-        : null
     profileManagerApp =
-      plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE
+      process.platform === 'darwin' &&
+      Boolean(process.versions.electron) &&
+      !process.defaultApp &&
+      isProfileManagerBundle(readOwnInfoPlist(), resolve(dirname(process.execPath), '..', '..'))
   }
   return profileManagerApp
 }

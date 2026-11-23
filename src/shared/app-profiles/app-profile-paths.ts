@@ -41,7 +41,11 @@ export type AppProfileRegistry = {
   profiles: AppProfileEntry[]
 }
 
-/** The name of the Profile Manager app. config/scripts/desktop-distribution/macos/macos-profile-manager-app.cjs uses it too. */
+/**
+ * The name of the Profile Manager app. The build script
+ * config/scripts/desktop-distribution/macos/macos-profile-manager-app.cjs has its own copy of this
+ * name and of the role; its test checks that they agree.
+ */
 export const PROFILE_MANAGER_APP_NAME = 'Orca Profile Manager'
 
 /** The Profile Manager app inside a default app. The release build makes it. */

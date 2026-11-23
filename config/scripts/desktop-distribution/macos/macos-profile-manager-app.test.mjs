@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
@@ -20,6 +20,9 @@ const {
   macProfileManagerSignIgnore
 } = require('./macos-profile-manager-app.cjs')
 const { assertMacExecutableUuid } = require('./macos-executable-uuid.cjs')
+// The runtime reads these. The build script has its own copies.
+const { APP_ROLE_PLIST_KEY, PROFILE_MANAGER_ROLE, profileManagerAppPath } =
+  await import('../../../../src/shared/app-profiles/app-profile-paths.ts')
 
 const PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -86,12 +89,12 @@ const build = () =>
 describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () => {
   it('nests the app with its own id and copies, and relative links into the outer app', async () => {
     const bundle = await build()
-    expect(bundle).toBe(join(app, 'Contents', 'Applications', 'Orca Profile Manager.app'))
+    expect(bundle).toBe(profileManagerAppPath(app))
     const contents = join(bundle, 'Contents')
     const plist = join(contents, 'Info.plist')
     expect(plistValue(plist, 'CFBundleIdentifier')).toBe('com.stablyai.orca.dlux.profile-manager')
     expect(plistValue(plist, 'CFBundleDisplayName')).toBe('Orca Profile Manager')
-    expect(plistValue(plist, 'OrcaAppRole')).toBe('profile-manager')
+    expect(plistValue(plist, APP_ROLE_PLIST_KEY)).toBe(PROFILE_MANAGER_ROLE)
     // Helpers are found by CFBundleName, so it stays.
     expect(plistValue(plist, 'CFBundleName')).toBe('Orca')
     expect(plistValue(plist, 'CFBundleURLTypes')).toBeNull()
@@ -132,7 +135,7 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
 describe('macProfileManagerSignIgnore', () => {
   const ignored = (path) => macProfileManagerSignIgnore.some((pattern) => path.match(pattern))
   it('keeps electron-builder out of the nested app only', () => {
-    const nested = resolve('/b/Orca.app/Contents/Applications/Orca Profile Manager.app')
+    const nested = profileManagerAppPath('/b/Orca.app')
     expect(ignored(nested)).toBe(true)
     expect(ignored(`${nested}/Contents/Resources/app.asar.unpacked/x.node`)).toBe(true)
     expect(ignored('/b/Orca.app/Contents/Resources/app.asar.unpacked/x.node')).toBe(false)

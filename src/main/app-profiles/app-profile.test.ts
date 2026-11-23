@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
+import { isAppProfileRuntime, isProfileManagerBundle, resolveAppProfile } from './app-profile'
 import {
   ensureAppProfileMarker,
   readAppProfileMarker
@@ -242,5 +242,28 @@ describe('ensureAppProfileMarker', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('isProfileManagerBundle', () => {
+  const nested = '/Applications/Orca.app/Contents/Applications/Orca Profile Manager.app'
+  const role = '<dict><key>OrcaAppRole</key><string>profile-manager</string></dict>'
+  const plain = '<dict><key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string></dict>'
+
+  it('takes the role from Info.plist', () => {
+    expect(isProfileManagerBundle(role, '/Applications/Orca.app')).toBe(true)
+  })
+
+  it('takes the place in a default app when the role is missing, so preflight never runs', () => {
+    expect(isProfileManagerBundle(plain, nested)).toBe(true)
+    expect(isProfileManagerBundle(null, nested)).toBe(true)
+  })
+
+  it('is false for the default app, a profile app and a Manager copy outside a default app', () => {
+    expect(isProfileManagerBundle(plain, '/Applications/Orca.app')).toBe(false)
+    expect(isProfileManagerBundle(plain, '/Users/x/Applications/Orca Profiles/Work.app')).toBe(
+      false
+    )
+    expect(isProfileManagerBundle(plain, '/Applications/Orca Profile Manager.app')).toBe(false)
   })
 })
