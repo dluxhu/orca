@@ -21,6 +21,7 @@ import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useKeybindingActionEditor } from './use-keybinding-action-editor'
 import { useShortcutRecorderFocus } from './use-shortcut-recorder-focus'
 import type { KeybindingActionId, KeybindingInput } from '../../../../../shared/keybindings/types'
+import { orcaHomeDisplay, profilePathDisplay } from '@/lib/app-profile-path-display'
 
 export function ShortcutsPane(): React.JSX.Element {
   const t = useTranslate()
@@ -165,11 +166,15 @@ export function ShortcutsPane(): React.JSX.Element {
                 'Customize shortcuts visually or edit'
               )}{' '}
               <span className="font-mono text-[11px]">
-                {keybindingSnapshot?.path ??
-                  t(
-                    'auto.components.settings.ShortcutsPane.d8c988dab4',
-                    '~/.orca/keybindings.json'
-                  )}
+                {keybindingSnapshot?.path
+                  ? profilePathDisplay(keybindingSnapshot.path)
+                  : t(
+                      'auto.components.settings.ShortcutsPane.d8c988dab4',
+                      '{{root}}/keybindings.json',
+                      {
+                        root: orcaHomeDisplay()
+                      }
+                    )}
               </span>{' '}
               {t('auto.components.settings.ShortcutsPane.4b7ae34062', 'directly.')}
             </>

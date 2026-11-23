@@ -30,9 +30,10 @@ import { sayNativeChatSessionOptionTranslated } from '../native-chat/session/opt
 export function botFolderPreview(
   name: string,
   bots: readonly { name: string }[],
+  hostId: string,
   windows?: boolean
 ): string {
-  return botFolderDisplay(botFolderName(newBotName(name, bots)), windows)
+  return botFolderDisplay(botFolderName(newBotName(name, bots)), hostId, windows)
 }
 
 function BotFolderPreview({ name, host }: { name: string; host: BotCreateHostChoice['host'] }) {
@@ -41,7 +42,7 @@ function BotFolderPreview({ name, host }: { name: string; host: BotCreateHostCho
   return (
     <p className="text-2xs text-muted-foreground">
       {t('bots.new.folder', 'Folder: {{path}}', {
-        path: botFolderPreview(name, bots, host.windows)
+        path: botFolderPreview(name, bots, host.hostId, host.windows)
       })}
     </p>
   )

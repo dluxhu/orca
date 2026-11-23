@@ -2,14 +2,22 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { claudeConfigDirEnvPatch } from './claude-config-dir-pin'
+import { buildClaudeChildProcessEnv } from '../../child-process/claude-child-process-environment'
+import { claudeConfigDirEnvPatch, withoutInheritedClaudeConfigDir } from './claude-config-dir-pin'
+import { claudeChildEnv } from './claude-structured-child-env'
 
 let home: string
+let profileHome: string
 
 // A temp HOME stands for the user's home.
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'orca-claude-pin-'))
   vi.stubEnv('HOME', home)
+  vi.stubEnv('CLAUDE_CONFIG_DIR', undefined)
+  const profile = join(home, 'Orca Profiles', 'work')
+  mkdirSync(profile, { recursive: true })
+  writeFileSync(join(profile, 'orca-app-profile.json'), JSON.stringify({ id: 'work' }))
+  profileHome = join(profile, 'orca-home', 'agents', 'claude')
 })
 
 afterEach(() => {
@@ -17,28 +25,59 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
-describe('claudeConfigDirEnvPatch', () => {
-  it("pins a profile's Claude folder, which the child env does not inherit", () => {
-    const profile = join(home, 'Orca Profiles', 'work')
-    mkdirSync(profile, { recursive: true })
-    writeFileSync(join(profile, 'orca-app-profile.json'), JSON.stringify({ id: 'work' }))
-    const profileHome = join(profile, 'orca-home', 'agents', 'claude')
-    const env = { CLAUDE_CONFIG_DIR: profileHome }
-    expect(claudeConfigDirEnvPatch(profileHome, { env, platform: 'darwin' })).toEqual({
-      CLAUDE_CONFIG_DIR: profileHome
+const patch = (accountHome: string, env: NodeJS.ProcessEnv) =>
+  claudeConfigDirEnvPatch(accountHome, { env, platform: 'darwin' })
+
+describe('claudeConfigDirEnvPatch in a profile', () => {
+  beforeEach(() => vi.stubEnv('CLAUDE_CONFIG_DIR', profileHome))
+
+  it("pins the profile's folder in a child env without the variable", () => {
+    expect(patch(profileHome, {})).toEqual({ CLAUDE_CONFIG_DIR: profileHome })
+  })
+
+  it('does not pin ~/.claude in a child env without the variable', () => {
+    expect(patch(join(home, '.claude'), {})).toEqual({})
+  })
+
+  it("pins ~/.claude in an env that keeps the profile's variable", () => {
+    expect(patch(join(home, '.claude'), { CLAUDE_CONFIG_DIR: profileHome })).toEqual({
+      CLAUDE_CONFIG_DIR: join(home, '.claude')
     })
   })
 
-  it('does not pin the default folder in the default app', () => {
-    expect(claudeConfigDirEnvPatch(join(home, '.claude'), { env: {}, platform: 'darwin' })).toEqual(
-      {}
+  it("gives the structured chat's spawn env the profile's folder", () => {
+    const launchEnv = claudeChildEnv(
+      {
+        command: 'claude',
+        prefixArgs: [],
+        overlay: undefined,
+        inheritedEnv: { PATH: '/usr/bin', HOME: home, CLAUDE_CONFIG_DIR: profileHome }
+      } as never,
+      undefined,
+      { runtimeOnPath: false }
     )
+    expect(launchEnv.CLAUDE_CONFIG_DIR).toBeUndefined()
+    const spawnEnv = { ...launchEnv, ...claudeConfigDirEnvPatch(profileHome, { env: launchEnv }) }
+    const finalEnv = buildClaudeChildProcessEnv(spawnEnv, {
+      inheritedEnv: withoutInheritedClaudeConfigDir(process.env)
+    })
+    expect(finalEnv.CLAUDE_CONFIG_DIR).toBe(profileHome)
+  })
+})
+
+describe('claudeConfigDirEnvPatch in the default app', () => {
+  it('does not pin ~/.claude without the variable', () => {
+    expect(patch(join(home, '.claude'), {})).toEqual({})
+  })
+
+  it('pins ~/.claude when the env names another folder', () => {
+    expect(patch(join(home, '.claude'), { CLAUDE_CONFIG_DIR: '/custom' })).toEqual({
+      CLAUDE_CONFIG_DIR: join(home, '.claude')
+    })
   })
 
   it('pins a nondefault folder', () => {
     const other = join(home, 'accounts', 'second')
-    expect(claudeConfigDirEnvPatch(other, { env: {}, platform: 'darwin' })).toEqual({
-      CLAUDE_CONFIG_DIR: other
-    })
+    expect(patch(other, {})).toEqual({ CLAUDE_CONFIG_DIR: other })
   })
 })
