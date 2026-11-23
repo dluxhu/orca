@@ -132,6 +132,15 @@ describe('ProfileManager', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('one visible character')
   })
 
+  it('sends no set-icon when an edit keeps the icon', async () => {
+    render(<ProfileManager />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    type('Server port', '6864')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'set-port', id: 'work', port: 6864 }]])
+  })
+
   it('sends a new icon of an edit as set-icon, with the own badge free for the preview', async () => {
     appState.rows[1] = {
       ...appState.rows[1],
