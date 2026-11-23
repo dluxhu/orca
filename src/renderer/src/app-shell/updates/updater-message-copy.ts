@@ -11,7 +11,8 @@ const CHANNEL_LABELS: Record<ReleaseChannel, (t: Translate) => string> = {
   stable: (t) => t('auto.components.settings.ReleaseChannelSection.stableLabel', 'Stable'),
   rc: (t) => t('auto.components.settings.ReleaseChannelSection.rcLabel', 'RC'),
   hourly: (t) => t('auto.components.settings.ReleaseChannelSection.hourlyLabel', 'Hourly'),
-  daily: (t) => t('auto.components.settings.ReleaseChannelSection.dailyLabel', 'Daily'),
+  // Fork patch: `daily` is the fork's Nightly app.
+  daily: (t) => t('auto.components.settings.ReleaseChannelSection.dailyLabel', 'Nightly'),
   adhoc: (t) => t('auto.components.settings.ReleaseChannelSection.adhocLabel', 'Ad hoc')
 }
 
