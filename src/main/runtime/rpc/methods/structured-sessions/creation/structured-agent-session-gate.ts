@@ -154,7 +154,7 @@ export async function requireReadSendStructuredHost(
   ctx: RpcContext,
   sessionId: string
 ): Promise<StructuredAgentSessionHost> {
-  assertBotGroupSessionAccess(ctx.runtime, sessionId, ctx.caller)
+  assertBotGroupSessionAccess(ctx.runtime, sessionId)
   if (!getStructuredAgentSessionHost()) {
     await ctx.runtime.ensureStructuredAgentSessionHost()
   }
