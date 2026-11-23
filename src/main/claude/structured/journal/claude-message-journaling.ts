@@ -82,12 +82,11 @@ export function journalClaudeMessage(
   message: Record<string, unknown>,
   startsTurn: boolean,
   observedAt: number,
-  /** Host clock on the submission that produced this send, when known. */
-  requestedAt?: number,
-  clientMessageId?: string,
-  /** Remote Control sent this prompt, so no host submission row shows it. */
-  remotePrompt = false
+  /** The frame's send: the host clock of its submission when known, the submission id, and
+   *  `remotePrompt` when Remote Control sent the prompt, so no host submission row shows it. */
+  send: { requestedAt?: number; clientMessageId?: string; remotePrompt?: true } = {}
 ): boolean {
+  const { requestedAt, clientMessageId, remotePrompt } = send
   const envelope = readClaudeMessageEnvelope(message)
   if (!envelope) {
     return false

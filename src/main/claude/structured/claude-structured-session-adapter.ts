@@ -9,7 +9,8 @@ import type {
   StructuredAgentSessionAdapter
 } from '../../native-chat/agent-session-wire/providers/structured-agent-session-adapter'
 import { stopCurrentClaudeBackgroundTasks } from './turns/claude-structured-control-actions'
-import { claudeHeldSends, claudeHoldsDispatch } from './turns/claude-command-lifecycle'
+import { claudeHoldsDispatch } from './turns/claude-command-lifecycle'
+import { claudeHeldSendsOf, claudeHoldsLiveProviderProcess } from './claude-session-holds'
 import {
   releaseClaudeAcquisition,
   type ClaudeReleaseRequest
@@ -62,12 +63,11 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   private readonly endings = new AgentSessionStartEndings()
   private readonly exitLifecycle: ClaudeExitLifecycle
   private readonly naming: ClaudeConversationNaming | undefined
-  private readonly remote: ClaudeRemoteControl
+  private readonly remote = new ClaudeRemoteControl(this.sessions, () => this.deps)
   /** Sessions a reader shows prompt suggestions for; a process for any other is paused. */
   private readonly suggestionReaders = new Set<string>()
 
   constructor(private readonly deps: ClaudeStructuredSessionAdapterDeps) {
-    this.remote = new ClaudeRemoteControl(this.sessions, deps)
     const { namingInputs: snapshot, requestTimeoutMs: timeoutMs } = deps
     this.naming = snapshot && new ClaudeConversationNaming({ snapshot, timeoutMs })
     this.atRestCommands = deps.atRestCommands
@@ -220,19 +220,10 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
   requiresModelTransitionRestart = claudeOptions.claudeModelTransitionRestart(this.sessions)
   liveTurnId = (sessionId: string): string | null | undefined =>
     this.sessions.get(sessionId)?.translator?.currentTurnId
-  heldSends = (sessionId: string): ReadonlySet<string> | undefined => {
-    const session = this.sessions.get(sessionId) ?? this.exits.get(sessionId)?.session
-    const held = session && claudeHeldSends(session)
-    return held ?? (this.settledExitErrors.has(sessionId) ? new Set() : undefined)
-  }
-  holdsLiveProviderProcess = (sessionId: string, acquisitionGeneration: string): boolean => {
-    const session = this.sessions.get(sessionId)
-    return (
-      session?.acquisitionGeneration === acquisitionGeneration &&
-      session.connection.pid !== undefined &&
-      session.connection.exitVerdict.root === 'live'
-    )
-  }
+  heldSends = (sessionId: string): ReadonlySet<string> | undefined =>
+    claudeHeldSendsOf(sessionId, this.sessions, this.exits, this.settledExitErrors)
+  holdsLiveProviderProcess = (sessionId: string, acquisitionGeneration: string): boolean =>
+    claudeHoldsLiveProviderProcess(this.sessions.get(sessionId), acquisitionGeneration)
   answerPrompt: StructuredAgentSessionAdapter['answerPrompt'] = (request) =>
     settleClaudePromptFreeingChild(this.asker(request), answerClaudeStructuredPrompt)
   setOption: StructuredAgentSessionAdapter['setOption'] = (input) =>
@@ -249,22 +240,12 @@ export class ClaudeStructuredSessionAdapter implements StructuredAgentSessionAda
       endings: this.endings,
       deps: this.deps,
       emit: (session, event) => this.emit(session, event),
-      afterOpen: (session, initialization, newConversation) =>
-        this.remote.opened(session, request.sessionId, initialization, newConversation),
+      afterOpen: this.remote.afterOpen(request.sessionId),
       promptSuggestionsWanted: (sessionId) => this.suggestionReaders.has(sessionId)
     })
-  remoteControl: NonNullable<StructuredAgentSessionAdapter['remoteControl']> = ({
-    sessionId,
-    enabled
-  }) =>
-    enabled === undefined
-      ? Promise.resolve(this.remote.state(sessionId))
-      : this.remote.set(sessionId, enabled)
-  turnOnRemoteControlAtOpen = (input: { sessionId: string; forget?: true }) =>
-    this.remote.turnOnAtOpen(input.sessionId, input.forget)
-  /** A chat on Remote Control must stay reachable from claude.ai, so the idle stop leaves it running. */
-  confirmIdle = (sessionId: string) =>
-    this.sessions.get(sessionId)?.remoteControl ? Promise.resolve('busy' as const) : undefined
+  remoteControl = this.remote.control
+  turnOnRemoteControlAtOpen = this.remote.atOpen
+  confirmIdle = this.remote.confirmIdle
   noteModelPick = (input: { sessionId: string; fence: number }) =>
     claudeOptions.noteClaudeModelPick(this.sessions, input, this.emit.bind(this))
   readOptions = (input: { sessionId: string; fence: number }) =>

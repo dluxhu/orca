@@ -8,6 +8,7 @@ import {
   providerDiagnostic,
   withProviderDiagnostic
 } from '../../../shared/agent-session/failures/agent-session-failure'
+import { claudeQueryRemoteControl } from './claude-agent-sdk-remote-control'
 
 export class ClaudeControlRequestError extends Error {
   constructor(
@@ -63,20 +64,6 @@ export function claudeQuerySessionRenamer(
   const rename = 'renameSession' in query ? query.renameSession : null
   return typeof rename === 'function'
     ? (title, sessionId): unknown => rename.call(query, title, sessionId)
-    : null
-}
-
-// shortcut: sdk.d.ts (0.3.319) omits Query.enableRemoteControl, so its runtime signature is typed here; drop it once the SDK declares it.
-type ClaudeEnableRemoteControl = (
-  enabled: boolean,
-  name?: string,
-  options?: { reattachSessionId?: string }
-) => Promise<unknown>
-
-function claudeQueryRemoteControl(query: Query): ClaudeEnableRemoteControl | null {
-  const enable = 'enableRemoteControl' in query ? query.enableRemoteControl : null
-  return typeof enable === 'function'
-    ? (...args) => Promise.resolve(enable.apply(query, args))
     : null
 }
 

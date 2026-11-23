@@ -71,11 +71,32 @@ export class ClaudeRemoteControl {
 
   constructor(
     private readonly sessions: ReadonlyMap<string, ClaudeSession>,
-    private readonly deps: Pick<
+    // A getter, so the adapter can make this before its own deps are set.
+    private readonly deps: () => Pick<
       ClaudeStructuredSessionAdapterDeps,
       'requestTimeoutMs' | 'logger' | 'remoteControlForNewChats'
     >
   ) {}
+
+  /** The adapter's `remoteControl`: reads the state, or turns Remote Control on or off. */
+  readonly control = (input: { sessionId: string; enabled?: boolean }) =>
+    input.enabled === undefined
+      ? Promise.resolve(this.state(input.sessionId))
+      : this.set(input.sessionId, input.enabled)
+
+  /** The adapter's `turnOnRemoteControlAtOpen`. */
+  readonly atOpen = (input: { sessionId: string; forget?: true }) =>
+    this.turnOnAtOpen(input.sessionId, input.forget)
+
+  /** A chat on Remote Control must stay reachable from claude.ai, so the idle stop leaves it running. */
+  readonly confirmIdle = (sessionId: string) =>
+    this.sessions.get(sessionId)?.remoteControl ? Promise.resolve('busy' as const) : undefined
+
+  /** The open hook of one chat: it turns Remote Control on when the chat or the setting asks. */
+  readonly afterOpen =
+    (sessionId: string) =>
+    (session: ClaudeSession, initialization: unknown, newConversation: boolean): void =>
+      this.opened(session, sessionId, initialization, newConversation)
 
   state(sessionId: string): AgentSessionRemoteControlState | null {
     const session = this.sessions.get(sessionId)
@@ -123,7 +144,7 @@ export class ClaudeRemoteControl {
     // A choice made in this chat outranks the setting and the CLI's auto-connect.
     const on =
       this.intents.get(sessionId) ??
-      ((newConversation && this.deps.remoteControlForNewChats?.() === true) ||
+      ((newConversation && this.deps().remoteControlForNewChats?.() === true) ||
         claudeRemoteControlAutoEnable(initialization))
     if (!on) {
       return
@@ -132,7 +153,7 @@ export class ClaudeRemoteControl {
     // The chat works without Remote Control; a refusal only leaves it off.
     void this.request(session, sessionId, true).catch((error: unknown) => {
       if (!session.connection.closed) {
-        this.deps.logger?.warn('turning on Claude Remote Control failed', {
+        this.deps().logger?.warn('turning on Claude Remote Control failed', {
           scope: 'claude-remote-control',
           sessionId,
           error
@@ -159,9 +180,9 @@ export class ClaudeRemoteControl {
     try {
       reply = claudeRecord(
         await set(enabled, {
-          ...(this.deps.requestTimeoutMs === undefined
+          ...(this.deps().requestTimeoutMs === undefined
             ? {}
-            : { timeoutMs: this.deps.requestTimeoutMs }),
+            : { timeoutMs: this.deps().requestTimeoutMs }),
           ...(reattachSessionId ? { reattachSessionId } : {})
         })
       )
