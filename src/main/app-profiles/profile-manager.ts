@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process'
 import { mkdirSync, watch } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import {
   APP_PROFILE_MARKER,
@@ -27,13 +27,18 @@ import {
 import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
-import { getAppProfile } from './app-profile'
-import { isProfileManagerRenderer, openProfileManagerWindow } from './profile-manager-window'
+import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
+import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
 /** The root of this app's profiles. A profile app with a test root keeps it. */
 function profilesRoot(): string {
   const profile = getAppProfile()
   return profile ? dirname(profile.userDataPath) : appProfilesRoot()
+}
+
+/** The id of this app's row: null in the Profile Manager app, which is no row. */
+function currentAppId(): string | null {
+  return isProfileManagerApp() ? null : (getAppProfile()?.id ?? 'default')
 }
 
 function profilesEnv(): NodeJS.ProcessEnv {
@@ -43,14 +48,15 @@ function profilesEnv(): NodeJS.ProcessEnv {
 export async function readAppProfilesState(
   options: { serviceRun?: ServeServiceRun } = {}
 ): Promise<AppProfilesState> {
-  const profile = getAppProfile()
+  const currentId = currentAppId()
   const rows = await listAppProfiles({
     env: profilesEnv(),
     serviceRun: options.serviceRun,
-    // Without profiles.json there are no profiles, and this app is the default app.
-    defaultAppPath: resolve(process.execPath, '..', '..', '..'),
+    // Used when there is no profiles.json yet.
+    defaultAppPath: await ownDefaultAppPath(),
     // The default app's userData, as the CLI's getPlatformUserDataPath gives it on macOS.
-    defaultUserDataPath: profile ? join(app.getPath('appData'), 'orca') : app.getPath('userData')
+    defaultUserDataPath:
+      currentId === 'default' ? app.getPath('userData') : join(app.getPath('appData'), 'orca')
   })
   const taken = new Set(rows.map((row) => row.id.toLowerCase()))
   const root = profilesRoot()
@@ -68,7 +74,7 @@ export async function readAppProfilesState(
       marker.toLowerCase() === names[index].toLowerCase() &&
       !taken.has(marker.toLowerCase())
   )
-  return { rows, currentId: profile?.id ?? 'default', keptIds }
+  return { rows, currentId, keptIds }
 }
 
 /** Where a "Start at login" service runs: the profile's port and the default app's stable `orca`. */
@@ -183,15 +189,6 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   }
 }
 
-/** Brings the app to the front, or starts it. */
-function openApp(appPath: string): void {
-  execFile('/usr/bin/open', ['-a', appPath], (error) => {
-    if (error) {
-      console.warn('[profiles] open failed:', error.message)
-    }
-  })
-}
-
 export async function openAppProfile(id: string): Promise<AppProfileReply> {
   const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
   if (!row) {
@@ -215,7 +212,9 @@ function fromProfileManager<T extends unknown[], R>(
 /** "Start at login" of this app's own profile, as Settings shows it. */
 export async function readOwnStartAtLogin(): Promise<{ id: string; enabled: boolean }> {
   const { rows, currentId } = await readAppProfilesState()
-  return { id: currentId, enabled: rows.find((row) => row.id === currentId)?.startAtLogin === true }
+  // The Profile Manager app has no Settings, so a null id does not come here.
+  const id = currentId ?? 'default'
+  return { id, enabled: rows.find((row) => row.id === id)?.startAtLogin === true }
 }
 
 export function registerProfileManagerIpc(): void {
@@ -307,7 +306,7 @@ export function startProfilesMenu(rebuild: () => void): void {
 }
 
 export function profilesMenuItems(): MenuItemConstructorOptions[] {
-  const currentId = getAppProfile()?.id ?? 'default'
+  const currentId = currentAppId()
   const stateLabel = {
     running: translateMain('menu.profileRunning', 'Running'),
     background: translateMain('menu.profileBackground', 'Running in background'),
@@ -326,7 +325,7 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
     ...(menuRows.length > 0 ? [{ type: 'separator' } as const] : []),
     {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
-      click: () => openProfileManagerWindow()
+      click: () => void showProfileManager()
     }
   ]
 }
