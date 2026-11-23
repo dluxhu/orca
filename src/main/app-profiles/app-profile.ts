@@ -1,6 +1,7 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
-import { readFileSync, realpathSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
@@ -31,6 +32,17 @@ export type AppProfileInput = {
   userDataDirArg: string | null
   defaultRoot: string
   readMarker: (userDataPath: string) => string | null
+  /** The default app's data folder. A profile never takes it. */
+  defaultDataPath?: string
+}
+
+function pathExists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** True when the folder is missing (it is made inside the root) or resolves inside the root. */
@@ -52,6 +64,16 @@ export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
       throw new Error(`This app has a profile id that Orca does not accept: "${plistId}".`)
     }
     const userDataPath = input.userDataDirArg ?? join(root, plistId)
+    // OrcaAppProfilesRoot is plain data too: never the default app's data, never a folder that
+    // is not this profile's. `orca profiles create` writes the marker first.
+    const defaultData =
+      input.defaultDataPath ?? join(homedir(), 'Library', 'Application Support', 'orca')
+    if (
+      input.userDataDirArg === null &&
+      resolve(userDataPath).toLowerCase() === resolve(defaultData).toLowerCase()
+    ) {
+      throw new Error(`The profile "${plistId}" points at the default app's data: ${userDataPath}.`)
+    }
     if (input.userDataDirArg === null && !staysInRoot(userDataPath, root)) {
       throw new Error(
         `The data folder of the profile "${plistId}" is outside ${root}: ${userDataPath}.`
@@ -60,7 +82,9 @@ export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
     const markerId = input.readMarker(userDataPath)
     // A given folder must carry this profile's marker: a profile app must never take, and mark,
     // the default folder or another profile's folder.
-    if (markerId ? markerId !== plistId : input.userDataDirArg !== null) {
+    if (
+      markerId ? markerId !== plistId : input.userDataDirArg !== null || pathExists(userDataPath)
+    ) {
       throw new Error(
         `This app is the profile "${plistId}", but ${userDataPath} is ${markerId ? `the profile "${markerId}"` : 'not this profile'}.`
       )

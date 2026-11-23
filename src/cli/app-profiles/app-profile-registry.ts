@@ -92,8 +92,13 @@ export async function withRegistryLockAsync<T>(root: string, body: () => Promise
   }
 }
 
+/** The escape of the unit renderer (serve-service-unit.ts), so a rewrite finds its text. */
 function xml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 /** Puts the new app path into Orca's own serve unit of the profile. True when the unit changed. */

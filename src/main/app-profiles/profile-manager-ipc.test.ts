@@ -9,7 +9,8 @@ const h = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
   windows: [] as { webContents: object }[],
   execFileCalls: [] as { file: string; args: string[]; options: Record<string, unknown> }[],
-  stdout: '{"ok":true,"result":{}}'
+  stdout: '{"ok":true,"result":{}}',
+  profile: null as null | { id: string; userDataPath: string }
 }))
 
 vi.mock('electron', () => {
@@ -60,7 +61,7 @@ vi.mock('../ipc/ui', () => ({
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({
-  getAppProfile: () => null,
+  getAppProfile: () => h.profile,
   isProfileManagerApp: () => false,
   ownDefaultAppPath: async () => '/apps/Orca.app'
 }))
@@ -80,6 +81,7 @@ beforeEach(() => {
   Object.defineProperty(process, 'resourcesPath', { value: '/app/Resources', configurable: true })
   h.execFileCalls.length = 0
   h.stdout = '{"ok":true,"result":{}}'
+  h.profile = null
 })
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -158,6 +160,15 @@ describe('Profile Manager IPC', () => {
             userDataPath: join(profiles, 'work'),
             port: 6832,
             createdAt: 1
+          },
+          {
+            id: 'home',
+            name: 'Orca - Home',
+            bundleId: 'b.home',
+            appPath: '/Apps/Profiles/Orca - Home.app',
+            userDataPath: join(profiles, 'home'),
+            port: 6864,
+            createdAt: 2
           }
         ]
       })
@@ -215,5 +226,39 @@ describe('Profile Manager IPC', () => {
       id: 'default',
       enabled: false
     })
+  })
+
+  it("Settings in a profile app changes that profile's own service", async () => {
+    writeRegistry()
+    h.profile = { id: 'home', userDataPath: join(root, 'profiles', 'home') }
+    registerProfileManagerIpc()
+    await h.handlers.get('appProfiles:setOwnStartAtLogin')?.({ sender: { trusted: true } }, true)
+    expect(h.execFileCalls[0].args.slice(1)).toEqual([
+      '--profile',
+      'home',
+      'serve',
+      'service',
+      'install',
+      '--port',
+      '6864',
+      '--command',
+      launcher,
+      '--json'
+    ])
+  })
+
+  it('runs no CLI for an unknown id', async () => {
+    writeRegistry()
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    await expect(
+      h.handlers.get('appProfiles:change')?.(manager, {
+        kind: 'start-at-login',
+        id: 'nobody',
+        enabled: true
+      })
+    ).resolves.toMatchObject({ ok: false })
+    expect(h.execFileCalls).toEqual([])
   })
 })
