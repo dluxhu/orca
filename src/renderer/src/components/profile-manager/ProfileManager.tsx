@@ -371,7 +371,7 @@ export function ProfileManager(): React.JSX.Element {
           <li key={row.id} className="flex items-center gap-4 p-3">
             <div className="min-w-0 flex-1">
               <div className="font-medium">
-                {row.name}
+                {row.id === 'default' ? t('profileManager.defaultName', 'Default') : row.name}
                 {row.id === state?.currentId ? (
                   <span className="text-muted-foreground">
                     {t('profileManager.thisApp', ' · this app')}
@@ -383,6 +383,19 @@ export function ProfileManager(): React.JSX.Element {
               </div>
             </div>
             <span className="text-sm">{stateLabel(t, row.state)}</span>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`profile-start-at-login-${row.id}`}
+                checked={row.startAtLogin}
+                disabled={busy}
+                onCheckedChange={(checked) =>
+                  void run([{ kind: 'start-at-login', id: row.id, enabled: checked === true }])
+                }
+              />
+              <Label htmlFor={`profile-start-at-login-${row.id}`} className="text-sm">
+                {t('profileManager.startAtLogin', 'Start at login')}
+              </Label>
+            </div>
             <Button size="sm" variant="outline" onClick={() => void api.open(row.id)}>
               {t('profileManager.open', 'Open')}
             </Button>

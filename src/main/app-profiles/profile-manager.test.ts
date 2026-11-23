@@ -23,6 +23,7 @@ vi.mock('electron', () => ({
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
+vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
   openProfileManagerWindow: vi.fn()
@@ -54,7 +55,8 @@ const row = (id: string, name: string, state: AppProfileRow['state']): AppProfil
   appPath: `/apps/${name}.app`,
   userDataPath: `/data/${id}`,
   port: 6800,
-  state
+  state,
+  startAtLogin: false
 })
 
 let root: string
@@ -80,6 +82,7 @@ describe('profileCommandArgs', () => {
         { settingsFile: '/tmp/s.json', pinRoot: true }
       )
     ).toEqual([
+      'profiles',
       'create',
       'Orca - Work',
       '--id',
@@ -92,6 +95,7 @@ describe('profileCommandArgs', () => {
       '--json'
     ])
     expect(profileCommandArgs({ kind: 'rename', id: 'work', name: 'Job' })).toEqual([
+      'profiles',
       'rename',
       'work',
       '--name',
@@ -99,6 +103,7 @@ describe('profileCommandArgs', () => {
       '--json'
     ])
     expect(profileCommandArgs({ kind: 'set-port', id: 'work', port: 7000 })).toEqual([
+      'profiles',
       'set-port',
       'work',
       '--port',
@@ -106,14 +111,45 @@ describe('profileCommandArgs', () => {
       '--json'
     ])
     expect(profileCommandArgs({ kind: 'remove', id: 'work', keepData: true })).toEqual([
+      'profiles',
       'remove',
       'work',
       '--keep-data',
       '--json'
     ])
     expect(profileCommandArgs({ kind: 'remove', id: 'work', keepData: false })).toEqual([
+      'profiles',
       'remove',
       'work',
+      '--json'
+    ])
+  })
+})
+
+describe('profileCommandArgs for Start at login', () => {
+  it("installs and removes that profile's own serve service, on its port", () => {
+    const service = { port: 6832, command: '/Apps/Orca.app/Contents/Resources/bin/orca' }
+    expect(
+      profileCommandArgs({ kind: 'start-at-login', id: 'work', enabled: true }, { service })
+    ).toEqual([
+      '--profile',
+      'work',
+      'serve',
+      'service',
+      'install',
+      '--port',
+      '6832',
+      '--command',
+      '/Apps/Orca.app/Contents/Resources/bin/orca',
+      '--json'
+    ])
+    // Uninstall removes only the service; the data stays.
+    expect(profileCommandArgs({ kind: 'start-at-login', id: 'work', enabled: false })).toEqual([
+      '--profile',
+      'work',
+      'serve',
+      'service',
+      'uninstall',
       '--json'
     ])
   })
@@ -145,15 +181,23 @@ describe('registerProfileManagerIpc', () => {
     expect([...handlers.keys()]).toEqual([
       'appProfiles:state',
       'appProfiles:change',
-      'appProfiles:open'
+      'appProfiles:open',
+      'appProfiles:ownStartAtLogin',
+      'appProfiles:setOwnStartAtLogin'
     ])
     await expect(handlers.get('appProfiles:state')?.({ sender: {} })).resolves.toMatchObject({
       currentId: 'default'
     })
     isManager.current = false
-    for (const channel of handlers.keys()) {
+    for (const channel of ['appProfiles:state', 'appProfiles:change', 'appProfiles:open']) {
       await expect(handlers.get(channel)?.({ sender: {} }, 'work')).rejects.toThrow(
         'Only the Profile Manager window'
+      )
+    }
+    // Settings of this app: the main window or the Profile Manager window.
+    for (const channel of ['appProfiles:ownStartAtLogin', 'appProfiles:setOwnStartAtLogin']) {
+      await expect(handlers.get(channel)?.({ sender: {} }, true)).rejects.toThrow(
+        'Only an Orca window'
       )
     }
   })
@@ -173,7 +217,7 @@ describe('profilesMenuItems', () => {
     await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
     const items = profilesMenuItems()
     expect(items.map((item) => [item.label, item.checked])).toEqual([
-      ['Orca — Running', false],
+      ['Default — Running', false],
       ['Orca - Work — Running', true],
       ['Orca - Home — Running in background', false],
       ['Orca - Client', false],

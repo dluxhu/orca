@@ -196,6 +196,20 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
   })
 })
 
+describe.skipIf(process.platform !== 'darwin')('the default app', () => {
+  it('cannot be renamed, removed or get another port', async () => {
+    makeProfile()
+    for (const attempt of [
+      () => renameAppProfile({ id: 'default', name: 'Job', ...deps() }),
+      () => removeAppProfile({ id: 'Default', keepData: false, trash: () => {}, ...deps() }),
+      () => setAppProfilePort({ id: 'default', port: 7000, ...deps() })
+    ]) {
+      await expect(attempt()).rejects.toThrow('The default app is not a profile')
+    }
+    expect(calls).toEqual([])
+  })
+})
+
 describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
   it('writes a valid port and refuses the range of another profile', async () => {
     makeProfile()
@@ -280,8 +294,9 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     const home = makeProfile('Home')
     makeProfile('Client')
     writeRuntimePid(work.userDataPath, 10)
-    // Only the serve service runs for Home.
+    // Only the serve service runs for Home, and only Home has a unit (Start at login).
     writeRuntimePid(home.userDataPath, 20)
+    file(serveServiceUnitOf(home.userDataPath, false, dir).unitPath, 'unit')
     servicePid = 20
     const defaultUserData = join(dir, 'default-data')
     const rows = await listAppProfiles({
@@ -293,8 +308,9 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
           ? { code: 0, out: 'pid = 20' }
           : { code: 113, out: '' }
     })
+    expect(rows.map((row) => row.startAtLogin)).toEqual([false, false, true, false])
     expect(rows.map((row) => [row.id, row.name, row.state])).toEqual([
-      ['default', 'Orca @dLux', 'stopped'],
+      ['default', 'Default', 'stopped'],
       ['work', 'Orca - Work', 'running'],
       ['home', 'Home', 'background'],
       ['client', 'Client', 'stopped']

@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const h = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
   windows: [] as { webContents: object }[],
-  execFileCalls: [] as { file: string; args: string[]; options: Record<string, unknown> }[]
+  execFileCalls: [] as { file: string; args: string[]; options: Record<string, unknown> }[],
+  stdout: '{"ok":true,"result":{}}'
 }))
 
 vi.mock('electron', () => {
@@ -46,11 +47,14 @@ vi.mock('node:child_process', async (original) => ({
       args,
       options: (typeof options === 'object' ? options : {}) as Record<string, unknown>
     })
-    done(null, '{"ok":true,"result":{}}')
+    done(null, h.stdout)
   }
 }))
 vi.mock('../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal', () => ({
   runServeServiceManager: async () => ({ code: 113, out: '' })
+}))
+vi.mock('../ipc/ui', () => ({
+  isTrustedUIRenderer: (sender: { trusted?: boolean }) => sender.trusted === true
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
@@ -59,6 +63,7 @@ vi.mock('../window/security/privileged-window-navigation', () => ({
   installPrivilegedWindowNavigationPolicy: vi.fn()
 }))
 
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { registerProfileManagerIpc } from './profile-manager'
 import { openProfileManagerWindow } from './profile-manager-window'
 
@@ -69,6 +74,7 @@ beforeEach(() => {
   vi.stubEnv('HOME', root)
   Object.defineProperty(process, 'resourcesPath', { value: '/app/Resources', configurable: true })
   h.execFileCalls.length = 0
+  h.stdout = '{"ok":true,"result":{}}'
 })
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -127,5 +133,82 @@ describe('Profile Manager IPC', () => {
     ])
     expect(call.options.shell).toBeUndefined()
     expect((call.options.env as Record<string, string>).ELECTRON_RUN_AS_NODE).toBe('1')
+  })
+
+  function writeRegistry(): void {
+    const profiles = join(root, 'profiles')
+    mkdirSync(join(profiles, 'work'), { recursive: true })
+    writeFileSync(
+      join(profiles, 'profiles.json'),
+      JSON.stringify({
+        version: 1,
+        defaultAppPath: '/Apps/Orca.app',
+        urlHandler: { mode: 'ask' },
+        profiles: [
+          {
+            id: 'work',
+            name: 'Orca - Work',
+            bundleId: 'b.work',
+            appPath: '/Apps/Profiles/Orca - Work.app',
+            userDataPath: join(profiles, 'work'),
+            port: 6832,
+            createdAt: 1
+          }
+        ]
+      })
+    )
+  }
+  const launcher = '/Apps/Orca.app/Contents/Resources/bin/orca'
+
+  it("Start at login installs the chosen profile's service on its port", async () => {
+    writeRegistry()
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    await h.handlers.get('appProfiles:change')?.(manager, {
+      kind: 'start-at-login',
+      id: 'work',
+      enabled: true
+    })
+    expect(h.execFileCalls[0].args.slice(1)).toEqual([
+      '--profile',
+      'work',
+      'serve',
+      'service',
+      'install',
+      '--port',
+      '6832',
+      '--command',
+      launcher,
+      '--json'
+    ])
+  })
+
+  it("Settings changes only this app's own profile, and shows a failure", async () => {
+    writeRegistry()
+    registerProfileManagerIpc()
+    const settings = { sender: { trusted: true } }
+    await expect(
+      h.handlers.get('appProfiles:setOwnStartAtLogin')?.({ sender: {} }, true)
+    ).rejects.toThrow('Only an Orca window')
+    h.stdout = '{"ok":false,"error":{"message":"launchctl bootstrap failed"}}'
+    await expect(
+      h.handlers.get('appProfiles:setOwnStartAtLogin')?.(settings, true)
+    ).resolves.toEqual({
+      ok: false,
+      error: { message: 'launchctl bootstrap failed' }
+    })
+    expect(h.execFileCalls[0].args.slice(1, 6)).toEqual([
+      '--profile',
+      'default',
+      'serve',
+      'service',
+      'install'
+    ])
+    expect(h.execFileCalls[0].args).toContain('6768')
+    await expect(h.handlers.get('appProfiles:ownStartAtLogin')?.(settings)).resolves.toEqual({
+      id: 'default',
+      enabled: false
+    })
   })
 })

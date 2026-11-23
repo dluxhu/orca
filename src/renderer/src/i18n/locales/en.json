@@ -1428,7 +1428,12 @@
       "inlineBlameKeywordBlame": "blame",
       "inlineBlameKeywordGit": "git",
       "inlineBlameKeywordAuthor": "author",
-      "inlineBlameKeywordAnnotation": "annotation"
+      "inlineBlameKeywordAnnotation": "annotation",
+      "startAtLogin": {
+        "label": "Start at login",
+        "description": "Runs this profile's server from login, also when Orca is closed, so your other devices can connect.",
+        "error": "Start at login did not change: {{message}}"
+      }
     },
     "openInApp": {
       "preset": {
@@ -1999,7 +2004,8 @@
     "profiles": "Profiles",
     "profileManager": "Profile Manager…",
     "profileRunning": "Running",
-    "profileBackground": "Running in background"
+    "profileBackground": "Running in background",
+    "profileDefault": "Default"
   },
   "tray": {
     "openOrca": "Open Orca",
@@ -29937,6 +29943,8 @@
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
       "portRange": "The port must be 1024 to 65535: {{port}}",
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile."
-    }
+    },
+    "startAtLogin": "Start at login",
+    "defaultName": "Default"
   }
 }

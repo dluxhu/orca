@@ -34,6 +34,7 @@ import { GeneralConfirmationsSection } from './GeneralConfirmationsSection'
 import { GeneralSearchResults } from './GeneralSearchResults'
 import { getGeneralSubPageTitle, type GeneralSubPage } from './general-sub-pages'
 import { useOpenInMenuDraft } from './OpenInMenuSetting'
+import { StartAtLoginSetting } from './StartAtLoginSetting'
 
 export function getDesktopPlatformFromUserAgent(userAgent: string): 'darwin' | 'win32' | 'other' {
   if (userAgent.includes('Mac')) {
@@ -301,6 +302,10 @@ function GeneralRootSettings({
           wslAvailable={wslAvailable}
           wslCapabilitiesLoading={wslCapabilitiesLoading}
         />
+      ) : null}
+      {/* Fork patch: profiles are macOS only. */}
+      {getDesktopPlatformFromUserAgent(navigator.userAgent) === 'darwin' ? (
+        <StartAtLoginSetting query={query} />
       ) : null}
       {aboutMatches ? (
         <GeneralUpdateSettingsSection>

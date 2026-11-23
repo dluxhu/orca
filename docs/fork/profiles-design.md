@@ -912,6 +912,11 @@ Done on `dlux/profile-manager`:
   "Profile Manager…". It follows `profiles.json` and app activation.
 - The copied settings apply once at the first start of the new profile.
 - A rename in Finder keeps the profile (section 9).
+- "Start at login" (owner, 2026-11-22): a switch in Settings > General of every Orca app, for that
+  app's own profile, and a check box on each row of the Profile Manager. It installs or removes
+  the profile's own serve service (`orca --profile <id> serve service install --port <port>
+  --command <default app>/Contents/Resources/bin/orca`); the data stays. The Profile Manager is not
+  needed for it. A failed `launchctl` step shows its error.
 
 Changes from this design:
 

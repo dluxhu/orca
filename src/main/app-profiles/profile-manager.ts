@@ -23,6 +23,7 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { translateMain } from '../i18n/main-i18n'
+import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile } from './app-profile'
 import { isProfileManagerRenderer, openProfileManagerWindow } from './profile-manager-window'
@@ -65,14 +66,18 @@ export async function readAppProfilesState(
   return { rows, currentId: profile?.id ?? 'default', keptIds }
 }
 
-/** The `orca profiles` arguments for one change. */
+/** Where a "Start at login" service runs: the profile's port and the default app's stable `orca`. */
+export type StartAtLoginTarget = { port: number; command: string }
+
+/** The `orca` arguments for one change. */
 export function profileCommandArgs(
   change: AppProfileChange,
-  extra: { settingsFile?: string; pinRoot?: boolean } = {}
+  extra: { settingsFile?: string; pinRoot?: boolean; service?: StartAtLoginTarget } = {}
 ): string[] {
   switch (change.kind) {
     case 'create':
       return [
+        'profiles',
         'create',
         change.name,
         '--id',
@@ -84,27 +89,52 @@ export function profileCommandArgs(
         '--json'
       ]
     case 'rename':
-      return ['rename', change.id, '--name', change.name, '--json']
+      return ['profiles', 'rename', change.id, '--name', change.name, '--json']
     case 'set-port':
-      return ['set-port', change.id, '--port', String(change.port), '--json']
+      return ['profiles', 'set-port', change.id, '--port', String(change.port), '--json']
     case 'remove':
-      return ['remove', change.id, ...(change.keepData ? ['--keep-data'] : []), '--json']
+      return [
+        'profiles',
+        'remove',
+        change.id,
+        ...(change.keepData ? ['--keep-data'] : []),
+        '--json'
+      ]
+    case 'start-at-login': {
+      // The existing serve service of the profile: a LaunchAgent with RunAtLoad.
+      const service = ['--profile', change.id, 'serve', 'service']
+      if (!change.enabled) {
+        return [...service, 'uninstall', '--json']
+      }
+      if (!extra.service) {
+        throw new Error('Start at login needs the port and the orca command.')
+      }
+      return [
+        ...service,
+        'install',
+        '--port',
+        String(extra.service.port),
+        '--command',
+        extra.service.command,
+        '--json'
+      ]
+    }
   }
 }
 
 /** Runs the CLI of this app as Node. The reply is the CLI's `--json` output. */
-function runProfilesCli(args: string[]): Promise<AppProfileReply> {
+function runCli(args: string[]): Promise<AppProfileReply> {
   const cli = join(process.resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
   return new Promise((done) => {
     execFile(
       process.execPath,
-      [cli, 'profiles', ...args],
+      [cli, ...args],
       { env: { ...profilesEnv(), ELECTRON_RUN_AS_NODE: '1' } },
       (error, stdout) => {
         try {
           done(JSON.parse(stdout) as AppProfileReply)
         } catch {
-          done({ ok: false, error: { message: error?.message ?? 'orca profiles failed.' } })
+          done({ ok: false, error: { message: error?.message ?? 'orca failed.' } })
         }
       }
     )
@@ -125,7 +155,21 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
     }
     // A test root must stick in the new bundle, so that a Dock launch finds it.
     const pinRoot = profilesRoot() !== appProfilesRoot({})
-    return await runProfilesCli(profileCommandArgs(change, { settingsFile, pinRoot }))
+    let service: StartAtLoginTarget | undefined
+    if (change.kind === 'start-at-login') {
+      const rows = (await readAppProfilesState()).rows
+      const row = rows.find((candidate) => candidate.id === change.id)
+      if (!row) {
+        return { ok: false, error: { message: `No profile "${change.id}".` } }
+      }
+      // A GUI app's PATH has no orca; the default app's launcher keeps its path across updates.
+      const defaultApp = rows.find((candidate) => candidate.id === 'default')?.appPath ?? ''
+      service = {
+        port: row.port,
+        command: join(defaultApp, 'Contents', 'Resources', 'bin', 'orca')
+      }
+    }
+    return await runCli(profileCommandArgs(change, { settingsFile, pinRoot, service }))
   } finally {
     if (settingsDir) {
       rmSync(settingsDir, { recursive: true, force: true })
@@ -163,6 +207,12 @@ function fromProfileManager<T extends unknown[], R>(
   }
 }
 
+/** "Start at login" of this app's own profile, as Settings shows it. */
+export async function readOwnStartAtLogin(): Promise<{ id: string; enabled: boolean }> {
+  const { rows, currentId } = await readAppProfilesState()
+  return { id: currentId, enabled: rows.find((row) => row.id === currentId)?.startAtLogin === true }
+}
+
 export function registerProfileManagerIpc(): void {
   ipcMain.handle(
     'appProfiles:state',
@@ -170,6 +220,24 @@ export function registerProfileManagerIpc(): void {
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
+  // Settings in the main window changes only this app's own profile.
+  const fromSettings =
+    <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
+    (event: IpcMainInvokeEvent, ...args: T): Promise<R> =>
+      isTrustedUIRenderer(event.sender) || isProfileManagerRenderer(event.sender)
+        ? handler(...args)
+        : Promise.reject(new Error('Only an Orca window can do this.'))
+  ipcMain.handle('appProfiles:ownStartAtLogin', fromSettings(readOwnStartAtLogin))
+  ipcMain.handle(
+    'appProfiles:setOwnStartAtLogin',
+    fromSettings(async (enabled: unknown) =>
+      changeAppProfile({
+        kind: 'start-at-login',
+        id: (await readOwnStartAtLogin()).id,
+        enabled: enabled === true
+      })
+    )
+  )
 }
 
 // The Profiles menu. Electron menus are not live, so the rows are cached and the menu rebuilt.
@@ -241,12 +309,15 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
     stopped: ''
   }
   return [
-    ...menuRows.map((row): MenuItemConstructorOptions => ({
-      label: row.state === 'stopped' ? row.name : `${row.name} — ${stateLabel[row.state]}`,
-      type: 'checkbox',
-      checked: row.id === currentId,
-      click: () => openApp(row.appPath)
-    })),
+    ...menuRows.map((row): MenuItemConstructorOptions => {
+      const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
+      return {
+        label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`,
+        type: 'checkbox',
+        checked: row.id === currentId,
+        click: () => openApp(row.appPath)
+      }
+    }),
     ...(menuRows.length > 0 ? [{ type: 'separator' } as const] : []),
     {
       label: translateMain('menu.profileManager', 'Profile Manager…'),

@@ -1,13 +1,12 @@
 // `orca profiles list`: every profile with its state. See docs/fork/profiles-design.md, section 4.
 // The main process imports this module for the Profiles menu, so it has no CLI-only imports.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import {
   appProfilesRoot,
   locateAppProfileApp,
   readAppProfileRegistry,
-  readPlistString,
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import type { AppProfileRow, AppProfileState } from '../../shared/app-profiles/app-profile-rules'
@@ -92,20 +91,6 @@ export async function readAppProfileState(
   return servicePid !== null && isAlive(servicePid) ? 'background' : 'stopped'
 }
 
-/** The default app's display name, from its Info.plist. */
-function appName(appPath: string): string {
-  try {
-    const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
-    return (
-      readPlistString(plist, 'CFBundleDisplayName') ??
-      readPlistString(plist, 'CFBundleName') ??
-      'Orca'
-    )
-  } catch {
-    return 'Orca'
-  }
-}
-
 /** The default app first, then the profiles in the registry order. */
 export async function listAppProfiles(
   options: { defaultAppPath: string; defaultUserDataPath: string } & AppProfileListDeps
@@ -114,10 +99,11 @@ export async function listAppProfiles(
     appProfilesRoot(options.env ?? process.env, options.home ?? homedir())
   )
   const defaultAppPath = registry?.defaultAppPath ?? options.defaultAppPath
-  const rows: Omit<AppProfileRow, 'state'>[] = [
+  const rows: Omit<AppProfileRow, 'state' | 'startAtLogin'>[] = [
     {
       id: 'default',
-      name: appName(defaultAppPath),
+      // The plain app is the "Default" entry. Its data stays where the app keeps it.
+      name: 'Default',
       appPath: defaultAppPath,
       userDataPath: options.defaultUserDataPath,
       port: DEFAULT_APP_PORT
@@ -134,10 +120,14 @@ export async function listAppProfiles(
       }
     })
   ]
+  const home = options.home ?? homedir()
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
-      state: await readAppProfileState(row.userDataPath, row.id === 'default', options)
+      state: await readAppProfileState(row.userDataPath, row.id === 'default', options),
+      startAtLogin: existsSync(
+        serveServiceUnitOf(row.userDataPath, row.id === 'default', home).unitPath
+      )
     }))
   )
 }

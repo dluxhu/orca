@@ -54,7 +54,14 @@ type Context = {
   inBackground: boolean
 }
 
-function rootOf(options: EditAppProfileOptions): string {
+/** The root of the profiles. The default app is not a profile, so no edit takes it. */
+function rootOf(options: EditAppProfileOptions, action: string): string {
+  if (options.id.toLowerCase() === 'default') {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `The default app is not a profile: Orca does not ${action} it. Its data stays where it is.`
+    )
+  }
   return appProfilesRoot(options.env ?? process.env, options.home ?? homedir())
 }
 
@@ -65,7 +72,7 @@ function rootOf(options: EditAppProfileOptions): string {
 async function prepare(options: EditAppProfileOptions, action: string): Promise<Context> {
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
-  const root = rootOf(options)
+  const root = appProfilesRoot(env, home)
   const registry = readAppProfileRegistry(root)
   const found = registry?.profiles.find((profile) => profile.id === options.id)
   if (!registry || !found) {
@@ -128,7 +135,7 @@ function updateEntry(
 export async function renameAppProfile(
   options: EditAppProfileOptions & { name: string }
 ): Promise<AppProfileEntry & { serveService: ServeServiceChange }> {
-  return withRegistryLockAsync(rootOf(options), async () => {
+  return withRegistryLockAsync(rootOf(options, 'rename'), async () => {
     const context = await prepare(options, 'rename')
     return renameLocked(context, options.name)
   })
@@ -253,7 +260,7 @@ function renameLocked(
 export async function setAppProfilePort(
   options: EditAppProfileOptions & { port: number }
 ): Promise<AppProfileEntry & { serveServiceInstalled: boolean }> {
-  return withRegistryLockAsync(rootOf(options), async () => {
+  return withRegistryLockAsync(rootOf(options, 'edit'), async () => {
     const context = await prepare(options, 'edit')
     return setPortLocked(context, options.port)
   })
@@ -306,7 +313,7 @@ function moveToTrash(run: RunTool, path: string, home: string): void {
 export async function removeAppProfile(
   options: EditAppProfileOptions & { keepData: boolean; trash?: (path: string) => void }
 ): Promise<{ id: string; keptData: boolean; serveService: ServeServiceChange }> {
-  return withRegistryLockAsync(rootOf(options), async () => {
+  return withRegistryLockAsync(rootOf(options, 'remove'), async () => {
     const context = await prepare(options, 'remove')
     return removeLocked(context, options)
   })

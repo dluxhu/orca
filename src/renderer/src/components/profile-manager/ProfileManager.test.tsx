@@ -14,7 +14,8 @@ const row = (id: string, name: string, state: AppProfileRow['state'], port: numb
   appPath: `/apps/${name}.app`,
   userDataPath: `/data/${id}`,
   port,
-  state
+  state,
+  startAtLogin: id === 'work'
 })
 
 let appState: AppProfilesState
@@ -48,6 +49,8 @@ describe('ProfileManager', () => {
     expect(await screen.findByText('Running in background')).toBeTruthy()
     expect(screen.getByText('Running')).toBeTruthy()
     expect(screen.getByText('· this app')).toBeTruthy()
+    // The plain app is the "Default" entry.
+    expect(screen.getByText(/^Default/)).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1])
     expect(open).toHaveBeenCalledWith('work')
     // The default app has no Edit or Remove.
@@ -105,6 +108,16 @@ describe('ProfileManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove profile' }))
     await waitFor(() =>
       expect(change).toHaveBeenCalledWith({ kind: 'remove', id: 'work', keepData: true })
+    )
+  })
+
+  it('shows Start at login per app and changes it for that app', async () => {
+    render(<ProfileManager />)
+    const boxes = await screen.findAllByRole('checkbox', { name: 'Start at login' })
+    expect(boxes.map((box) => box.getAttribute('aria-checked'))).toEqual(['false', 'true'])
+    fireEvent.click(boxes[0])
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith({ kind: 'start-at-login', id: 'default', enabled: true })
     )
   })
 })

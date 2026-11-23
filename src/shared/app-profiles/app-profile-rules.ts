@@ -18,6 +18,8 @@ export type AppProfileRow = {
   userDataPath: string
   port: number
   state: AppProfileState
+  /** The profile's own serve service is installed (`orca serve service install`). */
+  startAtLogin: boolean
 }
 
 /** What the Profile Manager window gets from the main process. */
@@ -35,6 +37,8 @@ export type AppProfileChange =
   | { kind: 'rename'; id: string; name: string }
   | { kind: 'set-port'; id: string; port: number }
   | { kind: 'remove'; id: string; keepData: boolean }
+  /** Installs or removes the profile's own serve service. Its data stays. */
+  | { kind: 'start-at-login'; id: string; enabled: boolean }
 
 /** The `--json` reply of `orca profiles`. */
 export type AppProfileReply =
