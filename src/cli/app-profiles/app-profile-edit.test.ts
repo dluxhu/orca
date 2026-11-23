@@ -212,7 +212,7 @@ describe.skipIf(process.platform !== 'darwin')('the default app', () => {
 })
 
 describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
-  it('moves an installed Start at login service to the new port', async () => {
+  it('moves an installed Start at login service that is not loaded to the new port', async () => {
     const work = makeProfile()
     const unit = serveServiceUnitOf(work.userDataPath, false, dir)
     file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
@@ -221,7 +221,28 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
     expect(readFileSync(unit.unitPath, 'utf8')).toBe(
       '<string>--port</string>\n    <string>7000</string>'
     )
-    expect(calls).toContainEqual(['/bin/launchctl', 'bootout', `gui/501/${unit.label}`])
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
+  it('restarts a loaded service on the new port, so the server keeps running', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    let portAtBootstrap = ''
+    const recording: RunTool = (program, args) => {
+      if (args[0] === 'bootstrap') {
+        portAtBootstrap = readFileSync(unit.unitPath, 'utf8')
+      }
+      return run(program, args)
+    }
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps(), run: recording })
+    expect(result.serveService).toBe('restarted')
+    expect(calls.filter((call) => call[0].endsWith('launchctl')).map((call) => call[1])).toEqual([
+      'bootout',
+      'bootstrap'
+    ])
+    expect(portAtBootstrap).toContain('<string>7000</string>')
   })
 
   it('writes a valid port and refuses the range of another profile', async () => {

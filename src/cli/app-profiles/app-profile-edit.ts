@@ -15,7 +15,10 @@ import {
   appProfileNameError,
   appProfilePortError
 } from '../../shared/app-profiles/app-profile-rules'
-import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
+import {
+  runServeServiceManager,
+  type ServeServiceRun
+} from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { defaultAppOf, LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
@@ -262,20 +265,18 @@ export async function setAppProfilePort(
 ): Promise<AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange }> {
   return withRegistryLockAsync(rootOf(options, 'edit'), async () => {
     const context = await prepare(options, 'edit')
-    return setPortLocked(context, options.port)
+    const { label } = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
+    const run = options.serviceRun ?? runServeServiceManager
+    const loaded = (await run('launchctl', ['print', `gui/${context.uid}/${label}`])).code === 0
+    return setPortLocked(context, options.port, loaded)
   })
 }
 
 function setPortLocked(
   context: Context,
-  port: number
+  port: number,
+  loaded: boolean
 ): AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
-  if (context.inBackground) {
-    throw new RuntimeClientError(
-      'profile_running',
-      `The server of "${context.entry.name}" runs. Stop it before you change the port.`
-    )
-  }
   const error = appProfilePortError(
     port,
     context.registry.profiles.filter((p) => p.id !== context.entry.id).map((p) => p.port)
@@ -289,12 +290,23 @@ function setPortLocked(
       profile.id === context.entry.id ? { ...profile, port } : profile
     )
   }))
-  // Start at login keeps the profile's port. A loaded job reads the unit again at its next load.
+  // Start at login keeps the profile's port. A loaded job restarts on it; others read it at load.
   const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
-  const updated = rewriteServeUnitPort(unit.unitPath, port)
-  if (updated) {
+  if (loaded) {
     tryRun(context.run, '/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
   }
-  const serveService: ServeServiceChange = updated ? 'updated' : 'none'
-  return { ...context.entry, port, serveServiceInstalled: existsSync(unit.unitPath), serveService }
+  try {
+    const updated = rewriteServeUnitPort(unit.unitPath, port)
+    const serveService: ServeServiceChange = loaded ? 'restarted' : updated ? 'updated' : 'none'
+    return {
+      ...context.entry,
+      port,
+      serveServiceInstalled: existsSync(unit.unitPath),
+      serveService
+    }
+  } finally {
+    if (loaded) {
+      context.run('/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
+    }
+  }
 }
