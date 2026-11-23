@@ -1,5 +1,4 @@
 import { app, powerMonitor, type BrowserWindow } from 'electron'
-import { getAppProfile } from '../../app-profiles/app-profile'
 import type { ReleaseBuild, ReleaseChannel } from '../../../shared/updater/release-channel'
 import { APP_RELEASE_REPO } from '../../../shared/updater/release-channel'
 import type { ReleaseBuildListOptions } from '../releases/updater-release-build-cache'
@@ -171,8 +170,7 @@ export class UpdaterSetup extends UpdaterDownloadInstall {
       this.sendErrorStatus(`The server update did not complete: ${serveHandoffFailure}`, true)
     }
 
-    // A profile app runs the default app's code through its links, so it has no updater.
-    if (!app.isPackaged || getAppProfile()) {
+    if (!app.isPackaged || this.inAppProfile()) {
       return
     }
 
