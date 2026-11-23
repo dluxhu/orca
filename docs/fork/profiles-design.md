@@ -951,9 +951,12 @@ Changes from this design:
 - Remove refuses while the profile runs. It does not ask the profile to quit.
 - Ids use `-`, not `_` (section 9).
 
-Checked: unit tests for the nested layout, Profile Manager mode, the menu item and the CLI. To
-check: a release build in a temporary folder, with `codesign --verify --deep --strict` on the outer
-app and the CLI of the nested app. Not checked: the nested app's window and menu in a GUI run, U8 (Launch Services
+Checked: unit tests for the nested layout, Profile Manager mode, the menu item and the CLI. A
+release build (`--mac dir --arm64`, Developer ID signature, 2026-11-23): the nested app has its own
+bundle id and `OrcaAppRole`, no `orca:` claim, a real framework copy, and every link resolves inside
+the outer app. The outer app passes `codesign --verify --deep --strict`. The nested app passes
+`codesign --verify` and has the release team id. The nested executable, run as Node, finds the outer
+app as the default app. Sizes: outer app 980 MB, nested app 277 MB. Not checked: the nested app's window and menu in a GUI run, U8 (Launch Services
 and `orca:`), Gatekeeper on a quarantined download of the zip or dmg.
 
 Not done yet: U8, the icon picker (slice 4 supplies the icons), the `orca:`
