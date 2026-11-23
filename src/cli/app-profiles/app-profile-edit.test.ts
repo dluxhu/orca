@@ -15,6 +15,8 @@ import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervis
 import { createAppProfile, type RunTool } from './app-profile-create'
 import { removeAppProfile, renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
+import { healAppProfileAppPath } from './app-profile-registry'
+import { selectAppProfile } from './app-profile-selection'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -295,5 +297,55 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['home', 'Home', 'background'],
       ['client', 'Client', 'stopped']
     ])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder', () => {
+  const finderPath = (): string => join(dir, 'apps', 'Orca - Finder.app')
+  function renameInFinder() {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, `<string>${work.appPath}/Contents/Resources/bin</string>`)
+    renameSync(work.appPath, finderPath())
+    return { work, unit }
+  }
+
+  it('heals the registry and the serve unit at start, once, without a service install', () => {
+    const { work, unit } = renameInFinder()
+    const heal = () =>
+      healAppProfileAppPath({
+        root: join(dir, 'data'),
+        id: 'work',
+        appPath: finderPath(),
+        unitPath: unit.unitPath
+      })
+    expect(heal()).toBe('healed')
+    expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Finder', appPath: finderPath() })
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${finderPath()}/Contents/Resources/bin</string>`
+    )
+    expect(heal()).toBe('unchanged')
+    expect(registry().profiles[0]).toMatchObject({ id: 'work', userDataPath: work.userDataPath })
+    expect(calls).toEqual([])
+  })
+
+  it('lists the renamed app by its embedded id before it starts', async () => {
+    renameInFinder()
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps()
+    })
+    expect(rows[1]).toMatchObject({ id: 'work', name: 'Orca - Finder', appPath: finderPath() })
+  })
+
+  it('serve, open and rename find the renamed app', async () => {
+    renameInFinder()
+    const cliEnv: NodeJS.ProcessEnv = { ...env(), ORCA_PROFILE: 'work' }
+    selectAppProfile([], cliEnv)
+    expect(cliEnv.ORCA_APP_EXECUTABLE).toBe(join(finderPath(), 'Contents', 'MacOS', 'Orca'))
+    const result = await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
+    expect(result.appPath).toBe(join(dir, 'apps', 'Orca - Job.app'))
+    expect(existsSync(finderPath())).toBe(false)
   })
 })

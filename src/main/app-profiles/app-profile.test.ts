@@ -46,6 +46,18 @@ describe('resolveAppProfile', () => {
     expect(resolveAppProfile({ ...input, userDataDirArg: '/given' })?.userDataPath).toBe('/given')
   })
 
+  it('keeps the id and folder after a Finder rename, and shows the file name', () => {
+    expect(
+      resolveAppProfile({
+        plist: profilePlist,
+        bundlePath: '/Users/x/Applications/Orca Profiles/Orca - Finder.app',
+        userDataDirArg: null,
+        defaultRoot: '/root',
+        readMarker: () => null
+      })
+    ).toMatchObject({ id: 'work', name: 'Orca - Finder', userDataPath: '/root/work' })
+  })
+
   it('stops when the bundle and the marker name different profiles', () => {
     expect(() =>
       resolveAppProfile({

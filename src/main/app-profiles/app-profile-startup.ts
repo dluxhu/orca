@@ -1,6 +1,7 @@
 // The start of a profile app, before the instance locks. See docs/fork/profiles-design.md, section 1.
 import { readFileSync, rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { app } from 'electron'
 import {
   APP_PROFILE_SETTINGS_SEED,
@@ -8,6 +9,8 @@ import {
 } from '../../shared/app-profiles/app-profile-paths'
 import type { GlobalSettings } from '../../shared/settings/global-settings-types'
 import { getAppProfile, type AppProfile } from './app-profile'
+import { healAppProfileAppPath } from '../../cli/app-profiles/app-profile-registry'
+import { serveServiceUnitOf } from '../../cli/app-profiles/app-profile-list'
 
 /** Pins the profile's own userData and writes its marker when it is missing (orcad reads only the marker). */
 export function configureAppProfileStartup(isDev: boolean): AppProfile | null {
@@ -19,11 +22,27 @@ export function configureAppProfileStartup(isDev: boolean): AppProfile | null {
   if (!isDev && !app.commandLine.hasSwitch('user-data-dir')) {
     app.setPath('userData', profile.userDataPath)
     ensureAppProfileMarker(profile.userDataPath, profile.id)
+    healRenamedApp(profile)
   }
   // Electron takes the Keychain item name from this name: "orca-<id> Safe Storage".
   // userData is pinned already, so the name does not move it.
   app.setName(`orca-${profile.id}`)
   return profile
+}
+
+/** After a rename in Finder, the registry and Orca's own serve unit get the new app path. */
+function healRenamedApp(profile: AppProfile): void {
+  try {
+    healAppProfileAppPath({
+      root: dirname(profile.userDataPath),
+      id: profile.id,
+      appPath: resolve(dirname(process.execPath), '..', '..'),
+      unitPath: serveServiceUnitOf(profile.userDataPath, false, homedir()).unitPath
+    })
+  } catch (error) {
+    // The next start tries again; the app works with the old registry path.
+    console.warn('[profiles] could not record the new app path:', error)
+  }
 }
 
 /** Applies the settings that "Copy settings from:" left for a new profile, once. */

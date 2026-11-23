@@ -667,6 +667,19 @@ must be unique, and is also the `.app` file name, so it cannot contain `/` or `:
 write the registry. The profile must quit first. The id, the bundle id and the userData do not
 change. A rename changes the cdhash, so TCC and the Keychain ask once more.
 
+**Rename in Finder** (owner, 2026-11-22). The user can rename a profile app in Finder. Only the
+file name changes, so the id, the bundle id, the data, the settings and the serve service stay:
+
+- Identity comes from the bundle: `OrcaAppProfileId` in Info.plist gives the id, and the id gives
+  the data folder. Orca shows the file name as the profile's name. Info.plist does not change,
+  because a change breaks the signature (`CFBundleDisplayName` keeps the old name).
+- Each reader of the registry path (list, Profile Manager, Open, rename, remove, `--profile` for
+  serve and open) finds the app by its embedded id: the registry path, or the app in the same
+  folder with that id.
+- At start, the profile app writes its new path and name to the registry and to Orca's own serve
+  unit. It installs and starts no service: the app starts the service at quit, and launchd then
+  reads the rewritten unit.
+
 **Recreate.** "New profile" with an id that has a data folder already (for example after the
 default app moved, or after Remove with "Keep data") uses that folder again. The marker file in it
 confirms the id: a marker with another id (a case change) stops the create. The form says so
@@ -898,6 +911,7 @@ Done on `dlux/profile-manager`:
 - The top-level Profiles menu: each app with its state, a check mark on the current app, and
   "Profile Manager…". It follows `profiles.json` and app activation.
 - The copied settings apply once at the first start of the new profile.
+- A rename in Finder keeps the profile (section 9).
 
 Changes from this design:
 

@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import {
   appProfilesRoot,
+  locateAppProfileApp,
   readAppProfileRegistry,
   type AppProfileEntry,
   type AppProfileRegistry
@@ -16,7 +17,7 @@ import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervis
 import { RuntimeClientError } from '../runtime/connection/types'
 import { defaultAppOf, LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
-import { withRegistryLock, writeRegistry } from './app-profile-registry'
+import { rewriteServeUnitAppPath, withRegistryLock, writeRegistry } from './app-profile-registry'
 
 export type EditAppProfileOptions = {
   id: string
@@ -49,14 +50,16 @@ async function prepare(options: EditAppProfileOptions, action: string): Promise<
   const home = options.home ?? homedir()
   const root = appProfilesRoot(env, home)
   const registry = readAppProfileRegistry(root)
-  const entry = registry?.profiles.find((profile) => profile.id === options.id)
-  if (!registry || !entry) {
+  const found = registry?.profiles.find((profile) => profile.id === options.id)
+  if (!registry || !found) {
     const ids = registry?.profiles.map((profile) => profile.id).join(', ') || 'none'
     throw new RuntimeClientError(
       'invalid_argument',
       `No profile "${options.id}". Profiles: ${ids}.`
     )
   }
+  // A rename in Finder leaves the registry path behind; the embedded id finds the app.
+  const entry = { ...found, appPath: locateAppProfileApp(found) ?? found.appPath }
   const state = await readAppProfileState(entry.userDataPath, false, {
     home,
     uid: options.uid,
@@ -86,10 +89,6 @@ function tryRun(run: RunTool, program: string, args: string[]): void {
   } catch {
     // Best effort: the item is already gone or was never there.
   }
-}
-
-function xml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /** Profile changes go to the registry entry with this id, under the lock. */
@@ -197,13 +196,8 @@ export async function renameAppProfile(
         throw failure
       }
       // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
-      if (existsSync(unit.unitPath)) {
-        const content = readFileSync(unit.unitPath, 'utf8')
-        const updated = content.split(xml(`${oldPath}/`)).join(xml(`${newPath}/`))
-        if (updated !== content) {
-          writeFileSync(unit.unitPath, updated)
-          serveService = 'updated'
-        }
+      if (rewriteServeUnitAppPath(unit.unitPath, oldPath, newPath)) {
+        serveService = 'updated'
       }
     } finally {
       rmSync(entitlements, { force: true })

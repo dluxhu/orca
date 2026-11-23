@@ -1,7 +1,7 @@
 // App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
@@ -70,6 +70,37 @@ export function ensureAppProfileMarker(userDataPath: string, id: string): void {
 export function readAppProfileRegistry(root: string): AppProfileRegistry | null {
   try {
     return JSON.parse(readFileSync(join(root, APP_PROFILES_REGISTRY), 'utf8')) as AppProfileRegistry
+  } catch {
+    return null
+  }
+}
+
+function appProfileIdOfApp(appPath: string): string | null {
+  try {
+    return readPlistString(
+      readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8'),
+      APP_PROFILE_PLIST_ID_KEY
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The profile's app: the registry path, or the app in the same folder whose Info.plist has this
+ * profile id (a rename in Finder changes only the file name). Null when neither exists.
+ */
+export function locateAppProfileApp(entry: Pick<AppProfileEntry, 'id' | 'appPath'>): string | null {
+  if (appProfileIdOfApp(entry.appPath) === entry.id) {
+    return entry.appPath
+  }
+  try {
+    const folder = dirname(entry.appPath)
+    const name = readdirSync(folder).find(
+      (candidate) =>
+        candidate.endsWith('.app') && appProfileIdOfApp(join(folder, candidate)) === entry.id
+    )
+    return name ? join(folder, name) : null
   } catch {
     return null
   }

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ vi.mock('electron', () => ({ app: { setPath, setName, commandLine: { hasSwitch }
 vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
 
 import { applyAppProfileSettingsSeed, configureAppProfileStartup } from './app-profile-startup'
+import { serveServiceUnitOf } from '../../cli/app-profiles/app-profile-list'
 
 let home: string
 
@@ -49,6 +50,37 @@ describe('configureAppProfileStartup', () => {
     expect(setPath).not.toHaveBeenCalled()
     expect(existsSync(join(home, 'given', 'orca-app-profile.json'))).toBe(false)
     expect(setName).toHaveBeenCalledWith('orca-work')
+  })
+
+  it('records a rename in Finder in the registry and in its own serve unit', () => {
+    const userDataPath = join(home, 'data', 'work')
+    const oldApp = join(home, 'apps', 'Orca - Work.app')
+    const newApp = join(home, 'apps', 'Orca - Finder.app')
+    mkdirSync(join(newApp, 'Contents', 'MacOS'), { recursive: true })
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(
+      join(home, 'data', 'profiles.json'),
+      JSON.stringify({
+        profiles: [{ id: 'work', name: 'Orca - Work', appPath: oldApp, userDataPath }]
+      })
+    )
+    const { unitPath } = serveServiceUnitOf(userDataPath, false, home)
+    mkdirSync(join(unitPath, '..'), { recursive: true })
+    writeFileSync(unitPath, `<string>${oldApp}/Contents/Resources/bin</string>`)
+    const execPath = process.execPath
+    Object.defineProperty(process, 'execPath', {
+      value: join(newApp, 'Contents', 'MacOS', 'Orca'),
+      configurable: true
+    })
+    try {
+      profile.current = { id: 'work', userDataPath }
+      configureAppProfileStartup(false)
+    } finally {
+      Object.defineProperty(process, 'execPath', { value: execPath, configurable: true })
+    }
+    const registry = JSON.parse(readFileSync(join(home, 'data', 'profiles.json'), 'utf8'))
+    expect(registry.profiles[0]).toMatchObject({ name: 'Orca - Finder', appPath: newApp })
+    expect(readFileSync(unitPath, 'utf8')).toBe(`<string>${newApp}/Contents/Resources/bin</string>`)
   })
 
   it('does nothing for the default app', () => {

@@ -1,8 +1,18 @@
 // Writers of profiles.json: docs/fork/profiles-design.md, section 4.
-import { closeSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
+import { basename, join } from 'node:path'
 import {
   APP_PROFILES_REGISTRY,
+  readAppProfileRegistry,
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import { RuntimeClientError } from '../runtime/connection/types'
@@ -60,4 +70,66 @@ export function withRegistryLock<T>(root: string, body: () => T): T {
     closeSync(fd)
     rmSync(lock, { force: true })
   }
+}
+
+function xml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Puts the new app path into Orca's own serve unit of the profile. True when the unit changed. */
+export function rewriteServeUnitAppPath(
+  unitPath: string,
+  oldPath: string,
+  newPath: string
+): boolean {
+  if (!existsSync(unitPath)) {
+    return false
+  }
+  const content = readFileSync(unitPath, 'utf8')
+  const updated = content.split(xml(`${oldPath}/`)).join(xml(`${newPath}/`))
+  if (updated === content) {
+    return false
+  }
+  writeFileSync(unitPath, updated)
+  return true
+}
+
+function samePath(left: string, right: string): boolean {
+  try {
+    return realpathSync(left) === realpathSync(right)
+  } catch {
+    return left === right
+  }
+}
+
+/**
+ * A rename in Finder changes only the app's file name. The app writes its new path and name to
+ * the registry and to its own serve unit at start. The loaded service reads the unit again when
+ * the app starts it at quit, so this installs and starts nothing.
+ */
+export function healAppProfileAppPath(options: {
+  root: string
+  id: string
+  appPath: string
+  unitPath: string
+}): 'unchanged' | 'healed' {
+  const entry = readAppProfileRegistry(options.root)?.profiles.find((p) => p.id === options.id)
+  if (!entry || samePath(entry.appPath, options.appPath)) {
+    return 'unchanged'
+  }
+  return withRegistryLock(options.root, () => {
+    const registry = readAppProfileRegistry(options.root)
+    if (!registry) {
+      return 'unchanged'
+    }
+    const name = basename(options.appPath, '.app')
+    writeRegistry(options.root, {
+      ...registry,
+      profiles: registry.profiles.map((profile) =>
+        profile.id === options.id ? { ...profile, name, appPath: options.appPath } : profile
+      )
+    })
+    rewriteServeUnitAppPath(options.unitPath, entry.appPath, options.appPath)
+    return 'healed'
+  })
 }

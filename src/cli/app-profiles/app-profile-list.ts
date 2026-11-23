@@ -2,9 +2,10 @@
 // The main process imports this module for the Profiles menu, so it has no CLI-only imports.
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import {
   appProfilesRoot,
+  locateAppProfileApp,
   readAppProfileRegistry,
   readPlistString,
   type AppProfileRegistry
@@ -121,13 +122,17 @@ export async function listAppProfiles(
       userDataPath: options.defaultUserDataPath,
       port: DEFAULT_APP_PORT
     },
-    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => ({
-      id,
-      name,
-      appPath,
-      userDataPath,
-      port
-    }))
+    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => {
+      // A rename in Finder changes only the file name; the app shows that name.
+      const found = locateAppProfileApp({ id, appPath })
+      return {
+        id,
+        name: found ? basename(found, '.app') : name,
+        appPath: found ?? appPath,
+        userDataPath,
+        port
+      }
+    })
   ]
   return Promise.all(
     rows.map(async (row) => ({

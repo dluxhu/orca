@@ -1,6 +1,6 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
 import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
   APP_PROFILE_PLIST_ID_KEY,
@@ -22,6 +22,8 @@ export type AppProfile = {
 export type AppProfileInput = {
   /** The XML Info.plist of the running bundle, or null. */
   plist: string | null
+  /** The running bundle. A rename in Finder changes only its file name. */
+  bundlePath?: string
   userDataDirArg: string | null
   defaultRoot: string
   readMarker: (userDataPath: string) => string | null
@@ -43,7 +45,10 @@ export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
     }
     return {
       id: plistId,
-      name: readPlistString(input.plist, 'CFBundleDisplayName') ?? plistId,
+      // The file name: a rename in Finder does not change Info.plist (its signature seals it).
+      name: input.bundlePath
+        ? basename(input.bundlePath, '.app')
+        : (readPlistString(input.plist, 'CFBundleDisplayName') ?? plistId),
       bundleId: readPlistString(input.plist, 'CFBundleIdentifier') ?? FORK_IDENTITY.appId,
       userDataPath
     }
@@ -85,6 +90,7 @@ export function getAppProfile(): AppProfile | null {
       process.platform === 'darwin' && packagedElectron
         ? resolveAppProfile({
             plist: readOwnInfoPlist(),
+            bundlePath: resolve(dirname(process.execPath), '..', '..'),
             userDataDirArg: userDataDirArg(),
             defaultRoot: appProfilesRoot(),
             readMarker: readAppProfileMarker
