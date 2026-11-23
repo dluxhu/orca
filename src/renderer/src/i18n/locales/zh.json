@@ -20534,6 +20534,7 @@
       "notices": {
         "contextCleared": "上下文已清除",
         "compaction": "上下文已压缩",
+        "compactionAutomatic": "上下文已自动压缩",
         "details": "详情",
         "plan": "计划",
         "historyRepaired": "此聊天的部分历史记录无法加载",

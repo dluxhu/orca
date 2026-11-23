@@ -19787,6 +19787,7 @@
       "notices": {
         "contextCleared": "Contexte effacé",
         "compaction": "Contexte compacté",
+        "compactionAutomatic": "Contexte compacté automatiquement",
         "details": "Détails",
         "plan": "Plan",
         "historyRepaired": "Une partie de l'historique de ce chat n'a pas pu être chargée.",

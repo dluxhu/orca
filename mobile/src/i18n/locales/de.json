@@ -336,6 +336,7 @@
     },
     "notice": {
       "compaction": "Kontext komprimiert",
+      "compactionAutomatic": "Kontext automatisch komprimiert",
       "contextCleared": "Kontext geleert",
       "plan": "Plan",
       "stoppedManually": "Manuell gestoppt",

@@ -17,6 +17,7 @@ import {
 
 export const NATIVE_CHAT_NOTICE_COPY = {
   compaction: 'Context compacted',
+  compactionAutomatic: 'Context compacted automatically',
   contextCleared: 'Context cleared',
   forkedFrom: 'Forked from',
   forkedFromUnknown: 'Forked from another chat',
@@ -27,7 +28,7 @@ export type NativeChatNoticeTone = 'warning' | 'error' | 'notice'
 
 export type NativeChatNoticeLook =
   /** A rule across the chat with its label. */
-  | { kind: 'divider'; label: 'compaction' | 'contextCleared' }
+  | { kind: 'divider'; label: 'compaction' | 'compactionAutomatic' | 'contextCleared' }
   /** The rule after a fork's inherited history, naming the chat it came from. */
   | {
       kind: 'forked-from'
@@ -70,7 +71,14 @@ export function nativeChatNoticeBlock(
 export function nativeChatNoticeLook(block: NativeChatTextBlock): NativeChatNoticeLook {
   const { presentation } = block
   if (presentation === 'compaction') {
-    return { kind: 'divider', label: 'compaction' }
+    // The row text is the only place that keeps the trigger.
+    return {
+      kind: 'divider',
+      label:
+        block.text === NATIVE_CHAT_NOTICE_COPY.compactionAutomatic
+          ? 'compactionAutomatic'
+          : 'compaction'
+    }
   }
   if (presentation === 'context-cleared') {
     return { kind: 'divider', label: 'contextCleared' }
