@@ -140,5 +140,6 @@ describe('macProfileManagerSignIgnore', () => {
     expect(ignored(`${nested}/Contents/Resources/app.asar.unpacked/x.node`)).toBe(true)
     expect(ignored('/b/Orca.app/Contents/Resources/app.asar.unpacked/x.node')).toBe(false)
     expect(ignored('/b/Orca.app/Contents/Frameworks/Electron Framework.framework')).toBe(false)
+    expect(ignored('/b/Orca.app/Contents/Applications/Other.app')).toBe(false)
   })
 })

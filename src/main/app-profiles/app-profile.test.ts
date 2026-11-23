@@ -11,7 +11,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { isAppProfileRuntime, isProfileManagerBundle, resolveAppProfile } from './app-profile'
+import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
+import { isProfileManagerBundle } from '../../shared/app-profiles/app-profile-paths'
 import {
   ensureAppProfileMarker,
   readAppProfileMarker

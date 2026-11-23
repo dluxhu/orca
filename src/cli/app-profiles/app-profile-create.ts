@@ -21,11 +21,10 @@ import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILE_SETTINGS_SEED,
-  APP_ROLE_PLIST_KEY,
   appProfilesAppsDir,
   appProfilesRoot,
   ensureAppProfileMarker,
-  PROFILE_MANAGER_ROLE,
+  isProfileManagerBundle,
   readAppProfileMarker,
   readAppProfileRegistry,
   readPlistString,
@@ -293,7 +292,7 @@ export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
   if (
     readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null &&
-    readPlistString(plist, APP_ROLE_PLIST_KEY) !== PROFILE_MANAGER_ROLE
+    !isProfileManagerBundle(plist, appPath)
   ) {
     return appPath
   }

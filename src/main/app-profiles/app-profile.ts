@@ -7,10 +7,8 @@ import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
-  APP_ROLE_PLIST_KEY,
   appProfilesRoot,
-  PROFILE_MANAGER_ROLE,
-  profileManagerAppPath,
+  isProfileManagerBundle,
   readAppProfileMarker,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
@@ -145,17 +143,6 @@ export function getAppProfile(): AppProfile | null {
         : null
   }
   return resolved
-}
-
-/**
- * True for the Profile Manager app: its Info.plist role, or its place in a default app. The place
- * alone is enough, so a copy of Orca in that place never takes the default app's data.
- */
-export function isProfileManagerBundle(plist: string | null, bundlePath: string): boolean {
-  return (
-    (plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE) ||
-    bundlePath === profileManagerAppPath(resolve(bundlePath, '..', '..', '..'))
-  )
 }
 
 let profileManagerApp: boolean | undefined

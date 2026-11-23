@@ -1,7 +1,7 @@
 // App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
@@ -51,6 +51,17 @@ export const PROFILE_MANAGER_APP_NAME = 'Orca Profile Manager'
 /** The Profile Manager app inside a default app. The release build makes it. */
 export function profileManagerAppPath(defaultAppPath: string): string {
   return join(defaultAppPath, 'Contents', 'Applications', `${PROFILE_MANAGER_APP_NAME}.app`)
+}
+
+/**
+ * True for the Profile Manager app: its Info.plist role, or its place in a default app. The place
+ * alone is enough, so a copy of Orca in that place never takes the default app's data.
+ */
+export function isProfileManagerBundle(plist: string | null, bundlePath: string): boolean {
+  return (
+    (plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE) ||
+    bundlePath === profileManagerAppPath(resolve(bundlePath, '..', '..', '..'))
+  )
 }
 
 export function appProfilesRoot(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
