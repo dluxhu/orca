@@ -14,9 +14,11 @@ export const ORCHESTRATION_PEER_MAIL_RETURN_METHOD = defineOrchestrationMethod({
   access: { kind: 'localOnly', targets: {} },
   permission: 'workspace',
   params: PeerMailReturnParams,
-  handler: (params, ctx) => {
+  handler: async (params, ctx) => {
     const peerFingerprint = requireRuntimePairing(ctx)
     const { runtime } = ctx
+    // An unknown identity drops the sender's link, not the reply.
+    const own = await runtime.readStoreInstallationId().catch(() => undefined)
     const db = runtime.getOrchestrationDb()
     const through = new Map<string, number>()
     const gone = new Set<string>()
@@ -34,7 +36,7 @@ export const ORCHESTRATION_PEER_MAIL_RETURN_METHOD = defineOrchestrationMethod({
       }
       const payload = PeerMailRelayPayload.safeParse(safeJson(item.payload))
       if (payload.success) {
-        const stored = storePeerReply(runtime, db, conversation, item.messageId, payload.data)
+        const stored = storePeerReply(runtime, db, conversation, item.messageId, payload.data, own)
         if (stored) {
           returned = true
           runtime.notifyMessageArrived(stored.to_handle, stored.type)

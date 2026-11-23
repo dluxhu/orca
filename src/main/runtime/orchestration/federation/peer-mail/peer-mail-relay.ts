@@ -298,7 +298,9 @@ export class PeerMailRelay {
         deletedChat: deletedCoordinatorChat
       })
     }
-    const stored = this.importReply(db, environmentId, item)
+    // An unknown identity drops the sender's link, not the reply.
+    const own = await this.runtime.readStoreInstallationId().catch(() => undefined)
+    const stored = this.importReply(db, environmentId, item, own)
     return stored ? { to: stored.to_handle, type: stored.type } : undefined
   }
 
@@ -306,7 +308,8 @@ export class PeerMailRelay {
   private importReply(
     db: OrchestrationDb,
     environmentId: string,
-    item: z.infer<typeof PulledPeerMail>['items'][number]
+    item: z.infer<typeof PulledPeerMail>['items'][number],
+    own: string | undefined
   ): MessageRow | undefined {
     const conversation = db.getPeerMailConversation(item.conversationId)
     const payload = PeerMailRelayPayload.safeParse(safeJson(item.payload))
@@ -321,7 +324,7 @@ export class PeerMailRelay {
       )
       return undefined
     }
-    return storePeerReply(this.runtime, db, conversation, item.messageId, payload.data)
+    return storePeerReply(this.runtime, db, conversation, item.messageId, payload.data, own)
   }
 }
 
