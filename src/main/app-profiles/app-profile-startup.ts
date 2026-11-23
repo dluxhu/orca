@@ -8,6 +8,7 @@ import {
   ensureAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
 import type { GlobalSettings } from '../../shared/settings/global-settings-types'
+import { getDefaultSettings } from '../../shared/orca-profiles/constants'
 import { getAppProfile, type AppProfile } from './app-profile'
 import { healAppProfileAppPath } from '../../cli/app-profiles/app-profile-registry'
 import { serveServiceUnitOf } from '../../cli/app-profiles/app-profile-list'
@@ -45,18 +46,32 @@ function healRenamedApp(profile: AppProfile): void {
   }
 }
 
-/** Applies the settings that "Copy settings from:" left for a new profile, once. */
+/**
+ * Applies the settings that "Copy settings from:" left for a new profile, once. The seed is plain
+ * data: only an object applies, only with known settings keys, and a bad seed never stops the start.
+ */
 export function applyAppProfileSettingsSeed(
   userDataPath: string,
   store: { updateSettings: (updates: Partial<GlobalSettings>) => unknown }
 ): void {
   const seedPath = join(userDataPath, APP_PROFILE_SETTINGS_SEED)
-  let seed: Partial<GlobalSettings>
+  let raw: string
   try {
-    seed = JSON.parse(readFileSync(seedPath, 'utf8')) as Partial<GlobalSettings>
+    raw = readFileSync(seedPath, 'utf8')
   } catch {
     return
   }
-  store.updateSettings(seed)
-  rmSync(seedPath, { force: true })
+  try {
+    const seed: unknown = JSON.parse(raw)
+    if (typeof seed !== 'object' || seed === null || Array.isArray(seed)) {
+      throw new Error('the seed is not an object')
+    }
+    const known = new Set(Object.keys(getDefaultSettings(homedir())))
+    const updates = Object.fromEntries(Object.entries(seed).filter(([key]) => known.has(key)))
+    store.updateSettings(updates as Partial<GlobalSettings>)
+  } catch (error) {
+    console.warn('[profiles] the copied settings do not apply:', error)
+  } finally {
+    rmSync(seedPath, { force: true })
+  }
 }

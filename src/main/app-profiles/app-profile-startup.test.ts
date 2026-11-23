@@ -103,4 +103,39 @@ describe('applyAppProfileSettingsSeed', () => {
     expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
     expect(existsSync(join(folder, 'orca-settings-seed.json'))).toBe(false)
   })
+
+  it('ignores a seed that is not a settings object, never throws, and removes it', () => {
+    const folder = join(home, 'bad-seed')
+    mkdirSync(folder, { recursive: true })
+    const updateSettings = vi.fn()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const content of ['null', '5', '[]', '"x"', '{"theme":']) {
+      writeFileSync(join(folder, 'orca-settings-seed.json'), content)
+      expect(() => applyAppProfileSettingsSeed(folder, { updateSettings })).not.toThrow()
+      expect(existsSync(join(folder, 'orca-settings-seed.json'))).toBe(false)
+    }
+    expect(updateSettings).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('applies only known settings keys, and survives a store that throws', () => {
+    const folder = join(home, 'keys-seed')
+    mkdirSync(folder, { recursive: true })
+    const seed = join(folder, 'orca-settings-seed.json')
+    writeFileSync(seed, JSON.stringify({ theme: 'dark', notASetting: 1, __proto__x: 2 }))
+    const updateSettings = vi.fn()
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
+    writeFileSync(seed, JSON.stringify({ theme: 'dark' }))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(() =>
+      applyAppProfileSettingsSeed(folder, {
+        updateSettings: () => {
+          throw new Error('store failed')
+        }
+      })
+    ).not.toThrow()
+    expect(existsSync(seed)).toBe(false)
+    warn.mockRestore()
+  })
 })
