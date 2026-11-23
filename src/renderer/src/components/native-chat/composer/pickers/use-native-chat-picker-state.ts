@@ -37,10 +37,8 @@ import { completeNativeChatMention, type NativeChatMentionSession } from './nati
 import { useNativeChatPreferredSuggestion } from './use-native-chat-preferred-suggestion'
 import { useNativeChatPickerOpenEvents } from './use-native-chat-picker-open-events'
 import { useNativeChatPickerDismissal } from './use-native-chat-picker-dismissal'
-import {
-  emitNativeChatPickerItemAccepted,
-  emitNativeChatSendClassified
-} from '@/components/native-chat/telemetry/native-chat-telemetry'
+import { nativeChatFileMentionToken } from './native-chat-file-mention-token'
+import { emitNativeChatPickerItemAccepted } from '@/components/native-chat/telemetry/native-chat-telemetry'
 
 export type NativeChatPickerState = {
   autocomplete: ComposerAutocomplete
@@ -224,11 +222,18 @@ export function useNativeChatPickerState(args: {
     (path: string, token?: Parameters<typeof applyMention>[4], from?: number) => {
       if (!disabledRef.current && (from !== undefined || autocomplete.mode === 'mention')) {
         commitCompletion(
-          applyMention(textareaRef.current, ...liveDraft(), path, token, from, mentionNameMatches)
+          applyMention(
+            textareaRef.current,
+            ...liveDraft(),
+            path,
+            token ?? nativeChatFileMentionToken(terminalTabId, path),
+            from,
+            mentionNameMatches
+          )
         )
       }
     },
-    [autocomplete, commitCompletion, liveDraft, mentionNameMatches, textareaRef]
+    [autocomplete, commitCompletion, liveDraft, mentionNameMatches, terminalTabId, textareaRef]
   )
 
   const completeSessionMention = useCallback(
@@ -267,16 +272,14 @@ export function useNativeChatPickerState(args: {
 
   const classifySend = useCallback(
     (value: string) => {
-      const outcome = classifyNativeChatSend(
+      return classifyNativeChatSend(
         value,
         agentCommands,
         skillOriginRef.current,
         profile?.skillPrefix ?? null
       )
-      emitNativeChatSendClassified({ agent, outcome })
-      return outcome
     },
-    [agent, agentCommands, profile]
+    [agentCommands, profile]
   )
   const clearSkillOrigin = useCallback(() => {
     skillOriginRef.current = null
