@@ -54,44 +54,81 @@ export function appProfileIdFromName(name: string): string {
   return id || 'profile'
 }
 
+/** The renderer's translate. The CLI uses the English text. */
+export type RuleTranslate = (
+  key: string,
+  fallback: string,
+  values?: Record<string, string | number>
+) => string
+
+const english: RuleTranslate = (_key, fallback, values) =>
+  fallback.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(values?.[name] ?? ''))
+
 /** Null when the id is valid and free. The check ignores case, as APFS and bundle ids do. */
-export function appProfileIdError(id: string, takenIds: readonly string[]): string | null {
+export function appProfileIdError(
+  id: string,
+  takenIds: readonly string[],
+  t: RuleTranslate = english
+): string | null {
   if (!ID_PATTERN.test(id)) {
-    return 'Use 1 to 32 letters, digits and -, with a letter or digit first.'
+    return t(
+      'profileManager.rule.idPattern',
+      'Use 1 to 32 letters, digits and -, with a letter or digit first.'
+    )
   }
   const lower = id.toLowerCase()
   if (RESERVED_IDS.includes(lower)) {
-    return `The id "${id}" is reserved.`
+    return t('profileManager.rule.idReserved', 'The id "{{id}}" is reserved.', { id })
   }
   if (takenIds.some((taken) => taken.toLowerCase() === lower)) {
-    return `A profile with the id "${id}" exists.`
+    return t('profileManager.rule.idTaken', 'A profile with the id "{{id}}" exists.', { id })
   }
   return null
 }
 
-/** Null when the name can be the app's file name and no other profile has it. */
-export function appProfileNameError(name: string, takenNames: readonly string[]): string | null {
+/**
+ * Null when the name can be the app's file name and no other profile has it. A name that starts
+ * with "-" would be read as an option of `orca profiles`.
+ */
+export function appProfileNameError(
+  name: string,
+  takenNames: readonly string[],
+  t: RuleTranslate = english
+): string | null {
   const trimmed = name.trim()
-  if (!trimmed || trimmed.startsWith('.') || /[/:]/.test(trimmed)) {
-    return 'Type a name without "/" or ":".'
+  if (!trimmed || /^[.-]/.test(trimmed) || /[/:]/.test(trimmed)) {
+    return t(
+      'profileManager.rule.nameChars',
+      'Type a name without "/" or ":", and with no "." or "-" first.'
+    )
   }
   const lower = trimmed.toLowerCase()
   if (takenNames.some((taken) => taken.toLowerCase() === lower)) {
-    return `A profile with the name "${trimmed}" exists.`
+    return t('profileManager.rule.nameTaken', 'A profile with the name "{{name}}" exists.', {
+      name: trimmed
+    })
   }
   return null
 }
 
 /** Null when the port is valid and outside the port range of the default app and of other profiles. */
-export function appProfilePortError(port: number, otherPorts: readonly number[]): string | null {
+export function appProfilePortError(
+  port: number,
+  otherPorts: readonly number[],
+  t: RuleTranslate = english
+): string | null {
   if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    return `The port must be 1024 to 65535: ${port}`
+    return t('profileManager.rule.portRange', 'The port must be 1024 to 65535: {{port}}', { port })
   }
   const clash =
     (port >= DEFAULT_APP_PORTS.first && port <= DEFAULT_APP_PORTS.last) ||
     otherPorts.some((other) => Math.abs(other - port) < PORT_SPACING)
   return clash
-    ? `The port ${port} is inside the port range of the default app or of another profile.`
+    ? t(
+        'profileManager.rule.portClash',
+        'The port {{port}} is inside the port range of the default app or of another profile.',
+        { port }
+      )
     : null
 }
 

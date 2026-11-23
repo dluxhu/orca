@@ -36,11 +36,11 @@ type Form =
   | { mode: 'edit'; row: AppProfileRow; name: string; port: string }
   | { mode: 'remove'; row: AppProfileRow; keepData: boolean }
 
-function newProfileName(taken: readonly string[]): string {
+function newProfileName(t: Translate, taken: readonly string[]): string {
   const lower = taken.map((name) => name.toLowerCase())
-  let name = 'Orca - New Profile'
+  let name = t('profileManager.new.defaultName', 'Orca - New Profile')
   for (let n = 2; lower.includes(name.toLowerCase()); n++) {
-    name = `Orca - New Profile ${n}`
+    name = t('profileManager.new.defaultNameNumbered', 'Orca - New Profile {{n}}', { n })
   }
   return name
 }
@@ -123,7 +123,10 @@ export function ProfileManager(): React.JSX.Element {
   }
 
   const startNew = (): void => {
-    const name = newProfileName(profiles.map((row) => row.name))
+    const name = newProfileName(
+      t,
+      profiles.map((row) => row.name)
+    )
     setForm({
       mode: 'new',
       name,
@@ -139,15 +142,18 @@ export function ProfileManager(): React.JSX.Element {
   if (form?.mode === 'new') {
     const nameError = appProfileNameError(
       form.name,
-      profiles.map((row) => row.name)
+      profiles.map((row) => row.name),
+      t
     )
     const idError = appProfileIdError(
       form.id,
-      profiles.map((row) => row.id)
+      profiles.map((row) => row.id),
+      t
     )
     const portError = appProfilePortError(
       Number(form.port),
-      profiles.map((row) => row.port)
+      profiles.map((row) => row.port),
+      t
     )
     const kept = state?.keptIds.includes(form.id) ?? false
     formView = (
@@ -232,11 +238,13 @@ export function ProfileManager(): React.JSX.Element {
   } else if (form?.mode === 'edit') {
     const nameError = appProfileNameError(
       form.name,
-      others(form.row).map((row) => row.name)
+      others(form.row).map((row) => row.name),
+      t
     )
     const portError = appProfilePortError(
       Number(form.port),
-      others(form.row).map((row) => row.port)
+      others(form.row).map((row) => row.port),
+      t
     )
     const changes: AppProfileChange[] = [
       ...(form.name.trim() !== form.row.name

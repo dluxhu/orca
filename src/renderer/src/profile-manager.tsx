@@ -5,6 +5,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { applyStartupAppTheme } from './app-shell/appearance/use-app-theme-paint'
 import { ProfileManager } from './components/profile-manager/ProfileManager'
+import { translate } from './i18n/i18n'
 import type { GlobalSettings } from '../../shared/settings/global-settings-types'
 
 let settings: GlobalSettings | null = null
@@ -14,6 +15,7 @@ try {
   // The system theme stays.
 }
 applyStartupAppTheme(settings)
+document.title = translate('profileManager.title', 'Orca Profile Manager')
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {
