@@ -122,7 +122,7 @@ export async function replyOverPeerMail(args: {
         subject,
         body: params.body,
         threadId,
-        sender: peerMailSender(runtime, replier)
+        sender
       } satisfies z.infer<typeof ClientReplyPayload>
     })
     db.markAsRead([original.id], { kind: 'reply' })

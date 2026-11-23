@@ -233,7 +233,11 @@ export async function importPairedServerItem(
           body: data.body,
           peerFingerprint: asks.pairing,
           environmentId: asks.environmentId,
-          senderSnapshot: peerMailSenderSnapshot(data.senderLabel, data.sender),
+          senderSnapshot: peerMailSenderSnapshot(
+            data.senderLabel,
+            data.sender,
+            await runtime.readStoreInstallationId().catch(() => undefined)
+          ),
           admits: (to) => tookPart(db, item.conversationId, to)
         },
         () => (db.getPeerMailMessage(item.messageId) ? true : null)

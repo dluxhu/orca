@@ -49,21 +49,29 @@ describe('the mail header', () => {
   it("names a paired computer's bot, or an agent there, never its raw address", () => {
     const fromBot = message({
       from_handle: PAIRED_LABEL,
-      answer_sender_snapshot: peerMailSenderSnapshot(PAIRED_LABEL, {
-        name: 'Fix the sidebar',
-        computer: 'MacBook Pro (7)',
-        bot: { id: 'eng', name: 'Eng-Bot-Builder', avatar: null }
-      })
+      answer_sender_snapshot: peerMailSenderSnapshot(
+        PAIRED_LABEL,
+        {
+          name: 'Fix the sidebar',
+          computer: 'MacBook Pro (7)',
+          bot: { id: 'eng', name: 'Eng-Bot-Builder', avatar: null }
+        },
+        undefined
+      )
     })
     expect(header(fromBot, linkedPeer(fromBot))).toBe(
       '──── From: Eng-Bot-Builder on MacBook Pro (7) (handoff) ────'
     )
     const fromAgent = message({
       from_handle: PAIRED_LABEL,
-      answer_sender_snapshot: peerMailSenderSnapshot(PAIRED_LABEL, {
-        name: 'Fix RAM',
-        computer: "Brennan's MacBook Pro"
-      })
+      answer_sender_snapshot: peerMailSenderSnapshot(
+        PAIRED_LABEL,
+        {
+          name: 'Fix RAM',
+          computer: "Brennan's MacBook Pro"
+        },
+        undefined
+      )
     })
     expect(header(fromAgent, linkedPeer(fromAgent))).toBe(
       "──── From: an agent on Brennan's MacBook Pro (handoff) ────"
@@ -90,11 +98,15 @@ describe('the mail header', () => {
   it("names a paired bot request as its own record does, over the sender's own snapshot", () => {
     const pulled = message({
       from_handle: PAIRED_LABEL,
-      answer_sender_snapshot: peerMailSenderSnapshot(PAIRED_LABEL, {
-        name: 'Ranger',
-        computer: 'Lab Mac',
-        bot: { id: 'ranger', name: 'Ranger', avatar: null }
-      })
+      answer_sender_snapshot: peerMailSenderSnapshot(
+        PAIRED_LABEL,
+        {
+          name: 'Ranger',
+          computer: 'Lab Mac',
+          bot: { id: 'ranger', name: 'Ranger', avatar: null }
+        },
+        undefined
+      )
     })
     const recorded = (
       record: Pick<
@@ -123,11 +135,15 @@ describe('the mail header', () => {
   it('names a paired sender from records saved in the older shapes', () => {
     const row = message({
       from_handle: PAIRED_LABEL,
-      answer_sender_snapshot: peerMailSenderSnapshot(PAIRED_LABEL, {
-        name: 'Ranger',
-        computer: 'Lab Mac',
-        bot: { id: 'ranger', name: 'Ranger', avatar: null }
-      })
+      answer_sender_snapshot: peerMailSenderSnapshot(
+        PAIRED_LABEL,
+        {
+          name: 'Ranger',
+          computer: 'Lab Mac',
+          bot: { id: 'ranger', name: 'Ranger', avatar: null }
+        },
+        undefined
+      )
     })
     const saved = (record: string): MessageFormattingOptions => ({
       peerMail: {
@@ -169,10 +185,14 @@ describe('the mail header', () => {
     const row = message({
       from_handle: PAIRED_LABEL,
       priority: 'high',
-      answer_sender_snapshot: peerMailSenderSnapshot(PAIRED_LABEL, {
-        name: null,
-        computer: 'MacBook Pro (7)'
-      })
+      answer_sender_snapshot: peerMailSenderSnapshot(
+        PAIRED_LABEL,
+        {
+          name: null,
+          computer: 'MacBook Pro (7)'
+        },
+        undefined
+      )
     })
     const { text, content } = formatMessageBannerWithContent(row, linkedPeer(row))
     expect(text.split('\n')[0]).toBe('──── From: an agent on MacBook Pro (7) [HIGH] (handoff) ────')

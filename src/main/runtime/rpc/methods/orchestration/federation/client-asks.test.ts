@@ -15,6 +15,7 @@ import {
   settleRemovedPairedClient,
   withdrawClientAsksOf
 } from '../../../../orchestration/federation/client-asks/client-ask-queue'
+import { readAnswerSenderSnapshot } from '../../../../../../shared/agent-session/journal/answer-sender-snapshot'
 import { RpcDispatcher } from '../../../dispatcher'
 import { ORCHESTRATION_METHODS } from '../orchestration'
 
@@ -298,6 +299,38 @@ describe('agents here messaging agents on a paired computer', () => {
     const items = (await pull()).items.filter((queued) => queued.messageId !== item!.messageId)
     expect(items.map((queued) => queued.kind)).toEqual(['client_reply'])
     expect(JSON.parse(items[0]!.payload)).toMatchObject({ to: 'bot:Literature', body: 'Thanks.' })
+  })
+
+  it('sends where the asker runs, and keeps the link of a reply from a chat on the computer', async () => {
+    vi.spyOn(runtime, 'readStoreInstallationId').mockResolvedValue('install_home')
+    await pull()
+    await ask({ type: 'question' })
+    const [item] = (await pull()).items
+    expect(JSON.parse(item!.payload).sender).toMatchObject({ hostId: 'install_home' })
+    const chat = 'orca_session_id:0d31576f-309e-42f7-8cf4-7e79e47a2cc2'
+    await fromClient('orchestration.peerMailReturn', {
+      items: [
+        {
+          conversationId: item!.conversationId,
+          sequence: 1,
+          messageId: 'msg_answer_1',
+          kind: 'peer_mail',
+          payload: JSON.stringify({
+            senderLabel: 'Literature on Client A',
+            fromAddress: 'bot:Literature',
+            subject: 'Re: Check the citations',
+            body: 'All real.',
+            threadId: item!.messageId,
+            sender: { name: 'Literature', computer: 'Client A', address: chat, hostId: 'install_a' }
+          })
+        }
+      ]
+    })
+    const [answer] = db.getUnreadMessages('term_s')
+    expect(readAnswerSenderSnapshot(answer!.answer_sender_snapshot)?.origin).toEqual({
+      hostId: 'install_a',
+      address: chat
+    })
   })
 
   it('on a re-pair that keeps its device, tells only questions of the older pairing', async () => {
