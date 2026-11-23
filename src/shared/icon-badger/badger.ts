@@ -125,11 +125,8 @@ export function pageCurl(
   const vb1 = FLAP_BASE[0] * L
   const vb2 = FLAP_BASE[1] * L
   const arcPts = linspace(vb1, vb2, 120).map((v): Pt => [arcDD(v), v])
-  const poly = [
-    ...arcPts,
-    ...bez(arcPts.at(-1), cl, T).slice(1),
-    ...bez(T, cu, arcPts[0]).slice(1, -1)
-  ]
+  const [arcEnd] = arcPts.slice(-1)
+  const poly = [...arcPts, ...bez(arcEnd, cl, T).slice(1), ...bez(T, cu, arcPts[0]).slice(1, -1)]
   const SS = 4
   const fm4 = newImg(S * SS, S * SS, 1)
   fillPolygon(

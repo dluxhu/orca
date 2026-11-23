@@ -182,7 +182,7 @@ export function fillPolygon(
   for (let i = 0; i < p.length - 1; i++) {
     pairs.push([p[i], p[i + 1]])
   }
-  const last = p.at(-1)
+  const [last] = p.slice(-1)
   if (last[0] !== p[0][0] || last[1] !== p[0][1]) {
     pairs.push([last, p[0]])
   }

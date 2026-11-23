@@ -24,7 +24,8 @@ export function interp(x: number, xp: readonly number[], fp: readonly number[]):
       return fp[i - 1] + ((x - xp[i - 1]) * (fp[i] - fp[i - 1])) / (xp[i] - xp[i - 1])
     }
   }
-  return fp.at(-1)
+  const [last] = fp.slice(-1)
+  return last
 }
 
 export const clip = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v))
