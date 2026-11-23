@@ -1,5 +1,7 @@
 import { getAgentLabel } from '@/lib/agent-catalog/agent-catalog'
 import { translate } from '@/i18n/i18n'
+import { APP_PROFILE_PATH_ROOT, appProfileDir } from '@/lib/app-profile-path-display'
+import { isLocalExecutionHost } from '../../../../shared/execution-host/execution-host'
 import type { TerminalAgent } from '../../../../shared/agent-status/identity/terminal-agent'
 import { UNSAVED_DRAFTS_REMOVAL_REFUSAL } from '../../../../shared/worktree/removal/removal'
 
@@ -12,8 +14,16 @@ export function botAgentLabel(agent: TerminalAgent): string {
 
 const IS_WINDOWS = navigator.userAgent.includes('Windows')
 
-/** A bot's home, shown from the user's home rather than as a full path. */
-export function botFolderDisplay(folder: string, windows = IS_WINDOWS): string {
+/** A bot's home, shown from the user's home, or from the app profile's folder, not as a full path. */
+export function botFolderDisplay(
+  folder: string,
+  hostId: string,
+  windows = IS_WINDOWS,
+  profileDir = appProfileDir()
+): string {
+  if (profileDir && isLocalExecutionHost(hostId)) {
+    return `${APP_PROFILE_PATH_ROOT}/bots/${folder}`
+  }
   return windows ? `%USERPROFILE%\\.orca\\bots\\${folder}` : `~/.orca/bots/${folder}`
 }
 

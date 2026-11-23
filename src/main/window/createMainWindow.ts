@@ -1,7 +1,8 @@
 import { app, BrowserWindow, nativeTheme, powerMonitor, screen } from 'electron'
 import { release } from 'node:os'
 import { join } from 'node:path'
-import { runtimeAppIdentity } from '../app-profiles/app-profile'
+import { getAppProfile, runtimeAppIdentity } from '../app-profiles/app-profile'
+import { formatAppProfileDirArgument } from '../../shared/app-profiles/app-profile-dir-argument'
 import { pathToFileURL } from 'node:url'
 import { installRendererHangStackPolicy } from '../hang-watchdog/renderer-hang-stack-policy'
 import { getAppIconPath } from './desktop-integration/app-icon'
@@ -124,6 +125,7 @@ export function createMainWindow(
   )
 
   const pumpHiddenFrames = shouldPumpHiddenWindowFrames(process.env, process.platform)
+  const appProfile = getAppProfile()
   const mainWindow = new BrowserWindow({
     width: savedBounds?.width ?? defaultBounds.width,
     height: savedBounds?.height ?? defaultBounds.height,
@@ -169,6 +171,7 @@ export function createMainWindow(
         formatBrowserClientHostIdArgument(getBrowserClientHostId()),
         ...(windowMaterial === 'off' ? [] : [formatWindowMaterialArgument(windowMaterial)]),
         ...(pumpHiddenFrames ? [formatHiddenWindowFramePumpArgument()] : []),
+        ...(appProfile ? [formatAppProfileDirArgument(appProfile.userDataPath)] : []),
         ...wslHostsWindowArguments()
       ]
     }

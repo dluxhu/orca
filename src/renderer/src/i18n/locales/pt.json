@@ -8248,7 +8248,7 @@
           "25b0004fbf": "Terminal ativo",
           "781cb74d22": "Executado a partir de painéis de terminal.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "O atalho não está mais disponível.",
           "9a3a3ca03d": "Atalhos de Teclado"
         },
@@ -8704,7 +8704,7 @@
           "2b077b5544": "Prompt copiado."
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "As chaves do runtime local são armazenadas em ~/.orca usando armazenamento criptografado do Electron quando disponível.",
+          "d246b2bdb3": "As chaves do runtime local são armazenadas em {{root}} usando armazenamento criptografado do Electron quando disponível.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "Chave de API configurada",
           "07ed3e512e": "O áudio é enviado à OpenAI somente quando um modelo de voz da OpenAI é selecionado.",
