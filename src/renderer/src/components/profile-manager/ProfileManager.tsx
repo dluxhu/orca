@@ -74,10 +74,10 @@ export function ProfileManager(): React.JSX.Element {
     profiles.filter((profile) => profile.id !== row?.id)
 
   /** Runs the changes in order and stops at the first error. */
-  const run = async (changes: AppProfileChange[]): Promise<void> => {
+  const run = (changes: AppProfileChange[]): Promise<void> => {
     setBusy(true)
     setMessage(null)
-    try {
+    const runAll = async (): Promise<void> => {
       for (const change of changes) {
         const reply = await api.change(change)
         if (!reply.ok) {
@@ -86,10 +86,12 @@ export function ProfileManager(): React.JSX.Element {
         }
       }
       setForm(null)
-    } finally {
+    }
+    // Promise.finally: React Compiler cannot compile a try/finally statement.
+    return runAll().finally(async () => {
       setBusy(false)
       await load()
-    }
+    })
   }
 
   const startNew = (): void => {
@@ -309,7 +311,7 @@ export function ProfileManager(): React.JSX.Element {
   }
 
   return (
-    <main className="flex h-screen flex-col gap-4 overflow-auto bg-background p-6 text-foreground">
+    <main className="scrollbar-sleek flex h-screen flex-col gap-4 overflow-auto bg-background p-6 text-foreground">
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold">{t('profileManager.heading', 'Profiles')}</h1>
@@ -362,7 +364,7 @@ export function ProfileManager(): React.JSX.Element {
                   void run([{ kind: 'start-at-login', id: row.id, enabled: checked === true }])
                 }
               />
-              <Label htmlFor={`profile-start-at-login-${row.id}`} className="text-sm">
+              <Label htmlFor={`profile-start-at-login-${row.id}`}>
                 {t('profileManager.startAtLogin', 'Start at login')}
               </Label>
             </div>

@@ -44,15 +44,20 @@ export function appProfilesAppsDir(env: NodeJS.ProcessEnv = process.env, home = 
   return env[APP_PROFILES_APPS_DIR_ENV] || join(home, 'Applications', 'Orca Profiles')
 }
 
+/** The profile id in the text of a marker, or null. */
+export function parseAppProfileMarker(text: string): string | null {
+  try {
+    const id = (JSON.parse(text) as { id?: unknown }).id
+    return typeof id === 'string' && id.length > 0 ? id : null
+  } catch {
+    return null
+  }
+}
+
 /** The profile id in a userData folder, or null when the folder is not a profile's. */
 export function readAppProfileMarker(userDataPath: string): string | null {
   try {
-    const id = (
-      JSON.parse(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8')) as {
-        id?: unknown
-      }
-    ).id
-    return typeof id === 'string' && id.length > 0 ? id : null
+    return parseAppProfileMarker(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8'))
   } catch {
     return null
   }

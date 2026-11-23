@@ -28,18 +28,20 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
     return null
   }
 
-  const change = async (next: boolean): Promise<void> => {
+  const change = (next: boolean): Promise<void> => {
     setBusy(true)
     setError(null)
-    try {
+    const set = async (): Promise<void> => {
       const reply = await api.setOwnStartAtLogin(next)
       if (!reply.ok) {
         setError(reply.error.message)
       }
-    } finally {
+    }
+    // Promise.finally: React Compiler cannot compile a try/finally statement.
+    return set().finally(async () => {
       setEnabled((await api.getOwnStartAtLogin()).enabled)
       setBusy(false)
-    }
+    })
   }
 
   return (
