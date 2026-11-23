@@ -5,6 +5,7 @@ import logo from '../../../../../resources/logo.svg'
 import { useTranslate } from '@/i18n/use-translate'
 import { withForkName } from '../../../../shared/fork-identity'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { keepPaneFocusPressProps } from '@/lib/overlay-interaction/focus-keeping-press'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -77,6 +78,7 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
                   className="titlebar-icon-button"
                   aria-label={t('auto.App.8b0b8eb54f', 'Application menu')}
                   onClick={() => window.api.ui.popupMenu()}
+                  {...keepPaneFocusPressProps}
                 >
                   <MoreHorizontal size={14} />
                 </button>
@@ -114,6 +116,7 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
                 ref={sidebarToggleRef}
                 className="sidebar-toggle"
                 onClick={toggleSidebar}
+                {...keepPaneFocusPressProps}
                 aria-label={t('auto.App.e4b9e7dff7', 'Toggle sidebar')}
               >
                 <SidebarToggleIcon side="left" size={16} />

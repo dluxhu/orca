@@ -44,6 +44,8 @@ Features:
 - **Sender names across Orcas.** Mail from a chat on another Orca shows that chat's name to the agent, and a click on the "Message from" card opens the chat on its Orca ([#41](https://github.com/dluxhu/orca/pull/41)).
 - **Stable and Nightly.** The release channel switcher lists Stable and Nightly. Nightly is a separate app that updates itself to newer Nightly builds; the stable app never takes a Nightly build ([#38](https://github.com/dluxhu/orca/pull/38)).
 - **App profiles.** `orca profiles create <name>` makes a separate app with its own data, sign-ins, `~/.orca` and agent folders, beside the default app ([#43](https://github.com/dluxhu/orca/pull/43)).
+- **Profile Manager.** An app inside Orca (Profiles > Profile Manager...) lists, opens, makes, edits and removes profiles. You set the id; a profile removed with "Keep data" gets its data back when you make it again with the same id. A rename in Finder keeps the profile. Start at login is in Settings > General and on each Manager row. The plain app is "Default" ([#46](https://github.com/dluxhu/orca/pull/46), [#47](https://github.com/dluxhu/orca/pull/47)).
+- **Profile icons.** Each profile app gets an icon with a badge: a character, an image or your own icon file. Pick it in the Profile Manager or with `orca profiles set-icon` ([#45](https://github.com/dluxhu/orca/pull/45), [#48](https://github.com/dluxhu/orca/pull/48)).
 
 Fixes:
 

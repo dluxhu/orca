@@ -16,14 +16,8 @@ const WSL_ENV_PROBE_VALUE_MAX_LENGTH = 4_096
 // Room for rc output ahead of the fence; a clipped fence reads as a failed probe.
 const WSL_ENV_PROBE_MAX_BYTES = 65_536
 const PROVIDER_HOME_ENVS = SKILL_INSTALL_PROVIDERS.flatMap((provider) =>
-  provider.homeEnv
-    ? [{ id: provider.id, name: provider.homeEnv, skills: skillsSegments(provider) }]
-    : []
+  provider.homeEnv ? [{ id: provider.id, name: provider.homeEnv }] : []
 )
-
-function skillsSegments(provider: { homeEnvSkillsSegments?: readonly string[] }): string[] {
-  return [...(provider.homeEnvSkillsSegments ?? ['skills'])]
-}
 // Why $HOME first: unusable homes are judged against the guest's own home.
 const WSL_PROVIDER_HOMES_PROBE = buildWslCapturedLoginShellCommand(
   `printf '%s\\0' "$HOME" ${PROVIDER_HOME_ENVS.map(({ name }) => `"\${${name}:-}"`).join(' ')}`
@@ -65,7 +59,7 @@ export function resolveEnvironmentSkillProviderRoots(
   for (const provider of SKILL_INSTALL_PROVIDERS) {
     const home = provider.homeEnv ? normalizedRoot(env[provider.homeEnv]) : null
     if (home && isUsableProviderHome(home, resolve(userHome), path)) {
-      roots[provider.id] = join(home, ...skillsSegments(provider))
+      roots[provider.id] = join(home, 'skills')
     }
   }
   return roots
@@ -144,10 +138,10 @@ export async function resolveWslSkillProviderRoots(
       return {}
     }
     const roots: SkillProviderRootOverrides = {}
-    PROVIDER_HOME_ENVS.forEach(({ id, skills }, index) => {
+    PROVIDER_HOME_ENVS.forEach(({ id }, index) => {
       const home = cleanWslPath(values[index])
       if (home && isUsableProviderHome(home, userHome, posix)) {
-        roots[id] = toWindowsWslPath(`${home}/${skills.join('/')}`, distro)
+        roots[id] = toWindowsWslPath(`${home}/skills`, distro)
       }
     })
     return roots

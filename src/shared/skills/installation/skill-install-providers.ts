@@ -8,8 +8,6 @@ type SkillInstallProviderEntry = {
   workspaceSegments: readonly string[] | null
   /** Env var relocating the agent's home (skills in `<home>/skills`). */
   homeEnv?: string
-  /** The skills folder under `homeEnv`, when it is not `skills`. */
-  homeEnvSkillsSegments?: readonly string[]
 }
 
 export const SKILL_INSTALL_PROVIDERS = Object.freeze([
@@ -33,14 +31,12 @@ export const SKILL_INSTALL_PROVIDERS = Object.freeze([
     globalSegments: ['.cursor', 'skills'],
     workspaceSegments: null
   },
+  // Gemini CLI also reads ~/.agents/skills and warns when ~/.gemini/skills repeats a name.
   {
     id: 'gemini',
     displayName: 'Gemini CLI',
-    globalSegments: ['.gemini', 'skills'],
-    workspaceSegments: null,
-    // GEMINI_CLI_HOME names the folder that holds `.gemini`.
-    homeEnv: 'GEMINI_CLI_HOME',
-    homeEnvSkillsSegments: ['.gemini', 'skills']
+    globalSegments: null,
+    workspaceSegments: null
   },
   {
     id: 'droid',
