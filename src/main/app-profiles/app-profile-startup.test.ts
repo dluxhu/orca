@@ -57,6 +57,10 @@ describe('configureAppProfileStartup', () => {
     const oldApp = join(home, 'apps', 'Orca - Work.app')
     const newApp = join(home, 'apps', 'Orca - Finder.app')
     mkdirSync(join(newApp, 'Contents', 'MacOS'), { recursive: true })
+    writeFileSync(
+      join(newApp, 'Contents', 'Info.plist'),
+      '<dict><key>OrcaAppProfileId</key><string>work</string></dict>'
+    )
     mkdirSync(userDataPath, { recursive: true })
     writeFileSync(
       join(home, 'data', 'profiles.json'),

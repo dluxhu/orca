@@ -88,7 +88,8 @@ export function readAppProfileRegistry(root: string): AppProfileRegistry | null 
   }
 }
 
-function appProfileIdOfApp(appPath: string): string | null {
+/** The profile id in an app's Info.plist, or null. */
+export function appProfileIdOfApp(appPath: string): string | null {
   try {
     return readPlistString(
       readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8'),
@@ -100,8 +101,9 @@ function appProfileIdOfApp(appPath: string): string | null {
 }
 
 /**
- * The profile's app: the registry path, or the app in the same folder whose Info.plist has this
- * profile id (a rename in Finder changes only the file name). Null when neither exists.
+ * The profile's app: the registry path, or the one app in the same folder whose Info.plist has
+ * this profile id (a rename in Finder changes only the file name). Null when there is none, or
+ * more than one (a copy in Finder): Orca does not guess.
  */
 export function locateAppProfileApp(entry: Pick<AppProfileEntry, 'id' | 'appPath'>): string | null {
   if (appProfileIdOfApp(entry.appPath) === entry.id) {
@@ -109,11 +111,11 @@ export function locateAppProfileApp(entry: Pick<AppProfileEntry, 'id' | 'appPath
   }
   try {
     const folder = dirname(entry.appPath)
-    const name = readdirSync(folder).find(
+    const names = readdirSync(folder).filter(
       (candidate) =>
         candidate.endsWith('.app') && appProfileIdOfApp(join(folder, candidate)) === entry.id
     )
-    return name ? join(folder, name) : null
+    return names.length === 1 ? join(folder, names[0]) : null
   } catch {
     return null
   }

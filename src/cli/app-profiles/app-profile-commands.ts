@@ -136,9 +136,14 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
         throw new RuntimeClientError('invalid_argument', USAGE)
       }
       const entry = await setAppProfilePort({ id: oneId(parsed), port })
-      const note = entry.serveServiceInstalled
-        ? `\nInstall the serve service again: orca --profile ${entry.id} serve service install`
-        : ''
+      const note =
+        entry.serveService === 'restarted'
+          ? '\nThe serve service runs again, on the new port.'
+          : entry.serveService === 'updated'
+            ? '\nThe serve service uses the new port from its next start.'
+            : entry.serveServiceInstalled
+              ? `\nInstall the serve service again: orca --profile ${entry.id} serve service install --port ${entry.port}`
+              : ''
       print(entry, json, `The port of "${entry.id}" is ${entry.port}.${note}`)
       return
     }

@@ -1,10 +1,21 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
-import { ensureAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
+import {
+  ensureAppProfileMarker,
+  readAppProfileMarker
+} from '../../shared/app-profiles/app-profile-paths'
 
 const plist = (entries: Record<string, string>): string =>
   `<plist><dict>${Object.entries(entries)
@@ -56,6 +67,31 @@ describe('resolveAppProfile', () => {
         readMarker: () => null
       })
     ).toMatchObject({ id: 'work', name: 'Orca - Finder', userDataPath: '/root/work' })
+  })
+
+  it('refuses an id or a data folder that leaves the profiles root', () => {
+    const base = mkdtempSync(join(tmpdir(), 'orca-profile-id-'))
+    try {
+      const root = join(base, 'profiles')
+      mkdirSync(root)
+      mkdirSync(join(base, 'orca'))
+      const resolveId = (id: string) =>
+        resolveAppProfile({
+          plist: plist({ CFBundleIdentifier: 'b', OrcaAppProfileId: id }),
+          userDataDirArg: null,
+          defaultRoot: root,
+          readMarker: readAppProfileMarker
+        })
+      for (const id of ['../orca', '/tmp/x', 'default']) {
+        expect(() => resolveId(id)).toThrow('does not accept')
+      }
+      // A link at <root>/<id> to another folder.
+      symlinkSync(join(base, 'orca'), join(root, 'work'))
+      expect(() => resolveId('work')).toThrow('is outside')
+      expect(existsSync(join(base, 'orca', 'orca-app-profile.json'))).toBe(false)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
   })
 
   it('stops when the bundle and the marker name different profiles', () => {

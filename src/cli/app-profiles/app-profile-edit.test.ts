@@ -212,6 +212,39 @@ describe.skipIf(process.platform !== 'darwin')('the default app', () => {
 })
 
 describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
+  it('moves an installed Start at login service that is not loaded to the new port', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps() })
+    expect(result).toMatchObject({ serveServiceInstalled: true, serveService: 'updated' })
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      '<string>--port</string>\n    <string>7000</string>'
+    )
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
+  it('restarts a loaded service on the new port, so the server keeps running', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    let portAtBootstrap = ''
+    const recording: RunTool = (program, args) => {
+      if (args[0] === 'bootstrap') {
+        portAtBootstrap = readFileSync(unit.unitPath, 'utf8')
+      }
+      return run(program, args)
+    }
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps(), run: recording })
+    expect(result.serveService).toBe('restarted')
+    expect(calls.filter((call) => call[0].endsWith('launchctl')).map((call) => call[1])).toEqual([
+      'bootout',
+      'bootstrap'
+    ])
+    expect(portAtBootstrap).toContain('<string>7000</string>')
+  })
+
   it('writes a valid port and refuses the range of another profile', async () => {
     makeProfile()
     makeProfile('Home')
@@ -346,6 +379,53 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
     expect(heal()).toBe('unchanged')
     expect(registry().profiles[0]).toMatchObject({ id: 'work', userDataPath: work.userDataPath })
     expect(calls).toEqual([])
+  })
+
+  it('keeps the registry and the unit on the original when a Finder copy starts', () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, `<string>${work.appPath}/Contents/Resources/bin</string>`)
+    const copy = join(dir, 'apps', 'Orca - Work copy.app')
+    execFileSync('/bin/cp', ['-R', work.appPath, copy])
+    const heal = (appPath: string) =>
+      healAppProfileAppPath({
+        root: join(dir, 'data'),
+        id: 'work',
+        appPath,
+        unitPath: unit.unitPath
+      })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(heal(copy)).toBe('unchanged')
+    // The original is gone, but two apps have the id: Orca does not guess.
+    renameSync(work.appPath, finderPath())
+    expect(heal(finderPath())).toBe('unchanged')
+    expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Work', appPath: work.appPath })
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${work.appPath}/Contents/Resources/bin</string>`
+    )
+    vi.mocked(console.warn).mockRestore()
+  })
+
+  it('tries the unit again at the next start when its write fails', () => {
+    const { work, unit } = renameInFinder()
+    const heal = () =>
+      healAppProfileAppPath({
+        root: join(dir, 'data'),
+        id: 'work',
+        appPath: finderPath(),
+        unitPath: unit.unitPath
+      })
+    chmodSync(unit.unitPath, 0o444)
+    try {
+      expect(heal).toThrow('EACCES')
+    } finally {
+      chmodSync(unit.unitPath, 0o644)
+    }
+    expect(registry().profiles[0].appPath).toBe(work.appPath)
+    expect(heal()).toBe('healed')
+    expect(readFileSync(unit.unitPath, 'utf8')).toBe(
+      `<string>${finderPath()}/Contents/Resources/bin</string>`
+    )
   })
 
   it('lists the renamed app by its embedded id before it starts', async () => {
