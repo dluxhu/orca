@@ -235,9 +235,7 @@ describe('Profiles menu refresh on activation', () => {
       startProfilesMenu(rebuild)
       await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(1))
       launchctl.mockClear()
-      const activate = appOn.mock.calls
-        .filter(([event]) => event === 'did-become-active')
-        .at(-1)?.[1]
+      const activate = appOn.mock.calls.findLast(([event]) => event === 'did-become-active')?.[1]
       activate()
       await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(2))
       expect(launchctl).not.toHaveBeenCalled()

@@ -49,7 +49,7 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
         description={description}
         checked={enabled}
         disabled={busy}
-        onChange={(next) => void change(next)}
+        onChange={() => void change(!enabled)}
       />
       {error ? (
         <p role="alert" className="px-4 pb-3 text-xs text-destructive">

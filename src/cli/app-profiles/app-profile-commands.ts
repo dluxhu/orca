@@ -11,7 +11,8 @@ import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cl
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
-import { removeAppProfile, renameAppProfile, setAppProfilePort } from './app-profile-edit'
+import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
+import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles } from './app-profile-list'
 
 const USAGE = `Usage:

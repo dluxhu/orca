@@ -2,6 +2,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type * as ChildProcess from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
@@ -36,7 +37,7 @@ vi.mock('electron', () => {
   }
 })
 vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof import('node:child_process')>()),
+  ...(await original<typeof ChildProcess>()),
   execFile: (file: string, args: string[], options: unknown, callback?: unknown) => {
     const done = (typeof options === 'function' ? options : callback) as (
       error: Error | null,

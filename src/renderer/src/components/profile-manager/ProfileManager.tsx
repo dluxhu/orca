@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Field } from './ProfileField'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
 import {
   appProfileIdError,
@@ -43,36 +43,6 @@ function newProfileName(t: Translate, taken: readonly string[]): string {
     name = t('profileManager.new.defaultNameNumbered', 'Orca - New Profile {{n}}', { n })
   }
   return name
-}
-
-function Field(props: {
-  /** Stable id part; the label is translated. */
-  name: string
-  label: string
-  value: string
-  onChange: (value: string) => void
-  error?: string | null
-  note?: string
-}): React.JSX.Element {
-  const id = `profile-field-${props.name}`
-  return (
-    <div className="flex flex-col gap-1">
-      <Label htmlFor={id}>{props.label}</Label>
-      <Input
-        id={id}
-        value={props.value}
-        aria-invalid={props.error ? true : undefined}
-        onChange={(event) => props.onChange(event.target.value)}
-      />
-      {props.error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {props.error}
-        </p>
-      ) : props.note ? (
-        <p className="text-xs text-muted-foreground">{props.note}</p>
-      ) : null}
-    </div>
-  )
 }
 
 export function ProfileManager(): React.JSX.Element {
