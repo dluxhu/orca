@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   applyMentionSuggestion,
   deriveComposerAutocomplete,
-  isSkillPickerTriggered
+  isSkillPickerTriggered,
+  removeMentionToken
 } from './native-chat-composer-autocomplete'
 import { botGroupMentions } from '../../../bots/bot-group-mentions'
 import { nativeChatRoomNameMatches } from '../native-chat-room-mentions'
@@ -147,6 +148,14 @@ describe('skill picker scope retention', () => {
     expect(items[0].name).toBe('deploy-000')
     expect(items[499].name).toBe('deploy-499')
     expect(items.some((item) => item.name === 'alpha-deploy')).toBe(false)
+  })
+})
+
+describe('removeMentionToken', () => {
+  it('deletes only the @ token before the caret', () => {
+    expect(removeMentionToken('ask @rel now', 8)).toEqual({ draft: 'ask  now', caret: 4 })
+    expect(removeMentionToken('@rel', 4)).toEqual({ draft: '', caret: 0 })
+    expect(removeMentionToken('mail a@b', 8)).toEqual({ draft: 'mail a@b', caret: 8 })
   })
 })
 
