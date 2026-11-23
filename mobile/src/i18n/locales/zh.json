@@ -357,6 +357,7 @@
     },
     "notice": {
       "compaction": "上下文压缩",
+      "compactionAutomatic": "上下文已自动压缩",
       "contextCleared": "上下文已清除",
       "plan": "计划",
       "stoppedManually": "已手动停止",

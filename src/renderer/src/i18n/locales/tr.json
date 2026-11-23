@@ -19575,6 +19575,7 @@
       "notices": {
         "contextCleared": "Bağlam temizlendi",
         "compaction": "Bağlam sıkıştırıldı",
+        "compactionAutomatic": "Bağlam otomatik olarak sıkıştırıldı",
         "details": "Ayrıntılar",
         "plan": "Plan",
         "historyRepaired": "Bu sohbetin geçmişinin bir bölümü yüklenemedi.",

@@ -3430,6 +3430,7 @@
     "notice": {
       "stoppedManually": "Stopped manually",
       "compaction": "Context compacted",
+      "compactionAutomatic": "Context compacted automatically",
       "contextCleared": "Context cleared",
       "plan": "Plan",
       "botCreated": "Bot created",

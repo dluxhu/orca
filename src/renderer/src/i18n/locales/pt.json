@@ -20709,6 +20709,7 @@
       },
       "notices": {
         "compaction": "Contexto compactado",
+        "compactionAutomatic": "Contexto compactado automaticamente",
         "details": "Detalhes",
         "plan": "Plano",
         "contextCleared": "Contexto limpo",

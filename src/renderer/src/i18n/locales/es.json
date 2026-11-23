@@ -19668,6 +19668,7 @@
       "notices": {
         "contextCleared": "Contexto borrado",
         "compaction": "Contexto compactado",
+        "compactionAutomatic": "Contexto compactado automáticamente",
         "details": "Detalles",
         "plan": "Plan",
         "historyRepaired": "No se pudo cargar parte del historial de este chat.",

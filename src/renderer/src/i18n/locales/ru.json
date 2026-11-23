@@ -20024,6 +20024,7 @@
       "notices": {
         "contextCleared": "Контекст очищен",
         "compaction": "Контекст сокращён",
+        "compactionAutomatic": "Контекст сокращён автоматически",
         "details": "Подробности",
         "plan": "План",
         "historyRepaired": "Часть истории этого чата не удалось загрузить.",

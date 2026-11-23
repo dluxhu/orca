@@ -336,6 +336,7 @@
     },
     "notice": {
       "compaction": "Bağlam sıkıştırıldı",
+      "compactionAutomatic": "Bağlam otomatik olarak sıkıştırıldı",
       "contextCleared": "Bağlam temizlendi",
       "plan": "Plan",
       "stoppedManually": "Elle durduruldu",
