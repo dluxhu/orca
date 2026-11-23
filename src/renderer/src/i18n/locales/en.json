@@ -21731,6 +21731,7 @@
         "senderReplaced": "{{name}} is no longer running in its terminal; another agent is running there now. Open that terminal from the sidebar if you need it.",
         "senderAmbiguous": "Orca can't tell which terminal {{name}} is running in. Open it from the sidebar.",
         "senderNotRunning": "{{name}} is no longer running. Start a new agent from the sidebar to continue its work.",
+        "hostNotConnected": "{{name}} is on a host this window is not connected to.",
         "unnamedSenderSubject": "An agent",
         "open": "Open {{name}}",
         "row": {
