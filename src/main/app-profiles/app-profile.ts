@@ -1,5 +1,6 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
 import { readFileSync, realpathSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
@@ -121,21 +122,27 @@ export function getAppProfile(): AppProfile | null {
   return resolved
 }
 
+let profileManagerApp: boolean | undefined
+
 /** True in the Profile Manager app, the nested bundle that the release build makes. */
 export function isProfileManagerApp(): boolean {
-  const plist =
-    process.platform === 'darwin' && process.versions.electron && !process.defaultApp
-      ? readOwnInfoPlist()
-      : null
-  return plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE
+  if (profileManagerApp === undefined) {
+    const plist =
+      process.platform === 'darwin' && process.versions.electron && !process.defaultApp
+        ? readOwnInfoPlist()
+        : null
+    profileManagerApp =
+      plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE
+  }
+  return profileManagerApp
 }
 
 /** The default app: this app, or the app that the links of a profile or the Profile Manager point into. */
-export function ownDefaultAppPath(): string {
+export async function ownDefaultAppPath(): Promise<string> {
   if (getAppProfile() === null && !isProfileManagerApp()) {
     return resolve(dirname(process.execPath), '..', '..')
   }
-  return resolve(realpathSync(join(process.resourcesPath, 'app.asar')), '..', '..', '..')
+  return resolve(await realpath(join(process.resourcesPath, 'app.asar')), '..', '..', '..')
 }
 
 /** The name and bundle id of the running app. Use it in place of the build-time FORK_IDENTITY. */

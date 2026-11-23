@@ -1,4 +1,3 @@
-import type * as ChildProcess from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import type * as Fs from 'node:fs'
 import { mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs'
@@ -7,11 +6,10 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, opened, openWindow } =
+const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, showManager } =
   vi.hoisted(() => ({
-    managerApp: { current: false, defaultApp: '' },
-    opened: [] as string[][],
-    openWindow: vi.fn(),
+    managerApp: { current: false },
+    showManager: vi.fn(async () => {}),
     appOn: vi.fn(),
     launchctl: vi.fn(async () => ({ code: 113, out: '' })),
     handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
@@ -36,16 +34,13 @@ vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({
   getAppProfile: () => profile.current,
   isProfileManagerApp: () => managerApp.current,
-  ownDefaultAppPath: () => managerApp.defaultApp
-}))
-vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof ChildProcess>()),
-  execFile: (file: string, args: string[]) => opened.push([file, ...args])
+  ownDefaultAppPath: async () => '/apps/Orca.app'
 }))
 vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
-  openProfileManagerWindow: openWindow
+  openApp: vi.fn(),
+  showProfileManager: showManager
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
   // One service read per list, as the real list does for each profile.
@@ -87,9 +82,7 @@ beforeEach(() => {
   isManager.current = true
   profile.current = null
   managerApp.current = false
-  managerApp.defaultApp = join(root, 'Orca.app')
-  opened.length = 0
-  openWindow.mockClear()
+  showManager.mockClear()
 })
 
 afterEach(() => {
@@ -273,30 +266,15 @@ describe('Profiles menu refresh on activation', () => {
 })
 
 describe('Profiles > Profile Manager…', () => {
-  const click = (): void => {
+  it('shows the Profile Manager', () => {
     const item = profilesMenuItems().at(-1)
     expect(item?.label).toBe('Profile Manager…')
-    ;(item?.click as () => void)()
-  }
-  const nestedApp = (): string =>
-    join(managerApp.defaultApp, 'Contents', 'Applications', 'Orca Profile Manager.app')
-
-  it('opens the Profile Manager app inside the default app, once', () => {
-    mkdirSync(nestedApp(), { recursive: true })
+    const click = item?.click as () => void
     click()
-    // Without -n, `open` brings a running Profile Manager to the front.
-    expect(opened).toEqual([['/usr/bin/open', '-a', nestedApp()]])
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(showManager).toHaveBeenCalledTimes(1)
   })
 
-  it("shows this app's own window when the build has no Profile Manager app (dev)", () => {
-    click()
-    expect(opened).toEqual([])
-    expect(openWindow).toHaveBeenCalledTimes(1)
-  })
-
-  it('shows its own window in the Profile Manager app, and checks no row', async () => {
-    mkdirSync(nestedApp(), { recursive: true })
+  it('checks no row in the Profile Manager app, which is no row', async () => {
     managerApp.current = true
     rows.current = [row('default', 'Orca', 'running'), row('work', 'Orca - Work', 'stopped')]
     const rebuild = vi.fn()
@@ -308,9 +286,6 @@ describe('Profiles > Profile Manager…', () => {
       undefined,
       undefined
     ])
-    click()
-    expect(opened).toEqual([])
-    expect(openWindow).toHaveBeenCalledTimes(1)
     expect((await readAppProfilesState()).currentId).toBeNull()
   })
 })

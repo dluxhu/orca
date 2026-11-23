@@ -2,22 +2,13 @@
 // See docs/fork/profiles-design.md, section 4. Changes run `orca profiles`, so the CLI and this
 // window share one writer of profiles.json.
 import { execFile } from 'node:child_process'
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  watch,
-  writeFileSync
-} from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import {
   APP_PROFILES_ROOT_ENV,
   appProfilesRoot,
-  profileManagerAppPath,
   readAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
 import type {
@@ -35,7 +26,7 @@ import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
-import { isProfileManagerRenderer, openProfileManagerWindow } from './profile-manager-window'
+import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
 /** The root of this app's profiles. A profile app with a test root keeps it. */
 function profilesRoot(): string {
@@ -60,7 +51,7 @@ export async function readAppProfilesState(
     env: profilesEnv(),
     serviceRun: options.serviceRun,
     // Used when there is no profiles.json yet.
-    defaultAppPath: ownDefaultAppPath(),
+    defaultAppPath: await ownDefaultAppPath(),
     // The default app's userData, as the CLI's getPlatformUserDataPath gives it on macOS.
     defaultUserDataPath:
       currentId === 'default' ? app.getPath('userData') : join(app.getPath('appData'), 'orca')
@@ -191,28 +182,6 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
     }
     void refreshProfilesMenu()
   }
-}
-
-/**
- * Opens the Profile Manager app, which `open` starts once and brings to the front after that.
- * This app's own window serves in the Manager app and where the build has no Manager app (dev).
- */
-export function showProfileManager(exists: (path: string) => boolean = existsSync): void {
-  const managerApp = profileManagerAppPath(ownDefaultAppPath())
-  if (isProfileManagerApp() || !exists(managerApp)) {
-    openProfileManagerWindow()
-    return
-  }
-  openApp(managerApp)
-}
-
-/** Brings the app to the front, or starts it. */
-function openApp(appPath: string): void {
-  execFile('/usr/bin/open', ['-a', appPath], (error) => {
-    if (error) {
-      console.warn('[profiles] open failed:', error.message)
-    }
-  })
 }
 
 export async function openAppProfile(id: string): Promise<AppProfileReply> {
@@ -351,7 +320,7 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
     ...(menuRows.length > 0 ? [{ type: 'separator' } as const] : []),
     {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
-      click: () => showProfileManager()
+      click: () => void showProfileManager()
     }
   ]
 }

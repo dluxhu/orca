@@ -62,7 +62,7 @@ vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({
   getAppProfile: () => null,
   isProfileManagerApp: () => false,
-  ownDefaultAppPath: () => '/apps/Orca.app'
+  ownDefaultAppPath: async () => '/apps/Orca.app'
 }))
 vi.mock('../window/security/privileged-window-navigation', () => ({
   installPrivilegedWindowNavigationPolicy: vi.fn()
