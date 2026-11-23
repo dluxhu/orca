@@ -1,8 +1,11 @@
-import { mkdtemp, realpath, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { adoptedTranscriptSourceObserver } from './adopted-transcript-source'
+import {
+  adoptedTranscriptSourceObserver,
+  resolveAdoptedTranscriptFolder
+} from './adopted-transcript-source'
 
 const SESSION = '0b7c1f2e-5d3a-4c8b-9e61-2f4a7d9c0e13'
 
@@ -49,5 +52,26 @@ describe('a Claude transcript adopted into a workspace', () => {
         details: { reason: 'transcriptUnreadable', otherFolder: true }
       }
     })
+  })
+
+  it('resolves this workspace at create when a later turn ran in it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'orca-adopted-file-'))
+    const filePath = join(dir, `${SESSION}.jsonl`)
+    const turn = (cwd: string) => JSON.stringify({ type: 'user', sessionId: SESSION, cwd })
+    // The workspace turn comes after the first read chunk, so an early stop misses it.
+    const filler = JSON.stringify({ type: 'assistant', sessionId: SESSION, text: 'x'.repeat(200) })
+    const lines = [turn('/workspace'), ...Array(1000).fill(filler), turn(workspace)]
+    await writeFile(filePath, `${lines.join('\n')}\n`)
+    try {
+      await expect(
+        resolveAdoptedTranscriptFolder({
+          agent: 'claude',
+          filePath,
+          source: { providerSessionId: SESSION, workspaceCwd: workspace }
+        })
+      ).resolves.toBe(workspace)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
