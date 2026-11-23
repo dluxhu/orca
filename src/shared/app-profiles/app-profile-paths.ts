@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import type { IconStyle } from '../icon-badger/badger'
 
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
@@ -24,6 +25,15 @@ export const PROFILE_MANAGER_USER_DATA = '.manager'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
+/** The source of the profile icon: a badge character, an uploaded badge image or an uploaded icon. */
+export type AppProfileIcon =
+  | { kind: 'badge'; text: string; style: IconStyle }
+  | { kind: 'image'; style: IconStyle }
+  | { kind: 'file' }
+
+/** A copy of the profile icon in the profile's userData, so the icon does not depend on the app. */
+export const APP_PROFILE_ICON_FILE = 'profile-icon.icns'
+
 export type AppProfileEntry = {
   id: string
   name: string
@@ -31,6 +41,7 @@ export type AppProfileEntry = {
   appPath: string
   userDataPath: string
   port: number
+  icon?: AppProfileIcon
   createdAt: number
 }
 

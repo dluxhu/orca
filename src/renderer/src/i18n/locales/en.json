@@ -30989,7 +30989,27 @@
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile."
     },
     "startAtLogin": "Start at login",
-    "defaultName": "Default"
+    "defaultName": "Default",
+    "icon": {
+      "label": "Icon",
+      "modeBadge": "Badge character",
+      "modeImage": "Badge image",
+      "modeFile": "Own icon",
+      "badge": "Badge character",
+      "badgeNote": "One letter, digit or emoji.",
+      "chooseImage": "Choose a badge image…",
+      "chooseFile": "Choose an icon file…",
+      "imageNote": "PNG, JPEG, WebP, SVG or ICNS.",
+      "fileNote": "ICNS or PNG, used as it is.",
+      "style": "Badge style",
+      "styleRefMatch": "Page curl",
+      "styleRefMatchBigger": "Page curl, bigger",
+      "previewAlt": "Preview of the icon",
+      "making": "Making the preview…",
+      "preview": "Preview",
+      "imageFiles": "Images",
+      "iconFiles": "Icons"
+    }
   },
   "activityBar": {
     "moveUp": "Move up",
