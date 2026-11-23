@@ -1443,7 +1443,12 @@
       "inlineBlameKeywordBlame": "blame",
       "inlineBlameKeywordGit": "git",
       "inlineBlameKeywordAuthor": "author",
-      "inlineBlameKeywordAnnotation": "annotation"
+      "inlineBlameKeywordAnnotation": "annotation",
+      "startAtLogin": {
+        "label": "Start at login",
+        "description": "Runs this profile's server from login, also when Orca is closed, so your other devices can connect.",
+        "error": "Start at login did not change: {{message}}"
+      }
     },
     "openInApp": {
       "preset": {
@@ -2032,7 +2037,12 @@
     "toggleFullScreen": "Toggle Full Screen",
     "undo": "Undo",
     "unhide": "Show All",
-    "zoom": "Zoom"
+    "zoom": "Zoom",
+    "profiles": "Profiles",
+    "profileManager": "Profile Manager…",
+    "profileRunning": "Running",
+    "profileBackground": "Running in background",
+    "profileDefault": "Default"
   },
   "tray": {
     "openOrca": "Open Orca",
@@ -30923,6 +30933,63 @@
       "workerOwed": "An orchestration still waits on this chat",
       "home": "A managed agent's Home Chat can't be deleted"
     }
+  },
+  "profileManager": {
+    "title": "Orca Profile Manager",
+    "macOnly": "Profiles are only on macOS.",
+    "heading": "Profiles",
+    "intro": "Each profile is its own Mac app with its own windows, Dock icon, sign-ins and chats.",
+    "list": "Your profiles",
+    "thisApp": " · this app",
+    "open": "Open",
+    "state": {
+      "running": "Running",
+      "background": "Running in background",
+      "stopped": "Stopped"
+    },
+    "field": {
+      "name": "App name",
+      "nameNote": "Shown in the Dock, the menu bar and notifications.",
+      "id": "Profile id",
+      "idNote": "The data folder and the bundle id use it. It does not change later.",
+      "idKept": "A data folder for \"{{id}}\" exists. The new profile uses that data.",
+      "port": "Server port"
+    },
+    "new": {
+      "title": "New profile",
+      "copySettings": "Copy settings from this app",
+      "create": "Create profile",
+      "defaultName": "Orca - New Profile",
+      "defaultNameNumbered": "Orca - New Profile {{n}}"
+    },
+    "edit": {
+      "button": "Edit",
+      "label": "Edit profile",
+      "title": "Edit {{name}}",
+      "nameNote": "The id and the data stay. Quit the profile first.",
+      "save": "Save"
+    },
+    "remove": {
+      "button": "Remove",
+      "buttonLabel": "Remove {{name}}",
+      "label": "Remove profile",
+      "title": "Remove {{name}}?",
+      "note": "Orca moves the app to the Trash. Quit the profile first.",
+      "keepData": "Keep data (a new profile with the id \"{{id}}\" gets it back)",
+      "confirm": "Remove profile"
+    },
+    "cancel": "Cancel",
+    "rule": {
+      "idPattern": "Use 1 to 32 letters, digits and -, with a letter or digit first.",
+      "idReserved": "The id \"{{id}}\" is reserved.",
+      "idTaken": "A profile with the id \"{{id}}\" exists.",
+      "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
+      "nameTaken": "A profile with the name \"{{name}}\" exists.",
+      "portRange": "The port must be 1024 to 65535: {{port}}",
+      "portClash": "The port {{port}} is inside the port range of the default app or of another profile."
+    },
+    "startAtLogin": "Start at login",
+    "defaultName": "Default"
   },
   "activityBar": {
     "moveUp": "Move up",
