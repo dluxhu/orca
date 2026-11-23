@@ -2,14 +2,16 @@
 // See docs/fork/profiles-design.md, section 4. Changes run `orca profiles`, so the CLI and this
 // window share one writer of profiles.json.
 import { execFile } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs'
+import { mkdirSync, watch } from 'node:fs'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
 import {
+  APP_PROFILE_MARKER,
   APP_PROFILES_ROOT_ENV,
   appProfilesRoot,
-  readAppProfileMarker
+  parseAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
 import type {
   AppProfileChange,
@@ -57,18 +59,21 @@ export async function readAppProfilesState(
       currentId === 'default' ? app.getPath('userData') : join(app.getPath('appData'), 'orca')
   })
   const taken = new Set(rows.map((row) => row.id.toLowerCase()))
-  let keptIds: string[] = []
-  try {
-    // Ids ignore case, as appProfileIdError does.
-    keptIds = readdirSync(profilesRoot()).flatMap((name) => {
-      const marker = readAppProfileMarker(join(profilesRoot(), name))
-      return marker && marker.toLowerCase() === name.toLowerCase() && !taken.has(name.toLowerCase())
-        ? [marker]
-        : []
-    })
-  } catch {
-    // No root yet: no kept data.
-  }
+  const root = profilesRoot()
+  // No root yet: no kept data.
+  const names = await readdir(root).catch(() => [])
+  const markers = await Promise.all(
+    names.map((name) =>
+      readFile(join(root, name, APP_PROFILE_MARKER), 'utf8').then(parseAppProfileMarker, () => null)
+    )
+  )
+  // Ids ignore case, as appProfileIdError does.
+  const keptIds = markers.filter(
+    (marker, index): marker is string =>
+      marker !== null &&
+      marker.toLowerCase() === names[index].toLowerCase() &&
+      !taken.has(marker.toLowerCase())
+  )
   return { rows, currentId, keptIds }
 }
 
@@ -155,9 +160,9 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   try {
     let settingsFile: string | undefined
     if (change.kind === 'create' && change.copySettings && state.store) {
-      settingsDir = mkdtempSync(join(tmpdir(), 'orca-profile-settings-'))
+      settingsDir = await mkdtemp(join(tmpdir(), 'orca-profile-settings-'))
       settingsFile = join(settingsDir, 'settings.json')
-      writeFileSync(settingsFile, JSON.stringify(state.store.getSettings()), { mode: 0o600 })
+      await writeFile(settingsFile, JSON.stringify(state.store.getSettings()), { mode: 0o600 })
     }
     // A test root must stick in the new bundle, so that a Dock launch finds it.
     const pinRoot = profilesRoot() !== appProfilesRoot({})
@@ -178,7 +183,7 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
     return await runCli(profileCommandArgs(change, { settingsFile, pinRoot, service }))
   } finally {
     if (settingsDir) {
-      rmSync(settingsDir, { recursive: true, force: true })
+      await rm(settingsDir, { recursive: true, force: true })
     }
     void refreshProfilesMenu()
   }

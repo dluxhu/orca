@@ -1383,10 +1383,10 @@
 2 src/main/startup/main-process-observers.ts
 1 src/main/startup/main-process-preflight-failure.ts
 25 src/main/startup/main-process-preflight.ts
-15 src/main/startup/main-process-ready-foundation.ts
+16 src/main/startup/main-process-ready-foundation.ts # +1 app profiles (fork): the settings seed, once at ready
 3 src/main/startup/main-process-ready-runtime.ts
 4 src/main/startup/main-process-ready.ts
-1 src/main/startup/main-window/main-process-i18n-menu.ts
+2 src/main/startup/main-window/main-process-i18n-menu.ts # +1 app profiles (fork): startProfilesMenu, one mkdir at menu start
 15 src/main/startup/main-window/main-window-controller.ts
 4 src/main/startup/main-window/main-window-core-services.ts
 1 src/main/startup/native-setting-subscriptions.ts # HTTP/1 marker write moved here from main-process-ready-foundation.ts (settings change only)
