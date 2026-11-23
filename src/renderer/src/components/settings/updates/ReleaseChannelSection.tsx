@@ -29,11 +29,12 @@ import {
   type ReleaseChannel
 } from '../../../../../shared/updater/release-channel'
 
+// Fork patch: Stable and Daily describe the fork's Stable and Nightly apps.
 const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, (t: Translate) => string> = {
   stable: (t) =>
     t(
       'auto.components.settings.ReleaseChannelSection.stableDescription',
-      'Stable releases for general use.'
+      'Orca @dLux releases: the fork patches on the newest upstream stable release.'
     ),
   rc: (t) =>
     t(
@@ -48,7 +49,7 @@ const CHANNEL_DESCRIPTIONS: Record<ReleaseChannel, (t: Translate) => string> = {
   daily: (t) =>
     t(
       'auto.components.settings.ReleaseChannelSection.dailyDescription',
-      'Built once a day from main.'
+      'macOS only. Orca @dLux Nightly: the fork patches on an upstream daily build. A separate app with its own profile.'
     ),
   adhoc: (t) =>
     t(
@@ -158,7 +159,7 @@ export function ReleaseChannelSection(): React.JSX.Element {
   }
 
   const isRunningBuild = selectedBuild?.version === appVersion
-  // Signed Windows builds reject unsigned dev installers through publisher validation; entry to dev requires manual download, while returns work normally.
+  // Fork patch: every pick installs by hand, except a stable build in the stable app.
   const needsManualInstall = requiresManualDevChannelInstall({
     platform,
     runningChannel,
@@ -242,10 +243,15 @@ export function ReleaseChannelSection(): React.JSX.Element {
                   'auto.components.settings.ReleaseChannelSection.adhocWarning',
                   'Windows builds are unsigned. The author may stop maintaining a build, so keep a stable build handy.'
                 )
-              : t(
-                  'auto.components.settings.ReleaseChannelSection.scheduledWarning',
-                  'These builds ship with no test gate. Windows builds are unsigned. Keep a stable build handy.'
-                )}
+              : activeChannel === 'daily'
+                ? t(
+                    'auto.components.settings.ReleaseChannelSection.dailyWarning',
+                    'Nightly builds have fewer tests than stable releases. Nightly is a separate app: it installs beside Orca @dLux and does not replace it.'
+                  )
+                : t(
+                    'auto.components.settings.ReleaseChannelSection.scheduledWarning',
+                    'These builds ship with no test gate. Windows builds are unsigned. Keep a stable build handy.'
+                  )}
           </p>
         </div>
       ) : null}
@@ -331,11 +337,8 @@ export function ReleaseChannelSection(): React.JSX.Element {
           <p className="text-xs text-muted-foreground">
             {t(
               'auto.components.settings.ReleaseChannelSection.manualInstallHint',
-              '{{value0}} builds are unsigned on Windows, so the in-app updater cannot install one over a signed build. Run the downloaded installer once — Windows will warn about an unknown publisher — and every later switch, including back to {{stable}}, works from here.',
-              {
-                value0: getReleaseChannelLabel(activeChannel, t),
-                stable: getReleaseChannelLabel('stable', t)
-              }
+              '{{value0}} builds install by hand: open the downloaded disk image and move the app to Applications. Stable and Nightly are separate apps. Each app updates itself only to newer builds of its own channel.',
+              { value0: getReleaseChannelLabel(activeChannel, t) }
             )}
           </p>
         ) : isRunningBuild ? (
