@@ -1,7 +1,4 @@
-import {
-  defaultAgentHomeDir,
-  isAppProfileHomeValue
-} from '../../../../shared/app-profiles/app-profile-homes'
+import { defaultAgentHomeDir } from '../../../../shared/app-profiles/app-profile-homes'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -41,9 +38,8 @@ export function claudeConfigDirEnvPatch(
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
   const resolved = accountHome.trim()
-  const fallback = defaultClaudeConfigDir(env)
-  // A child env can drop a profile's folder. Without the variable, the CLI uses ~/.claude.
-  const cliDefault = isAppProfileHomeValue(fallback) ? join(homedir(), '.claude') : fallback
+  // The folder the CLI uses with this env. Without the variable it is ~/.claude, also in a profile.
+  const cliDefault = env.CLAUDE_CONFIG_DIR?.trim() || join(homedir(), '.claude')
   if (!resolved || samePath(resolved, cliDefault, platform)) {
     return {}
   }
