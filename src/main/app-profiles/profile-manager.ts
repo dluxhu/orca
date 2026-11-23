@@ -200,11 +200,10 @@ export function registerProfileManagerIpc(): void {
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
   ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
-  ipcMain.handle(
-    'appProfiles:chooseIconFile',
-    fromProfileManager(async (kind: unknown) =>
-      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image')
-    )
+  ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
+    fromProfileManager(async () =>
+      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
+    )(event)
   )
   // Settings in the main window changes only this app's own profile.
   const fromSettings =

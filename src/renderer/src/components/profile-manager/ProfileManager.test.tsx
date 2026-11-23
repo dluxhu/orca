@@ -132,6 +132,32 @@ describe('ProfileManager', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('one visible character')
   })
 
+  it("keeps the row's own badge in an edit: a rename sends no set-icon", async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: 'W', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    expect(field('Badge character').value).toBe('W')
+    type('App name', 'Orca - Job')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
+  })
+
+  it("offers the profile's own badge again in an edit: it is not taken", async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Badge image' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Badge character' }))
+    expect(field('Badge character').value).toBe('2')
+  })
+
   it('sends no set-icon when an edit keeps the icon', async () => {
     render(<ProfileManager />)
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))

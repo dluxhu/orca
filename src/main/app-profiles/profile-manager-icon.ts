@@ -1,6 +1,6 @@
 // The icon parts of the Profile Manager: the preview and the file choice.
 // See docs/fork/profiles-design.md, section 8.
-import { dialog } from 'electron'
+import { BrowserWindow, dialog, type WebContents } from 'electron'
 import type {
   AppProfileIconSource,
   AppProfileReply
@@ -27,8 +27,11 @@ export function previewAppProfileIcon(
 }
 
 /** The path of a badge image or of an icon file that the user chooses, or null. */
-export async function chooseAppProfileIconFile(kind: 'image' | 'file'): Promise<string | null> {
-  const result = await dialog.showOpenDialog({
+export async function chooseAppProfileIconFile(
+  kind: 'image' | 'file',
+  sender: WebContents
+): Promise<string | null> {
+  const options: Electron.OpenDialogOptions = {
     properties: ['openFile'],
     filters: [
       kind === 'image'
@@ -41,6 +44,11 @@ export async function chooseAppProfileIconFile(kind: 'image' | 'file'): Promise<
             extensions: ['icns', 'png']
           }
     ]
-  })
+  }
+  // A sheet on the Profile Manager window, so it does not hide behind it.
+  const parent = BrowserWindow.fromWebContents(sender)
+  const result = await (parent
+    ? dialog.showOpenDialog(parent, options)
+    : dialog.showOpenDialog(options))
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }

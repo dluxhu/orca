@@ -562,8 +562,8 @@ So:
 | Character badge (text to image) | **AppKit through `osascript -l JavaScript`** (`NSString` drawing, heavy system font, 1024 px sRGB bitmap) | Text needs a font rasterizer. AppKit has one, with emoji, and the CLI has no Chromium. |
 | Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `NSImage` in the same AppKit script | AppKit decodes all four. SVG needs no cairo. |
 | Decode an uploaded ICNS icon | used as it is; the default app's `.icns` is read by its largest PNG entry, else by `NSImage` | No conversion needed. |
-| Encode PNG | a small writer on `node:zlib` (`src/main/app-profiles/app-profile-icon.ts`) | Runs in the CLI and in main. |
-| Live preview | `makeAppProfileIcon` in main; the preview is the largest PNG of its `.icns` | One code path for the CLI, the preview and the output. |
+| Encode PNG | a small writer on `node:zlib` (`src/main/app-profiles/app-profile-icns.ts`) | Runs in the CLI and in main. |
+| Live preview | `orca profiles icon-preview` in a child process of main (`makeAppProfileIcon`, then the largest PNG of its `.icns`) | One code path for the CLI, the preview and the output. No window stops while the icon is made. |
 
 Do not use Canvas 2D drawing (`filter: blur()`, `drawImage` scaling, path fill) inside the core.
 Their anti-aliasing and blur differ from Pillow, and they can differ between GPU and CPU. The core

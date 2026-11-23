@@ -1,6 +1,16 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-const created = vi.hoisted(() => ({ options: [] as unknown[] }))
+const created = vi.hoisted(() => ({ options: [] as unknown[], used: [] as unknown[] }))
+vi.mock('../../main/app-profiles/app-profile-icon', async (original) => ({
+  ...(await original<object>()),
+  makeAppProfileIcon: (_app: string, _source: unknown, used: unknown) => {
+    created.used.push(used)
+    return { icns: Buffer.alloc(0), icon: { kind: 'badge', text: '2', style: 'ref-match' } }
+  }
+}))
 vi.mock('./app-profile-create', async (original) => ({
   ...(await original<object>()),
   createAppProfile: (options: unknown) => {
@@ -55,5 +65,28 @@ describe.skipIf(process.platform !== 'darwin')('orca profiles create', () => {
       defaultAppPath: '/Apps/Orca.app',
       icon: { kind: 'image', path: '/x/logo.svg', style: 'ref-match-bigger' }
     })
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('orca profiles icon-preview', () => {
+  it('treats the badge of the --id profile as free', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'orca-icon-preview-'))
+    const badge = (text: string) => ({ kind: 'badge', text, style: 'ref-match' })
+    const profile = (id: string, text: string) => ({ id, name: id, icon: badge(text) })
+    writeFileSync(
+      join(root, 'profiles.json'),
+      JSON.stringify({
+        version: 1,
+        defaultAppPath: '/Apps/Orca.app',
+        profiles: [profile('work', '2'), profile('home', '3')]
+      })
+    )
+    vi.stubEnv('ORCA_PROFILES_ROOT', root)
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    await runProfilesCommand(['icon-preview', '--id', 'work', '--json'])
+    write.mockRestore()
+    vi.unstubAllEnvs()
+    rmSync(root, { recursive: true, force: true })
+    expect(created.used.at(-1)).toEqual([badge('3')])
   })
 })
