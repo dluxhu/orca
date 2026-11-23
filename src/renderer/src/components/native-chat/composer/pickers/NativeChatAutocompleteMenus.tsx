@@ -26,6 +26,8 @@ import {
 } from './NativeChatPickerParts'
 import { NativeChatMentionChatList } from './NativeChatMentionChatList'
 import { cn } from '@/lib/class-names'
+import { NativeChatMentionLabel } from './NativeChatMentionLabel'
+import { nativeChatMentionSessionOf } from './native-chat-mentions'
 import { localizeSlashCommandDescription } from './native-chat-slash-command-descriptions'
 import { nativeChatPickerEmptyText } from './native-chat-picker-empty-text'
 
@@ -292,7 +294,8 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
           : room?.withFiles && room.unavailable.length > 0
             ? null
             : nativeChatMentionEmptyText(room !== null, room?.query)
-  // The room's bots lead, then this chat's crew agents, then files, each under its heading.
+  // The room's bots lead, then this chat's crew agents, then other chats and terminals, then files,
+  // each under its heading.
   const { bots, agentCount, listed } = groupNativeChatMentionValues(
     files,
     room?.mentions,
@@ -305,7 +308,11 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
   // Paused bots are listed in the Bots group too, so they keep its heading when no other bot matches.
   const pausedListed = grouped && (room?.unavailable.length ?? 0) > 0
   const headed = grouped || agentCount > 0
+  const sessionOf = (value: string) => nativeChatMentionSessionOf(mention.sessions, value)
+  const sessionEnd = files.findIndex((value, index) => index >= listed && sessionOf(value) === null)
+  const sessions = (sessionEnd === -1 ? files.length : sessionEnd) - listed
   const option = (path: string, index: number) => {
+    const session = sessionOf(path)
     const member = room ? memberOf(path) : undefined
     const selected = index === selectedIndex
     const opens = member?.id && chats?.picker.offers(member.id) ? member.id : null
@@ -322,11 +329,15 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
         // Room for the Chats action; important, as the row's own px-2 comes later in the CSS.
         className={cn(member && 'items-center', opens && '!pr-20')}
       >
-        <NativeChatMentionOption
-          value={path}
-          member={member}
-          match={room ? matchOf(path) : undefined}
-        />
+        {session ? (
+          <NativeChatMentionLabel item={session} />
+        ) : (
+          <NativeChatMentionOption
+            value={path}
+            member={member}
+            match={room ? matchOf(path) : undefined}
+          />
+        )}
         {opens ? (
           <span className="sr-only">
             {t('components.native-chat.composer.chatsHint', 'Right arrow for chats')}
@@ -372,9 +383,15 @@ export const NativeChatMentionMenu = memo(function NativeChatMentionMenu({
       <div className="flex flex-col gap-0.5">
         {files.slice(bots, listed).map((path, index) => option(path, index + bots))}
       </div>
-      {headed && files.length > listed ? <PickerGroupHeading kind="files" /> : null}
+      {headed && sessions > 0 ? <PickerGroupHeading kind="sessions" /> : null}
       <div className="flex flex-col gap-0.5">
-        {files.slice(listed).map((path, index) => option(path, index + listed))}
+        {files.slice(listed, listed + sessions).map((path, index) => option(path, index + listed))}
+      </div>
+      {headed && files.length > listed + sessions ? <PickerGroupHeading kind="files" /> : null}
+      <div className="flex flex-col gap-0.5">
+        {files
+          .slice(listed + sessions)
+          .map((path, index) => option(path, index + listed + sessions))}
       </div>
       {statusText ? (
         <PickerStatus>

@@ -5,19 +5,58 @@ import {
   type Editor,
   type NodeViewProps
 } from '@tiptap/react'
-import { Users } from 'lucide-react'
+import { MessageSquare, SquareTerminal, Users } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
 import { AgentTypeIcon } from '@/components/agent/icons/agent-type-icon'
 import { NativeChatPromptPill } from './NativeChatPromptPill'
 import {
   agentReferenceToken,
+  isAgentReferenceKind,
+  type AgentReferenceKind,
   type OrchestrationAgentReference
 } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import { closeHistory } from '@tiptap/pm/history'
+import { promptTextPosition } from './native-chat-prompt-document'
+
+/** A chat or terminal chip says its kind to a screen reader; an orchestration chip says "Agent". */
+export function AgentReferencePillContent({
+  label,
+  kind,
+  agentType = '',
+  selected
+}: {
+  label: string
+  kind: AgentReferenceKind | null
+  /** The agent's logo, where the chip was picked from a list that knows it. */
+  agentType?: string
+  selected: boolean
+}): React.JSX.Element {
+  const t = useTranslate()
+  const icon = kind === 'chat' ? MessageSquare : kind ? SquareTerminal : Users
+  const spokenLabel =
+    kind === 'chat'
+      ? t('components.native-chat.composer.chatPillLabel', 'Chat: {{name}}', { name: label })
+      : kind
+        ? t('components.native-chat.composer.terminalPillLabel', 'Terminal: {{name}}', {
+            name: label
+          })
+        : t('components.native-chat.composer.agentPillLabel', 'Agent: {{name}}', { name: label })
+  return (
+    <NativeChatPromptPill
+      icon={icon}
+      // Older drafts keep the generic icon.
+      avatar={
+        agentType ? <AgentTypeIcon agentType={agentType} size={12} className="size-3" /> : undefined
+      }
+      label={label}
+      spokenLabel={spokenLabel}
+      selected={selected}
+    />
+  )
+}
 
 function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Element {
-  const t = useTranslate()
-  const label = String(node.attrs.label)
+  const { kind } = node.attrs
   const agentType = String(node.attrs.agentType ?? '')
   return (
     <NodeViewWrapper
@@ -26,18 +65,10 @@ function AgentReferencePill({ node, selected }: NodeViewProps): React.JSX.Elemen
       contentEditable={false}
       data-native-chat-agent-reference={node.attrs.address}
     >
-      <NativeChatPromptPill
-        icon={Users}
-        // The agent's logo where it was picked from a list that knows it; older drafts keep the generic icon.
-        avatar={
-          agentType ? (
-            <AgentTypeIcon agentType={agentType} size={12} className="size-3" />
-          ) : undefined
-        }
-        label={label}
-        spokenLabel={t('components.native-chat.composer.agentPillLabel', 'Agent: {{name}}', {
-          name: label
-        })}
+      <AgentReferencePillContent
+        label={String(node.attrs.label)}
+        kind={isAgentReferenceKind(kind) ? kind : null}
+        agentType={agentType}
         selected={selected}
       />
     </NodeViewWrapper>
@@ -54,6 +85,7 @@ export const NativeChatAgentReference = Node.create({
     label: { default: '' },
     address: { default: '' },
     hostKey: { default: '' },
+    kind: { default: null },
     agentType: { default: '' }
   }),
   addNodeView: () => ReactNodeViewRenderer(AgentReferencePill),
@@ -70,13 +102,17 @@ export const NativeChatAgentReference = Node.create({
   ]
 })
 
-/** A draft holds each agent once: references already in it, or repeated in the list, are skipped. */
+/**
+ * A draft holds each agent once: references already in it, or repeated in the list, are skipped.
+ * `replace` is a text range (an `@` token) that the chips take the place of, only when one is inserted.
+ */
 export function insertAgentReferences(
   editor: Editor,
-  candidates: OrchestrationAgentReference[]
-): void {
+  candidates: OrchestrationAgentReference[],
+  replace?: { from: number; to: number }
+): boolean {
   if (!editor.isEditable) {
-    return
+    return false
   }
   const present = new Set<string>()
   editor.state.doc.descendants((node) => {
@@ -89,7 +125,14 @@ export function insertAgentReferences(
     return !present.has(key) && Boolean(present.add(key))
   })
   if (references.length === 0) {
-    return
+    return false
+  }
+  if (replace) {
+    const { doc } = editor.state
+    editor.commands.setTextSelection({
+      from: promptTextPosition(doc, replace.from),
+      to: promptTextPosition(doc, replace.to)
+    })
   }
   const { $to } = editor.state.selection
   const nextNode = $to.nodeAfter
@@ -107,4 +150,5 @@ export function insertAgentReferences(
     ])
   )
   editor.view.dispatch(closeHistory(editor.state.tr))
+  return true
 }
