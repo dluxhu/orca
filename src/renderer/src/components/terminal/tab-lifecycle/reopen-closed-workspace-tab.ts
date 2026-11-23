@@ -1,4 +1,4 @@
-import { isViewEntry } from '@/store/slices/ui/workspace-navigation-history'
+import { historyEntryWorkspaceId } from '@/store/slices/ui/workspace-navigation-history'
 import { useAppStore } from '@/store'
 import { activateAndRevealWorkspace } from '@/lib/workspace/activation/worktree-activation'
 
@@ -7,7 +7,7 @@ export function reopenClosedWorkspaceTab(activeWorktreeId: string | null): void 
   // Closing the last tab lands on welcome without discarding the workspace navigation entry.
   const previous = state.worktreeNavHistory[state.worktreeNavHistoryIndex]
   const worktreeId =
-    activeWorktreeId ?? (typeof previous === 'string' && !isViewEntry(previous) ? previous : null)
+    activeWorktreeId ?? (previous === undefined ? null : historyEntryWorkspaceId(previous))
   if (!worktreeId || !state.reopenClosedTab(worktreeId)) {
     return
   }
