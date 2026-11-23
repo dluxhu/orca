@@ -373,7 +373,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
 
   it('refuses when the app starts while the icon is made', () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
-    const starting = ((...args: Parameters<typeof makeIcon>) => {
+    const starting = ((...args: unknown[]) => {
       writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
       return (makeIcon as (...a: unknown[]) => unknown)(...args)
     }) as never

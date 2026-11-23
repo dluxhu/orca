@@ -83,7 +83,7 @@ export function setAppProfileIcon(
     const plist = readFileSync(join(contents, 'Info.plist'), 'utf8')
     const iconPath = join(contents, 'Resources', appIconFileName(plist))
     // A profile made before icons has a link to the default app's icon.
-    const old = lstatSync(iconPath).isSymbolicLink()
+    const old: { link: string } | { bytes: Buffer } = lstatSync(iconPath).isSymbolicLink()
       ? { link: readlinkSync(iconPath) }
       : { bytes: readFileSync(iconPath) }
     const temporary = mkdtempSync(join(tmpdir(), 'orca-profile-icon-'))
