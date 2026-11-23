@@ -1,17 +1,22 @@
+import type * as ChildProcess from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl } = vi.hoisted(() => ({
-  appOn: vi.fn(),
-  launchctl: vi.fn(async () => ({ code: 113, out: '' })),
-  handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
-  rows: { current: [] as AppProfileRow[] },
-  isManager: { current: true },
-  profile: { current: null as { id: string; userDataPath: string } | null }
-}))
+const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, opened, openWindow } =
+  vi.hoisted(() => ({
+    managerApp: { current: false, defaultApp: '' },
+    opened: [] as string[][],
+    openWindow: vi.fn(),
+    appOn: vi.fn(),
+    launchctl: vi.fn(async () => ({ code: 113, out: '' })),
+    handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
+    rows: { current: [] as AppProfileRow[] },
+    isManager: { current: true },
+    profile: { current: null as { id: string; userDataPath: string } | null }
+  }))
 
 vi.mock('electron', () => ({
   app: { isPackaged: true, getPath: () => '/default-data', on: appOn },
@@ -22,11 +27,19 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
-vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
+vi.mock('./app-profile', () => ({
+  getAppProfile: () => profile.current,
+  isProfileManagerApp: () => managerApp.current,
+  ownDefaultAppPath: () => managerApp.defaultApp
+}))
+vi.mock('node:child_process', async (original) => ({
+  ...(await original<typeof ChildProcess>()),
+  execFile: (file: string, args: string[]) => opened.push([file, ...args])
+}))
 vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
-  openProfileManagerWindow: vi.fn()
+  openProfileManagerWindow: openWindow
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
   // One service read per list, as the real list does for each profile.
@@ -67,6 +80,10 @@ beforeEach(() => {
   rows.current = [row('default', 'Orca', 'running')]
   isManager.current = true
   profile.current = null
+  managerApp.current = false
+  managerApp.defaultApp = join(root, 'Orca.app')
+  opened.length = 0
+  openWindow.mockClear()
 })
 
 afterEach(() => {
@@ -246,5 +263,48 @@ describe('Profiles menu refresh on activation', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('Profiles > Profile Manager…', () => {
+  const click = (): void => {
+    const item = profilesMenuItems().at(-1)
+    expect(item?.label).toBe('Profile Manager…')
+    ;(item?.click as () => void)()
+  }
+  const nestedApp = (): string =>
+    join(managerApp.defaultApp, 'Contents', 'Applications', 'Orca Profile Manager.app')
+
+  it('opens the Profile Manager app inside the default app, once', () => {
+    mkdirSync(nestedApp(), { recursive: true })
+    click()
+    // Without -n, `open` brings a running Profile Manager to the front.
+    expect(opened).toEqual([['/usr/bin/open', '-a', nestedApp()]])
+    expect(openWindow).not.toHaveBeenCalled()
+  })
+
+  it("shows this app's own window when the build has no Profile Manager app (dev)", () => {
+    click()
+    expect(opened).toEqual([])
+    expect(openWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows its own window in the Profile Manager app, and checks no row', async () => {
+    mkdirSync(nestedApp(), { recursive: true })
+    managerApp.current = true
+    rows.current = [row('default', 'Orca', 'running'), row('work', 'Orca - Work', 'stopped')]
+    const rebuild = vi.fn()
+    startProfilesMenu(rebuild)
+    await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
+    expect(profilesMenuItems().map((item) => item.checked)).toEqual([
+      false,
+      false,
+      undefined,
+      undefined
+    ])
+    click()
+    expect(opened).toEqual([])
+    expect(openWindow).toHaveBeenCalledTimes(1)
+    expect((await readAppProfilesState()).currentId).toBeNull()
   })
 })

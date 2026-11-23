@@ -21,9 +21,11 @@ import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILE_SETTINGS_SEED,
+  APP_ROLE_PLIST_KEY,
   appProfilesAppsDir,
   appProfilesRoot,
   ensureAppProfileMarker,
+  PROFILE_MANAGER_ROLE,
   readAppProfileMarker,
   readAppProfileRegistry,
   readPlistString,
@@ -283,10 +285,16 @@ function keptDataFolderId(
   return keptId
 }
 
-/** A profile's `orca` runs in the profile app; its app.asar link points into the default app. */
+/**
+ * A profile's `orca` runs in the profile app, and the Profile Manager's in the Manager app. Their
+ * app.asar link points into the default app.
+ */
 export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
-  if (readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null) {
+  if (
+    readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null &&
+    readPlistString(plist, APP_ROLE_PLIST_KEY) !== PROFILE_MANAGER_ROLE
+  ) {
     return appPath
   }
   return resolve(realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar')), '..', '..', '..')

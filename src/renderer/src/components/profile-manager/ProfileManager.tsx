@@ -172,16 +172,19 @@ export function ProfileManager(): React.JSX.Element {
           onChange={(port) => setForm({ ...form, port })}
         />
         {/* Hook point: the icon picker of the profile icons work goes here. */}
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="profile-copy-settings"
-            checked={form.copySettings}
-            onCheckedChange={(checked) => setForm({ ...form, copySettings: checked === true })}
-          />
-          <Label htmlFor="profile-copy-settings">
-            {t('profileManager.new.copySettings', 'Copy settings from this app')}
-          </Label>
-        </div>
+        {/* The Profile Manager app has no settings of its own to copy. */}
+        {state?.currentId === null ? null : (
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="profile-copy-settings"
+              checked={form.copySettings}
+              onCheckedChange={(checked) => setForm({ ...form, copySettings: checked === true })}
+            />
+            <Label htmlFor="profile-copy-settings">
+              {t('profileManager.new.copySettings', 'Copy settings from this app')}
+            </Label>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button
             disabled={busy || Boolean(nameError ?? idError ?? portError)}
