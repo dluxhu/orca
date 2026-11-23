@@ -640,18 +640,22 @@ notice of dock-icon-badger in the ported files.
 
 ## 9. Ids, rename and remove
 
-**Automatic id** (from the name):
+**The id is the user's** (owner, 2026-11-22). It gives the profile a fixed data path, and a
+profile that the user removes with "Keep data" and creates again with the same id gets its old data
+back. The create form and `orca profiles create --id` set it. Without `--id`, the CLI makes it from
+the name; the form shows the same value and the user can change it.
 
-1. Remove the word "Orca" (any case) and a leading "-".
-2. Change each character that is not `A-Z a-z 0-9` to a space.
-3. Trim, change to lower case, and join the words with `_`. "Orca - New Profile" becomes `new_profile`.
-4. An empty result becomes `profile`. An id in use gets `_2`, `_3`, and so on.
+**Id from the name:**
 
-The automatic id is always lower case.
+1. Remove the word "Orca" (any case).
+2. Change each run of characters that are not `a-z 0-9` (after lower case) to one `-`.
+3. Trim `-` at the two ends. An empty result becomes `profile`.
 
-**Edited id.** The user can edit the id in the create dialog.
+"Orca - New Profile" becomes `new-profile`. A bundle id cannot contain `_`, so ids use `-`.
 
-- Pattern `^[A-Za-z0-9][A-Za-z0-9_]{0,31}$`. An edited id keeps the case that the user types.
+**Id rules.**
+
+- Pattern `^[A-Za-z0-9][A-Za-z0-9-]{0,31}$`. An id keeps the case that the user types.
 - Every id must be unique when case is ignored, because the default APFS volume and bundle ids
   ignore case.
 - `default`, `all` and `manager` are reserved.
@@ -663,9 +667,10 @@ must be unique, and is also the `.app` file name, so it cannot contain `/` or `:
 write the registry. The profile must quit first. The id, the bundle id and the userData do not
 change. A rename changes the cdhash, so TCC and the Keychain ask once more.
 
-**Recreate.** "New profile" with a name whose id has a data folder already (for example after the
+**Recreate.** "New profile" with an id that has a data folder already (for example after the
 default app moved, or after Remove with "Keep data") uses that folder again. The marker file in it
-confirms the id. The dialog says so before it creates the app.
+confirms the id: a marker with another id (a case change) stops the create. The form says so
+before it creates the app, and the result has `adoptedData: true`.
 
 **Change of id after creation** is not in this design. A new bundle id loses the notification
 settings, the TCC grants and the Keychain access, and the userData must move.
@@ -878,3 +883,29 @@ that a profile's terminal exports, and it clears those variables before each tes
 **Not tested.** macOS 14, 15 and 26; notification entries, banners and clicks; the notification
 toggle; TCC prompts and grants; U3; the serve service stop and restart by the app; the "Stop the
 server and open" dialog; terminals over a profile restart; the browser, computer use and `orcad`.
+
+## 13. Slice 3 status
+
+Done on `dlux/profile-manager`:
+
+- CLI: `orca profiles create <name> [--id] [--port] [--settings-file]`, `rename <id> --name`,
+  `set-port <id> --port`, `remove <id> [--keep-data]`, `list [--json]`, `manager`. Recreate with
+  the same id adopts kept data.
+- The Profile Manager window, in each Orca app (Profiles > Profile Manager…, or `orca profiles
+  manager`): the list with the three states and "Open" (default app too), New profile (name, id,
+  port, "Copy settings from this app"), Edit (name, port), Remove with "Keep data". Changes run the
+  app's own `orca profiles … --json`.
+- The top-level Profiles menu: each app with its state, a check mark on the current app, and
+  "Profile Manager…". It follows `profiles.json` and app activation.
+- The copied settings apply once at the first start of the new profile.
+
+Changes from this design:
+
+- The Profile Manager is a window of each Orca app, not the nested `Orca Profile Manager.app`. The
+  nested app needs the release signing step and the U8 and Gatekeeper checks. "Copy settings
+  from:" copies only from the app that shows the window.
+- Remove refuses while the profile runs. It does not ask the profile to quit.
+- Ids use `-`, not `_` (section 9).
+
+Not done yet: the nested app and U8, the icon picker (slice 4 supplies the icons), the `orca:`
+section (slice 6), the update rule ("Restart all Orca apps to update").
