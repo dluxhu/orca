@@ -149,6 +149,11 @@ describe('app profile homes', () => {
     expect(skillRoot('home-gemini')).toBe(
       join(work, 'orca-home', 'agents', 'gemini', '.gemini', 'skills')
     )
+    const { formerSkillRootPaths } =
+      await import('../../main/skills/bundled-skill-install/former-skill-roots')
+    expect(formerSkillRootPaths({ scope: 'global', homeDirectory: homedir() })).toEqual([
+      join(work, 'orca-home', 'agents', 'gemini', '.gemini', 'skills')
+    ])
   })
 
   it('write workspace trust into the profile folders, not the user home', async () => {
