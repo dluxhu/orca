@@ -15,7 +15,10 @@ import {
   type MobileMarkdownTreeCache
 } from './mobile-markdown-growing-tree'
 import { protectMobileMarkdownVisualLines } from '../blocks/mobile-markdown-visual-lines'
-import { drawMobileMarkdownSlackMentions } from './mobile-markdown-mentions'
+import {
+  drawMobileMarkdownBotMentions,
+  drawMobileMarkdownSlackMentions
+} from './mobile-markdown-mentions'
 import type { SlackPeople } from '../../../../../src/shared/connectors/slack-message-markup'
 import { showSlackMentionTokens } from '../../../../../src/shared/connectors/slack-mention-tokens'
 
@@ -61,6 +64,7 @@ export function useMobileMarkdownTree(
   const source = visualLines?.text ?? text
   const link = useMemo(
     () => (tree: Root) => {
+      drawMobileMarkdownBotMentions(tree)
       if (slackMentions) {
         drawMobileMarkdownSlackMentions(tree)
       } else if (slackPeople) {
