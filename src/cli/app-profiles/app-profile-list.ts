@@ -58,9 +58,11 @@ export async function readServeServicePid(
 
 function runtimePid(userDataPath: string): number | null {
   try {
-    const pid = (JSON.parse(readFileSync(getRuntimeMetadataPath(userDataPath), 'utf8')) as {
-      pid?: unknown
-    }).pid
+    const pid = (
+      JSON.parse(readFileSync(getRuntimeMetadataPath(userDataPath), 'utf8')) as {
+        pid?: unknown
+      }
+    ).pid
     return typeof pid === 'number' && pid > 0 ? pid : null
   } catch {
     return null

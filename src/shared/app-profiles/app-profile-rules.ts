@@ -20,6 +20,27 @@ export type AppProfileRow = {
   state: AppProfileState
 }
 
+/** What the Profile Manager window gets from the main process. */
+export type AppProfilesState = {
+  rows: AppProfileRow[]
+  /** The id of the app that shows the Profile Manager. */
+  currentId: string
+  /** Ids of data folders that "Keep data" left. A new profile with such an id uses the folder. */
+  keptIds: string[]
+}
+
+/** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
+export type AppProfileChange =
+  | { kind: 'create'; name: string; id: string; port: number; copySettings: boolean }
+  | { kind: 'rename'; id: string; name: string }
+  | { kind: 'set-port'; id: string; port: number }
+  | { kind: 'remove'; id: string; keepData: boolean }
+
+/** The `--json` reply of `orca profiles`. */
+export type AppProfileReply =
+  | { ok: true; result: unknown }
+  | { ok: false; error: { message: string } }
+
 /**
  * The automatic id: the name without the word "Orca", in lower case, with `-` between the
  * words. A bundle id has no `_`, so the id has none.

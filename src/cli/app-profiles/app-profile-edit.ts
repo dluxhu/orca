@@ -162,7 +162,13 @@ export async function renameAppProfile(
       const originalPlist = readFileSync(plistPath(oldPath))
       renameSync(oldPath, newPath)
       try {
-        run('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', name, plistPath(newPath)])
+        run('/usr/bin/plutil', [
+          '-replace',
+          'CFBundleDisplayName',
+          '-string',
+          name,
+          plistPath(newPath)
+        ])
         sign(newPath)
         // No --strict: the bundle links to the default app's files, and --strict refuses them.
         run('/usr/bin/codesign', ['--verify', newPath])

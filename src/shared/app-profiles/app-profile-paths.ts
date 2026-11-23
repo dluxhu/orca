@@ -14,6 +14,8 @@ export const APP_PROFILE_PLIST_ID_KEY = 'OrcaAppProfileId'
 export const APP_PROFILE_PLIST_ROOT_KEY = 'OrcaAppProfilesRoot'
 /** Overrides the folder that holds profiles.json and the profile userData folders. */
 export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
+/** The argument that makes an Orca app open its Profile Manager window. */
+export const PROFILE_MANAGER_ARG = '--orca-profile-manager'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 

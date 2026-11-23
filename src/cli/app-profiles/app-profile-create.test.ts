@@ -289,7 +289,13 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile on kept data', 
     mkdirSync(userDataPath, { recursive: true })
     writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}\n')
     writeFileSync(join(userDataPath, 'orca-data.json'), 'old chats')
-    const entry = createAppProfile({ name: 'Job', id: 'work', defaultAppPath: app, env: env(), run })
+    const entry = createAppProfile({
+      name: 'Job',
+      id: 'work',
+      defaultAppPath: app,
+      env: env(),
+      run
+    })
     expect(entry).toMatchObject({ id: 'work', userDataPath, adoptedData: true })
     expect(readFileSync(join(userDataPath, 'orca-data.json'), 'utf8')).toBe('old chats')
     expect(

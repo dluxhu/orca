@@ -263,9 +263,9 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
   it('refuses while the profile app runs', async () => {
     const work = makeProfile()
     writeRuntimePid(work.userDataPath, 4242)
-    await expect(removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })).rejects.toThrow(
-      'runs'
-    )
+    await expect(
+      removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    ).rejects.toThrow('runs')
     expect(trashed).toEqual([])
   })
 })

@@ -1,7 +1,11 @@
 // `orca profiles create|rename|set-port|remove|list|manager`: local commands, no runtime needed.
 // See docs/fork/profiles-design.md, section 6.
 import { execFileSync } from 'node:child_process'
-import { appProfilesRoot, readAppProfileRegistry } from '../../shared/app-profiles/app-profile-paths'
+import {
+  appProfilesRoot,
+  PROFILE_MANAGER_ARG,
+  readAppProfileRegistry
+} from '../../shared/app-profiles/app-profile-paths'
 import { getMacAppBundlePath } from '../runtime/serve/updates/mac-app-update-bundle'
 import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cli-interpreter'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
@@ -9,9 +13,6 @@ import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
 import { removeAppProfile, renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { listAppProfiles } from './app-profile-list'
-
-/** The argument that makes an Orca app open its Profile Manager window. */
-export const PROFILE_MANAGER_ARG = '--orca-profile-manager'
 
 const USAGE = `Usage:
   orca profiles create <name> [--id <id>] [--port <port>]
@@ -134,13 +135,16 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
     }
     case 'list': {
       const rows = await listAppProfiles({
-        defaultAppPath: readAppProfileRegistry(appProfilesRoot())?.defaultAppPath ?? runningDefaultApp(),
+        defaultAppPath:
+          readAppProfileRegistry(appProfilesRoot())?.defaultAppPath ?? runningDefaultApp(),
         defaultUserDataPath: getPlatformUserDataPath()
       })
       print(
         rows,
         json,
-        rows.map((row) => `${row.id}\t${row.name}\t${row.state}\t${row.port}\t${row.appPath}`).join('\n')
+        rows
+          .map((row) => `${row.id}\t${row.name}\t${row.state}\t${row.port}\t${row.appPath}`)
+          .join('\n')
       )
       return
     }

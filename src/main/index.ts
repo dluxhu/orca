@@ -63,6 +63,8 @@ import { setBackgroundWindowOpener } from './window/activation/background-window
 import { installFatalSignalListenerGuard } from './crash-reporting/fatal-signal-listener-guard'
 import { installStdioWriteErrorSink } from './startup/process-failure/main-process-error-guards'
 import { installWorkerThreadDiagnostics } from './worker-threads/worker-thread-diagnostics'
+import { PROFILE_MANAGER_ARG } from '../shared/app-profiles/app-profile-paths'
+import { openProfileManagerWindow } from './app-profiles/profile-manager-window'
 
 // Before anything spawns, so no daemon, PTY or agent inherits it outside e2e.
 dropE2eSpawnLogOutsideE2e()
@@ -101,6 +103,11 @@ function publishDeepLink(link: DeepLink): void {
 }
 
 function requestDesktopActivation(argv: readonly string[] = []): void {
+  // `orca profiles manager` asks for the Profile Manager window only.
+  if (argv.includes(PROFILE_MANAGER_ARG)) {
+    void app.whenReady().then(openProfileManagerWindow)
+    return
+  }
   state.deepLinks.capture(argv, publishDeepLink)
   state.pluginInstallLinks.capture(argv, (link) => {
     state.mainWindow?.webContents.send('ui:openPluginInstallLink', link)
@@ -204,6 +211,9 @@ if (preflightReady) {
   })
   state.deepLinks.capture(process.argv)
   state.pluginInstallLinks.capture(process.argv)
+  if (process.argv.includes(PROFILE_MANAGER_ARG)) {
+    void app.whenReady().then(openProfileManagerWindow)
+  }
   // The first renderer pulls on mount; nothing listens this early.
   state.osOpenedDocuments.capture(process.argv)
   registerMainProcessIpcHandlers()
