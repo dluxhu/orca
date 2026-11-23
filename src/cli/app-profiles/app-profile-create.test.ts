@@ -13,7 +13,15 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAppProfile, nextAppProfilePort, type RunTool } from './app-profile-create'
+import {
+  createAppProfile,
+  nextAppProfilePort,
+  runProfilesCreate,
+  type RunTool
+} from './app-profile-create'
+import { setAppProfileIcon } from './app-profile-set-icon'
+import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
+import { nextBadgeText } from '../../main/app-profiles/app-profile-icon'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -33,6 +41,18 @@ const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 let dir: string
 let app: string
 let calls: string[][]
+let iconSources: unknown[]
+
+// The real icon takes seconds to render; its own tests cover it.
+const makeIcon = ((
+  _app: string,
+  source: { kind: string; text?: string },
+  used: Parameters<typeof nextBadgeText>[0]
+) => {
+  const text = source.text ?? nextBadgeText(used)
+  iconSources.push({ ...source, text })
+  return { icns: Buffer.from(`icns ${text}`), icon: { kind: 'badge', text, style: 'ref-match' } }
+}) as never
 
 // Real ditto and plutil; codesign and lsregister are recorded.
 const run: RunTool = (program, args) => {
@@ -67,11 +87,13 @@ beforeEach(() => {
   )
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
+  file(join(contents, 'Resources', 'icon.icns'), 'default icon')
   file(
     join(contents, 'Resources', 'profile-template', 'orca-notification-status'),
     'profile variant'
   )
   calls = []
+  iconSources = []
   vi.stubEnv('HOME', dir)
 })
 
@@ -103,6 +125,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       defaultAppPath: app,
       env: env(),
       run,
+      makeIcon,
       now: () => 1,
       pinRoot: true
     })
@@ -114,6 +137,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       appPath: join(dir, 'apps', 'Orca - Work.app'),
       userDataPath: join(dir, 'data', 'orca-work'),
       port: 6800,
+      icon: { kind: 'badge', text: '2', style: 'ref-match' },
       createdAt: 1
     })
     const isLink = (path: string): boolean => lstatSync(path).isSymbolicLink()
@@ -135,6 +159,10 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       join(app, 'Contents', 'Frameworks', 'Squirrel.framework')
     )
     expect(isLink(join(contents, 'Resources'))).toBe(false)
+    // The icon is the profile's own file; userData keeps a copy under the profile id.
+    expect(isLink(join(contents, 'Resources', 'icon.icns'))).toBe(false)
+    expect(readFileSync(join(contents, 'Resources', 'icon.icns'), 'utf8')).toBe('icns 2')
+    expect(readFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns 2')
     expect(readlinkSync(join(contents, 'Resources', 'app.asar'))).toBe(
       join(app, 'Contents', 'Resources', 'app.asar')
     )
@@ -172,36 +200,56 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(registry).toMatchObject({ version: 1, defaultAppPath: app, profiles: [entry] })
   })
 
-  it('gives the next profile the next port and refuses a taken id or port', () => {
-    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
-    expect(createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).port).toBe(6832)
-    expect(() => createAppProfile({ name: 'work', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "work" exists.'
-    )
+  it('gives the next profile the next port and badge, and refuses a taken id or port', () => {
+    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    expect(
+      createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run, makeIcon }).port
+    ).toBe(6832)
+    expect(iconSources).toEqual([
+      { kind: 'badge', text: '2' },
+      { kind: 'badge', text: '3' }
+    ])
     expect(() =>
-      createAppProfile({ name: 'Other', port: 6810, defaultAppPath: app, env: env(), run })
+      createAppProfile({ name: 'work', defaultAppPath: app, env: env(), run, makeIcon })
+    ).toThrow('The profile "work" exists.')
+    expect(() =>
+      createAppProfile({
+        name: 'Other',
+        port: 6810,
+        defaultAppPath: app,
+        env: env(),
+        run,
+        makeIcon
+      })
     ).toThrow('inside the port range')
     expect(() =>
-      createAppProfile({ name: 'Other', port: 6790, defaultAppPath: app, env: env(), run })
+      createAppProfile({
+        name: 'Other',
+        port: 6790,
+        defaultAppPath: app,
+        env: env(),
+        run,
+        makeIcon
+      })
     ).toThrow('inside the port range')
   })
 })
 
 describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and failures', () => {
   it('maps `_` to `-`, so `a_b` and `a-b` cannot share a bundle id', () => {
-    expect(createAppProfile({ name: 'a_b', defaultAppPath: app, env: env(), run }).bundleId).toBe(
-      'com.stablyai.orca.dlux.profile.a-b'
-    )
-    expect(() => createAppProfile({ name: 'a-b', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "a-b" exists.'
-    )
+    expect(
+      createAppProfile({ name: 'a_b', defaultAppPath: app, env: env(), run, makeIcon }).bundleId
+    ).toBe('com.stablyai.orca.dlux.profile.a-b')
+    expect(() =>
+      createAppProfile({ name: 'a-b', defaultAppPath: app, env: env(), run, makeIcon })
+    ).toThrow('The profile "a-b" exists.')
   })
 
   it('refuses an app of that name that the registry does not know', () => {
     mkdirSync(join(dir, 'apps', 'Work.app'), { recursive: true })
-    expect(() => createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })).toThrow(
-      'Work.app exists.'
-    )
+    expect(() =>
+      createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    ).toThrow('Work.app exists.')
   })
 
   it('writes the marker before the app is in place', () => {
@@ -211,7 +259,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and fa
       }
       return run(program, args)
     }
-    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: checking })
+    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: checking, makeIcon })
     expect(calls.some((call) => call[0].endsWith('lsregister'))).toBe(true)
   })
 
@@ -223,19 +271,27 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and fa
       return run(program, args)
     }
     expect(() =>
-      createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: failing })
+      createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run: failing, makeIcon })
     ).toThrow('lsregister failed')
     expect(existsSync(join(dir, 'apps', 'Work.app'))).toBe(false)
     expect(existsSync(join(dir, 'data', 'work', 'orca-app-profile.json'))).toBe(true)
-    expect(createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run }).id).toBe('work')
+    expect(
+      createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon }).id
+    ).toBe('work')
   })
 })
 
 describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile app', () => {
   it('links to the default app and keeps an inherited root out of Info.plist', () => {
-    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     // A profile's own `orca` passes the profile app as the running app.
-    const home = createAppProfile({ name: 'Home', defaultAppPath: work.appPath, env: env(), run })
+    const home = createAppProfile({
+      name: 'Home',
+      defaultAppPath: work.appPath,
+      env: env(),
+      run,
+      makeIcon
+    })
     expect(home.bundleId).toBe('com.stablyai.orca.dlux.profile.home')
     expect(readlinkSync(join(home.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(
       join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
@@ -244,6 +300,59 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
       const plist = join(entry.appPath, 'Contents', 'Info.plist')
       expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBeNull()
     }
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
+  const read = (path: string): string => readFileSync(path, 'utf8')
+
+  it('writes the icon by profile id, signs again, registers again and records it', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run, makeIcon })
+    calls = []
+    // The automatic character skips the badges of the other profiles, not the own one.
+    const changed = setAppProfileIcon('work', { kind: 'badge' }, { env: env(), run, makeIcon })
+    expect(changed.icon).toEqual({ kind: 'badge', text: '2', style: 'ref-match' })
+    setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, { env: env(), run, makeIcon })
+    expect(read(join(work.appPath, 'Contents', 'Resources', 'icon.icns'))).toBe('icns Q')
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
+    expect(calls.slice(-2)).toEqual([
+      [
+        '/usr/bin/codesign',
+        '--force',
+        '-s',
+        '-',
+        '--preserve-metadata=identifier,entitlements',
+        work.appPath
+      ],
+      [expect.stringMatching(/lsregister$/), '-f', work.appPath]
+    ])
+    const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
+    expect(registry.profiles.map((p: { icon: { text: string } }) => p.icon.text)).toEqual([
+      'Q',
+      '3'
+    ])
+  })
+
+  it('refuses an unknown id and a profile that runs', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    expect(() =>
+      setAppProfileIcon('home', { kind: 'badge' }, { env: env(), run, makeIcon })
+    ).toThrow('No profile "home".')
+    writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
+    expect(() =>
+      setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, { env: env(), run, makeIcon })
+    ).toThrow('"Work" runs.')
+    expect(read(join(work.appPath, 'Contents', 'Resources', 'icon.icns'))).toBe('icns 2')
+  })
+})
+
+describe('runProfilesCreate', () => {
+  it('refuses icon flags that do not go together, and unknown flags', () => {
+    expect(() => runProfilesCreate(['Work', '--icon-badge', 'Q', '--icon-file', 'a.icns'])).toThrow(
+      'Use only one'
+    )
+    expect(() => runProfilesCreate(['Work', '--icon-color', 'red'])).toThrow('Usage:')
   })
 })
 

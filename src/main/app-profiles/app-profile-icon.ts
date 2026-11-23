@@ -1,27 +1,22 @@
 // Profile icons: the default app's icon with a badge, or an uploaded icon, written as .icns.
 // See docs/fork/profiles-design.md, section 8. Runs in Node (the CLI and the main process).
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { extname, join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { extname, join, resolve } from 'node:path'
 import { crc32, deflateSync, inflateSync } from 'node:zlib'
 import { ICON_STYLES, renderBadgedIcon, type IconStyle } from '../../shared/icon-badger/badger'
-import { type Img, LANCZOS, resize } from '../../shared/icon-badger/raster'
-import { readPlistString } from '../../shared/app-profiles/app-profile-paths'
-
-/** The registry `icon` field. */
-export type AppProfileIcon =
-  | { kind: 'badge'; text: string; style: IconStyle }
-  | { kind: 'image'; style: IconStyle }
-  | { kind: 'file' }
+import type { Img } from '../../shared/icon-badger/raster'
+import { LANCZOS, resize } from '../../shared/icon-badger/resample'
+import { readPlistString, type AppProfileIcon } from '../../shared/app-profiles/app-profile-paths'
 
 /** What makes a profile icon: a badge character, a badge image file or a full icon file. */
 export type AppProfileIconSource =
-  | { kind: 'badge'; text: string; style?: IconStyle }
+  // No text: the first free character (nextBadgeText).
+  | { kind: 'badge'; text?: string; style?: IconStyle }
   | { kind: 'image'; path: string; style?: IconStyle }
   | { kind: 'file'; path: string }
 
-/** Runs a tool and returns its stdout; throws when it fails. */
-export type RunTool = (program: string, args: string[]) => string
+type RunTool = (program: string, args: string[]) => string
 
 const runTool: RunTool = (program, args) =>
   execFileSync(program, args, {
@@ -41,6 +36,38 @@ export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): s
 export function isIconStyle(value: string): value is IconStyle {
   return (ICON_STYLES as readonly string[]).includes(value)
 }
+
+/** The icon of the `--icon-badge`, `--icon-style`, `--icon-image` and `--icon-file` flags. */
+export function appProfileIconSourceFromFlags(
+  value: (flag: string) => string | undefined
+): AppProfileIconSource | undefined {
+  const text = value('--icon-badge')
+  const style = value('--icon-style')
+  const image = value('--icon-image')
+  const file = value('--icon-file')
+  if ([text, image, file].filter((v) => v !== undefined).length > 1) {
+    throw new Error('Use only one of --icon-badge, --icon-image and --icon-file.')
+  }
+  if (style !== undefined && !isIconStyle(style)) {
+    throw new Error(`--icon-style must be one of: ${ICON_STYLES.join(', ')}.`)
+  }
+  if (file !== undefined) {
+    if (style !== undefined) {
+      throw new Error('--icon-style does not apply to --icon-file.')
+    }
+    return { kind: 'file', path: resolve(file) }
+  }
+  if (image !== undefined) {
+    return { kind: 'image', path: resolve(image), style }
+  }
+  if (text !== undefined || style !== undefined) {
+    return { kind: 'badge', text, style }
+  }
+  return undefined
+}
+
+const graphemes = (text: string): number =>
+  [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].length
 
 // ---------------------------------------------------------------- PNG
 
@@ -76,7 +103,9 @@ export function encodePng(img: Img): Buffer {
 
 /** Decodes an 8-bit RGB or RGBA PNG without interlace; null for any other PNG. */
 export function decodePng(png: Buffer): Img | null {
-  if (!png.subarray(0, 8).equals(PNG_SIGNATURE)) return null
+  if (!png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return null
+  }
   let offset = 8
   let width = 0
   let height = 0
@@ -90,7 +119,9 @@ export function decodePng(png: Buffer): Img | null {
       width = data.readUInt32BE(0)
       height = data.readUInt32BE(4)
       colorType = data[9]
-      if (data[8] !== 8 || data[12] !== 0 || (colorType !== 6 && colorType !== 2)) return null
+      if (data[8] !== 8 || data[12] !== 0 || (colorType !== 6 && colorType !== 2)) {
+        return null
+      }
     } else if (type === 'IDAT') {
       idat.push(data)
     } else if (type === 'IEND') {
@@ -112,10 +143,13 @@ export function decodePng(png: Buffer): Img | null {
       const b = prev[i]
       const c = i >= bpp ? prev[i - bpp] : 0
       let pred = 0
-      if (filter === 1) pred = a
-      else if (filter === 2) pred = b
-      else if (filter === 3) pred = (a + b) >> 1
-      else if (filter === 4) {
+      if (filter === 1) {
+        pred = a
+      } else if (filter === 2) {
+        pred = b
+      } else if (filter === 3) {
+        pred = (a + b) >> 1
+      } else if (filter === 4) {
         const p = a + b - c
         const pa = Math.abs(p - a)
         const pb = Math.abs(p - b)
@@ -125,7 +159,9 @@ export function decodePng(png: Buffer): Img | null {
       out[i] = (line[i] + pred) & 0xff
     }
   }
-  if (bpp === 4) return { width, height, channels: 4, data: pixels }
+  if (bpp === 4) {
+    return { width, height, channels: 4, data: pixels }
+  }
   const data = new Uint8Array(width * height * 4)
   for (let i = 0; i < width * height; i++) {
     data.set(pixels.subarray(i * 3, i * 3 + 3), i * 4)
@@ -170,9 +206,11 @@ export function writeIcns(img: Img): Buffer {
 export function largestIcnsPng(icns: Buffer): Buffer | null {
   let best: Buffer | null = null
   let bestWidth = 0
-  for (let offset = 8; offset + 8 <= icns.length; ) {
+  for (let offset = 8; offset + 8 <= icns.length;) {
     const length = icns.readUInt32BE(offset + 4)
-    if (length < 8) break
+    if (length < 8) {
+      break
+    }
     const data = icns.subarray(offset + 8, offset + length)
     if (data.subarray(0, 8).equals(PNG_SIGNATURE) && data.readUInt32BE(16) > bestWidth) {
       best = data
@@ -220,34 +258,57 @@ function run(argv) {
 `
 
 /** A 1024 x 1024 RGBA image of a text (the badge character) or of an image file. */
-export function rasterizeWithAppKit(mode: 'text' | 'file', value: string, run: RunTool = runTool): Img {
+export function rasterizeWithAppKit(
+  mode: 'text' | 'file',
+  value: string,
+  run: RunTool = runTool
+): Img {
   const png = Buffer.from(
     run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', APPKIT_RASTERIZER, mode, value]).trim(),
     'base64'
   )
   const img = decodePng(png)
-  if (!img) throw new Error('AppKit returned an image that Orca cannot read.')
+  if (!img) {
+    throw new Error('AppKit returned an image that Orca cannot read.')
+  }
   return img
 }
 
 // ---------------------------------------------------------------- profile icon
 
+/** The file name of an app's icon in Contents/Resources, from its Info.plist XML. */
+export function appIconFileName(plistXml: string): string {
+  const name = readPlistString(plistXml, 'CFBundleIconFile') ?? 'icon.icns'
+  return name.endsWith('.icns') ? name : `${name}.icns`
+}
+
 /** The default app's own icon at 1024 px. */
 export function readAppIcon(appPath: string, run: RunTool = runTool): Img {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
-  const name = readPlistString(plist, 'CFBundleIconFile') ?? 'icon.icns'
-  const path = join(appPath, 'Contents', 'Resources', name.endsWith('.icns') ? name : `${name}.icns`)
+  const path = join(appPath, 'Contents', 'Resources', appIconFileName(plist))
   const png = largestIcnsPng(readFileSync(path))
   const img = png && decodePng(png)
   return img && img.width === 1024 ? img : rasterizeWithAppKit('file', path, run)
 }
 
-/** The .icns of a profile icon, and the registry `icon` field that describes it. */
+/**
+ * The .icns of a profile icon, and the registry `icon` field that describes it. `used` holds the
+ * icons of the other profiles, for the default badge character.
+ */
 export function makeAppProfileIcon(
   defaultAppPath: string,
   source: AppProfileIconSource,
+  used: readonly (AppProfileIcon | undefined)[] = [],
   run: RunTool = runTool
 ): { icns: Buffer; icon: AppProfileIcon } {
+  if (source.kind !== 'badge' && !existsSync(source.path)) {
+    throw new Error(`No file ${source.path}`)
+  }
+  const text = source.kind === 'badge' ? (source.text ?? nextBadgeText(used)) : ''
+  // One character: a wider badge does not fit under the curl (dock-icon-badger refuses it too).
+  if (source.kind === 'badge' && (!text.trim() || graphemes(text) !== 1)) {
+    throw new Error(`A badge has one character: "${text}"`)
+  }
   if (source.kind === 'file') {
     const icns =
       extname(source.path).toLowerCase() === '.icns'
@@ -258,10 +319,10 @@ export function makeAppProfileIcon(
   const style = source.style ?? 'ref-match'
   const badge =
     source.kind === 'badge'
-      ? rasterizeWithAppKit('text', source.text, run)
+      ? rasterizeWithAppKit('text', text, run)
       : rasterizeWithAppKit('file', source.path, run)
   const img = renderBadgedIcon(readAppIcon(defaultAppPath, run), badge, style)
   const icon: AppProfileIcon =
-    source.kind === 'badge' ? { kind: 'badge', text: source.text, style } : { kind: 'image', style }
+    source.kind === 'badge' ? { kind: 'badge', text, style } : { kind: 'image', style }
   return { icns: writeIcns(img), icon }
 }

@@ -1,12 +1,10 @@
-// `orca profiles create <name> [--port N]`: makes the thin profile bundle of
+// `orca profiles create <name> [--port N] [--icon-…]`: makes the thin profile bundle of
 // docs/fork/profiles-design.md, sections 1 and 2. Hidden while profiles are a prototype.
 import { execFileSync } from 'node:child_process'
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  openSync,
-  closeSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -18,9 +16,9 @@ import {
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
+  APP_PROFILE_ICON_FILE,
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
-  APP_PROFILES_REGISTRY,
   appProfilesAppsDir,
   appProfilesRoot,
   ensureAppProfileMarker,
@@ -32,8 +30,15 @@ import {
 import { getMacAppBundlePath } from '../runtime/serve/updates/mac-app-update-bundle'
 import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cli-interpreter'
 import { RuntimeClientError } from '../runtime/connection/types'
+import { withRegistryLock, writeRegistry } from './app-profile-registry'
+import {
+  appIconFileName,
+  appProfileIconSourceFromFlags,
+  makeAppProfileIcon,
+  type AppProfileIconSource
+} from '../../main/app-profiles/app-profile-icon'
 
-const LSREGISTER =
+export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
 const NOTIFICATION_HELPER = 'orca-notification-status'
 const ELECTRON_FRAMEWORK = 'Electron Framework.framework'
@@ -45,18 +50,22 @@ const PORT_SPACING = 32
 /** Runs a tool and returns its stdout; throws when it fails. */
 export type RunTool = (program: string, args: string[]) => string
 
-const runTool: RunTool = (program, args) =>
+export const runTool: RunTool = (program, args) =>
   execFileSync(program, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 
 export type CreateAppProfileOptions = {
   name: string
   port?: number
+  /** The default: a badge with the first free character, in the ref-match style. */
+  icon?: AppProfileIconSource
   defaultAppPath: string
   /** Test runs only: write the profiles root into Info.plist, so a Dock launch finds a test root. */
   pinRoot?: boolean
   env?: NodeJS.ProcessEnv
   home?: string
   run?: RunTool
+  /** Tests only: the icon renderer. */
+  makeIcon?: typeof makeAppProfileIcon
   now?: () => number
 }
 
@@ -183,6 +192,15 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       for (const entry of readdirSync(join(source, 'Resources'))) {
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }
+      // The icon is a real file, so the seal covers it and the Dock shows it.
+      const made = (options.makeIcon ?? makeAppProfileIcon)(
+        defaultApp,
+        options.icon ?? { kind: 'badge' },
+        registry.profiles.map((profile) => profile.icon)
+      )
+      const iconPath = join(contents, 'Resources', appIconFileName(defaultPlist))
+      rmSync(iconPath, { force: true })
+      writeFileSync(iconPath, made.icns)
 
       const plutil = (...args: string[]): void => {
         run('/usr/bin/plutil', [...args, plistPath])
@@ -224,6 +242,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       // removes the app, so a retry with the same name works.
       const userDataPath = join(root, id)
       ensureAppProfileMarker(userDataPath, id)
+      writeFileSync(join(userDataPath, APP_PROFILE_ICON_FILE), made.icns)
       const entry: AppProfileEntry = {
         id,
         name,
@@ -231,6 +250,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
         appPath,
         userDataPath,
         port,
+        icon: made.icon,
         createdAt: (options.now ?? Date.now)()
       }
       renameSync(bundle, appPath)
@@ -261,47 +281,36 @@ function readPlistKeyExists(xml: string, key: string): boolean {
   return xml.includes(`<key>${key}</key>`)
 }
 
-function writeRegistry(root: string, registry: AppProfileRegistry): void {
-  const path = join(root, APP_PROFILES_REGISTRY)
-  const temporary = `${path}.${process.pid}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(registry, null, 2)}\n`)
-  renameSync(temporary, path)
-}
+const CREATE_USAGE =
+  'Usage: orca profiles create <name> [--port N] [--icon-badge <text>] [--icon-style <style>] [--icon-image <file>] [--icon-file <file>]'
 
-// shortcut: a lock that a crashed writer leaves stops later writers; add stale-lock removal with the Profile Manager.
-function withRegistryLock<T>(root: string, body: () => T): T {
-  const lock = join(root, `${APP_PROFILES_REGISTRY}.lock`)
-  let fd: number
-  try {
-    fd = openSync(lock, 'wx')
-  } catch {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      `Another process changes the profiles now (${lock}). Remove the file if no process does.`
-    )
-  }
-  try {
-    return body()
-  } finally {
-    closeSync(fd)
-    rmSync(lock, { force: true })
-  }
-}
-
-/** The CLI entry: `orca profiles create <name> [--port N]`. */
+/** The CLI entry: `orca profiles create <name> [--port N] [--icon-…]`. */
 export function runProfilesCreate(argv: string[]): void {
   // --pin-root: test runs with ORCA_PROFILES_ROOT; an inherited root must not stick in a bundle.
   const pinRoot = argv.includes('--pin-root')
+  const rest: string[] = []
+  const values = new Map<string, string>()
   const args = argv.filter((arg) => arg !== '--pin-root')
-  const portIndex = args.indexOf('--port')
-  const port = portIndex === -1 ? undefined : Number(args[portIndex + 1])
-  const rest =
-    portIndex === -1 ? args : args.filter((_, i) => i !== portIndex && i !== portIndex + 1)
-  if (rest.length !== 1) {
-    throw new RuntimeClientError(
-      'invalid_argument',
-      'Usage: orca profiles create <name> [--port N]'
-    )
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+      if (args[i + 1] === undefined) {
+        throw new RuntimeClientError('invalid_argument', CREATE_USAGE)
+      }
+      values.set(args[i], args[++i])
+    } else {
+      rest.push(args[i])
+    }
+  }
+  const port = values.has('--port') ? Number(values.get('--port')) : undefined
+  let icon: AppProfileIconSource | undefined
+  try {
+    icon = appProfileIconSourceFromFlags((flag) => values.get(flag))
+  } catch (error) {
+    throw new RuntimeClientError('invalid_argument', (error as Error).message)
+  }
+  const known = ['--port', '--icon-badge', '--icon-style', '--icon-image', '--icon-file']
+  if (rest.length !== 1 || [...values.keys()].some((flag) => !known.includes(flag))) {
+    throw new RuntimeClientError('invalid_argument', CREATE_USAGE)
   }
   if (process.platform !== 'darwin') {
     throw new RuntimeClientError('unsupported_platform', 'Profiles are only on macOS.')
@@ -315,6 +324,6 @@ export function runProfilesCreate(argv: string[]): void {
       'Run this command with the orca CLI of an Orca app.'
     )
   }
-  const entry = createAppProfile({ name: rest[0], port, defaultAppPath, pinRoot })
+  const entry = createAppProfile({ name: rest[0], port, icon, defaultAppPath, pinRoot })
   process.stdout.write(`${JSON.stringify(entry, null, 2)}\n`)
 }
