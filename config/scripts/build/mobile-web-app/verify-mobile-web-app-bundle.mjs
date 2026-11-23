@@ -38,7 +38,9 @@ export const MOBILE_WEB_APP_HOST_CATALOG_MAX_BYTES = 384 * 1024
 // drops with it so those 198 KiB stay saved; the 446 KiB left is about what the phone parity round had.
 // 11 MiB (2026-11-21): the phone parity round's last pages (connectors, automations, memory, sharing) need
 // about 200 KiB more; a size pass follows the round.
-export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 11 * 1024 * 1024
+// Fork: 32 KiB more for the fork patches' phone page code: the bare #number setting, the compaction
+// divider copy, and the shared mention, quote, raw view and launch code. Upstream's fence stays below it.
+export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 11 * 1024 * 1024 + 32 * 1024
 
 // Only these licensed terminal fonts have their own allowance; other fonts (KaTeX's) and code count.
 // The page fetches each only when the terminal draws with it, so none weighs on first open.

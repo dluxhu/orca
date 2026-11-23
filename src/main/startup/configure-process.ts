@@ -222,6 +222,11 @@ export function configureDevUserDataPath(isDev: boolean): void {
   }
 
   if (!isDev) {
+    // Fork patch (see docs/fork/PATCHES.md): pin the default `orca` folder as an override.
+    // Without the pin, a setPath after the post-ready rename moves userData to `Orca @dLux`.
+    if (!app.commandLine.hasSwitch('user-data-dir')) {
+      app.setPath('userData', app.getPath('userData'))
+    }
     return
   }
   const overrideUserDataPath = process.env.ORCA_DEV_USER_DATA_PATH
