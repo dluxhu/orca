@@ -64,13 +64,13 @@ describe('ProfileManager', () => {
     expect(field('Profile id').value).toBe('client-x')
     type('Profile id', 'client')
     expect(screen.getByText(/A data folder for "client" exists/)).toBeTruthy()
-    type('App name', 'Orca - Client')
+    type('App name', 'Orca - Customer')
     expect(field('Profile id').value).toBe('client')
     fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
     await waitFor(() =>
       expect(change).toHaveBeenCalledWith({
         kind: 'create',
-        name: 'Orca - Client',
+        name: 'Orca - Customer',
         id: 'client',
         port: 6832,
         copySettings: false
