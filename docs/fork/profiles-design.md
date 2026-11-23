@@ -562,7 +562,7 @@ So:
 | Character badge (text to image) | **AppKit through `osascript -l JavaScript`** (`NSString` drawing, heavy system font, 1024 px sRGB bitmap) | Text needs a font rasterizer. AppKit has one, with emoji, and the CLI has no Chromium. |
 | Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `NSImage` in the same AppKit script | AppKit decodes all four. SVG needs no cairo. |
 | Decode an uploaded ICNS icon | used as it is; the default app's `.icns` is read by its largest PNG entry, else by `NSImage` | No conversion needed. |
-| Encode PNG | a small writer on `node:zlib` (`src/main/app-profiles/app-profile-icns.ts`) | Runs in the CLI and in main. |
+| Encode PNG | a small writer on `node:zlib` (`src/cli/app-profiles/app-profile-icns.ts`) | Runs in the CLI. |
 | Live preview | `orca profiles icon-preview` in a child process of main (`makeAppProfileIcon`, then the largest PNG of its `.icns`) | One code path for the CLI, the preview and the output. No window stops while the icon is made. |
 
 Do not use Canvas 2D drawing (`filter: blur()`, `drawImage` scaling, path fill) inside the core.
@@ -610,7 +610,8 @@ must now supply:
 
 Estimate: about 700 lines of TypeScript for `ref-match` with the primitives, and about 1,200 for
 all 14 styles. Put the core in `src/shared/icon-badger/` (no Electron import), the PNG and `.icns`
-I/O and the AppKit text badge in `src/main/app-profiles/`. Keep the MIT
+I/O and the AppKit text badge in `src/cli/app-profiles/` (the CLI build keeps them; electron-vite
+replaces `out/main`). Keep the MIT
 notice of dock-icon-badger in the ported files.
 
 ### Tests against dock-icon-badger's own output

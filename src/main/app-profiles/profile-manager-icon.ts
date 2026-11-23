@@ -6,7 +6,7 @@ import type {
   AppProfileReply
 } from '../../shared/app-profiles/app-profile-rules'
 import { translateMain } from '../i18n/main-i18n'
-import { appProfileIconFlags } from './app-profile-icon'
+import { appProfileIconFlags } from '../../shared/app-profiles/app-profile-rules'
 import { runCli } from './profile-manager-cli'
 
 /**

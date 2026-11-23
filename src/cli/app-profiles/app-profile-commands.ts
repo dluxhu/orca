@@ -13,11 +13,8 @@ import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cl
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
-import {
-  appProfileIconSourceFromFlags,
-  makeAppProfileIcon
-} from '../../main/app-profiles/app-profile-icon'
-import { largestIcnsPng } from '../../main/app-profiles/app-profile-icns'
+import { appProfileIconSourceFromFlags, makeAppProfileIcon } from './app-profile-icon'
+import { largestIcnsPng } from './app-profile-icns'
 import { setAppProfileIcon } from './app-profile-set-icon'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'

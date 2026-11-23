@@ -41,11 +41,7 @@ import {
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
-import {
-  appIconFileName,
-  makeAppProfileIcon,
-  type AppProfileIconSource
-} from '../../main/app-profiles/app-profile-icon'
+import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'

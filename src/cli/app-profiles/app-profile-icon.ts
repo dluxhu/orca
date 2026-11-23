@@ -1,5 +1,6 @@
 // Profile icons: the default app's icon with a badge, or an uploaded icon, written as .icns.
-// See docs/fork/profiles-design.md, section 8. Runs in Node (the CLI and the main process).
+// See docs/fork/profiles-design.md, section 8. The CLI runs it; electron-vite does not keep
+// src/main modules for the CLI.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
@@ -54,22 +55,6 @@ export function appProfileIconSourceFromFlags(
     return { kind: 'badge', text, style }
   }
   return undefined
-}
-
-/** The `--icon-*` flags of an icon source; the inverse of appProfileIconSourceFromFlags. */
-export function appProfileIconFlags(source: AppProfileIconSource | undefined): string[] {
-  if (!source) {
-    return []
-  }
-  const style = source.kind !== 'file' && source.style ? ['--icon-style', source.style] : []
-  if (source.kind === 'file') {
-    return ['--icon-file', source.path]
-  }
-  if (source.kind === 'image') {
-    return ['--icon-image', source.path, ...style]
-  }
-  // No text and no style still means a badge: the CLI makes the default one.
-  return [...(source.text ? ['--icon-badge', source.text] : []), ...style]
 }
 
 const graphemes = (text: string): number =>

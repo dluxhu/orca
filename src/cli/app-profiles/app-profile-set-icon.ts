@@ -16,11 +16,7 @@ import {
   APP_PROFILE_ICON_FILE,
   type AppProfileEntry
 } from '../../shared/app-profiles/app-profile-paths'
-import {
-  appIconFileName,
-  makeAppProfileIcon,
-  type AppProfileIconSource
-} from '../../main/app-profiles/app-profile-icon'
+import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
 import { LSREGISTER } from './app-profile-create'
 import { prepare, rootOf, updateEntry, type EditAppProfileOptions } from './app-profile-edit'
 import { withRegistryLockAsync } from './app-profile-registry'

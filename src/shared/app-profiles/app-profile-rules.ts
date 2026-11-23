@@ -50,6 +50,24 @@ export type AppProfilesState = {
   keptIds: string[]
 }
 
+/**
+ * The `--icon-*` flags of an icon source. The CLI reads them with appProfileIconSourceFromFlags.
+ */
+export function appProfileIconFlags(source: AppProfileIconSource | undefined): string[] {
+  if (!source) {
+    return []
+  }
+  const style = source.kind !== 'file' && source.style ? ['--icon-style', source.style] : []
+  if (source.kind === 'file') {
+    return ['--icon-file', source.path]
+  }
+  if (source.kind === 'image') {
+    return ['--icon-image', source.path, ...style]
+  }
+  // No text and no style still means a badge: the CLI makes the default one.
+  return [...(source.text ? ['--icon-badge', source.text] : []), ...style]
+}
+
 /** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
 export type AppProfileChange =
   | {

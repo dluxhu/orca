@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { bbox, newImg } from '../../shared/icon-badger/raster'
+import { appProfileIconFlags } from '../../shared/app-profiles/app-profile-rules'
 import {
-  appProfileIconFlags,
   appProfileIconSourceFromFlags,
   makeAppProfileIcon,
   nextBadgeText,

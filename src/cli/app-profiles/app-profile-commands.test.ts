@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 const created = vi.hoisted(() => ({ options: [] as unknown[], used: [] as unknown[] }))
-vi.mock('../../main/app-profiles/app-profile-icon', async (original) => ({
+vi.mock('./app-profile-icon', async (original) => ({
   ...(await original<object>()),
   makeAppProfileIcon: (_app: string, _source: unknown, used: unknown) => {
     created.used.push(used)

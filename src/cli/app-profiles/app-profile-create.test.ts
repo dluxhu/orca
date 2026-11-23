@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppProfile, defaultAppOf, type RunTool } from './app-profile-create'
 import { setAppProfileIcon, type SetAppProfileIconOptions } from './app-profile-set-icon'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
-import { nextBadgeText } from '../../main/app-profiles/app-profile-icon'
+import { nextBadgeText } from './app-profile-icon'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
