@@ -6,7 +6,6 @@ import {
   claudeStreamingMessageBody,
   type ClaudeToolUse
 } from './claude-structured-item-translation'
-import { journalClaudeCompaction } from './claude-compaction-row'
 import { publishClaudeTurnActivity } from '../turns/claude-turn-activity'
 import {
   claudeProviderFrameKind,
@@ -224,7 +223,6 @@ export function createClaudeJournalTranslator(
       messageContext.usageLimits.observe(event.message, turn.command?.rejections)
       const kind = claudeProviderFrameKind(event.message)
       if (
-        !journalClaudeCompaction(deps.sink, event.message, turnScope(), turn.command !== null) &&
         !journalClaudeMessage(
           messageContext,
           event.message,
