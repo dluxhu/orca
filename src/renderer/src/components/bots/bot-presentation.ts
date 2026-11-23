@@ -38,7 +38,8 @@ export function localBotFolderPath(
   profileDir = appProfileDir(),
   orcaHome = localOrcaHomeDir()
 ): string | null {
-  // shortcut: an isolated data folder (dev runs) keeps bots in <userData>/bots, so the link opens ~/.orca/bots there; pass the bots root from main when that matters.
+  // shortcut: an isolated data folder (dev runs) keeps bots in <userData>/bots. There the link
+  // opens ~/.orca/bots. When that is a problem, get the bots folder from main.
   return orcaHome ? [profileDir ?? orcaHome, 'bots', folder].join(windows ? '\\' : '/') : null
 }
 
