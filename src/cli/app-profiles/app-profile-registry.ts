@@ -12,6 +12,7 @@ import {
 import { basename, join, sep } from 'node:path'
 import {
   APP_PROFILES_REGISTRY,
+  locateAppProfileApp,
   readAppProfileRegistry,
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
@@ -113,6 +114,23 @@ export function rewriteServeUnitAppPath(
   return true
 }
 
+/** Puts the new port into the `--port` argument of Orca's own serve unit. True when it changed. */
+export function rewriteServeUnitPort(unitPath: string, port: number): boolean {
+  if (!existsSync(unitPath)) {
+    return false
+  }
+  const content = readFileSync(unitPath, 'utf8')
+  const updated = content.replace(
+    /(<string>--port<\/string>\s*<string>)\d+(<\/string>)/,
+    `$1${port}$2`
+  )
+  if (updated === content) {
+    return false
+  }
+  writeFileSync(unitPath, updated)
+  return true
+}
+
 /** True when path is inside parent after both resolve their links. */
 export function isInside(path: string, parent: string): boolean {
   try {
@@ -145,11 +163,23 @@ export function healAppProfileAppPath(options: {
   if (!entry || samePath(entry.appPath, options.appPath)) {
     return 'unchanged'
   }
+  // A copy in Finder has the same id. The registry app keeps the profile while it carries the
+  // id, and two apps without the registry app are not a rename: the registry stays.
+  const located = locateAppProfileApp(entry)
+  if (!located || !samePath(located, options.appPath)) {
+    console.warn(
+      `[profiles] ${options.appPath} has the id "${options.id}", but it is not the profile's app (${entry.appPath}). The registry stays.`
+    )
+    return 'unchanged'
+  }
   return withRegistryLock(options.root, () => {
     const registry = readAppProfileRegistry(options.root)
     if (!registry) {
       return 'unchanged'
     }
+    // The unit first: when its write fails, the registry keeps the old path, and the next start
+    // tries both again.
+    rewriteServeUnitAppPath(options.unitPath, entry.appPath, options.appPath)
     const name = basename(options.appPath, '.app')
     writeRegistry(options.root, {
       ...registry,
@@ -157,7 +187,6 @@ export function healAppProfileAppPath(options: {
         profile.id === options.id ? { ...profile, name, appPath: options.appPath } : profile
       )
     })
-    rewriteServeUnitAppPath(options.unitPath, entry.appPath, options.appPath)
     return 'healed'
   })
 }

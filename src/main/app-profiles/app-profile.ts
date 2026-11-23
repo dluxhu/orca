@@ -1,6 +1,6 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
-import { readFileSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { readFileSync, realpathSync } from 'node:fs'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
   APP_PROFILE_PLIST_ID_KEY,
@@ -9,6 +9,7 @@ import {
   readAppProfileMarker,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
+import { appProfileIdError } from '../../shared/app-profiles/app-profile-rules'
 
 export type AppProfile = {
   id: string
@@ -29,12 +30,30 @@ export type AppProfileInput = {
   readMarker: (userDataPath: string) => string | null
 }
 
+/** True when the folder is missing (it is made inside the root) or resolves inside the root. */
+function staysInRoot(path: string, root: string): boolean {
+  try {
+    return realpathSync(path).startsWith(`${realpathSync(root)}${sep}`)
+  } catch {
+    return true
+  }
+}
+
 /** Order: the bundle's own profile id, then the marker in --user-data-dir. */
 export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
   const plistId = input.plist ? readPlistString(input.plist, APP_PROFILE_PLIST_ID_KEY) : null
   if (input.plist && plistId) {
     const root = readPlistString(input.plist, APP_PROFILE_PLIST_ROOT_KEY) ?? input.defaultRoot
+    // Info.plist is plain data: an id such as "../orca" must never point at another app's data.
+    if (appProfileIdError(plistId, []) !== null) {
+      throw new Error(`This app has a profile id that Orca does not accept: "${plistId}".`)
+    }
     const userDataPath = input.userDataDirArg ?? join(root, plistId)
+    if (input.userDataDirArg === null && !staysInRoot(userDataPath, root)) {
+      throw new Error(
+        `The data folder of the profile "${plistId}" is outside ${root}: ${userDataPath}.`
+      )
+    }
     const markerId = input.readMarker(userDataPath)
     // A given folder must carry this profile's marker: a profile app must never take, and mark,
     // the default folder or another profile's folder.
