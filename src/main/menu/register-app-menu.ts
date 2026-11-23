@@ -44,6 +44,8 @@ type RegisterAppMenuOptions = AppMenuQuitHandlers & {
   toggleFocusedPageDevTools?: (focused: Electron.WebContents) => boolean
   // app.name stays stable for Keychain; menus use the per-branch development label.
   appMenuLabel?: string
+  /** Fork patch: the items of the top-level Profiles menu (macOS). See docs/fork/profiles-design.md. */
+  getProfilesMenuItems?: () => Electron.MenuItemConstructorOptions[]
 }
 
 function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
@@ -295,11 +297,15 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
     ]
   }
 
+  const profilesItems = isMac ? options.getProfilesMenuItems?.() : undefined
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac ? [macAppMenu] : []),
     ...(isMac ? [] : [fileMenu]),
     editMenu,
     viewMenu,
+    ...(profilesItems
+      ? [{ label: translateMain('menu.profiles', 'Profiles'), submenu: profilesItems }]
+      : []),
     windowMenu,
     helpMenu
   ]

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +12,8 @@ const { setPath, setName, hasSwitch, profile } = vi.hoisted(() => ({
 vi.mock('electron', () => ({ app: { setPath, setName, commandLine: { hasSwitch } } }))
 vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
 
-import { configureAppProfileStartup } from './app-profile-startup'
+import { applyAppProfileSettingsSeed, configureAppProfileStartup } from './app-profile-startup'
+import { serveServiceUnitOf } from '../../cli/app-profiles/app-profile-list'
 
 let home: string
 
@@ -51,10 +52,94 @@ describe('configureAppProfileStartup', () => {
     expect(setName).toHaveBeenCalledWith('orca-work')
   })
 
+  it('records a rename in Finder in the registry and in its own serve unit', () => {
+    const userDataPath = join(home, 'data', 'work')
+    const oldApp = join(home, 'apps', 'Orca - Work.app')
+    const newApp = join(home, 'apps', 'Orca - Finder.app')
+    mkdirSync(join(newApp, 'Contents', 'MacOS'), { recursive: true })
+    writeFileSync(
+      join(newApp, 'Contents', 'Info.plist'),
+      '<dict><key>OrcaAppProfileId</key><string>work</string></dict>'
+    )
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(
+      join(home, 'data', 'profiles.json'),
+      JSON.stringify({
+        profiles: [{ id: 'work', name: 'Orca - Work', appPath: oldApp, userDataPath }]
+      })
+    )
+    const { unitPath } = serveServiceUnitOf(userDataPath, false, home)
+    mkdirSync(join(unitPath, '..'), { recursive: true })
+    writeFileSync(unitPath, `<string>${oldApp}/Contents/Resources/bin</string>`)
+    const execPath = process.execPath
+    Object.defineProperty(process, 'execPath', {
+      value: join(newApp, 'Contents', 'MacOS', 'Orca'),
+      configurable: true
+    })
+    try {
+      profile.current = { id: 'work', userDataPath }
+      configureAppProfileStartup(false)
+    } finally {
+      Object.defineProperty(process, 'execPath', { value: execPath, configurable: true })
+    }
+    const registry = JSON.parse(readFileSync(join(home, 'data', 'profiles.json'), 'utf8'))
+    expect(registry.profiles[0]).toMatchObject({ name: 'Orca - Finder', appPath: newApp })
+    expect(readFileSync(unitPath, 'utf8')).toBe(`<string>${newApp}/Contents/Resources/bin</string>`)
+  })
+
   it('does nothing for the default app', () => {
     profile.current = null
     expect(configureAppProfileStartup(false)).toBeNull()
     expect(setPath).not.toHaveBeenCalled()
     expect(setName).not.toHaveBeenCalled()
+  })
+})
+
+describe('applyAppProfileSettingsSeed', () => {
+  it('applies the copied settings once and removes the seed', () => {
+    const folder = join(home, 'seeded')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 'orca-settings-seed.json'), JSON.stringify({ theme: 'dark' }))
+    const updateSettings = vi.fn()
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    expect(updateSettings).toHaveBeenCalledTimes(1)
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
+    expect(existsSync(join(folder, 'orca-settings-seed.json'))).toBe(false)
+  })
+
+  it('ignores a seed that is not a settings object, never throws, and removes it', () => {
+    const folder = join(home, 'bad-seed')
+    mkdirSync(folder, { recursive: true })
+    const updateSettings = vi.fn()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const content of ['null', '5', '[]', '"x"', '{"theme":']) {
+      writeFileSync(join(folder, 'orca-settings-seed.json'), content)
+      expect(() => applyAppProfileSettingsSeed(folder, { updateSettings })).not.toThrow()
+      expect(existsSync(join(folder, 'orca-settings-seed.json'))).toBe(false)
+    }
+    expect(updateSettings).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('applies only known settings keys, and survives a store that throws', () => {
+    const folder = join(home, 'keys-seed')
+    mkdirSync(folder, { recursive: true })
+    const seed = join(folder, 'orca-settings-seed.json')
+    writeFileSync(seed, JSON.stringify({ theme: 'dark', notASetting: 1, __proto__x: 2 }))
+    const updateSettings = vi.fn()
+    applyAppProfileSettingsSeed(folder, { updateSettings })
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
+    writeFileSync(seed, JSON.stringify({ theme: 'dark' }))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(() =>
+      applyAppProfileSettingsSeed(folder, {
+        updateSettings: () => {
+          throw new Error('store failed')
+        }
+      })
+    ).not.toThrow()
+    expect(existsSync(seed)).toBe(false)
+    warn.mockRestore()
   })
 })
