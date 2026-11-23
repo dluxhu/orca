@@ -1,4 +1,6 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { EventEmitter } from 'node:events'
+import type * as Fs from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +15,10 @@ const { handlers, rows, isManager, profile, appOn, launchctl } = vi.hoisted(() =
   profile: { current: null as { id: string; userDataPath: string } | null }
 }))
 
+vi.mock('node:fs', async (original) => {
+  const actual = await original<typeof Fs>()
+  return { ...actual, watch: vi.fn(actual.watch) }
+})
 vi.mock('electron', () => ({
   app: { isPackaged: true, getPath: () => '/default-data', on: appOn },
   ipcMain: {
@@ -246,5 +252,22 @@ describe('Profiles menu refresh on activation', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('Profiles folder watch', () => {
+  it('logs a watch error and does not throw', async () => {
+    const watcher = Object.assign(new EventEmitter(), { unref: vi.fn(), close: vi.fn() })
+    vi.mocked(watch).mockReturnValueOnce(watcher as unknown as ReturnType<typeof watch>)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const rebuild = vi.fn()
+    startProfilesMenu(rebuild)
+    await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
+    expect(() => watcher.emit('error', new Error('folder removed'))).not.toThrow()
+    expect(warn).toHaveBeenCalledWith(
+      '[profiles] the profiles folder watch stopped:',
+      expect.any(Error)
+    )
+    warn.mockRestore()
   })
 })

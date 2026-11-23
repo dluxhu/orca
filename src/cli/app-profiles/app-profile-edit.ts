@@ -21,6 +21,7 @@ import { defaultAppOf, LSREGISTER, runTool, type RunTool } from './app-profile-c
 import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
+  rewriteServeUnitPort,
   withRegistryLockAsync,
   writeRegistry
 } from './app-profile-registry'
@@ -258,7 +259,7 @@ function renameLocked(
 /** Changes the port of the profile's desktop endpoint and server. */
 export async function setAppProfilePort(
   options: EditAppProfileOptions & { port: number }
-): Promise<AppProfileEntry & { serveServiceInstalled: boolean }> {
+): Promise<AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange }> {
   return withRegistryLockAsync(rootOf(options, 'edit'), async () => {
     const context = await prepare(options, 'edit')
     return setPortLocked(context, options.port)
@@ -268,7 +269,7 @@ export async function setAppProfilePort(
 function setPortLocked(
   context: Context,
   port: number
-): AppProfileEntry & { serveServiceInstalled: boolean } {
+): AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
   if (context.inBackground) {
     throw new RuntimeClientError(
       'profile_running',
@@ -288,6 +289,12 @@ function setPortLocked(
       profile.id === context.entry.id ? { ...profile, port } : profile
     )
   }))
+  // Start at login keeps the profile's port. A loaded job reads the unit again at its next load.
   const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
-  return { ...context.entry, port, serveServiceInstalled: existsSync(unit.unitPath) }
+  const updated = rewriteServeUnitPort(unit.unitPath, port)
+  if (updated) {
+    tryRun(context.run, '/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
+  }
+  const serveService: ServeServiceChange = updated ? 'updated' : 'none'
+  return { ...context.entry, port, serveServiceInstalled: existsSync(unit.unitPath), serveService }
 }
