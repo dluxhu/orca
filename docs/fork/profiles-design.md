@@ -117,7 +117,7 @@ Mac, not changed at most updates) is the same as Chrome's.
     <name> Helper (GPU).app           copy
     <name> Helper (Plugin).app        copy
     <name> Helper (Renderer).app      copy
-    Electron Framework.framework      link -> <default app>/Contents/Frameworks/Electron Framework.framework
+    Electron Framework.framework      APFS clone (cp -c); a link stops the helpers (section 12, U4)
     Mantle.framework, ReactiveObjC.framework, Squirrel.framework   links, as above
   Resources/icon.icns                 own icon
   Resources/<each other entry>        link -> <default app>/Contents/Resources/<entry>
@@ -721,3 +721,160 @@ done only after slice 2 (isolation).
 | 6. URL | The Profile Manager as the `orca:` handler, the two modes, the chooser, forwarding of every `orca:` URL, the target's handling of every `orca:` URL. | An `orca:` link opens in the selected profile, or only the chooser shows. The default app's main window does not open. |
 
 Not in this design: Linux and Windows, a change of id after creation, "Repair" of a profile after the default app moves.
+
+## 12. Slice 1 results
+
+Measured on 2026-11-21 on one Mac with macOS 27.2 (build 26B123), Apple silicon. Branch
+`nightly/profiles`. macOS 14, 15 and 26 are not tested.
+
+**Test setup.**
+
+- The default app is a local nightly build (`1.4.264-daily.202611181832-dlux.profiles.1`, Electron
+  43.8.10). It is not a release build. electron-builder signed the app, its frameworks and its helper
+  apps with a local self-signed certificate (no team, no hardened runtime). The terminal host and the
+  notification helpers are ad hoc. A release has a Developer ID signature instead. So the profile ran
+  ad hoc on code with another identity, as in a release, but not with a Developer ID.
+- The build has no `orcad` template, so `orca serve` runs on Electron.
+- Two profiles, "Work" and "Home", in a test folder. `ORCA_PROFILES_ROOT` and
+  `ORCA_PROFILES_APPS_DIR` select the test folders; `orca profiles create --pin-root` also writes
+  `OrcaAppProfilesRoot` into the profile's `Info.plist`.
+- The apps ran with a test `HOME`. It holds one link, `Library/Keychains`, to the user's keychains.
+- No GUI input was possible in the session (no clicks), so steps that need a click are not done.
+
+**Bundle.** A profile bundle is 1.3 MB on disk with links. `codesign --verify` passes and
+`codesign --verify --strict` fails ("invalid destination for symbolic link"), as expected.
+`CodeResources` records each link as its target path. The helper copies keep their signatures.
+
+| # | Answer | Evidence |
+| --- | --- | --- |
+| U1 | Yes, on macOS 27.2: the bundle with outside links launches. Work and Home ran as two foreground apps with their own bundle ids, Dock tiles and windows titled "Work" and "Home". Notifications and TCC: not measured (the notification permission request needs a closed onboarding, which needs a click). | `lsappinfo` |
+| U2 | Yes. `open -a Work.app orca://skills/share/<id>` delivered `open-url` to Work, which does not claim `orca:`. Work moved to its Skills page. | window captures before and after |
+| U3 | Not tested. | — |
+| U4 | **No with a linked framework.** With `Electron Framework.framework` as a link, every child process (GPU, network service, renderer) stops at once with `EXC_BREAKPOINT` in `ElectronMain`, and the app exits with "GPU process isn't usable". **Yes with a cloned framework.** With an APFS clone of the framework (`cp -c`, about no extra disk) and no other change, the GPU, utility and renderer processes start and the window renders. `orca --profile work status` reaches Work. In Work's terminal, `ORCA_USER_DATA_PATH` is the profile folder, `orca` is `Work.app/Contents/Resources/bin/orca`, and `orca status` names Work's pid. The updater reports "updater-unavailable". Browser, computer use and the `orcad` template: not tested. | crash reports, process list, CLI output |
+| U5 | Yes. The default app was replaced by `…profiles.2` (same Electron, same small executables, new `app.asar`). Work's cdhash, `codesign --verify` and `CodeResources` did not change. Work started on version `.2`, used its existing Keychain item and showed no prompt. TCC grant: not measured. | cdhash, `cmp`, Keychain item dates |
+| U6 | The case with helpers of another identity than the ad-hoc browser process starts and connects (Electron 43.8.10). A Developer ID case is not tested. | process list |
+| U7 | Notification helper: each profile's helper reads its own bundle's record (Work and Home: `not-determined`; the installed stable app: `denied`). The toggle check needs a click: not done. Keychain: a profile makes its own item `orca-<id> Safe Storage` with **no prompt**. After the profile's cdhash changed (it was signed again), the item asked for the **login keychain password** ("Work wants to use your confidential information stored in "orca-work Safe Storage" in your keychain", Always Allow, Deny, Allow), and the window stayed empty until an answer. A rebuild at an Electron upgrade changes the cdhash in the same way. | dialog capture |
+
+**Changes from these results (in slice 1).**
+
+- The thin bundle clones `Electron Framework.framework` with `cp -c` (option T with one clone). The
+  other frameworks stay links. The clone changes only when Electron changes, so it is part of the
+  `templateKey` rebuild (section 7) and U5 still holds.
+- Terminal host H2 finds the default app through the real path of `Contents/Resources/app.asar`,
+  because the framework is no longer a link. With the linked framework, H2 worked: the profile ran
+  the default app's host copy under launchd from `<userData>/daemon-host/macos/`. With the cloned
+  framework and the old lookup, terminals fell back to the in-process path. The new lookup and the
+  survival of terminals over a profile restart are not tested in the app yet.
+
+**Finding: a profile's serve service wrote the shared agent configs.** `orca serve service install`
+loads the LaunchAgent at once, with `PATH` and `ORCA_USER_DATA_PATH` only. launchd gives the job the
+login `HOME`. For about 2 s, before the test changed the unit, the profile's server ran with the real
+home and installed the managed agent hooks there: `~/.claude/settings.json`, `~/.grok/hooks/orca-status.json`
+and two files in `~/.orca/agent-hooks/`. Cause: the service did not carry the profile's environment,
+and a profile app installed agent hooks into shared folders. Fix in slice 1:
+
+- `orca serve service install` for a profile (its userData has the marker) writes `HOME`,
+  `ORCA_HOME_DIR`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `GROK_HOME` and `ORCA_PROFILES_ROOT` of the
+  caller into the unit.
+- A profile app, and every process that serves a profile's userData (also `orcad`), writes nothing
+  to the shared agent folders until the isolation slice gives each profile its own folders. One
+  check, `isAppProfileRuntime()`, stops: the managed hook install, refresh and removal; the Codex
+  hook reconcile (`~/.codex/hooks.json`, the approvals in `config.toml` and the Codex script in
+  `~/.orca/agent-hooks`), which runs at app start, in `orcad` and for each native terminal; the
+  Claude agent view (`~/.claude/keybindings.json` and its markers); the OpenCode status plugin
+  refresh; the Claude Code theme sync; and the uninstall of the shared hooks, plugins,
+  `~/.orca/agent-hooks` and the `orca` command (the uninstall reports them as kept for the
+  default app).
+- A profile app writes its marker at start when it is missing, so `orcad` and the CLI find the
+  profile.
+- `orca profiles create` started from a profile's `orca` finds the default app through the
+  profile's `app.asar` link, so it does not nest the bundle id. It writes `OrcaAppProfilesRoot`
+  only with the hidden test flag `--pin-root`, never from an inherited `ORCA_PROFILES_ROOT`.
+  An id has only `a-z`, `0-9` and `-`, so two names cannot share a bundle id. It writes the
+  marker before the app is in place, and removes the app when registration fails.
+
+- A profile app takes only its own folder. With `--user-data-dir`, the folder must carry the
+  profile's marker; else the app stops. It writes its marker only into its own folder. `orca
+  --profile <id> serve` and `orca open` start the target's own app: the profile's app, or the
+  default app for `default`.
+
+**Isolation (slice 2, in this PR).** Each profile has its own home folders under
+`<userData>/orca-home`. The variables below are set in the process environment before any module
+reads a path: by the main bundle's banner (Rolldown loads shared chunks before the entry's first
+import, so an imported module is too late; `config/build-plugins/app-profile-homes-banner.ts`), by
+the first module of the `orcad` bundle entry (esbuild keeps import order in one file), and by the
+CLI's `--profile` selection. Terminals, serve, `orcad` and agent launches inherit them; a profile's
+serve LaunchAgent carries them too. A profile sets all of them to its own folders, also when the
+user set a value before the profile started. The default app removes only a profile's values: a
+value under a profile's `orca-home` folder (its userData has the profile marker). It keeps every
+other value. Path code is lazy: a static test fails on a helper call at module load.
+
+Known limit: a shell startup file that exports one of these variables overrides the profile's
+folder in that profile's terminals.
+
+| Variable | Profile folder | Moves (each CLI's docs or source) |
+| --- | --- | --- |
+| `ORCA_HOME_DIR` | `orca-home` | `~/.orca`: credentials, API keys, cookies, hook scripts, host terminal policy, keybindings, theme sync, the hook install lock |
+| `CLAUDE_CONFIG_DIR` | `orca-home/agents/claude` | Claude Code settings, hooks, sessions, plugins, `.claude.json`, `.credentials.json`, and its Keychain entry |
+| `CODEX_HOME` | `agents/codex` | Codex `config.toml`, `auth.json`, history, logs |
+| `GROK_HOME` | `agents/grok` | Grok Build config, auth, sessions, skills, plugins, logs |
+| `COPILOT_HOME` | `agents/copilot` | Copilot CLI settings, auth, sessions, hooks |
+| `HERMES_HOME` | `agents/hermes` | Hermes config and user data |
+| `KIMI_CODE_HOME` | `agents/kimi-code` | Kimi Code config, sessions, logs, OAuth |
+| `KIRO_HOME` | `agents/kiro` | Kiro agents, prompts, skills, settings, sessions |
+| `OPENCLAW_STATE_DIR` | `agents/openclaw` | OpenClaw config, credentials, sessions, logs |
+| `MIMOCODE_HOME` | `agents/mimocode` | MiMo Code config, data, state, cache |
+| `GEMINI_CLI_HOME` | `agents/gemini` (Gemini makes `.gemini` in it) | Gemini CLI user config and storage |
+| `QWEN_HOME` | `agents/qwen` | Qwen Code global config and runtime data |
+| `QODER_CONFIG_DIR` | `agents/qoder` | Qoder CLI user config |
+| `CODEBUDDY_CONFIG_DIR` | `agents/codebuddy` | CodeBuddy config, history, runtime data |
+| `CLINE_DIR` | `agents/cline` | Cline CLI config, providers, sessions, logs |
+
+Every Orca site that builds one of these folders goes through `app-profile-homes.ts`
+(`orcaHomeDir()`, `defaultAgentHomeDir()`, `defaultClaudeJsonPath()`), and the Codex home path
+(`getSystemCodexHomePath()`) follows `CODEX_HOME` from the profile. A static test fails when a raw
+`homedir()` path, an `os.homedir()` path to `.claude.json` or a `$HOME/.<agent>` template for one
+of these folders appears outside the helpers, unless the line reads the folder's variable first.
+It also flags a home held in a name (`join(home, '.codex')`) and `app.getPath('home')`. Its
+allow-list names each exception and its reason (WSL guest and other hosts' homes, Antigravity,
+test harnesses, binary folders, `orcad`'s data folder, the frozen hook command forms). Skill
+discovery, skill install roots (Gemini through `GEMINI_CLI_HOME`, CodeBuddy through
+`CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi, Qwen) take the
+launch's variable, else the profile's folder.
+
+The Keychain item is per profile: the profile start sets the name `orca-<id>` before ready, so
+Electron uses "orca-<id> Safe Storage".
+
+**Agents that stay on the real home.** These have no folder variable, or Orca rewrites the variable
+per pane, or the folder moves only with XDG variables that would also move git and other tools:
+Pi, OMP and Prime Agent (`PI_CODING_AGENT_DIR`, `PRIME_AGENT_CODING_AGENT_DIR`: Orca sets them per
+pane), OpenCode (`OPENCODE_CONFIG_DIR` only adds a folder; config and data follow
+`XDG_CONFIG_HOME` and `XDG_DATA_HOME`), Cursor (`CURSOR_CONFIG_DIR` moves only
+`cli-config.json`), Antigravity, Devin, Factory, Rovo Dev, Amp, JCode, Zcode and DSH. For them, the
+`isAppProfileRuntime()` checks stay the only guard: a profile installs, refreshes and removes no
+hook, plugin or config of theirs.
+The one exception is workspace trust: a profile that launches Cursor or Antigravity adds the
+workspace to their trusted folders in the real home, as the default app does. The write adds a
+trusted folder, and on worktree removal removes only the entries it added. That agent reads the
+real home in a profile too.
+
+**Safety model.** The per-profile folders are the first guard. The `isAppProfileRuntime()` checks
+on each writer are the second one: a profile still installs no managed agent hooks. The hook
+command forms keep `${HOME-}/.orca` (the Codex form is frozen bytes that Codex approves by hash),
+so a later change that turns hooks on in a profile must first give the commands an
+`ORCA_HOME_DIR` form.
+
+Tests: the vitest real-home write guard also refuses writes to `~/.grok` and to the folders
+that a profile's terminal exports, and it clears those variables before each test file.
+
+**Other findings.**
+
+- The floating workspace uses Electron's native home path; it is a working folder, not a config
+  folder. Keybindings now follow `ORCA_HOME_DIR`.
+- The profile apps show macOS "App Running in Background" notices for Work and Home (their terminal
+  host jobs).
+- The main window loads `app.asar` from the default app's real path.
+
+**Not tested.** macOS 14, 15 and 26; notification entries, banners and clicks; the notification
+toggle; TCC prompts and grants; U3; the serve service stop and restart by the app; the "Stop the
+server and open" dialog; terminals over a profile restart; the browser, computer use and `orcad`.

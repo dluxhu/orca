@@ -32,7 +32,7 @@ function NoHome({ bot }: { bot: Bot }): React.JSX.Element {
       {t(
         'bots.settingsView.noHome',
         'Can’t open {{name}}’s soul and memory here. They stay in its folder at {{path}}.',
-        { name: bot.name, path: botFolderDisplay(bot.folder) }
+        { name: bot.name, path: botFolderDisplay(bot.folder, bot.hostId) }
       )}
     </p>
   )

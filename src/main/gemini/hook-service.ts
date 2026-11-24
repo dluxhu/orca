@@ -1,4 +1,4 @@
-import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { join } from 'node:path'
 import type { SFTPWrapper } from 'ssh2'
 import type {
@@ -39,7 +39,7 @@ import { posixCurlCommand } from '../agent-hooks/installation/scripts/hook-post-
 const GEMINI_EVENTS = ['BeforeAgent', 'AfterAgent', 'AfterTool', 'BeforeTool'] as const
 
 function getConfigPath(): string {
-  return join(homedir(), '.gemini', 'settings.json')
+  return join(defaultAgentHomeDir('GEMINI_CLI_HOME', '.gemini'), 'settings.json')
 }
 
 function getManagedScriptFileName(): string {

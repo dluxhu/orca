@@ -23,6 +23,8 @@
 2 src/main/amp/managed-plugin-install-status.ts
 2 src/main/antigravity/native-credential-backend.ts
 3 src/main/antigravity/native-file-credentials.ts
+1 src/main/app-profiles/app-profile-serve-exclusion.ts # app profiles (fork): one serve unit check before the instance locks, pre-ready where nothing can await
+1 src/main/app-profiles/app-profile.ts # app profiles (fork): one Info.plist read, memoized, before userData is set
 3 src/main/artifacts/artifact-create-intent-store.ts
 2 src/main/artifacts/artifact-share-record-store.ts
 1 src/main/automations/external-managers/external-manager-discovery.ts
@@ -561,6 +563,7 @@
 5 src/shared/agent-launch/plugins/opencode/opencode-tui-config-registration.ts
 1 src/shared/agent-launch/plugins/opencode/opencode-tui-plugin-install.ts
 4 src/shared/agent-launch/startup/omp-fresh-config.ts
+5 src/shared/app-profiles/app-profile-paths.ts # app profiles (fork): marker and registry reads and one marker write at start; the CLI uses them too
 2 src/shared/desktop-distribution/appimage/appimage-cache-identity.ts
 2 src/shared/file-access/real-path-sync.ts
 6 src/shared/file-content/node-bounded-file-reader.ts
