@@ -32,6 +32,18 @@ vi.mock('electron', () => ({
   }
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
+// The icons come from the real bundle files; profile-manager-app-icon.test.ts covers that.
+vi.mock('./profile-manager-app-icon', () => {
+  const icons = async (rows: AppProfileRow[]) =>
+    new Map(rows.map((row) => [row.id, { list: `url-${row.id}`, menu: `image-${row.id}` }]))
+  return {
+    appIcons: icons,
+    withAppIcons: async (state: { rows: AppProfileRow[] }) => ({
+      ...state,
+      icons: Object.fromEntries([...(await icons(state.rows))].map(([id, i]) => [id, i.list]))
+    })
+  }
+})
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({
   getAppProfile: () => profile.current,
@@ -238,7 +250,8 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:setOwnStartAtLogin'
     ])
     await expect(handlers.get('appProfiles:state')?.({ sender: {} })).resolves.toMatchObject({
-      currentId: 'default'
+      currentId: 'default',
+      icons: { default: 'url-default' }
     })
     isManager.current = false
     for (const channel of [
@@ -297,6 +310,10 @@ describe('profilesMenuItems', () => {
       ['separator', undefined, undefined],
       [undefined, 'Profile Manager…', undefined]
     ])
+    // Each profile item has its app's 18 pt icon.
+    expect(items.filter((item) => item.label?.startsWith('Orca')).map((item) => item.icon)).toEqual(
+      ['image-work', 'image-home', 'image-client']
+    )
   })
 })
 

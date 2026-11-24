@@ -191,7 +191,11 @@ export function ProfileFormDialog(props: {
               onChange={(icon) => onChange({ ...form, icon })}
             />
           </div>
-          <ProfileIconPreview value={form.icon} profileId={row?.id} />
+          <ProfileIconPreview
+            value={form.icon}
+            profileId={row?.id}
+            appIcon={props.state?.icons?.default}
+          />
         </div>
         {props.alert ? <div className="px-6 pb-4">{props.alert}</div> : null}
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 border-t px-6 py-4 sm:justify-between">

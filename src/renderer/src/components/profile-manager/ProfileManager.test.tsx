@@ -73,6 +73,17 @@ const editWork = async (): Promise<void> => {
 }
 
 describe('ProfileManager', () => {
+  it("shows each app's own Dock icon from the main process", async () => {
+    appState = { ...appState, icons: { default: 'data:image/png;base64,T1JDQQ==' } }
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    expect(rowOf('Orca').querySelector('img')?.getAttribute('src')).toBe(
+      'data:image/png;base64,T1JDQQ=='
+    )
+    // A row without an icon keeps the space, so the names line up.
+    expect(rowOf('Orca - Work').querySelector('img')).toBeNull()
+  })
+
   it('offers every badge style, and shows the preview on a light and a dark Dock', async () => {
     render(<ProfileManager />)
     fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))

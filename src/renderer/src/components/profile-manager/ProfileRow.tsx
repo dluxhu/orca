@@ -50,6 +50,8 @@ function ProfileStatus(props: { state: AppProfileRow['state'] }): React.JSX.Elem
 
 export function ProfileRow(props: {
   row: AppProfileRow
+  /** The app's own Dock icon, as a data URL. */
+  iconUrl?: string
   /** This app's own row. */
   current: boolean
   busy: boolean
@@ -65,6 +67,11 @@ export function ProfileRow(props: {
   const name = isDefault ? appName(row.appPath) : row.name
   return (
     <li className="flex flex-wrap items-center gap-4 px-4 py-3.5">
+      {props.iconUrl ? (
+        <img src={props.iconUrl} alt="" className="size-12 shrink-0" />
+      ) : (
+        <span aria-hidden="true" className="size-12 shrink-0" />
+      )}
       <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{name}</span>

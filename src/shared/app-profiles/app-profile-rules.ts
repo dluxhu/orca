@@ -48,6 +48,8 @@ export type AppProfilesState = {
   currentId: string | null
   /** Ids of data folders that "Keep data" left. A new profile with such an id uses the folder. */
   keptIds: string[]
+  /** Each app's own Dock icon as a PNG data URL, by row id. The main process sets it for the window. */
+  icons?: Record<string, string>
 }
 
 /**

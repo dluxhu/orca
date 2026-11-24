@@ -148,6 +148,7 @@ export function ProfileManager(): React.JSX.Element {
               <ProfileRow
                 key={row.id}
                 row={row}
+                iconUrl={state?.icons?.[row.id]}
                 current={row.id === state?.currentId}
                 busy={busy}
                 onOpen={() => void api.open(row.id)}

@@ -183,6 +183,8 @@ export function ProfileIconPreview(props: {
   value: AppProfileIconSource
   /** The profile that the Edit dialog changes; its own badge character is free. */
   profileId?: string | null
+  /** The default app's icon, shown next to the preview as in the Dock. */
+  appIcon?: string
 }): React.JSX.Element {
   const t = useTranslate()
   const api = window.api.appProfiles
@@ -218,6 +220,9 @@ export function ProfileIconPreview(props: {
       {dockSamples.map((sample, index) => (
         <div key={sample.key} className={`flex justify-center rounded-[14px] p-5 ${sample.sample}`}>
           <div className={`flex items-end gap-3 rounded-[18px] border px-4 py-2.5 ${sample.dock}`}>
+            {props.appIcon ? (
+              <img src={props.appIcon} alt="" className="size-14 opacity-85" />
+            ) : null}
             {preview && 'png' in preview ? (
               <img
                 className="size-24"

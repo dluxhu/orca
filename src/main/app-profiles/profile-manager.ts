@@ -35,6 +35,7 @@ import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-pro
 import { appProfileIconFlags } from '../../shared/app-profiles/app-profile-rules'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
 import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
+import { appIcons, withAppIcons, type AppIcon } from './profile-manager-app-icon'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
 /** The id of this app's row: null in the Profile Manager app, which is no row. */
@@ -204,7 +205,7 @@ export async function readOwnStartAtLogin(): Promise<{ id: string; enabled: bool
 export function registerProfileManagerIpc(): void {
   ipcMain.handle(
     'appProfiles:state',
-    fromProfileManager(() => readAppProfilesState())
+    fromProfileManager(async () => withAppIcons(await readAppProfilesState()))
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
@@ -240,6 +241,7 @@ export function registerProfileManagerIpc(): void {
 
 // The Profiles menu. Electron menus are not live, so the rows are cached and the menu rebuilt.
 let menuRows: AppProfileRow[] = []
+let menuIcons = new Map<string, AppIcon>()
 let rebuildMenu: (() => void) | null = null
 
 // One launchctl print per profile is slow. A refresh on app activation reads only the runtime pids
@@ -267,6 +269,7 @@ async function refreshProfilesMenu(full = true): Promise<void> {
   }
   try {
     menuRows = (await readAppProfilesState({ serviceRun: cachedServiceRun })).rows
+    menuIcons = await appIcons(menuRows)
     rebuildMenu()
   } catch (error) {
     console.warn('[profiles] menu refresh failed:', error)
@@ -308,10 +311,10 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
   }
   const item = (row: AppProfileRow): MenuItemConstructorOptions => {
     const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
-    const click = (): void => openApp(row.appPath)
+    const common = { icon: menuIcons.get(row.id)?.menu, click: () => openApp(row.appPath) }
     return row.id === currentId
-      ? { label: name, type: 'checkbox', checked: true, click }
-      : { label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`, click }
+      ? { ...common, label: name, type: 'checkbox', checked: true }
+      : { ...common, label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}` }
   }
   const section = (label: string, rows: AppProfileRow[]): MenuItemConstructorOptions[] =>
     rows.length > 0 ? [{ type: 'header', label }, ...rows.map(item), { type: 'separator' }] : []
