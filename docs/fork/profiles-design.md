@@ -325,6 +325,7 @@ in place of the defaults.
 {
   "version": 1,
   "defaultAppPath": "/Applications/<default app>.app",
+  "defaultPort": 6769,
   "urlHandler": { "mode": "ask" },
   "profiles": [
     {
@@ -349,33 +350,57 @@ in place of the defaults.
 - **Writers.** The Profile Manager and the local `orca profiles` commands write the file. Each one
   takes a lock file next to it, and writes a temporary file and a rename. The profiles read the file
   and watch it with `fs.watch`.
-- **Port** (owner: "a parameter in the profile editor"). Each profile has its own port for the
-  desktop WebSocket endpoint and for `orca serve`. The New profile and Edit dialogs show it.
-  - **Today.** The packaged desktop does not pin 6768 (`preferPinnedWsPort` and
-    `requirePinnedWsPort` default to false, `src/main/runtime/rpc/server/runtime-rpc-state.ts:124-126`).
-    When the port is taken, it tries a fallback ladder of the next 31 ports (`port+1` … `port+31`,
-    without 6769), then a random port (`src/main/runtime/rpc/transports/websocket/ws-fallback-port-store.ts:7-20`).
-    6769 is reserved for `pnpm dev` (`DEV_PINNED_WS_PORT`, `:8-9`). So the default app uses 6768 to 6799.
+- **Port** (owner: "a parameter in the profile editor"). Each profile has a saved port for
+  `orca serve`. The New profile and Edit dialogs show it, and Settings > General shows it for the
+  app's own profile.
+  - **Desktop.** The packaged desktop does not use the saved port. It listens on 6768
+    (`DEFAULT_WS_PORT`) and, when that port is taken, on a fallback ladder of the next 31 ports
+    (`port+1` … `port+31`, without 6769), then a random port
+    (`src/main/runtime/rpc/transports/websocket/ws-fallback-port-store.ts`). 6769 is reserved for
+    `pnpm dev`. So desktop apps use 6768 to 6799.
+  - **Serve.** `orca serve` without `--port` uses the saved port: the profile's `port`, or the
+    default app's `defaultPort` (`savedAppPort`, `app-profile-paths.ts`). Without a saved port,
+    serve uses 6768 and its ladder, as upstream. A saved port is a pinned port: a taken port stops
+    serve with `PinnedPortUnavailableError`. `--port` comes before the saved port.
+  - **`defaultPort`** (owner, 2026-11-24): the default app's saved port, optional.
+    `orca profiles set-port default --port <n>` writes it. Without it, the default app uses 6768.
   - **Profile ports** start at 6800 and are 32 apart: 6800, 6832, 6864, … The default for a new
-    profile is the first free value in that series. So no profile's port or fallback ladder overlaps
-    another profile's or the default app's.
-  - **Validation** in the editor: a number from 1024 to 65535; not the port of another profile; not
-    inside the ladder of another profile or of the default app (6768 to 6799); a warning (not an
-    error) when another process listens on it now.
-  - **Desktop:** the profile app passes its port as the preferred `wsPort`
-    (`runtime-rpc-lifecycle.ts:135-146`) and keeps the normal fallback. It does not set
-    `requirePinnedWsPort`, so a taken port never stops the app.
-  - **Serve:** only `orca --profile <id> serve` pins the port, with `--port`. A taken port stops
-    serve with an error, as today (`PinnedPortUnavailableError`).
+    profile is the first value that is 32 or more from every other profile's port and from the
+    default app's saved port.
+  - **Validation** (`app-profile-rules.ts`, the same in the CLI, the dialogs and Settings): a number
+    from 1024 to 65535. Refused: the default app's saved port, and a port less than 32 from another
+    profile's port. The default app refuses a port that a profile saves. A warning, not an error:
+    a port in 6768 to 6799 (desktop apps can take it first), and a port less than 32 from the
+    other side's saved port (a profile from the default app's port, the default app from a
+    profile's port).
+  - **A change** asks first: "Paired servers will need to be re-paired." (Settings and Edit). The
+    port is read-only while a server of the profile runs. `set-port` works while the app runs, and
+    moves a Start at login unit to the new port (a loaded job restarts on it).
+- **Who owns the runtime.** The process that writes `orca-runtime.json` also writes its `role`
+  (`app`, `serve` or `orcad`) and its `userDataPath` (`runtime-rpc-request-admission.ts`). The
+  owner check (`readAppProfileRuntime`, `app-profile-list.ts`) reads only that file, the pid and
+  launchd. It does not read the command line: a Dock-opened app has no `--user-data-dir`, a Finder
+  rename moves the bundle under a running process, orcad has another command, and pids are reused.
+  - The pid is alive, and it did not start after the file was written (`ps -o ppid=,etime=`, 2 s
+    slack). Else: no owner.
+  - The profile's own service: the runtime pid is the service job (`launchctl print`) or a child of
+    it, up to 3 levels (the `--supervise` supervisor and its server).
+  - Else the role: `serve` or `orcad` is a server; `app`, or no role (a file of an older version),
+    is the app. No role never means "stopped", so no edit removes a running app's data.
 - **States** (owner). Each row of the list shows one of:
-  - "Running": the profile app runs;
-  - "Running in background": the profile's serve service runs and the app does not (also after the
-    user quits the app and macOS shows the service as running in the background);
-  - "Stopped": neither runs.
+  - "Running": the profile app owns the runtime;
+  - "Running in background": a server owns it (the profile's own service, another launch agent, or
+    a terminal), or the profile's service job runs;
+  - "Stopped": none of these.
 
-  The Profile Manager reads them from the app's `orca-runtime.json` (its pid, tested with signal 0,
-  as `runtime-rpc-socket-metadata.ts:43-47` does) and from `orca --profile <id> serve service
-  status` (`src/cli/specs/serve.ts:109-116`).
+  Each row also shows the port: "Running on <live port>" from the runtime file's WebSocket
+  transport, with "(saved port <n>)" for a server on another port, or "Port <saved>" when nothing
+  runs. The list reads again every 2 s, and at once when the window shows again. One read: one
+  `launchctl print` per profile, one runtime file and one `ps` per live runtime (measured: each
+  under 10 ms).
+- **Edits and the owner.** Rename, remove and set-port refuse a server that the profile's own
+  service did not start. Rename and remove refuse the app. Remove stops and uninstalls the
+  profile's own service before it moves the data.
 - **Serve and app exclude each other** in both directions: serve refuses a running app (section 0),
   and the app refuses a profile that a serve (`orcad`) holds ("Orca could not start",
   `main-process-preflight-failure.ts:10-19`). One mechanism, in the profile app itself:
@@ -946,7 +971,8 @@ Done on `dlux/profile-manager` and `dlux/profile-manager-app`:
   (a dev run, `pnpm dev`) shows the Profile Manager window of the app, as before. In the Manager app,
   "Profile Manager…" shows its own window.
 - The Profile Manager (list, New profile, Edit, Remove): the list with the three states and
-  "Open" (default app too), New profile (name, id, port, "Copy settings from this app"), Edit (name, port), Remove with "Keep data". Changes run the
+  "Open" (default app too), New profile (name, id, port, "Copy settings from this app"), Edit (name,
+  port, Start at login), Remove with "Keep data". Changes run the
   app's own `orca profiles … --json`. In the Manager app, that `orca` finds the default app through
   the links, and no row is "this app".
 - The top-level Profiles menu: each app with its state, a check mark on the current app, and
@@ -958,6 +984,8 @@ Done on `dlux/profile-manager` and `dlux/profile-manager-app`:
   the profile's own serve service (`orca --profile <id> serve service install --port <port>
   --command <default app>/Contents/Resources/bin/orca`); the data stays. The Profile Manager is not
   needed for it. A failed `launchctl` step shows its error.
+- "Port" (owner, 2026-11-24): in Settings > General next to "Start at login", the saved port of the
+  app's own profile, also in the default app (`defaultPort`). Section 4 gives the rules.
 
 Changes from this design:
 
