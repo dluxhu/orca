@@ -4,6 +4,7 @@ import { useConfirmationDialog } from '@/components/dismiss/confirmation/confirm
 import { deleteFolderWorkspaceUnlessUnsaved } from '@/components/sidebar/workspace-actions/deletion/folder-workspace-delete'
 import { useTranslate } from '@/i18n/use-translate'
 import { deleteBot } from '@/lib/bot-catalog'
+import { profilePathDisplay } from '@/lib/app-profile-path-display'
 import { useAppStore } from '@/store'
 import { selectFolderWorkspaceOnHost } from '@/store/folder-workspaces/folder-workspace-record-index'
 import type { Bot } from '../../../../shared/bot-types'
@@ -24,7 +25,11 @@ export function useDeleteBot(bot: Bot): () => Promise<boolean> {
       description: t(
         'bots.row.deleteDescription',
         'Its folder stays at {{path}}, with its soul and memory.',
-        { path: home?.folderPath ?? botFolderDisplay(bot.folder) }
+        {
+          path: home
+            ? profilePathDisplay(home.folderPath)
+            : botFolderDisplay(bot.folder, bot.hostId)
+        }
       ),
       confirmLabel: t('bots.row.deleteConfirm', 'Delete bot'),
       confirmVariant: 'destructive'

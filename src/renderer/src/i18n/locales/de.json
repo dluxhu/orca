@@ -8552,7 +8552,7 @@
           "38e3bbeb25": "Benutzerdefinierte Datei auswählen"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Schlüssel der lokalen Laufzeitumgebung werden in ~/.orca gespeichert, sofern verfügbar mit der verschlüsselten Speicherung von Electron.",
+          "d246b2bdb3": "Schlüssel der lokalen Laufzeitumgebung werden in <path>{{root}}</path> gespeichert, sofern verfügbar mit der verschlüsselten Speicherung von Electron.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API-Schlüssel konfiguriert",
           "07ed3e512e": "Audiodaten werden nur an OpenAI gesendet, wenn ein OpenAI-Modell zur Spracherkennung ausgewählt ist.",
@@ -9153,7 +9153,7 @@
           "25b0004fbf": "Terminal aktiv",
           "781cb74d22": "Wird aus Terminalbereichen ausgeführt.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "Das Tastenkürzel ist nicht mehr verfügbar.",
           "9a3a3ca03d": "Tastenkürzel"
         },
@@ -24121,7 +24121,7 @@
       "computerAccountHint": "Wo der Bot läuft, bei Orca angemeldet als {{account}}.",
       "useChatDefaults": "Chat-Standardeinstellungen verwenden",
       "agent": "Agent",
-      "folder": "Ordner: {{path}}",
+      "folder": "Ordner: <path>{{path}}</path>",
       "name": "Name",
       "validation": {
         "addName": "Name eingeben",
