@@ -19,7 +19,11 @@ import {
   type BuiltInAppIconId
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
-import { fitAppIconToPlatformShape, ownDockIcon } from './platform-app-icon-shape'
+import { fitAppIconToPlatformShape, ownDockIcon, ownIconPath } from './platform-app-icon-shape'
+import {
+  MAC_DOCK_ICON_CLEAR_SCRIPT,
+  MAC_DOCK_ICON_SCRIPT
+} from '../../../shared/app-lifecycle/identity/mac-custom-icon-script'
 
 const isMac = process.platform === 'darwin'
 
@@ -50,25 +54,6 @@ type PersistMacDockIconOptions = {
   isDevApp?: boolean
   platform?: NodeJS.Platform
 }
-
-const MAC_DOCK_ICON_SCRIPT = [
-  'use framework "AppKit"',
-  'use scripting additions',
-  'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
-  'set iconPath to system attribute "ORCA_APP_ICON_PATH"',
-  "set image to current application's NSImage's alloc()'s initWithContentsOfFile:iconPath",
-  'if image is missing value then error "Orca app icon image could not be loaded"',
-  "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:image forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be persisted"'
-]
-
-const MAC_DOCK_ICON_CLEAR_SCRIPT = [
-  'use framework "AppKit"',
-  'use scripting additions',
-  'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
-  "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:(missing value) forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be cleared"'
-]
 
 const MAC_DOCK_ICON_COMMAND_TIMEOUT_MS = 10_000
 const MAC_DOCK_ICON_COMMAND_FALLBACK_MS = 1_000
@@ -304,11 +289,19 @@ export function persistMacDockIcon(value: unknown, options: PersistMacDockIconOp
     if (generation !== macDockIconPersistenceGeneration) {
       return
     }
+    // A profile app keeps the Finder custom icon of its profile (fork patch).
+    const own = getAppIconPath(value) === APP_ICON_PATHS.classic && ownDockIcon()
+    if (own) {
+      app.dock?.setIcon(own)
+      // A built-in or imported icon before can have replaced the profile's Finder icon.
+      await runMacCustomIconCommand(execFile, appBundlePath, ownIconPath())
+      return
+    }
     if (iconId === 'classic') {
       const cleared = await clearMacCustomIconMetadata(execFile, appBundlePath)
       // Empty image reaches AppKit as nil, so the Dock draws the sharp bundle icns once no custom icon remains.
       if (cleared && generation === macDockIconPersistenceGeneration) {
-        app.dock?.setIcon(ownDockIcon() ?? nativeImage.createEmpty())
+        app.dock?.setIcon(nativeImage.createEmpty())
       }
       return
     }
