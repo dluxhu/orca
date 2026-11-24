@@ -31,10 +31,7 @@ export type AppProfileIcon =
   | { kind: 'image'; style: IconStyle }
   | { kind: 'file' }
 
-/** A copy of the profile icon in the profile's userData, so the icon does not depend on the app. */
-export const APP_PROFILE_ICON_FILE = 'profile-icon.icns'
-/** A copy of an uploaded badge as PNG, next to the icon. The Edit form starts from it. */
-export const APP_PROFILE_BADGE_FILE = 'profile-icon-badge.png'
+export { APP_PROFILE_BADGE_FILE, APP_PROFILE_ICON_FILE } from './app-profile-icon-files'
 
 export type AppProfileEntry = {
   id: string
