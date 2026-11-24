@@ -115,6 +115,11 @@ export function adoptedTranscriptSourceObserver(input: {
       ? sessionIdFromFileName(input.filePath)
       : null
   let cwd: string | null = null
+  // A resumed Claude conversation records each folder it ran in; the one that is this workspace wins.
+  let claudeWorkspaceCwd: string | null = null
+  const workspace = normalizeRuntimePathForComparison(input.source.workspaceCwd.trim())
+  // A Claude conversation can reach this workspace after its first folder, so reading goes on until then.
+  const found = () => (input.agent === 'claude' ? claudeWorkspaceCwd !== null : cwd !== null)
   let sawCodexMetadata = false
   /** The conversation's recorded identity, read after every line is observed. */
   const identity = async (): Promise<{ sessionId: string | null; cwd: string | null }> => {
@@ -130,6 +135,8 @@ export function adoptedTranscriptSourceObserver(input: {
       sessionId = extractString(summary?.id) ?? sessionIdFromFileName(dirname(input.filePath))
       cwd = extractString(summary?.cwd)
     }
+    // A miss keeps the first folder, so the folder probe can still match it through a symlink.
+    cwd = claudeWorkspaceCwd ?? cwd
     if (input.agent === 'pi' && sessionIdFromFileName(input.filePath) !== sessionId) {
       throw new Error('The saved conversation header does not match its file identity.')
     }
@@ -144,11 +151,15 @@ export function adoptedTranscriptSourceObserver(input: {
     observe(line: string): boolean {
       const record = parseJsonObject(line)
       if (!record) {
-        return cwd !== null
+        return found()
       }
       if (input.agent === 'claude') {
         sessionId = extractString(record.sessionId) ?? sessionId
-        cwd ??= extractString(record.cwd)
+        const recorded = extractString(record.cwd)
+        if (recorded && normalizeRuntimePathForComparison(recorded.trim()) === workspace) {
+          claudeWorkspaceCwd ??= recorded
+        }
+        cwd ??= recorded
       } else if (input.agent === 'codex' && record.type === 'session_meta' && !sawCodexMetadata) {
         sawCodexMetadata = true
         const payload = asRecord(record.payload)
@@ -157,7 +168,7 @@ export function adoptedTranscriptSourceObserver(input: {
         sessionId = extractString(record.id)
         cwd = extractString(record.cwd)
       }
-      return cwd !== null
+      return found()
     },
     identity,
     async validate() {
