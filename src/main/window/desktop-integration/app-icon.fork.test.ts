@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
-  profile: null as { id: string } | null,
+  own: null as { tag: string } | null,
   setIcon: vi.fn(),
   image: { isEmpty: () => false, tag: 'png' },
   createFromPath: vi.fn()
@@ -32,9 +32,9 @@ vi.mock('./custom-app-icon', () => ({
   getCustomAppIconRevision: () => 1,
   hasCustomAppIcon: () => false
 }))
-vi.mock('../../app-profiles/app-profile', () => ({ getAppProfile: () => h.profile }))
+vi.mock('../../app-profiles/app-profile-dock-icon', () => ({ ownDockIcon: () => h.own }))
 
-import { applyAppIcon } from './app-icon'
+import { applyAppIcon, persistMacDockIcon } from './app-icon'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -42,23 +42,40 @@ beforeEach(() => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
 })
 
+const OWN = { tag: 'own bundle icon' }
+
 describe('applyAppIcon in a profile app', () => {
-  it('keeps the bundle icon for the default choice and a missing imported icon', () => {
-    h.profile = { id: 'work' }
+  it('shows its own bundle icon for the default choice and a missing imported icon', () => {
+    h.own = OWN
     applyAppIcon('classic')
     applyAppIcon('custom')
-    expect(h.setIcon).not.toHaveBeenCalledWith(h.image)
+    expect(h.setIcon.mock.calls).toEqual([[OWN], [OWN]])
   })
 
   it('still shows a built-in icon that the profile chose', () => {
-    h.profile = { id: 'work' }
+    h.own = OWN
     applyAppIcon('blue')
     expect(h.setIcon).toHaveBeenCalledWith(h.image)
   })
 
   it('shows the default icon in the default app', () => {
-    h.profile = null
+    h.own = null
     applyAppIcon('classic')
     expect(h.setIcon).toHaveBeenCalledWith(h.image)
+  })
+
+  it('sets its own icon again, not the cached bundle icon, after the default choice is saved', async () => {
+    h.own = OWN
+    const execFile = vi.fn((...args: unknown[]) => {
+      ;(args.find((arg) => typeof arg === 'function') as (e: null) => void)(null)
+      return {}
+    })
+    persistMacDockIcon('classic', {
+      platform: 'darwin',
+      isDevApp: false,
+      appBundlePath: '/Apps/Work.app',
+      execFile: execFile as never
+    })
+    await vi.waitFor(() => expect(h.setIcon).toHaveBeenCalledWith(OWN))
   })
 })

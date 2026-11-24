@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppProfile, defaultAppOf, type RunTool } from './app-profile-create'
 import { setAppProfileIcon, type SetAppProfileIconOptions } from './app-profile-set-icon'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
-import { nextBadgeText } from './app-profile-icon'
+import { appIconFileName, nextBadgeText } from './app-profile-icon'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -27,6 +27,7 @@ const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleExecutable</key><string>Orca</string>
   <key>CFBundleName</key><string>Orca</string>
   <key>CFBundleDisplayName</key><string>Orca</string>
+  <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>orca</string></array></dict></array>
   <key>CFBundleDocumentTypes</key><array><dict><key>CFBundleTypeRole</key><string>Editor</string></dict></array>
   <key>ElectronAsarIntegrity</key><dict><key>Resources/app.asar</key><dict/></dict>
@@ -38,6 +39,15 @@ let dir: string
 let app: string
 let calls: string[][]
 let iconSources: unknown[]
+
+// The icon file that the bundle's Info.plist names.
+const bundleIcon = (appPath: string): string =>
+  join(
+    appPath,
+    'Contents',
+    'Resources',
+    appIconFileName(readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8'))
+  )
 
 // The real icon takes seconds to render; its own tests cover it.
 const makeIcon = ((
@@ -57,7 +67,7 @@ const run: RunTool = (program, args) => {
     const target = args.at(-1) ?? ''
     // The seal must cover the new icon: a real file with the new bytes when the bundle is signed.
     if (args[0] === '--force' && target.endsWith('.app')) {
-      const icon = join(target, 'Contents', 'Resources', 'icon.icns')
+      const icon = bundleIcon(target)
       if (lstatSync(icon).isSymbolicLink() || !readFileSync(icon, 'utf8').startsWith('icns ')) {
         throw new Error(`codesign before the icon is written: ${icon}`)
       }
@@ -510,8 +520,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     ...more
   })
 
-  const icon = (entry: { appPath: string }): string =>
-    join(entry.appPath, 'Contents', 'Resources', 'icon.icns')
+  const icon = (entry: { appPath: string }): string => bundleIcon(entry.appPath)
   const defaultIcon = (): string => join(app, 'Contents', 'Resources', 'icon.icns')
   // A profile made before icons has a link to the default app's icon.
   const linkIcon = (entry: { appPath: string }): void => {
@@ -552,6 +561,19 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
       'Q',
       '3'
     ])
+  })
+
+  it('gives each new icon a new file name, so that macOS does not show a cached icon', async () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    const resources = join(work.appPath, 'Contents', 'Resources')
+    await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
+    const first = icon(work)
+    expect(first).toMatch(/\/icon-[0-9a-f]{8}\.icns$/)
+    expect(existsSync(join(resources, 'icon.icns'))).toBe(false)
+    await setAppProfileIcon('work', { kind: 'badge', text: 'R' }, opts())
+    expect(icon(work)).not.toBe(first)
+    expect(existsSync(first)).toBe(false)
+    expect(read(icon(work))).toBe('icns R')
   })
 
   it('keeps an uploaded badge as PNG, so that the Edit form can start from it', async () => {

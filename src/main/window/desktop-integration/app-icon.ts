@@ -19,7 +19,7 @@ import {
   type BuiltInAppIconId
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
-import { fitAppIconToPlatformShape, keepsBundleIcon } from './platform-app-icon-shape'
+import { fitAppIconToPlatformShape, ownDockIcon } from './platform-app-icon-shape'
 
 const isMac = process.platform === 'darwin'
 
@@ -308,7 +308,7 @@ export function persistMacDockIcon(value: unknown, options: PersistMacDockIconOp
       const cleared = await clearMacCustomIconMetadata(execFile, appBundlePath)
       // Empty image reaches AppKit as nil, so the Dock draws the sharp bundle icns once no custom icon remains.
       if (cleared && generation === macDockIconPersistenceGeneration) {
-        app.dock?.setIcon(nativeImage.createEmpty())
+        app.dock?.setIcon(ownDockIcon() ?? nativeImage.createEmpty())
       }
       return
     }
@@ -327,8 +327,8 @@ export function applyAppIcon(value: unknown): void {
   if (image.isEmpty()) {
     return
   }
-  if (process.platform === 'darwin' && !keepsBundleIcon(getAppIconPath(value), APP_ICON_PATHS)) {
-    app.dock?.setIcon(image)
+  if (process.platform === 'darwin') {
+    app.dock?.setIcon((getAppIconPath(value) === APP_ICON_PATHS.classic && ownDockIcon()) || image)
   }
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
