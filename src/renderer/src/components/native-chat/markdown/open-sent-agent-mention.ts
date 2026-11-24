@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store/index'
 import { openOrchestrationDispatch } from '@/lib/agent-session/open/open-agent-message-sender'
+import { showChatOpenUnavailable } from '@/lib/agent-session/open/chat-open-failure-toast'
 import {
   structuredSessionOpenFeedbackText,
   type StructuredSessionOpenFeedback
@@ -10,8 +11,9 @@ import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/h
 import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
 // A mention that cannot open says so in a short notice, not as an error.
+// A chat that does not open shows the shared chat open toast.
 const notice: StructuredSessionOpenFeedback = {
-  unavailable: () => toast.info(structuredSessionOpenFeedbackText.unavailable()),
+  unavailable: (agent, context) => showChatOpenUnavailable(context, agent),
   gone: () => toast.info(structuredSessionOpenFeedbackText.gone()),
   hostCannotOpen: () => toast.info(structuredSessionOpenFeedbackText.hostCannotOpen()),
   notLocated: (agent) => toast.info(structuredSessionOpenFeedbackText.notLocated(agent))
