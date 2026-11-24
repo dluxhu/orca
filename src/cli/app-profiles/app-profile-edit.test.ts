@@ -27,6 +27,7 @@ import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
 import { setAppProfileIcon } from './app-profile-set-icon'
+import { appIconFileName } from './app-profile-icon'
 import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -36,6 +37,7 @@ const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string>
   <key>CFBundleExecutable</key><string>Orca</string>
   <key>CFBundleName</key><string>Orca</string>
+  <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundleDisplayName</key><string>Orca @dLux</string>
 </dict>
 </plist>
@@ -508,8 +510,11 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
   it('set-icon writes the icon into the renamed app, also after a rename while the icon is made', async () => {
     renameInFinder()
     const later = join(dir, 'apps', 'Orca - Later.app')
-    const icon = (path: string): string =>
-      readFileSync(join(path, 'Contents', 'Resources', 'icon.icns'), 'utf8')
+    // set-icon names the icon file in the Info.plist.
+    const icon = (path: string): string => {
+      const plist = readFileSync(join(path, 'Contents', 'Info.plist'), 'utf8')
+      return readFileSync(join(path, 'Contents', 'Resources', appIconFileName(plist)), 'utf8')
+    }
     const made = (text: string, move?: () => void) =>
       (() => {
         move?.()
