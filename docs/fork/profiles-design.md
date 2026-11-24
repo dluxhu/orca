@@ -685,9 +685,11 @@ the name; the form shows the same value and the user can change it.
 **Name.** It starts as "Orca - New Profile", then "Orca - New Profile 2", 3, and so on. The name
 must be unique, and is also the `.app` file name, so it cannot contain `/` or `:`.
 
-**Rename** changes the name only: rename the `.app`, set `CFBundleDisplayName`, sign again, and
-write the registry. The profile must quit first. The id, the bundle id and the userData do not
-change. A rename changes the cdhash, so TCC and the Keychain ask once more.
+**Rename** changes the name only: rename the `.app`, as a Finder rename does, and write the
+registry. The profile must quit first. The id, the bundle id, the userData and the signed bundle
+contents do not change (owner, 2026-11-23: no new signature after create). So TCC and the Keychain
+do not ask again. Finder and the Dock show the file name; `CFBundleDisplayName` keeps the first
+name.
 
 **Rename in Finder** (owner, 2026-11-22). The user can rename a profile app in Finder. Only the
 file name changes, so the id, the bundle id, the data, the settings and the serve service stay:

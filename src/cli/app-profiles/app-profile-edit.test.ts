@@ -47,16 +47,16 @@ let app: string
 let calls: string[][]
 /** The pid of the loaded serve service job, or null when launchctl knows no job. */
 let servicePid: number | null
-let failVerify: boolean
+let failRegister: boolean
 
 // Real ditto, plutil and cp; codesign, lsregister, launchctl, tccutil and security are recorded.
 const run: RunTool = (program, args) => {
   calls.push([program, ...args])
   if (program.endsWith('codesign')) {
-    if (args[0] === '--verify' && failVerify) {
-      throw new Error('codesign --verify failed')
-    }
     return args[0] === '-d' ? '<plist><dict/></plist>' : ''
+  }
+  if (program.endsWith('lsregister') && args[0] === '-f' && failRegister) {
+    throw new Error('lsregister -f failed')
   }
   if (/(lsregister|launchctl|tccutil|security)$/.test(program) || program === '/usr/bin/env') {
     return ''
@@ -86,7 +86,7 @@ beforeEach(() => {
   file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
   calls = []
   servicePid = null
-  failVerify = false
+  failRegister = false
   vi.stubEnv('HOME', dir)
 })
 
@@ -104,8 +104,7 @@ const registry = (): {
   profiles: { id: string; name: string; appPath: string; port: number }[]
 } => JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))
 const deps = () => ({ env: env(), home: dir, uid: 501, run, serviceRun, isAlive: () => true })
-const plistValue = (path: string, key: string): string =>
-  execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', path], { encoding: 'utf8' }).trim()
+const read = (path: string): string => readFileSync(path, 'utf8')
 
 function makeProfile(name = 'Orca - Work', id?: string) {
   const entry = createAppProfile({ makeIcon, name, id, defaultAppPath: app, env: env(), run })
@@ -120,6 +119,7 @@ function writeRuntimePid(userDataPath: string, pid: number): void {
 describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
   it('renames the app and the registry name; the id, bundle id and data folder stay', async () => {
     const work = makeProfile()
+    const plistBefore = read(join(work.appPath, 'Contents', 'Info.plist'))
     const result = await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
     const newPath = join(dir, 'apps', 'Orca - Job.app')
     expect(result).toMatchObject({
@@ -131,21 +131,12 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
       serveService: 'none'
     })
     expect(existsSync(work.appPath)).toBe(false)
-    expect(plistValue(join(newPath, 'Contents', 'Info.plist'), 'CFBundleDisplayName')).toBe(
-      'Orca - Job'
-    )
-    expect(plistValue(join(newPath, 'Contents', 'Info.plist'), 'CFBundleIdentifier')).toBe(
-      work.bundleId
-    )
+    // The signed contents stay as create made them.
+    expect(read(join(newPath, 'Contents', 'Info.plist'))).toBe(plistBefore)
     expect(registry().profiles).toEqual([
       expect.objectContaining({ id: 'work', name: 'Orca - Job', appPath: newPath })
     ])
-    const sign = calls.find((call) => call[0].endsWith('codesign') && call[1] === '--force')
-    expect(sign).toEqual(
-      expect.arrayContaining(['-s', '-', '-i', work.bundleId, '--entitlements', newPath])
-    )
-    expect(sign).not.toContain('--deep')
-    expect(calls).toContainEqual(['/usr/bin/codesign', '--verify', newPath])
+    expect(calls.filter((call) => /codesign|plutil/.test(call[0]))).toEqual([])
     const lsregister = calls.filter((call) => call[0].endsWith('lsregister'))
     expect(lsregister.map((call) => call.slice(1))).toEqual([
       ['-u', work.appPath],
@@ -197,15 +188,12 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
 
   it('puts the app back under its old name when a step fails', async () => {
     const work = makeProfile()
-    failVerify = true
+    failRegister = true
     await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
-      'codesign --verify failed'
+      'lsregister -f failed'
     )
     expect(existsSync(work.appPath)).toBe(true)
     expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
-    expect(plistValue(join(work.appPath, 'Contents', 'Info.plist'), 'CFBundleDisplayName')).toBe(
-      'Orca - Work'
-    )
     expect(registry().profiles[0]).toMatchObject({ name: 'Orca - Work', appPath: work.appPath })
   })
 
