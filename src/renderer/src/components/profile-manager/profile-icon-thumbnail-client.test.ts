@@ -55,14 +55,17 @@ describe('renderThumbnail', () => {
     await expect(next).resolves.toMatch(/^data:/)
   })
 
-  it('a failed worker rejects its request and stops; a later style starts a new worker', async () => {
-    const failed = renderThumbnail(parts, 'stamp')
-    FakeWorker.all[0].onerror?.()
-    await expect(failed).rejects.toThrow('failed')
-    expect(FakeWorker.all[0].terminated).toBe(true)
-    const later = renderThumbnail(parts, 'round')
-    expect(FakeWorker.all).toHaveLength(2)
-    FakeWorker.all[1].reply(FakeWorker.all[1].lastId())
-    await expect(later).resolves.toMatch(/^data:/)
-  })
+  it.each(['onerror', 'onmessageerror'] as const)(
+    'a worker %s rejects its request and stops it; a later style starts a new worker',
+    async (handler) => {
+      const failed = renderThumbnail(parts, 'stamp')
+      FakeWorker.all[0][handler]?.()
+      await expect(failed).rejects.toThrow(/thumbnail worker/)
+      expect(FakeWorker.all[0].terminated).toBe(true)
+      const later = renderThumbnail(parts, 'round')
+      expect(FakeWorker.all).toHaveLength(2)
+      FakeWorker.all[1].reply(FakeWorker.all[1].lastId())
+      await expect(later).resolves.toMatch(/^data:/)
+    }
+  )
 })
