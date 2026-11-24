@@ -1,4 +1,5 @@
 // The Profile Manager window. Each Orca app can show it. See docs/fork/profiles-design.md, section 4.
+import { execFile } from 'node:child_process'
 import { join } from 'node:path'
 import { app, BrowserWindow, nativeTheme, type WebContents } from 'electron'
 import { translateMain } from '../i18n/main-i18n'
@@ -12,6 +13,15 @@ export function isProfileManagerRenderer(sender: WebContents): boolean {
     !profileManagerWindow.isDestroyed() &&
     profileManagerWindow.webContents === sender
   )
+}
+
+/** Brings the app to the front, or starts it. */
+export function openApp(appPath: string): void {
+  execFile('/usr/bin/open', ['-a', appPath], (error) => {
+    if (error) {
+      console.warn('[profiles] open failed:', error.message)
+    }
+  })
 }
 
 /** Shows the one Profile Manager window of this app. */

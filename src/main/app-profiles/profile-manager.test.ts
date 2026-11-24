@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl } = vi.hoisted(() => ({
+const { handlers, rows, isManager, profile, appOn, launchctl, reveal } = vi.hoisted(() => ({
+  reveal: vi.fn(),
   appOn: vi.fn(),
   launchctl: vi.fn(async () => ({ code: 113, out: '' })),
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
@@ -21,6 +22,7 @@ vi.mock('node:fs', async (original) => {
 })
 vi.mock('electron', () => ({
   app: { isPackaged: true, getPath: () => '/default-data', on: appOn },
+  shell: { showItemInFolder: reveal },
   ipcMain: {
     handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
       handlers.set(channel, handler)
@@ -32,6 +34,7 @@ vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
 vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
+  openApp: vi.fn(),
   openProfileManagerWindow: vi.fn()
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
@@ -188,6 +191,7 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:state',
       'appProfiles:change',
       'appProfiles:open',
+      'appProfiles:showInFinder',
       'appProfiles:ownStartAtLogin',
       'appProfiles:setOwnStartAtLogin'
     ])
@@ -195,7 +199,12 @@ describe('registerProfileManagerIpc', () => {
       currentId: 'default'
     })
     isManager.current = false
-    for (const channel of ['appProfiles:state', 'appProfiles:change', 'appProfiles:open']) {
+    for (const channel of [
+      'appProfiles:state',
+      'appProfiles:change',
+      'appProfiles:open',
+      'appProfiles:showInFinder'
+    ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, 'work')).rejects.toThrow(
         'Only the Profile Manager window'
       )
@@ -206,6 +215,17 @@ describe('registerProfileManagerIpc', () => {
         'Only an Orca window'
       )
     }
+  })
+
+  it('Show in Finder shows the app of the id, and nothing for an unknown id', async () => {
+    rows.current = [row('default', 'Orca', 'running'), row('work', 'Orca - Work', 'stopped')]
+    reveal.mockClear()
+    registerProfileManagerIpc()
+    const show = handlers.get('appProfiles:showInFinder')
+    await expect(show?.({ sender: {} }, 'work')).resolves.toMatchObject({ ok: true })
+    expect(reveal).toHaveBeenCalledWith('/apps/Orca - Work.app')
+    await expect(show?.({ sender: {} }, 'nope')).resolves.toMatchObject({ ok: false })
+    expect(reveal).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -222,13 +242,16 @@ describe('profilesMenuItems', () => {
     startProfilesMenu(rebuild)
     await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
     const items = profilesMenuItems()
-    expect(items.map((item) => [item.label, item.checked])).toEqual([
-      ['Default — Running', false],
-      ['Orca - Work — Running', true],
-      ['Orca - Home — Running in background', false],
-      ['Orca - Client', false],
-      [undefined, undefined],
-      ['Profile Manager…', undefined]
+    expect(items.map((item) => [item.type, item.label, item.checked])).toEqual([
+      ['header', 'This app', undefined],
+      ['checkbox', 'Orca - Work', true],
+      ['separator', undefined, undefined],
+      ['header', 'Switch to', undefined],
+      [undefined, 'Default — Running', undefined],
+      [undefined, 'Orca - Home — Running in background', undefined],
+      [undefined, 'Orca - Client', undefined],
+      ['separator', undefined, undefined],
+      [undefined, 'Profile Manager…', undefined]
     ])
   })
 })
