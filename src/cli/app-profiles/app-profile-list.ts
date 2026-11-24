@@ -10,7 +10,11 @@ import {
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import type { AppProfileRow, AppProfileState } from '../../shared/app-profiles/app-profile-rules'
-import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
+import {
+  findTransport,
+  getRuntimeMetadataPath,
+  type RuntimeMetadata
+} from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
 import {
   SERVE_LAUNCHD_LABEL_PREFIX,
   serveProfileSuffix
@@ -56,17 +60,37 @@ export async function readServeServicePid(
   return Number(/^\s*pid = (\d+)/m.exec(result.out)?.[1] ?? 0) || null
 }
 
-function runtimePid(userDataPath: string): number | null {
+/** The profile's runtime file, or null when it is missing or has no pid. */
+function readRuntime(userDataPath: string): RuntimeMetadata | null {
   try {
-    const pid = (
-      JSON.parse(readFileSync(getRuntimeMetadataPath(userDataPath), 'utf8')) as {
-        pid?: unknown
-      }
-    ).pid
-    return typeof pid === 'number' && pid > 0 ? pid : null
+    const runtime = JSON.parse(readFileSync(getRuntimeMetadataPath(userDataPath), 'utf8')) as
+      | RuntimeMetadata
+      | undefined
+    return typeof runtime?.pid === 'number' && runtime.pid > 0 ? runtime : null
   } catch {
     return null
   }
+}
+
+function runtimePid(userDataPath: string): number | null {
+  return readRuntime(userDataPath)?.pid ?? null
+}
+
+/**
+ * The port of the WebSocket listener of the profile's live runtime, as pairing advertises it.
+ * A service started with --port listens there, not on the saved port.
+ */
+export function readLiveRuntimePort(
+  userDataPath: string,
+  isAlive: (pid: number) => boolean = isProcessAlive
+): number | null {
+  const runtime = readRuntime(userDataPath)
+  if (!runtime || !isAlive(runtime.pid)) {
+    return null
+  }
+  const endpoint = findTransport(runtime, 'websocket')?.endpoint ?? ''
+  const port = Number(/:(\d+)$/.exec(endpoint)?.[1])
+  return port > 0 ? port : null
 }
 
 /**
@@ -122,12 +146,16 @@ export async function listAppProfiles(
   ]
   const home = options.home ?? homedir()
   return Promise.all(
-    rows.map(async (row) => ({
-      ...row,
-      state: await readAppProfileState(row.userDataPath, row.id === 'default', options),
-      startAtLogin: existsSync(
-        serveServiceUnitOf(row.userDataPath, row.id === 'default', home).unitPath
-      )
-    }))
+    rows.map(async (row) => {
+      const livePort = readLiveRuntimePort(row.userDataPath, options.isAlive)
+      return {
+        ...row,
+        ...(livePort === null ? {} : { livePort }),
+        state: await readAppProfileState(row.userDataPath, row.id === 'default', options),
+        startAtLogin: existsSync(
+          serveServiceUnitOf(row.userDataPath, row.id === 'default', home).unitPath
+        )
+      }
+    })
   )
 }
