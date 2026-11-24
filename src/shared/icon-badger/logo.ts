@@ -73,9 +73,77 @@ function fillHoles(lg: Img): Img {
   return bg
 }
 
+export type RGB = readonly [number, number, number]
+
+/**
+ * Most common saturated color of the opaque pixels (quantized to 32 levels, then averaged).
+ * Neutral (gray, black, white) badges give their mean opaque color.
+ */
+export function dominantColor(im: Img): RGB {
+  const a: RGB[] = []
+  for (let i = 0; i < im.data.length; i += 4) {
+    if (im.data[i + 3] > 200) {
+      a.push([im.data[i], im.data[i + 1], im.data[i + 2]])
+    }
+  }
+  if (!a.length) {
+    return [128, 128, 128]
+  }
+  const mean = (px: RGB[]): RGB =>
+    [0, 1, 2].map((c) => pyRound(px.reduce((s, p) => s + p[c], 0) / px.length)) as unknown as RGB
+  const sel = a.filter((p) => {
+    const mx = Math.max(...p)
+    return (mx - Math.min(...p)) / Math.max(mx, 1) > 0.25 && mx > 50
+  })
+  if (sel.length < 0.02 * a.length) {
+    return mean(a)
+  }
+  const key = (p: RGB): number =>
+    Math.floor(p[0] / 32) * 64 + Math.floor(p[1] / 32) * 8 + Math.floor(p[2] / 32)
+  const counts = Array.from({ length: 512 }, () => 0)
+  sel.forEach((p) => counts[key(p)]++)
+  const top = counts.indexOf(Math.max(...counts))
+  return mean(sel.filter((p) => key(p) === top))
+}
+
+/** A light tint with the hue of rgb: HSV saturation `sat` (less for grayish colors), value `val`. */
+export function tint(rgb: RGB, sat: number, val: number): RGB {
+  const [r, g, b] = rgb.map((v) => v / 255)
+  const mx = Math.max(r, g, b)
+  const mn = Math.min(r, g, b)
+  let h = 0
+  let s = 0
+  if (mx !== mn) {
+    s = (mx - mn) / mx
+    const [rc, gc, bc] = [r, g, b].map((v) => (mx - v) / (mx - mn))
+    h = r === mx ? bc - gc : g === mx ? 2 + rc - bc : 4 + gc - rc
+    h = (((h / 6) % 1) + 1) % 1
+  }
+  // colorsys.hsv_to_rgb
+  const sv = sat * Math.min(1, s / 0.5)
+  const i = Math.trunc(h * 6)
+  const f = h * 6 - i
+  const p = val * (1 - sv)
+  const q = val * (1 - sv * f)
+  const t = val * (1 - sv * (1 - f))
+  const out =
+    sv === 0
+      ? [val, val, val]
+      : [
+          [val, t, p],
+          [q, val, p],
+          [p, val, t],
+          [p, q, val],
+          [t, p, val],
+          [val, p, q]
+        ][i % 6]
+  return out.map((v) => pyRound(v * 255)) as unknown as RGB
+}
+
 /** A badge image, trimmed to its pixels (Python `Logo`). */
 export class Logo {
   readonly im: Img
+  readonly accent: RGB
   constructor(source: Img) {
     let im = source
     const corners = [
@@ -96,11 +164,34 @@ export class Logo {
       throw new Error('The badge image is empty.')
     }
     this.im = crop(im, ...b)
+    this.accent = dominantColor(this.im)
+  }
+
+  /** The logo at height h, or fitted into a box x box square; holes filled white if asked. */
+  sized(h: number, box?: number, holes = true): Img {
+    let w: number
+    const { width, height } = this.im
+    if (box !== undefined) {
+      const sc = box / Math.max(width, height)
+      w = Math.max(1, pyRound(width * sc))
+      h = Math.max(1, pyRound(height * sc))
+    } else {
+      w = Math.max(1, pyRound((width * h) / height))
+    }
+    const lg = resize(this.im, w, h)
+    return holes ? fillHoles(lg) : lg
   }
 
   /** The logo at height h with its holes filled white. */
   onWhite(h: number): Img {
-    const w = Math.max(1, pyRound((this.im.width * h) / this.im.height))
-    return fillHoles(resize(this.im, w, h))
+    return this.sized(h)
+  }
+
+  /** A size x size layer with the logo fitted into fill * size, centered on its bounding box. */
+  centered(size: number, fill: number, holes: boolean): Img {
+    const lg = this.sized(0, pyRound(size * fill), holes)
+    const c = newImg(size, size, 4)
+    alphaComposite(c, lg, Math.floor((size - lg.width) / 2), Math.floor((size - lg.height) / 2))
+    return c
   }
 }

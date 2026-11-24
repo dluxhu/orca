@@ -3,6 +3,8 @@
 //   swirl-app.png = samples/apps/Swirl.png, beta-badge.png = samples/badges/beta.png,
 //   swirl-beta-<style>-192.png = web/thumbs/<style>.png, which examples/make_gallery.py makes with
 //   render(App(Swirl), Logo(beta), style).resize((192, 192), LANCZOS).
+// Download command for each style, into a new empty directory:
+//   curl -sSfL -o t.png https://raw.githubusercontent.com/dluxhu/dock-icon-badger/<commit>/web/thumbs/<style>.png
 // The limit is the one of docs/fork/profiles-design.md, section 8.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -63,10 +65,7 @@ describe('icon badger golden tests', () => {
   // The reference badge came from beta.svg (cairo at 4096 px); the test uses beta.png. For
   // ref-match that moves the badge across the 16 % overlap limit of the size search (326 px here,
   // 322 px in the reference). So the test fixes the reference's height, and the search has its own test.
-  const referenceHeights: Record<IconStyle, number | undefined> = {
-    'ref-match': 322,
-    'ref-match-bigger': undefined
-  }
+  const referenceHeights: Partial<Record<IconStyle, number>> = { 'ref-match': 322 }
 
   it('finds the badge size with the overlap search', { timeout: 120_000 }, () => {
     const flat = normalizeIcon(fixture('swirl-app.png')).flat
@@ -76,7 +75,19 @@ describe('icon badger golden tests', () => {
     expect(fit.c).toBeLessThanOrEqual(0.16)
   })
 
-  for (const style of ['ref-match', 'ref-match-bigger'] as IconStyle[]) {
+  // The style ids of dock-icon-badger, in the order of its STYLES table.
+  const golden = [
+    'white-tile',
+    'tint-tile',
+    'frosted',
+    'round',
+    'stamp',
+    'liquid-glass',
+    'ref-match',
+    'ref-match-bigger'
+  ] as IconStyle[]
+
+  for (const style of golden) {
     it(`matches dock-icon-badger ${style}`, { timeout: 120_000 }, () => {
       const out = renderBadgedIcon(
         fixture('swirl-app.png'),

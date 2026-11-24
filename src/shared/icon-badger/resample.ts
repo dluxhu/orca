@@ -172,17 +172,7 @@ export function resize(img: Img, width: number, height: number, filter: Filter =
   if (width === img.width && height === img.height) {
     return cloneImg(img)
   }
-  let work = img
-  if (img.channels === 4) {
-    work = cloneImg(img)
-    const d = work.data
-    for (let i = 0; i < d.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const tmp = d[i + c] * d[i + 3] + 128
-        d[i + c] = ((tmp >> 8) + tmp) >> 8
-      }
-    }
-  }
+  let work = img.channels === 4 ? premultiply(img) : img
   if (width !== work.width) {
     work = resampleRows(work, width, filter)
   }
@@ -190,15 +180,33 @@ export function resize(img: Img, width: number, height: number, filter: Filter =
     work = transpose(resampleRows(transpose(work), height, filter))
   }
   if (img.channels === 4) {
-    const d = work.data
-    for (let i = 0; i < d.length; i += 4) {
-      const a = d[i + 3]
-      if (a !== 0 && a !== 255) {
-        for (let c = 0; c < 3; c++) {
-          d[i + c] = Math.min(255, Math.floor((255 * d[i + c]) / a))
-        }
-      }
+    unpremultiply(work)
+  }
+  return work
+}
+
+/** Pillow's RGBA to "RGBa" conversion, as a copy. */
+export function premultiply(img: Img): Img {
+  const work = cloneImg(img)
+  const d = work.data
+  for (let i = 0; i < d.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const tmp = d[i + c] * d[i + 3] + 128
+      d[i + c] = ((tmp >> 8) + tmp) >> 8
     }
   }
   return work
+}
+
+/** Pillow's "RGBa" to RGBA conversion, in place. */
+export function unpremultiply(work: Img): void {
+  const d = work.data
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3]
+    if (a !== 0 && a !== 255) {
+      for (let c = 0; c < 3; c++) {
+        d[i + c] = Math.min(255, Math.floor((255 * d[i + c]) / a))
+      }
+    }
+  }
 }
