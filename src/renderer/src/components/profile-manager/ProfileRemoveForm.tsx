@@ -27,7 +27,7 @@ export function ProfileRemoveForm(props: {
   const t = useTranslate()
   return (
     <Dialog open onOpenChange={(open) => (open ? null : props.onCancel())}>
-      <DialogContent size="confirm" busy={props.busy} initialFocus="cancel">
+      <DialogContent size="confirm" busy={props.busy} initialFocus="cancel" className="bg-popover">
         <DialogHeader>
           <DialogTitle>
             {t('profileManager.remove.title', 'Remove {{name}}?', { name: props.row.name })}
