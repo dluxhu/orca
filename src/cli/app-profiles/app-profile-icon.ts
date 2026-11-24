@@ -2,12 +2,17 @@
 // See docs/fork/profiles-design.md, section 8. The CLI runs it; electron-vite does not keep
 // src/main modules for the CLI.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { ICON_STYLES, renderBadgedIcon, type IconStyle } from '../../shared/icon-badger/badger'
 import type { Img } from '../../shared/icon-badger/raster'
-import { decodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
-import { readPlistString, type AppProfileIcon } from '../../shared/app-profiles/app-profile-paths'
+import { decodePng, encodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
+import {
+  APP_PROFILE_BADGE_FILE,
+  APP_PROFILE_ICON_FILE,
+  readPlistString,
+  type AppProfileIcon
+} from '../../shared/app-profiles/app-profile-paths'
 
 /** What makes a profile icon: a badge character, a badge image file or a full icon file. */
 export type AppProfileIconSource =
@@ -154,7 +159,7 @@ export function makeAppProfileIcon(
   source: AppProfileIconSource,
   used: readonly (AppProfileIcon | undefined)[] = [],
   run: RunTool = runTool
-): { icns: Buffer; icon: AppProfileIcon } {
+): { icns: Buffer; icon: AppProfileIcon; badgePng?: Buffer } {
   if (source.kind !== 'badge' && !existsSync(source.path)) {
     throw new Error(`No file ${source.path}`)
   }
@@ -176,7 +181,25 @@ export function makeAppProfileIcon(
       ? rasterizeWithAppKit('text', text, run)
       : rasterizeWithAppKit('file', source.path, run)
   const img = renderBadgedIcon(readAppIcon(defaultAppPath, run), badge, style)
-  const icon: AppProfileIcon =
-    source.kind === 'badge' ? { kind: 'badge', text, style } : { kind: 'image', style }
-  return { icns: writeIcns(img), icon }
+  if (source.kind === 'badge') {
+    return { icns: writeIcns(img), icon: { kind: 'badge', text, style } }
+  }
+  return { icns: writeIcns(img), icon: { kind: 'image', style }, badgePng: encodePng(badge) }
+}
+
+/** Keeps the icon, and an uploaded badge, in the profile's userData. The Edit form reads them. */
+export function keepProfileIcon(
+  userDataPath: string,
+  made: { icns: Buffer; badgePng?: Buffer }
+): void {
+  for (const [name, bytes] of [
+    [APP_PROFILE_ICON_FILE, made.icns],
+    [APP_PROFILE_BADGE_FILE, made.badgePng]
+  ] as const) {
+    // Kept data can hold a link here; the write must not follow it.
+    rmSync(join(userDataPath, name), { force: true })
+    if (bytes) {
+      writeFileSync(join(userDataPath, name), bytes)
+    }
+  }
 }

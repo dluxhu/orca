@@ -13,13 +13,17 @@ import {
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
-  APP_PROFILE_ICON_FILE,
   appProfilesRoot,
   readAppProfileRegistry,
   type AppProfileEntry
 } from '../../shared/app-profiles/app-profile-paths'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
-import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
+import {
+  appIconFileName,
+  keepProfileIcon,
+  makeAppProfileIcon,
+  type AppProfileIconSource
+} from './app-profile-icon'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { isProcessAlive, withRegistryLock, writeRegistry } from './app-profile-registry'
@@ -116,7 +120,7 @@ export function setAppProfileIcon(
     } finally {
       rmSync(temporary, { recursive: true, force: true })
     }
-    writeFileSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), made.icns)
+    keepProfileIcon(entry.userDataPath, made)
     const changed = { ...entry, icon: made.icon }
     writeRegistry(root, {
       ...registry,

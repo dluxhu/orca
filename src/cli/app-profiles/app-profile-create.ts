@@ -16,7 +16,6 @@ import {
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
-  APP_PROFILE_ICON_FILE,
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   appProfilesAppsDir,
@@ -34,6 +33,7 @@ import { withRegistryLock, writeRegistry } from './app-profile-registry'
 import {
   appIconFileName,
   appProfileIconSourceFromFlags,
+  keepProfileIcon,
   makeAppProfileIcon,
   type AppProfileIconSource
 } from './app-profile-icon'
@@ -242,7 +242,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       // removes the app, so a retry with the same name works.
       const userDataPath = join(root, id)
       ensureAppProfileMarker(userDataPath, id)
-      writeFileSync(join(userDataPath, APP_PROFILE_ICON_FILE), made.icns)
+      keepProfileIcon(userDataPath, made)
       const entry: AppProfileEntry = {
         id,
         name,
