@@ -13,3 +13,13 @@ export const MAC_DOCK_ICON_SCRIPT = [
   "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:image forFile:appPath options:0",
   'if ok is false then error "Orca app icon could not be persisted"'
 ]
+
+/** Removes the Finder custom icon of the bundle at ORCA_APP_BUNDLE_PATH. */
+export const MAC_DOCK_ICON_CLEAR_SCRIPT = [
+  'use framework "AppKit"',
+  'use scripting additions',
+  "set env to current application's NSProcessInfo's processInfo()'s environment()",
+  `set appPath to (env's objectForKey:"ORCA_APP_BUNDLE_PATH") as text`,
+  "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:(missing value) forFile:appPath options:0",
+  'if ok is false then error "Orca app icon could not be cleared"'
+]

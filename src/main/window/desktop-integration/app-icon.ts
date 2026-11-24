@@ -20,7 +20,10 @@ import {
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
 import { fitAppIconToPlatformShape, ownDockIcon, ownIconPath } from './platform-app-icon-shape'
-import { MAC_DOCK_ICON_SCRIPT } from '../../../shared/app-lifecycle/identity/mac-custom-icon-script'
+import {
+  MAC_DOCK_ICON_CLEAR_SCRIPT,
+  MAC_DOCK_ICON_SCRIPT
+} from '../../../shared/app-lifecycle/identity/mac-custom-icon-script'
 
 const isMac = process.platform === 'darwin'
 
@@ -51,14 +54,6 @@ type PersistMacDockIconOptions = {
   isDevApp?: boolean
   platform?: NodeJS.Platform
 }
-
-const MAC_DOCK_ICON_CLEAR_SCRIPT = [
-  'use framework "AppKit"',
-  'use scripting additions',
-  'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
-  "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:(missing value) forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be cleared"'
-]
 
 const MAC_DOCK_ICON_COMMAND_TIMEOUT_MS = 10_000
 const MAC_DOCK_ICON_COMMAND_FALLBACK_MS = 1_000
