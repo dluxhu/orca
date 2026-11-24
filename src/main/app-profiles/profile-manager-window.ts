@@ -48,7 +48,7 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(app.getAppPath(), 'out', 'preload', 'index.js'),
       sandbox: true,
       webviewTag: false
     }
@@ -69,6 +69,9 @@ function loadPage(window: BrowserWindow, hash: string): void {
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html#${hash}`)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'), { hash })
+    // From the app path, not from __dirname: the bundler can put this module into out/main/chunks.
+    void window.loadFile(join(app.getAppPath(), 'out', 'renderer', 'profile-manager.html'), {
+      hash
+    })
   }
 }
