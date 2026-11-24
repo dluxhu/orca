@@ -1,15 +1,19 @@
 // The Profile Manager in the main process: the list, the changes and the Profiles menu.
 // See docs/fork/profiles-design.md, section 4. Changes run `orca profiles`, so the CLI and this
 // window share one writer of profiles.json.
-import { execFile } from 'node:child_process'
 import { mkdirSync, watch } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import { join } from 'node:path'
+import {
+  app,
+  ipcMain,
+  shell,
+  type IpcMainInvokeEvent,
+  type MenuItemConstructorOptions
+} from 'electron'
 import {
   APP_PROFILE_MARKER,
-  APP_PROFILES_ROOT_ENV,
   appProfilesRoot,
   parseAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
@@ -28,21 +32,12 @@ import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
+import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
-
-/** The root of this app's profiles. A profile app with a test root keeps it. */
-function profilesRoot(): string {
-  const profile = getAppProfile()
-  return profile ? dirname(profile.userDataPath) : appProfilesRoot()
-}
 
 /** The id of this app's row: null in the Profile Manager app, which is no row. */
 function currentAppId(): string | null {
   return isProfileManagerApp() ? null : (getAppProfile()?.id ?? 'default')
-}
-
-function profilesEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, [APP_PROFILES_ROOT_ENV]: profilesRoot() }
 }
 
 export async function readAppProfilesState(
@@ -133,25 +128,6 @@ export function profileCommandArgs(
   }
 }
 
-/** Runs the CLI of this app as Node. The reply is the CLI's `--json` output. */
-function runCli(args: string[]): Promise<AppProfileReply> {
-  const cli = join(process.resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
-  return new Promise((done) => {
-    execFile(
-      process.execPath,
-      [cli, ...args],
-      { env: { ...profilesEnv(), ELECTRON_RUN_AS_NODE: '1' } },
-      (error, stdout) => {
-        try {
-          done(JSON.parse(stdout) as AppProfileReply)
-        } catch {
-          done({ ok: false, error: { message: error?.message ?? 'orca failed.' } })
-        }
-      }
-    )
-  })
-}
-
 export async function changeAppProfile(change: AppProfileChange): Promise<AppProfileReply> {
   if (!app.isPackaged) {
     return { ok: false, error: { message: 'Profiles need a packaged Orca app.' } }
@@ -189,14 +165,17 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   }
 }
 
-export async function openAppProfile(id: string): Promise<AppProfileReply> {
+/** Runs `action` on the app of the row `id`. The window sends only the id, never a path. */
+async function onAppOf(id: string, action: (appPath: string) => void): Promise<AppProfileReply> {
   const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
   if (!row) {
     return { ok: false, error: { message: `No profile "${id}".` } }
   }
-  openApp(row.appPath)
-  return { ok: true, result: { opened: row.appPath } }
+  action(row.appPath)
+  return { ok: true, result: { appPath: row.appPath } }
 }
+
+export const openAppProfile = (id: string): Promise<AppProfileReply> => onAppOf(id, openApp)
 
 function fromProfileManager<T extends unknown[], R>(
   handler: (...args: T) => Promise<R>
@@ -224,6 +203,10 @@ export function registerProfileManagerIpc(): void {
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
+  ipcMain.handle(
+    'appProfiles:showInFinder',
+    fromProfileManager((id: string) => onAppOf(id, (appPath) => shell.showItemInFolder(appPath)))
+  )
   // Settings in the main window changes only this app's own profile.
   const fromSettings =
     <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
@@ -312,17 +295,24 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
     background: translateMain('menu.profileBackground', 'Running in background'),
     stopped: ''
   }
+  const item = (row: AppProfileRow): MenuItemConstructorOptions => {
+    const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
+    const click = (): void => openApp(row.appPath)
+    return row.id === currentId
+      ? { label: name, type: 'checkbox', checked: true, click }
+      : { label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`, click }
+  }
+  const section = (label: string, rows: AppProfileRow[]): MenuItemConstructorOptions[] =>
+    rows.length > 0 ? [{ type: 'header', label }, ...rows.map(item), { type: 'separator' }] : []
   return [
-    ...menuRows.map((row): MenuItemConstructorOptions => {
-      const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
-      return {
-        label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`,
-        type: 'checkbox',
-        checked: row.id === currentId,
-        click: () => openApp(row.appPath)
-      }
-    }),
-    ...(menuRows.length > 0 ? [{ type: 'separator' } as const] : []),
+    ...section(
+      translateMain('menu.profileThisApp', 'This app'),
+      menuRows.filter((row) => row.id === currentId)
+    ),
+    ...section(
+      translateMain('menu.profileSwitchTo', 'Switch to'),
+      menuRows.filter((row) => row.id !== currentId)
+    ),
     {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
       click: () => void showProfileManager()
