@@ -37,4 +37,4 @@ export function fitAppIconToPlatformShape(
 }
 
 // Fork patch: app-icon.ts is at its line limit, so it imports this from here.
-export { ownDockIcon } from '../../app-profiles/app-profile-dock-icon'
+export { ownDockIcon, ownIconPath } from '../../app-profiles/app-profile-dock-icon'

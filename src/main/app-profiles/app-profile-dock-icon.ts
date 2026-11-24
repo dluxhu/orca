@@ -8,6 +8,11 @@ import { getAppProfile } from './app-profile'
 
 let own: NativeImage | null | undefined
 
+/** The profile icon that the userData of this profile app keeps. */
+export function ownIconPath(): string {
+  return join(app.getPath('userData'), APP_PROFILE_ICON_FILE)
+}
+
 /**
  * In a profile app: the image of the profile icon that its userData keeps. That copy is the source
  * of truth; macOS can show an older bundle icon from its cache. Null in every other app, and in a
@@ -18,9 +23,7 @@ export function ownDockIcon(): NativeImage | null {
     own = null
     if (getAppProfile()) {
       try {
-        const png = largestIcnsPng(
-          readFileSync(join(app.getPath('userData'), APP_PROFILE_ICON_FILE))
-        )
+        const png = largestIcnsPng(readFileSync(ownIconPath()))
         const image = png ? nativeImage.createFromBuffer(png) : null
         own = image && !image.isEmpty() ? image : null
       } catch (error) {

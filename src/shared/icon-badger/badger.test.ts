@@ -22,7 +22,11 @@ const fixture = (name: string): Img => {
   return { width: png.width, height: png.height, channels: 4, data: new Uint8Array(png.data) }
 }
 
-/** Differences on premultiplied RGBA, as the design's limit says. */
+// Tighter than the design's first limit (99.5 %, mean 1.0, max 48). Measured on the 13 styles:
+// within8 >= 0.9982, mean <= 0.068, max <= 15. A real change of a style goes over this limit.
+const LIMIT = { within8: 0.998, mean: 0.2, max: 24 }
+
+/** Differences on premultiplied RGBA. */
 function compare(a: Img, b: Img, label: string) {
   expect([a.width, a.height]).toEqual([b.width, b.height])
   const pre = (d: Uint8Array, i: number): number =>
@@ -49,7 +53,7 @@ function compare(a: Img, b: Img, label: string) {
     mean: sum / (a.width * a.height * 4),
     max: Math.round(max)
   }
-  if (stats.within8 < 0.995 || stats.mean > 1 || stats.max > 48) {
+  if (stats.within8 < LIMIT.within8 || stats.mean > LIMIT.mean || stats.max > LIMIT.max) {
     const path = join(tmpdir(), `icon-badger-diff-${label}.png`)
     writeFileSync(path, PNG.sync.write(diff))
     console.log(`difference image: ${path}`)
@@ -106,9 +110,9 @@ describe('icon badger golden tests', () => {
       )
       const stats = compare(resize(out, 192, 192), fixture(`swirl-beta-${style}-192.png`), style)
       console.log(style, stats)
-      expect(stats.within8).toBeGreaterThanOrEqual(0.995)
-      expect(stats.mean).toBeLessThanOrEqual(1)
-      expect(stats.max).toBeLessThanOrEqual(48)
+      expect(stats.within8).toBeGreaterThanOrEqual(LIMIT.within8)
+      expect(stats.mean).toBeLessThanOrEqual(LIMIT.mean)
+      expect(stats.max).toBeLessThanOrEqual(LIMIT.max)
     })
   }
 })
