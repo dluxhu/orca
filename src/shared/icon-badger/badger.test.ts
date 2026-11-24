@@ -65,7 +65,11 @@ describe('icon badger golden tests', () => {
   // The reference badge came from beta.svg (cairo at 4096 px); the test uses beta.png. For
   // ref-match that moves the badge across the 16 % overlap limit of the size search (326 px here,
   // 322 px in the reference). So the test fixes the reference's height, and the search has its own test.
-  const referenceHeights: Partial<Record<IconStyle, number>> = { 'ref-match': 322 }
+  // For rolled-cylinder the fit search stops one 5 px step higher (365 px here, 360 px in the reference).
+  const referenceHeights: Partial<Record<IconStyle, number>> = {
+    'ref-match': 322,
+    'rolled-cylinder': 360
+  }
 
   it('finds the badge size with the overlap search', { timeout: 120_000 }, () => {
     const flat = normalizeIcon(fixture('swirl-app.png')).flat
@@ -83,6 +87,11 @@ describe('icon badger golden tests', () => {
     'round',
     'stamp',
     'liquid-glass',
+    'page-curl',
+    'page-curl-small',
+    'gentle-curve',
+    'rolled-cylinder',
+    'round-peel',
     'ref-match',
     'ref-match-bigger'
   ] as IconStyle[]

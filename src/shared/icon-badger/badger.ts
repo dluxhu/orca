@@ -12,6 +12,7 @@ import { APPLE_SHADOW, S, masks, normalizeIcon, shadow } from './normalize'
 import { CORNER, DD, R2, VV, bez, edgeRing, fromChannels, paper } from './helpers'
 import { stFrosted, stLiquidGlass, stRound, stTintTile, stWhiteTile } from './styles-tile'
 import { stStamp } from './styles-stamp'
+import { stPageCurl, stRolled } from './styles-curl'
 
 // ---------------------------------------------------------------- constants (dock_icon_badger.py)
 export const ARC_MID = 0.522
@@ -197,7 +198,12 @@ export const ICON_STYLES = [
   'frosted',
   'round',
   'stamp',
-  'liquid-glass'
+  'liquid-glass',
+  'page-curl',
+  'page-curl-small',
+  'gentle-curve',
+  'rolled-cylinder',
+  'round-peel'
 ] as const
 export type IconStyle = (typeof ICON_STYLES)[number]
 
@@ -210,12 +216,17 @@ const STYLES: Record<IconStyle, Render> = {
   frosted: (icon, _, logo) => stFrosted(icon, logo),
   round: (icon, _, logo) => stRound(icon, logo),
   stamp: (icon, _, logo) => stStamp(icon, logo),
-  'liquid-glass': (icon, _, logo) => stLiquidGlass(icon, logo)
+  'liquid-glass': (icon, _, logo) => stLiquidGlass(icon, logo),
+  'page-curl': (_, flat, logo) => stPageCurl(flat, logo, 'page-curl'),
+  'page-curl-small': (_, flat, logo) => stPageCurl(flat, logo, 'page-curl-small'),
+  'gentle-curve': (_, flat, logo, h) => stRolled(flat, logo, 'gentle-curve', h),
+  'rolled-cylinder': (_, flat, logo, h) => stRolled(flat, logo, 'rolled-cylinder', h),
+  'round-peel': (_, flat, logo, h) => stRolled(flat, logo, 'round-peel', h)
 }
 
 /**
  * One badged icon, 1024 x 1024 RGBA. `app` is the app icon, `badge` the badge image.
- * `badgeHeight` fixes the badge height of the styles that search for it: ref-match.
+ * `badgeHeight` fixes the badge height of the styles that search for it: ref-match and the rolled curls.
  */
 export function renderBadgedIcon(
   app: Img,
