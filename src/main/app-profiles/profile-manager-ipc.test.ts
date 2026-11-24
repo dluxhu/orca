@@ -29,7 +29,12 @@ vi.mock('electron', () => {
     loadURL = vi.fn(async () => {})
   }
   return {
-    app: { isPackaged: true, getPath: () => '/default-data', on: vi.fn() },
+    app: {
+      isPackaged: true,
+      getPath: () => '/default-data',
+      getAppPath: () => '/App/app.asar',
+      on: vi.fn()
+    },
     BrowserWindow,
     shell: { showItemInFolder: h.reveal },
     nativeTheme: { shouldUseDarkColors: false },
