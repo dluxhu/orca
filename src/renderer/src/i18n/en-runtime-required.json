@@ -3512,7 +3512,9 @@
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
       "portRange": "The port must be 1024 to 65535: {{port}}",
-      "portTaken": "Another profile saves the port {{port}}."
+      "portTaken": "Another profile saves the port {{port}}.",
+      "portDesktop": "Orca desktop apps also use the ports 6768 to 6799. A running desktop app can take this port first.",
+      "portNear": "The server of another Orca app can use the 31 ports after its own. It can take this port first."
     }
   },
   "plugins": {

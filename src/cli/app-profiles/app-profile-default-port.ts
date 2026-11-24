@@ -5,7 +5,7 @@ import {
   appProfilesRoot,
   readAppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
-import { defaultAppPortError } from '../../shared/app-profiles/app-profile-rules'
+import { appPortWarning, defaultAppPortError } from '../../shared/app-profiles/app-profile-rules'
 import { runServeServiceManager } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
@@ -24,6 +24,8 @@ export async function setDefaultAppPort(
 ): Promise<{
   id: 'default'
   port: number
+  /** appPortWarning of the port. */
+  warning: string | null
   serveServiceInstalled: boolean
   serveService: ServeServiceChange
 }> {
@@ -48,17 +50,22 @@ export async function setDefaultAppPort(
     const uid = options.uid ?? process.getuid?.() ?? 0
     const serviceRun = options.serviceRun ?? runServeServiceManager
     const unit = serveServiceUnitOf(userDataPath, true, home)
-    const { owner } = await readAppProfileRuntime(
-      { userDataPath, appPath: registry.defaultAppPath },
-      true,
-      { home, uid, serviceRun, isAlive: options.isAlive }
-    )
+    const { owner } = await readAppProfileRuntime({ userDataPath }, true, {
+      home,
+      uid,
+      serviceRun,
+      isAlive: options.isAlive
+    })
     refuseOtherServer(owner, 'Default', 'edit')
     const loaded = (await serviceRun('launchctl', ['print', `gui/${uid}/${unit.label}`])).code === 0
     const port = options.port
     const moved = movePort({ run: options.run ?? runTool, uid, unit, loaded, port }, () =>
       writeRegistry(root, { ...registry, defaultPort: port })
     )
-    return { id: 'default', port, ...moved }
+    const warning = appPortWarning(
+      port,
+      registry.profiles.map((profile) => profile.port)
+    )
+    return { id: 'default', port, warning, ...moved }
   })
 }

@@ -12,8 +12,10 @@ import {
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import {
+  appPortWarning,
   appProfileNameError,
-  appProfilePortError
+  appProfilePortError,
+  DEFAULT_APP_PORT
 } from '../../shared/app-profiles/app-profile-rules'
 import {
   runServeServiceManager,
@@ -55,6 +57,7 @@ export type Context = {
   registry: AppProfileRegistry
   /** True when the serve service runs and the app does not. */
   inBackground: boolean
+  owner: RuntimeOwner
 }
 
 /** The root of the profiles. The default app is not a profile, so no edit takes it. */
@@ -127,7 +130,8 @@ export async function prepare(
     entry,
     located,
     registry,
-    inBackground: state === 'background'
+    inBackground: state === 'background',
+    owner
   }
 }
 
@@ -237,10 +241,17 @@ function renameLocked(
   return { ...entry, name, appPath: newPath, serveService }
 }
 
+export type AppProfilePortChange = AppProfileEntry & {
+  /** appPortWarning of the port. */
+  warning: string | null
+  serveServiceInstalled: boolean
+  serveService: ServeServiceChange
+}
+
 /** Changes the saved port: the port of the profile's server. */
 export async function setAppProfilePort(
   options: EditAppProfileOptions & { port: number }
-): Promise<AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange }> {
+): Promise<AppProfilePortChange> {
   return withRegistryLockAsync(rootOf(options, 'edit'), async () => {
     // The app does not use the saved port; the server uses it at its next start.
     const context = await prepare(options, 'edit', true)
@@ -251,11 +262,7 @@ export async function setAppProfilePort(
   })
 }
 
-function setPortLocked(
-  context: Context,
-  port: number,
-  loaded: boolean
-): AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
+function setPortLocked(context: Context, port: number, loaded: boolean): AppProfilePortChange {
   const error = appProfilePortError(
     port,
     context.registry.profiles.filter((p) => p.id !== context.entry.id).map((p) => p.port),
@@ -269,6 +276,7 @@ function setPortLocked(
   return {
     ...context.entry,
     port,
+    warning: appPortWarning(port, [context.registry.defaultPort ?? DEFAULT_APP_PORT]),
     ...movePort({ ...context, unit, loaded, port }, () =>
       updateEntry(context, (registry) => ({
         ...registry,

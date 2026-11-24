@@ -15,6 +15,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import {
   appProfileIdError,
   appProfileNameError,
+  appPortWarning,
   appProfilePortError,
   appProfileIdFromName,
   type AppProfileChange,
@@ -56,11 +57,17 @@ export function ProfileFormDialog(props: {
     others.map((row) => row.name),
     t
   )
+  const defaultPort = props.state?.rows.find((row) => row.id === 'default')?.port
   const portError = appProfilePortError(
     Number(form.port),
     others.map((row) => row.port),
     t,
-    props.state?.rows.find((row) => row.id === 'default')?.port
+    defaultPort
+  )
+  const portWarning = appPortWarning(
+    Number(form.port),
+    defaultPort === undefined ? [] : [defaultPort],
+    t
   )
   const idError =
     form.mode === 'new'
@@ -180,6 +187,7 @@ export function ProfileFormDialog(props: {
                   "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
                 ),
                 form.mode === 'edit' ? livePortText(form.row, t) : null,
+                portWarning,
                 serverRuns
                   ? t(
                       'profileManager.field.portServerRuns',
@@ -244,6 +252,7 @@ export function ProfileFormDialog(props: {
         {/* Inside the content, so that Radix keeps the Edit dialog open under it. */}
         <PortChangeConfirm
           port={confirmPort}
+          warning={portWarning}
           busy={props.busy}
           onCancel={() => setConfirmPort(null)}
           onConfirm={() => {
