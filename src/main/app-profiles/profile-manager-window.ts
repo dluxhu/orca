@@ -31,7 +31,10 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
       profileManagerWindow.restore()
     }
     profileManagerWindow.focus()
-    if (options.startNew) {
+    if (options.startNew && profileManagerWindow.webContents.isLoadingMainFrame()) {
+      // A page that still loads has no listener yet: load it again with the request in the hash.
+      loadPage(profileManagerWindow, 'new')
+    } else if (options.startNew) {
       profileManagerWindow.webContents.send('appProfiles:startNew')
     }
     return
@@ -59,7 +62,10 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
     }
   })
   // A new window has no listener yet, so the URL hash asks for the New dialog.
-  const hash = options.startNew ? 'new' : ''
+  loadPage(window, options.startNew ? 'new' : '')
+}
+
+function loadPage(window: BrowserWindow, hash: string): void {
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html#${hash}`)
   } else {

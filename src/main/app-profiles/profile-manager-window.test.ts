@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({ windows: [] as Record<string, ReturnType<typeof vi.fn>>[] }))
 
 vi.mock('electron', () => {
   class BrowserWindow {
-    webContents = { send: vi.fn() }
+    webContents = { send: vi.fn(), isLoadingMainFrame: vi.fn(() => false) }
     constructor() {
       h.windows.push(this as unknown as Record<string, ReturnType<typeof vi.fn>>)
     }
@@ -25,9 +25,7 @@ vi.mock('../window/security/privileged-window-navigation', () => ({
 
 import { openProfileManagerWindow } from './profile-manager-window'
 
-afterEach(() => {
-  h.windows.length = 0
-})
+// The module keeps its one window across the tests of this file.
 
 describe('openProfileManagerWindow', () => {
   it('asks for the New dialog by the URL hash of a new window, and by an event to an open one', () => {
@@ -45,5 +43,20 @@ describe('openProfileManagerWindow', () => {
     openProfileManagerWindow({ startNew: true })
     expect(h.windows).toHaveLength(1)
     expect(window.webContents.send).toHaveBeenCalledWith('appProfiles:startNew')
+  })
+
+  it('loads a window that still loads again with the hash, so New profile… is not lost', () => {
+    const window = h.windows[0] as unknown as {
+      loadFile: ReturnType<typeof vi.fn>
+      webContents: { send: ReturnType<typeof vi.fn>; isLoadingMainFrame: ReturnType<typeof vi.fn> }
+    }
+    window.loadFile.mockClear()
+    window.webContents.send.mockClear()
+    window.webContents.isLoadingMainFrame.mockReturnValue(true)
+    openProfileManagerWindow({ startNew: true })
+    expect(window.webContents.send).not.toHaveBeenCalled()
+    expect(window.loadFile).toHaveBeenCalledWith(expect.stringMatching(/profile-manager\.html$/), {
+      hash: 'new'
+    })
   })
 })
