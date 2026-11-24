@@ -27,7 +27,6 @@ import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
 import { setAppProfileIcon } from './app-profile-set-icon'
-import { appIconFileName } from './app-profile-icon'
 import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -59,7 +58,7 @@ const run: RunTool = (program, args) => {
     }
     return args[0] === '-d' ? '<plist><dict/></plist>' : ''
   }
-  if (/(lsregister|launchctl|tccutil|security)$/.test(program)) {
+  if (/(lsregister|launchctl|tccutil|security)$/.test(program) || program === '/usr/bin/env') {
     return ''
   }
   return execFileSync(program, args, { encoding: 'utf8' })
@@ -507,14 +506,15 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
     })
   })
 
-  it('set-icon writes the icon into the renamed app, also after a rename while the icon is made', async () => {
+  it('set-icon gives the renamed app its icon, also after a rename while the icon is made', async () => {
     renameInFinder()
     const later = join(dir, 'apps', 'Orca - Later.app')
-    // set-icon names the icon file in the Info.plist.
-    const icon = (path: string): string => {
-      const plist = readFileSync(join(path, 'Contents', 'Info.plist'), 'utf8')
-      return readFileSync(join(path, 'Contents', 'Resources', appIconFileName(plist)), 'utf8')
-    }
+    // The bundle of the last custom icon call.
+    const iconTarget = (): string | undefined =>
+      calls
+        .findLast((call) => call[0] === '/usr/bin/env')
+        ?.find((arg) => arg.startsWith('ORCA_APP_BUNDLE_PATH='))
+        ?.slice('ORCA_APP_BUNDLE_PATH='.length)
     const made = (text: string, move?: () => void) =>
       (() => {
         move?.()
@@ -524,15 +524,13 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
         }
       }) as never
     await setAppProfileIcon('work', { kind: 'badge' }, { ...deps(), makeIcon: made('Q') })
-    expect(icon(finderPath())).toBe('icns Q')
+    expect(iconTarget()).toBe(finderPath())
     await setAppProfileIcon(
       'work',
       { kind: 'badge' },
       { ...deps(), makeIcon: made('R', () => renameSync(finderPath(), later)) }
     )
-    expect(icon(later)).toBe('icns R')
-    // The last bundle signature is on the app at its new place.
-    expect(calls.findLast((call) => call[1] === '--force')?.at(-1)).toBe(later)
+    expect(iconTarget()).toBe(later)
   })
 
   it('serve, open and rename find the renamed app', async () => {

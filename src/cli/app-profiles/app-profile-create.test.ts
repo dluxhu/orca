@@ -39,6 +39,7 @@ let dir: string
 let app: string
 let calls: string[][]
 let iconSources: unknown[]
+let customIcons: [string, string][]
 
 // The icon file that the bundle's Info.plist names.
 const bundleIcon = (appPath: string): string =>
@@ -77,6 +78,16 @@ const run: RunTool = (program, args) => {
   if (program.endsWith('lsregister')) {
     return ''
   }
+  if (program === '/usr/bin/env') {
+    // The Finder custom icon: record the bundle and the icon file content at that time.
+    const value = (name: string): string =>
+      (args.find((arg) => arg.startsWith(`${name}=`)) ?? '').slice(name.length + 1)
+    customIcons.push([
+      value('ORCA_APP_BUNDLE_PATH'),
+      readFileSync(value('ORCA_APP_ICON_PATH'), 'utf8')
+    ])
+    return ''
+  }
   return execFileSync(program, args, { encoding: 'utf8' })
 }
 
@@ -87,6 +98,7 @@ function file(path: string, content: string): void {
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'orca-profile-create-'))
+  customIcons = []
   app = join(dir, 'Orca.app')
   const contents = join(app, 'Contents')
   file(join(contents, 'Info.plist'), DEFAULT_PLIST)
@@ -521,59 +533,33 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
   })
 
   const icon = (entry: { appPath: string }): string => bundleIcon(entry.appPath)
-  const defaultIcon = (): string => join(app, 'Contents', 'Resources', 'icon.icns')
-  // A profile made before icons has a link to the default app's icon.
-  const linkIcon = (entry: { appPath: string }): void => {
-    rmSync(icon(entry))
-    symlinkSync(defaultIcon(), icon(entry))
-  }
+  const signed = (entry: { appPath: string }): string[] => [
+    read(join(entry.appPath, 'Contents', 'Info.plist')),
+    read(icon(entry))
+  ]
 
-  it('writes the icon by profile id, signs again, registers again and records it', async () => {
+  it('sets a Finder custom icon by profile id and records it; the signed bundle stays as it is', async () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run, makeIcon })
-    linkIcon(work)
+    const before = signed(work)
     calls = []
     // The automatic character skips the badges of the other profiles, not the own one.
     const changed = await setAppProfileIcon('work', { kind: 'badge' }, opts())
     expect(changed.icon).toEqual({ kind: 'badge', text: '2', style: 'ref-match' })
     await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
-    expect(lstatSync(icon(work)).isSymbolicLink()).toBe(false)
-    expect(read(icon(work))).toBe('icns Q')
-    expect(read(defaultIcon())).toBe('default icon')
-    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
-    expect(calls.slice(-3)).toEqual([
-      ['/usr/bin/codesign', '-d', '--entitlements', '-', '--xml', app],
-      [
-        '/usr/bin/codesign',
-        '--force',
-        '-s',
-        '-',
-        '-i',
-        work.bundleId,
-        '--entitlements',
-        expect.stringMatching(/entitlements\.plist$/),
-        work.appPath
-      ],
-      [expect.stringMatching(/lsregister$/), '-f', work.appPath]
+    expect(customIcons).toEqual([
+      [work.appPath, 'icns 2'],
+      [work.appPath, 'icns Q']
     ])
+    expect(calls.filter(([program]) => /codesign|lsregister/.test(program))).toEqual([])
+    expect(calls.find(([program]) => program === '/usr/bin/env')).toContain('/usr/bin/osascript')
+    expect(signed(work)).toEqual(before)
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
     const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
     expect(registry.profiles.map((p: { icon: { text: string } }) => p.icon.text)).toEqual([
       'Q',
       '3'
     ])
-  })
-
-  it('gives each new icon a new file name, so that macOS does not show a cached icon', async () => {
-    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
-    const resources = join(work.appPath, 'Contents', 'Resources')
-    await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
-    const first = icon(work)
-    expect(first).toMatch(/\/icon-[0-9a-f]{8}\.icns$/)
-    expect(existsSync(join(resources, 'icon.icns'))).toBe(false)
-    await setAppProfileIcon('work', { kind: 'badge', text: 'R' }, opts())
-    expect(icon(work)).not.toBe(first)
-    expect(existsSync(first)).toBe(false)
-    expect(read(icon(work))).toBe('icns R')
   })
 
   it('keeps an uploaded badge as PNG, so that the Edit form can start from it', async () => {
@@ -632,27 +618,19 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     expect(read(icon(work))).toBe('icns 2')
   })
 
-  it('puts the old icon back and records nothing when codesign fails', async () => {
+  it('changes nothing when macOS refuses the custom icon', async () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     const failing: RunTool = (program, args) => {
-      if (program.endsWith('codesign') && args[0] === '--force') {
-        throw new Error('codesign failed')
+      if (program === '/usr/bin/env') {
+        throw new Error('setIcon failed')
       }
       return run(program, args)
     }
-    for (const before of ['file', 'link']) {
-      if (before === 'link') {
-        linkIcon(work)
-      }
-      await expect(
-        setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts({ run: failing }))
-      ).rejects.toThrow('codesign failed')
-      expect(lstatSync(icon(work)).isSymbolicLink()).toBe(before === 'link')
-      expect(read(icon(work))).toBe(before === 'link' ? 'default icon' : 'icns 2')
-      expect(read(defaultIcon())).toBe('default icon')
-      expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
-      const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
-      expect(registry.profiles[0].icon.text).toBe('2')
-    }
+    await expect(
+      setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts({ run: failing }))
+    ).rejects.toThrow('setIcon failed')
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
+    const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
+    expect(registry.profiles[0].icon.text).toBe('2')
   })
 })
