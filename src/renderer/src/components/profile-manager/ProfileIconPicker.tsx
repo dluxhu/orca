@@ -1,13 +1,17 @@
 // The icon part of the New and Edit profile dialogs: docs/fork/profiles-design.md, section 8.
 // The main process makes the preview; this view only shows its PNG.
+import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useTranslate } from '@/i18n/use-translate'
+import { cn } from '@/lib/class-names'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
 import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile-paths'
 import {
+  APP_PROFILE_BADGE_COLOR,
   APP_PROFILE_BADGE_FILE,
   APP_PROFILE_ICON_FILE
 } from '../../../../shared/app-profiles/app-profile-icon-files'
@@ -29,7 +33,7 @@ export function editIcon(
   userDataPath = ''
 ): AppProfileIconSource {
   if (icon?.kind === 'badge') {
-    return { kind: 'badge', text: icon.text, style: icon.style }
+    return { kind: 'badge', text: icon.text, style: icon.style, color: icon.color }
   }
   if (icon?.kind === 'image') {
     return { kind: 'image', path: `${userDataPath}/${APP_PROFILE_BADGE_FILE}`, style: icon.style }
@@ -42,6 +46,88 @@ export function editIcon(
 
 function fileName(path: string): string {
   return path.split('/').pop() ?? path
+}
+
+/** The swatches of the badge character colour. The first is the default. */
+const BADGE_COLORS = [
+  APP_PROFILE_BADGE_COLOR,
+  '#dc2626',
+  '#ea580c',
+  '#16a34a',
+  '#2563eb',
+  '#9333ea'
+] as const
+
+/** The badge character colour: the swatches, then any colour. The default colour is no colour. */
+function BadgeColors(props: {
+  color?: string
+  onChange: (color: string | undefined) => void
+}): React.JSX.Element {
+  const t = useTranslate()
+  const current = props.color ?? APP_PROFILE_BADGE_COLOR
+  const isCustom = !BADGE_COLORS.some((swatch) => swatch === current)
+  const names: Record<(typeof BADGE_COLORS)[number], string> = {
+    [APP_PROFILE_BADGE_COLOR]: t('profileManager.icon.colorDark', 'Dark'),
+    '#dc2626': t('profileManager.icon.colorRed', 'Red'),
+    '#ea580c': t('profileManager.icon.colorOrange', 'Orange'),
+    '#16a34a': t('profileManager.icon.colorGreen', 'Green'),
+    '#2563eb': t('profileManager.icon.colorBlue', 'Blue'),
+    '#9333ea': t('profileManager.icon.colorPurple', 'Purple')
+  }
+  const pick = (color: string): void =>
+    props.onChange(color === APP_PROFILE_BADGE_COLOR ? undefined : color)
+  const custom = t('profileManager.icon.colorCustom', 'Custom color')
+  const ring = 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label id="profile-badge-color" className="font-semibold">
+        {t('profileManager.icon.color', 'Character color')}
+      </Label>
+      <div
+        role="group"
+        aria-labelledby="profile-badge-color"
+        className="flex h-9 items-center gap-2"
+      >
+        {BADGE_COLORS.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            aria-label={names[swatch]}
+            aria-pressed={swatch === current}
+            style={{ backgroundColor: swatch }}
+            onClick={() => pick(swatch)}
+            className={cn(
+              'size-5 cursor-pointer rounded-full border border-black/10 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-white/15',
+              swatch === current && ring
+            )}
+          />
+        ))}
+        {isCustom ? (
+          <span
+            aria-hidden
+            style={{ backgroundColor: current }}
+            className={cn('size-5 rounded-full border border-black/10 dark:border-white/15', ring)}
+          />
+        ) : null}
+        <ColorPicker
+          value={current}
+          onChange={(next) => pick(next.toLowerCase())}
+          label={custom}
+          selected={isCustom}
+          trigger={
+            <button
+              type="button"
+              aria-label={custom}
+              title={custom}
+              className="flex size-5 cursor-pointer items-center justify-center rounded-full border border-border bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <Plus className="size-3" />
+            </button>
+          }
+        />
+      </div>
+    </div>
+  )
 }
 
 export function ProfileIconPicker(props: {
@@ -94,17 +180,22 @@ export function ProfileIconPicker(props: {
         </ToggleGroupItem>
       </ToggleGroup>
       {value.kind === 'badge' ? (
-        <Field
-          name="badge"
-          label={t('profileManager.icon.badge', 'Badge character')}
-          value={value.text ?? ''}
-          inputClassName="w-16 text-center text-lg font-bold md:text-lg"
-          note={t(
-            'profileManager.icon.badgeNote',
-            'Default: the next number that no profile uses (2, 3, 4, …). A letter or an emoji also works.'
-          )}
-          onChange={(text) => onChange({ ...value, text })}
-        />
+        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+          <div className="min-w-0 flex-1">
+            <Field
+              name="badge"
+              label={t('profileManager.icon.badge', 'Badge character')}
+              value={value.text ?? ''}
+              inputClassName="w-16 text-center text-lg font-bold md:text-lg"
+              note={t(
+                'profileManager.icon.badgeNote',
+                'Default: the next number that no profile uses (2, 3, 4, …). A letter or an emoji also works.'
+              )}
+              onChange={(text) => onChange({ ...value, text })}
+            />
+          </div>
+          <BadgeColors color={value.color} onChange={(color) => onChange({ ...value, color })} />
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => choose(value.kind)}>
@@ -128,15 +219,14 @@ export function ProfileIconPicker(props: {
         </div>
       )}
       {value.kind !== 'file' && style ? (
-        <ProfileStyleGrid
-          value={value}
-          style={style}
-          onChange={(next) => onChange({ ...value, style: next })}
-        />
+        <ProfileStyleGrid style={style} onChange={(next) => onChange({ ...value, style: next })} />
       ) : null}
     </div>
   )
 }
+
+// The CLI takes seconds for a preview: a quick series of changes (typing, a colour drag) makes one.
+const PREVIEW_DELAY_MS = 300
 
 const dockSamples = [
   {
@@ -172,15 +262,22 @@ export function ProfileIconPreview(props: {
     }
     let current = true
     setPreview(null)
-    void api.iconPreview(JSON.parse(key) as AppProfileIconSource, props.profileId).then((reply) => {
-      if (current) {
-        setPreview(
-          reply.ok ? { png: (reply.result as { png: string }).png } : { error: reply.error.message }
-        )
-      }
-    })
+    const timer = setTimeout(() => {
+      void api
+        .iconPreview(JSON.parse(key) as AppProfileIconSource, props.profileId)
+        .then((reply) => {
+          if (current) {
+            setPreview(
+              reply.ok
+                ? { png: (reply.result as { png: string }).png }
+                : { error: reply.error.message }
+            )
+          }
+        })
+    }, PREVIEW_DELAY_MS)
     return () => {
       current = false
+      clearTimeout(timer)
     }
   }, [api, key, ready, props.profileId])
 

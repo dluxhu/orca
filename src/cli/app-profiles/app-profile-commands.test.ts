@@ -6,17 +6,6 @@ import { describe, expect, it, vi } from 'vitest'
 const created = vi.hoisted(() => ({ options: [] as unknown[], used: [] as unknown[] }))
 vi.mock('./app-profile-icon', async (original) => ({
   ...(await original<object>()),
-  appProfileIconParts: (_app: string, source: unknown, used: unknown) => {
-    created.used.push(used)
-    created.options.push(source)
-    const img = (fill: number) => ({
-      width: 2,
-      height: 2,
-      channels: 4,
-      data: new Uint8Array(16).fill(fill)
-    })
-    return { base: img(1), badge: img(2), text: '3' }
-  },
   makeAppProfileIcon: (_app: string, _source: unknown, used: unknown) => {
     created.used.push(used)
     return { icns: Buffer.alloc(0), icon: { kind: 'badge', text: '2', style: 'ref-match' } }
@@ -77,6 +66,15 @@ describe.skipIf(process.platform !== 'darwin')('orca profiles create', () => {
       icon: { kind: 'image', path: '/x/logo.svg', style: 'ref-match-bigger' }
     })
   })
+
+  it('passes --icon-color with the badge', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    await runProfilesCommand(['create', 'Work', '--icon-badge', 'Q', '--icon-color', '#2563EB'])
+    write.mockRestore()
+    expect(created.options.at(-1)).toMatchObject({
+      icon: { kind: 'badge', text: 'Q', color: '#2563eb' }
+    })
+  })
 })
 
 describe.skipIf(process.platform !== 'darwin')('orca profiles icon-preview', () => {
@@ -99,47 +97,5 @@ describe.skipIf(process.platform !== 'darwin')('orca profiles icon-preview', () 
     vi.unstubAllEnvs()
     rmSync(root, { recursive: true, force: true })
     expect(created.used.at(-1)).toEqual([badge('3')])
-  })
-})
-
-describe('orca profiles icon-parts', () => {
-  it('prints the base icon and the badge as PNGs; the --id profile does not block its badge', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'orca-icon-parts-'))
-    const badge = (text: string) => ({ kind: 'badge', text, style: 'ref-match' })
-    writeFileSync(
-      join(root, 'profiles.json'),
-      JSON.stringify({
-        version: 1,
-        defaultAppPath: '/Apps/Orca.app',
-        profiles: [
-          { id: 'work', name: 'work', icon: badge('2') },
-          { id: 'home', name: 'home', icon: badge('3') }
-        ]
-      })
-    )
-    vi.stubEnv('ORCA_PROFILES_ROOT', root)
-    let out = ''
-    const write = vi.spyOn(process.stdout, 'write').mockImplementation((text) => {
-      out += String(text)
-      return true
-    })
-    await runProfilesCommand(['icon-parts', '--id', 'work', '--icon-badge', '4', '--json'])
-    write.mockRestore()
-    vi.unstubAllEnvs()
-    rmSync(root, { recursive: true, force: true })
-    expect(created.used.at(-1)).toEqual([badge('3')])
-    expect(created.options.at(-1)).toEqual({ kind: 'badge', text: '4' })
-    const result = JSON.parse(out).result as { base: string; badge: string }
-    const png = (base64: string) => Buffer.from(base64, 'base64')
-    // PNG files of the two 2 x 2 images.
-    expect(png(result.base).subarray(1, 4).toString()).toBe('PNG')
-    expect(png(result.base).readUInt32BE(16)).toBe(2)
-    expect(result.badge).not.toBe(result.base)
-  })
-
-  it('refuses an own icon file, which has no badge', async () => {
-    await expect(
-      runProfilesCommand(['icon-parts', '--icon-file', '/x/icon.icns', '--json'])
-    ).rejects.toThrow('no badge')
   })
 })

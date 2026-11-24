@@ -9,13 +9,6 @@ import type {
 import { ICON_STYLES } from '../../../../shared/icon-badger/badger'
 import { PROFILE_STATE_POLL_MS, ProfileManager } from './ProfileManager'
 
-// ProfileStyleGrid.test.tsx covers the thumbnails.
-vi.mock('./profile-icon-thumbnail-client', () => ({
-  decodeParts: async () => ({}),
-  renderThumbnail: async () => 'data:image/png;base64,VEhVTUI=',
-  stopThumbnails: () => {}
-}))
-
 const row = (id: string, name: string, state: AppProfileRow['state'], port: number) => ({
   id,
   name,
@@ -67,7 +60,6 @@ beforeEach(() => {
         showInFinder,
         iconPreview,
         chooseIconFile,
-        iconParts: async () => ({ ok: true, result: { base: '', badge: '' } }),
         onStartNew
       }
     }
@@ -347,6 +339,86 @@ describe('ProfileManager', () => {
       })
     )
     expect(change).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts with the default character colour, and creates with a swatch colour', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    const colors = screen.getByRole('group', { name: 'Character color' })
+    expect(within(colors).getByRole('button', { name: 'Dark' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: '2', style: 'ref-match', color: '#2563eb' },
+        undefined
+      )
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'create',
+          icon: { kind: 'badge', text: '2', style: 'ref-match', color: '#2563eb' }
+        })
+      )
+    )
+  })
+
+  it('makes one preview for a quick series of changes', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    const colors = screen.getByRole('group', { name: 'Character color' })
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    fireEvent.click(within(colors).getByRole('button', { name: 'Green' }))
+    await waitFor(() => expect(iconPreview).toHaveBeenCalledTimes(1))
+    expect(iconPreview).toHaveBeenLastCalledWith(
+      { kind: 'badge', text: '2', style: 'ref-match', color: '#16a34a' },
+      undefined
+    )
+  })
+
+  it('takes a custom character colour', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    fireEvent.click(screen.getByRole('button', { name: 'Custom color' }))
+    fireEvent.change(await screen.findByLabelText('Hex'), { target: { value: '#123456' } })
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: '2', style: 'ref-match', color: '#123456' },
+        undefined
+      )
+    )
+  })
+
+  it('shows the saved character colour in an edit, and sends a new one as set-icon', async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: '2', style: 'ref-match', color: '#dc2626' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    const colors = screen.getByRole('group', { name: 'Character color' })
+    expect(within(colors).getByRole('button', { name: 'Red' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: '2', style: 'ref-match', color: '#dc2626' },
+        'work'
+      )
+    )
+    // The default swatch stores no colour.
+    fireEvent.click(within(colors).getByRole('button', { name: 'Dark' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith({
+        kind: 'set-icon',
+        id: 'work',
+        icon: { kind: 'badge', text: '2', style: 'ref-match' }
+      })
+    )
   })
 
   it('opens the New dialog when the window starts with #new, after the list loads', async () => {

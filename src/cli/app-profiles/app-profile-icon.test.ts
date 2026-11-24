@@ -63,6 +63,7 @@ describe('profile icon sources', () => {
   it('writes the --icon flags that it reads back', () => {
     for (const source of [
       { kind: 'badge', text: 'Q', style: 'ref-match-bigger' },
+      { kind: 'badge', text: 'Q', style: 'ref-match', color: '#2563eb' },
       { kind: 'badge', text: undefined, style: 'ref-match' },
       { kind: 'image', path: '/x/logo.svg', style: 'ref-match' },
       { kind: 'file', path: '/x/icon.icns' }

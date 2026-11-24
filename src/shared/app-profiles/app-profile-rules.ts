@@ -70,7 +70,11 @@ export function appProfileIconFlags(source: AppProfileIconSource | undefined): s
     return ['--icon-image', source.path, ...style]
   }
   // No text and no style still means a badge: the CLI makes the default one.
-  return [...(source.text ? ['--icon-badge', source.text] : []), ...style]
+  return [
+    ...(source.text ? ['--icon-badge', source.text] : []),
+    ...style,
+    ...(source.color ? ['--icon-color', source.color] : [])
+  ]
 }
 
 /** This app's own profile, for Settings. */

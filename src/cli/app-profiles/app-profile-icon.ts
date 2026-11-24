@@ -172,11 +172,8 @@ function badgeTextOf(
   return text
 }
 
-/**
- * The two inputs of a badged icon at 1024 px: the default app's icon and the badge image. The
- * Profile Manager renders the style thumbnails from them.
- */
-export function appProfileIconParts(
+/** The two inputs of a badged icon at 1024 px: the default app's icon and the badge image. */
+function appProfileIconParts(
   defaultAppPath: string,
   source: AppProfileIconSource & { kind: 'badge' | 'image' },
   used: readonly (AppProfileIcon | undefined)[] = [],

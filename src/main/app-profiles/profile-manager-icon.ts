@@ -26,20 +26,6 @@ export function previewAppProfileIcon(
   ])
 }
 
-/** The base icon and the badge image of a badge source, as base64 PNGs, for the style thumbnails. */
-export function appProfileIconParts(
-  icon: AppProfileIconSource,
-  id?: string | null
-): Promise<AppProfileReply> {
-  return runCli([
-    'profiles',
-    'icon-parts',
-    ...(id ? ['--id', id] : []),
-    ...appProfileIconFlags(icon),
-    '--json'
-  ])
-}
-
 /** The path of a badge image or of an icon file that the user chooses, or null. */
 export async function chooseAppProfileIconFile(
   kind: 'image' | 'file',
@@ -74,7 +60,6 @@ export type ProfileManagerGuard = <T extends unknown[], R>(
 
 export function registerProfileIconIpc(fromProfileManager: ProfileManagerGuard): void {
   ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
-  ipcMain.handle('appProfiles:iconParts', fromProfileManager(appProfileIconParts))
   ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
     fromProfileManager(async () =>
       chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)

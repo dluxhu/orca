@@ -3,16 +3,19 @@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useTranslate } from '@/i18n/use-translate'
 import { ICON_STYLES, type IconStyle } from '../../../../shared/icon-badger/badger'
-import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
-import { useStyleThumbnails } from './use-style-thumbnails'
+
+// Made once with a placeholder badge: profile-style-thumbnails.test.ts. A live render takes seconds.
+const THUMBNAILS = import.meta.glob<string>('../../assets/profile-icon-styles/*.png', {
+  query: '?url',
+  import: 'default',
+  eager: true
+})
 
 export function ProfileStyleGrid(props: {
-  value: AppProfileIconSource & { kind: 'badge' | 'image' }
   style: IconStyle
   onChange: (style: IconStyle) => void
 }): React.JSX.Element {
   const t = useTranslate()
-  const thumbnails = useStyleThumbnails(props.value, props.style)
   // A style without a name here shows its id.
   const labels: Partial<Record<string, string>> = {
     'ref-match': t('profileManager.icon.styleRefMatch', 'Page curl'),
@@ -57,11 +60,11 @@ export function ProfileStyleGrid(props: {
             title={id}
             className="h-auto min-w-0 flex-col gap-1.5 rounded-[10px] px-1 py-2.5 text-[11px] leading-tight whitespace-normal data-[state=on]:border-foreground"
           >
-            {thumbnails[id] ? (
-              <img src={thumbnails[id]} alt="" className="size-12" />
-            ) : (
-              <span aria-hidden="true" className="size-12 animate-pulse rounded-xl bg-muted" />
-            )}
+            <img
+              src={THUMBNAILS[`../../assets/profile-icon-styles/${id}.png`]}
+              alt=""
+              className="size-12"
+            />
             {labels[id] ?? id}
           </ToggleGroupItem>
         ))}
