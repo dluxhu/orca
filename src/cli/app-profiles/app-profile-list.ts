@@ -201,7 +201,7 @@ export async function listAppProfiles(
       userDataPath: options.defaultUserDataPath,
       port: registry?.defaultPort ?? DEFAULT_APP_PORT
     },
-    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => {
+    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port, icon }) => {
       // A rename in Finder changes only the file name; the app shows that name.
       const found = locateAppProfileApp({ id, appPath })
       return {
@@ -209,7 +209,8 @@ export async function listAppProfiles(
         name: found ? basename(found, '.app') : name,
         appPath: found ?? appPath,
         userDataPath,
-        port
+        port,
+        icon
       }
     })
   ]
