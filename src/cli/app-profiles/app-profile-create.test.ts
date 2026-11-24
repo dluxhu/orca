@@ -449,7 +449,15 @@ describe('runProfilesCreate', () => {
     expect(() => runProfilesCreate(['Work', '--icon-badge', 'Q', '--icon-file', 'a.icns'])).toThrow(
       'Use only one'
     )
-    expect(() => runProfilesCreate(['Work', '--icon-color', 'red'])).toThrow('Usage:')
+    expect(() => runProfilesCreate(['Work', '--icon-size', '9'])).toThrow('Usage:')
+    expect(() => runProfilesCreate(['Work', '--icon-color', 'red'])).toThrow('#rrggbb')
+  })
+
+  it.skipIf(process.platform !== 'darwin')('takes --icon-color', () => {
+    // Past the flag check, plain Node is not an Orca app.
+    expect(() => runProfilesCreate(['Work', '--icon-color', '#2563eb'])).toThrow(
+      'Run this command with the orca CLI of an Orca app.'
+    )
   })
 })
 

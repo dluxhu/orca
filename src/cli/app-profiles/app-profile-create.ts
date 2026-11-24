@@ -282,7 +282,7 @@ function readPlistKeyExists(xml: string, key: string): boolean {
 }
 
 const CREATE_USAGE =
-  'Usage: orca profiles create <name> [--port N] [--icon-badge <text>] [--icon-style <style>] [--icon-image <file>] [--icon-file <file>]'
+  'Usage: orca profiles create <name> [--port N] [--icon-badge <text>] [--icon-style <style>] [--icon-color <#rrggbb>] [--icon-image <file>] [--icon-file <file>]'
 
 /** The CLI entry: `orca profiles create <name> [--port N] [--icon-…]`. */
 export function runProfilesCreate(argv: string[]): void {
@@ -308,7 +308,14 @@ export function runProfilesCreate(argv: string[]): void {
   } catch (error) {
     throw new RuntimeClientError('invalid_argument', (error as Error).message)
   }
-  const known = ['--port', '--icon-badge', '--icon-style', '--icon-image', '--icon-file']
+  const known = [
+    '--port',
+    '--icon-badge',
+    '--icon-style',
+    '--icon-color',
+    '--icon-image',
+    '--icon-file'
+  ]
   if (rest.length !== 1 || [...values.keys()].some((flag) => !known.includes(flag))) {
     throw new RuntimeClientError('invalid_argument', CREATE_USAGE)
   }
