@@ -13,6 +13,7 @@ import {
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { TranslationScopeProvider } from '@/i18n/translation-scope-provider'
+import { showChatOpenUnavailable } from '@/lib/agent-session/open/chat-open-failure-toast'
 import { MessageRow } from './NativeChatMessageRow'
 import { serializeNativeChatAgentReferences } from '../../composer/pickers/native-chat-agent-reference-send'
 import { AgentReferencePillContent } from '../../composer/editor/native-chat-agent-reference'
@@ -22,6 +23,10 @@ vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.f
 vi.mock('@/lib/agent-session/open/open-agent-message-sender', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   openOrchestrationDispatch: vi.fn(async () => {})
+}))
+vi.mock('@/lib/agent-session/open/chat-open-failure-toast', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  showChatOpenUnavailable: vi.fn()
 }))
 
 const initialStore = useAppStore.getState()
@@ -252,6 +257,18 @@ it('says so in a short notice when the mentioned chat is gone', async () => {
 
   expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('no longer on this host'))
   expect(toast.error).not.toHaveBeenCalled()
+})
+
+it('shows the shared chat open toast when the mentioned chat does not open', async () => {
+  bubble(sentText('Tech Lead'), undefined, LOCAL_CHAT)
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open Tech Lead' }))
+  const feedback = vi.mocked(openOrchestrationDispatch).mock.calls[0]?.[3]
+  const context = { detail: 'session_not_found', retry: vi.fn() }
+  feedback?.open?.unavailable('Tech Lead', context)
+
+  expect(showChatOpenUnavailable).toHaveBeenCalledWith(context, 'Tech Lead')
+  expect(toast.info).not.toHaveBeenCalled()
 })
 
 it('keeps a crew mention a plain chip', () => {
