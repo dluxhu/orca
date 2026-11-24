@@ -14,6 +14,8 @@ import { useTranslate } from '@/i18n/use-translate'
 /** Open while `port` is not null. */
 export function PortChangeConfirm(props: {
   port: number | null
+  /** appPortWarning of the new port. */
+  warning?: string | null
   busy: boolean
   onCancel: () => void
   onConfirm: (port: number) => void
@@ -33,6 +35,7 @@ export function PortChangeConfirm(props: {
             {t('profileManager.portConfirm.note', 'Paired servers will need to be re-paired.')}
           </DialogDescription>
         </DialogHeader>
+        {props.warning ? <p className="text-sm text-muted-foreground">{props.warning}</p> : null}
         <DialogFooter>
           <DialogCancel>{t('profileManager.cancel', 'Cancel')}</DialogCancel>
           <Button

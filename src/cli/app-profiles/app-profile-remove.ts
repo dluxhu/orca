@@ -38,6 +38,13 @@ export async function removeAppProfile(
 ): Promise<{ id: string; keptData: boolean; serveService: ServeServiceChange }> {
   return withRegistryLockAsync(rootOf(options, 'remove'), async () => {
     const context = await prepare(options, 'remove')
+    // A live owner, also the profile's own service, can still write to the data folder.
+    if (context.owner !== 'none') {
+      throw new RuntimeClientError(
+        'profile_running',
+        `A server of "${context.entry.name}" runs. Stop it before you remove the profile: orca --profile ${context.entry.id} serve service uninstall`
+      )
+    }
     return removeLocked(context, options)
   })
 }

@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   renameSync,
+  utimesSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -129,23 +130,21 @@ function makeProfile(name = 'Orca - Work', id?: string) {
 }
 
 /**
- * A live process of the profile owns its runtime: its app, or its server with `args` '--serve'.
- * `runtime`: more fields of orca-runtime.json.
+ * A live process owns the profile's runtime file, as the owner writes it: `role` 'app' (the
+ * default), 'serve' or 'orcad'; no role for a file of an older version. `etime`: the elapsed
+ * time that `ps` gives for the pid. `runtime`: more fields of orca-runtime.json.
  */
 function writeRuntimePid(
   userDataPath: string,
   pid: number,
-  options: { args?: string; ppid?: number; runtime?: object } = {}
+  options: { role?: string | null; ppid?: number; etime?: string; runtime?: object } = {}
 ): void {
+  const role = options.role === undefined ? 'app' : options.role
   writeFileSync(
     join(userDataPath, 'orca-runtime.json'),
-    JSON.stringify({ pid, ...options.runtime })
+    JSON.stringify({ pid, ...(role === null ? {} : { role, userDataPath }), ...options.runtime })
   )
-  const args = options.args ? ` ${options.args}` : ''
-  processes.set(
-    pid,
-    `${options.ppid ?? 1} /Apps/Orca.app/Contents/MacOS/Orca${args} --user-data-dir=${userDataPath}`
-  )
+  processes.set(pid, `${options.ppid ?? 1} ${options.etime ?? '00:01'}`)
 }
 
 describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
@@ -190,7 +189,7 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     const work = makeProfile()
     // The service job runs (pid 9), but the server that owns the runtime is not its child.
     servicePid = 9
-    writeRuntimePid(work.userDataPath, 4242, { args: '--serve' })
+    writeRuntimePid(work.userDataPath, 4242, { role: 'serve' })
     await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
       'Stop that server'
     )
@@ -204,8 +203,8 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     const work = makeProfile()
     file(serveServiceUnitOf(work.userDataPath, false, dir).unitPath, 'unit')
     servicePid = 9
-    writeRuntimePid(work.userDataPath, 10, { args: '--serve', ppid: 11 })
-    processes.set(11, '9 /Apps/orca serve --supervise')
+    writeRuntimePid(work.userDataPath, 10, { role: 'serve', ppid: 11 })
+    processes.set(11, '9 00:02')
     const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
     expect(result.serveService).toBe('restarted')
   })
@@ -284,6 +283,8 @@ describe.skipIf(process.platform !== 'darwin')('the default app', () => {
       ...deps()
     })
     expect(result).toMatchObject({ id: 'default', port: 6769, serveService: 'none' })
+    // Desktop apps can take 6769 first: a warning, no refusal.
+    expect(result.warning).toMatch('6768 to 6799')
     expect(JSON.parse(read(join(dir, 'data', 'profiles.json'))).defaultPort).toBe(6769)
     const rows = await listAppProfiles({
       defaultAppPath: app,
@@ -298,6 +299,21 @@ describe.skipIf(process.platform !== 'darwin')('the default app', () => {
     expect(registry().profiles[0].port).toBe(6768)
     // A profile keeps the saved ports of other profiles: no rewrite of its entry.
     expect(JSON.parse(read(join(dir, 'data', 'profiles.json'))).defaultPort).toBe(6769)
+  })
+
+  it('refuses a new port while a server of the default app runs that its service did not start', async () => {
+    makeProfile()
+    mkdirSync(defaultData(), { recursive: true })
+    writeRuntimePid(defaultData(), 4242, { role: 'serve' })
+    await expect(
+      setDefaultAppPort({ port: 6769, defaultUserDataPath: defaultData(), ...deps() })
+    ).rejects.toThrow('Stop that server')
+  })
+
+  it("gives a new profile a port outside the default app's range", async () => {
+    makeProfile()
+    await setDefaultAppPort({ port: 6832, defaultUserDataPath: defaultData(), ...deps() })
+    expect(makeProfile('Home').port).toBe(6864)
   })
 
   it('refuses the saved port of a profile', async () => {
@@ -483,6 +499,16 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     expect(registry().profiles.map((p) => p.id)).toEqual(['work'])
   })
 
+  it("refuses while the profile's own service runs, so its server writes no data then", async () => {
+    const work = makeProfile()
+    servicePid = 777
+    writeRuntimePid(work.userDataPath, 777, { role: 'serve' })
+    await expect(
+      removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    ).rejects.toThrow('serve service uninstall')
+    expect(trashed).toEqual([])
+  })
+
   it('refuses while the profile app runs', async () => {
     const work = makeProfile()
     writeRuntimePid(work.userDataPath, 4242)
@@ -528,24 +554,27 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     const work = makeProfile('Work')
     const home = makeProfile('Home')
     const client = makeProfile('Client')
-    const flag = makeProfile('Flag')
+    const legacy = makeProfile('Legacy')
     const reused = makeProfile('Reused')
     const stale = makeProfile('Stale')
+    const orcad = makeProfile('Orcad')
     // The service job (9) is the supervisor (11); its child server owns the runtime.
-    writeRuntimePid(work.userDataPath, 10, { args: '--serve', ppid: 11 })
-    processes.set(11, '9 /Apps/orca serve --supervise')
+    writeRuntimePid(work.userDataPath, 10, { role: 'serve', ppid: 11 })
+    processes.set(11, '9 00:02')
     // A launch agent with another label starts this server.
-    writeRuntimePid(home.userDataPath, 20, { args: '--serve' })
+    writeRuntimePid(home.userDataPath, 20, { role: 'serve' })
     writeRuntimePid(client.userDataPath, 30)
-    // --serve-port is no --serve token.
-    writeRuntimePid(flag.userDataPath, 40, { args: '--serve-port=6800' })
-    // Another process took the pid of an old runtime file.
-    writeRuntimePid(reused.userDataPath, 50)
-    processes.set(50, '1 /usr/bin/vim notes.txt')
+    // A file of an older version has no role: a live owner is the app, never stopped.
+    writeRuntimePid(legacy.userDataPath, 40, { role: null })
+    // A process that started after the file was written took the pid of its old owner.
+    writeRuntimePid(reused.userDataPath, 50, { etime: '00:05' })
+    const hourAgo = new Date(Date.now() - 3_600_000)
+    utimesSync(join(reused.userDataPath, 'orca-runtime.json'), hourAgo, hourAgo)
     // The pid of the runtime file is dead.
     writeRuntimePid(stale.userDataPath, 60, {
       runtime: { transports: [{ kind: 'websocket', endpoint: 'ws://0.0.0.0:6960' }] }
     })
+    writeRuntimePid(orcad.userDataPath, 70, { role: 'orcad' })
     const rows = await listAppProfiles({
       defaultAppPath: app,
       defaultUserDataPath: join(dir, 'default-data'),
@@ -562,9 +591,10 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['work', 'background', undefined],
       ['home', 'background', undefined],
       ['client', 'running', undefined],
-      ['flag', 'running', undefined],
+      ['legacy', 'running', undefined],
       ['reused', 'stopped', undefined],
-      ['stale', 'stopped', undefined]
+      ['stale', 'stopped', undefined],
+      ['orcad', 'background', undefined]
     ])
   })
 
@@ -574,7 +604,7 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     const client = makeProfile('Client')
     const ws = (endpoint: string) => ({ transports: [{ kind: 'websocket', endpoint }] })
     // A server started with --port 6768 runs on that port, not on the saved 6800.
-    writeRuntimePid(work.userDataPath, 10, { args: '--serve', runtime: ws('ws://0.0.0.0:6768') })
+    writeRuntimePid(work.userDataPath, 10, { role: 'serve', runtime: ws('ws://0.0.0.0:6768') })
     // The app listens on its own port.
     writeRuntimePid(home.userDataPath, 20, { runtime: ws('ws://127.0.0.1:6769') })
     // A file that a stopped server left gives no port.
@@ -603,6 +633,25 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
     renameSync(work.appPath, finderPath())
     return { work, unit }
   }
+
+  it('a running app renamed in Finder stays running, and remove refuses it', async () => {
+    const work = makeProfile()
+    writeRuntimePid(work.userDataPath, 4242)
+    renameSync(work.appPath, finderPath())
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps()
+    })
+    expect(rows[1]).toMatchObject({ id: 'work', state: 'running' })
+    const trash = (): void => {
+      throw new Error('trashed a running app')
+    }
+    await expect(
+      removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
+    ).rejects.toThrow('runs')
+    expect(existsSync(work.userDataPath)).toBe(true)
+  })
 
   it('heals the registry and the serve unit at start, once, without a service install', () => {
     const { work, unit } = renameInFinder()

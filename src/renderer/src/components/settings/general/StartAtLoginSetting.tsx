@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslate } from '@/i18n/use-translate'
 import {
+  appPortWarning,
   appProfilePortError,
   defaultAppPortError,
   type AppProfileReply,
@@ -83,6 +84,10 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
       : appProfilePortError(port, own.otherPorts, t, own.defaultPort)
   // A hand edit of profiles.json can give two profiles one port.
   const shownPortError = portError ?? ruleError(own.port)
+  // Both ways: a profile is near the default app's port, the default app near a profile's.
+  const warning = (port: number): string | null =>
+    appPortWarning(port, own.id === 'default' ? own.otherPorts : [own.defaultPort], t)
+  const shownWarning = shownPortError ? null : warning(own.port)
 
   const askPort = (port: number): void => {
     const rule = ruleError(port)
@@ -133,8 +138,12 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
           {shownPortError}
         </p>
       ) : null}
+      {shownWarning ? (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">{shownWarning}</p>
+      ) : null}
       <PortChangeConfirm
         port={newPort}
+        warning={newPort === null ? null : warning(newPort)}
         busy={busy}
         onCancel={cancelPort}
         onConfirm={(port) => {

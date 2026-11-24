@@ -135,11 +135,16 @@ describe('StartAtLoginSetting', () => {
     await waitFor(() => expect(setOwnPort).toHaveBeenCalledWith(6769))
   })
 
-  it("a profile's range check follows the default app's saved port", async () => {
+  it("a profile may save 6768 next to the default app's 6769, with a warning", async () => {
     own = { ...own, port: 6768, defaultPort: 6769 }
     show('')
     await screen.findByRole('spinbutton', { name: 'Port' })
     expect(screen.queryByRole('alert')).toBeNull()
+    expect(
+      screen.getByText(
+        'Orca desktop apps also use the ports 6768 to 6799. A running desktop app can take this port first.'
+      )
+    ).toBeTruthy()
   })
 
   it('hides itself when the search does not match', async () => {

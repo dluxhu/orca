@@ -1,6 +1,6 @@
 // `orca profiles list`: every profile with its state. See docs/fork/profiles-design.md, section 4.
 // The main process imports this module for the Profiles menu, so it has no CLI-only imports.
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import {
@@ -28,10 +28,6 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { isProcessAlive } from './app-profile-registry'
-import { readOrcadInstanceLockRecord } from '../../main/orcad/instance-lock/orcad-instance-lock-record'
-
-// ORCAD_LOCK_FILE_NAME: that module brings the whole lock code.
-const ORCAD_LOCK_FILE = 'orcad.lock'
 
 export type AppProfileListDeps = {
   env?: NodeJS.ProcessEnv
@@ -65,13 +61,14 @@ export async function readServeServicePid(
   return Number(/^\s*pid = (\d+)/m.exec(result.out)?.[1] ?? 0) || null
 }
 
-/** The profile's runtime file, or null when it is missing or has no pid. */
-function readRuntime(userDataPath: string): RuntimeMetadata | null {
+/** The profile's runtime file and its write time, or null when it is missing or has no pid. */
+function readRuntime(userDataPath: string): { runtime: RuntimeMetadata; writtenAt: number } | null {
   try {
-    const runtime = JSON.parse(readFileSync(getRuntimeMetadataPath(userDataPath), 'utf8')) as
-      | RuntimeMetadata
-      | undefined
-    return typeof runtime?.pid === 'number' && runtime.pid > 0 ? runtime : null
+    const path = getRuntimeMetadataPath(userDataPath)
+    const runtime = JSON.parse(readFileSync(path, 'utf8')) as RuntimeMetadata | undefined
+    return typeof runtime?.pid === 'number' && runtime.pid > 0
+      ? { runtime, writtenAt: statSync(path).mtimeMs }
+      : null
   } catch {
     return null
   }
@@ -79,7 +76,7 @@ function readRuntime(userDataPath: string): RuntimeMetadata | null {
 
 /** Who owns the profile's runtime file. */
 export type RuntimeOwner =
-  /** No live process of this profile: a stale file, or a pid that another process took. */
+  /** No live owner: no file, a dead pid, or a pid that a later process took. */
   | 'none'
   | 'app'
   /** A server of the profile that its own serve service did not start. */
@@ -94,40 +91,52 @@ export type AppProfileRuntime = {
   livePort: number | null
 }
 
-type ProcessRow = { ppid: number; command: string }
-
-async function readProcess(pid: number, run: ServeServiceRun): Promise<ProcessRow | null> {
-  const result = await run('/bin/ps', ['-o', 'ppid=,command=', '-p', String(pid)])
-  const match = result.code === 0 ? /^\s*(\d+)\s+(.+)$/s.exec(result.out) : null
-  return match ? { ppid: Number(match[1]), command: match[2].trim() } : null
+/** `ps` elapsed time: [[dd-]hh:]mm:ss. */
+function elapsedMs(etime: string): number | null {
+  const match = /^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/.exec(etime)
+  if (!match) {
+    return null
+  }
+  const [, days = '0', hours = '0', minutes, seconds] = match
+  return (
+    (((Number(days) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 + Number(seconds)) * 1000
+  )
 }
 
+type ProcessRow = { ppid: number; startedAt: number | null }
+
+async function readProcess(pid: number, run: ServeServiceRun): Promise<ProcessRow | null> {
+  const result = await run('/bin/ps', ['-o', 'ppid=,etime=', '-p', String(pid)])
+  const match = result.code === 0 ? /^\s*(\d+)\s+(\S+)\s*$/.exec(result.out) : null
+  if (!match) {
+    return null
+  }
+  const elapsed = elapsedMs(match[2])
+  return { ppid: Number(match[1]), startedAt: elapsed === null ? null : Date.now() - elapsed }
+}
+
+// `ps` gives whole seconds, so the computed start can be up to a second late.
+const START_SLACK_MS = 2000
 // The service job is the server's supervisor: its parent, or a few levels up.
 const SERVICE_DEPTH = 3
 
+/**
+ * The owner from the runtime file, which its owner writes: its role, and the pid. A pid that
+ * started after the file was written belongs to another process. A file without a role (an
+ * older version) is the app, so that no edit removes a running app's data.
+ */
 async function classifyOwner(
-  pid: number,
-  profile: { userDataPath: string; appPath: string },
+  file: { runtime: RuntimeMetadata; writtenAt: number },
   servicePid: number | null,
   run: ServeServiceRun
 ): Promise<RuntimeOwner> {
+  const { pid } = file.runtime
   const row = await readProcess(pid, run)
-  if (!row) {
-    return 'none'
-  }
-  const lock = readOrcadInstanceLockRecord(join(profile.userDataPath, ORCAD_LOCK_FILE))
-  // An Electron serve takes the desktop role; only orcad holds the orcad role.
-  const orcad = lock?.pid === pid && lock.role !== 'desktop'
-  const command = ` ${row.command} `
-  const ours =
-    orcad ||
-    command.startsWith(` ${profile.appPath}/Contents/`) ||
-    command.includes(` --user-data-dir=${profile.userDataPath} `)
-  if (!ours) {
+  if (row?.startedAt != null && row.startedAt > file.writtenAt + START_SLACK_MS) {
     return 'none'
   }
   let current = pid
-  let parent: ProcessRow | null = row
+  let parent = row
   for (let depth = 0; servicePid !== null && depth <= SERVICE_DEPTH; depth++) {
     if (current === servicePid) {
       return 'service'
@@ -138,8 +147,7 @@ async function classifyOwner(
     current = parent.ppid
     parent = await readProcess(current, run)
   }
-  // `orca serve` starts the Electron server with a --serve token (not --serve-port).
-  return orcad || command.includes(' --serve ') ? 'server' : 'app'
+  return file.runtime.role === 'serve' || file.runtime.role === 'orcad' ? 'server' : 'app'
 }
 
 function webSocketPort(runtime: RuntimeMetadata): number | null {
@@ -154,7 +162,7 @@ function webSocketPort(runtime: RuntimeMetadata): number | null {
  * that another launch agent or a terminal started. "stopped": neither runs.
  */
 export async function readAppProfileRuntime(
-  profile: { userDataPath: string; appPath: string },
+  profile: { userDataPath: string },
   isDefault: boolean,
   deps: AppProfileListDeps = {}
 ): Promise<AppProfileRuntime> {
@@ -165,16 +173,14 @@ export async function readAppProfileRuntime(
     uid: deps.uid ?? process.getuid?.() ?? 0,
     run
   })
-  const runtime = readRuntime(profile.userDataPath)
+  const file = readRuntime(profile.userDataPath)
   const owner =
-    runtime && isAlive(runtime.pid)
-      ? await classifyOwner(runtime.pid, profile, servicePid, run)
-      : 'none'
+    file && isAlive(file.runtime.pid) ? await classifyOwner(file, servicePid, run) : 'none'
   const serviceRuns = servicePid !== null && isAlive(servicePid)
   return {
     state: owner === 'app' ? 'running' : owner !== 'none' || serviceRuns ? 'background' : 'stopped',
     owner,
-    livePort: runtime && owner !== 'none' ? webSocketPort(runtime) : null
+    livePort: file && owner !== 'none' ? webSocketPort(file.runtime) : null
   }
 }
 
