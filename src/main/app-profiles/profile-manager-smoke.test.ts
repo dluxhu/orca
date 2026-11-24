@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
-import { describe, expect, it } from 'vitest'
-import { profileManagerSmoke } from './profile-manager-smoke'
+import { describe, expect, it, vi } from 'vitest'
+import { profileManagerSmoke, runProfileManagerSmoke } from './profile-manager-smoke'
 
 function fakeWindow(
   rendered: () => boolean,
@@ -45,5 +45,26 @@ describe('profileManagerSmoke', () => {
     await expect(profileManagerSmoke(window, 20, 1)).resolves.toBe(
       'no heading after 20 ms (about:blank)'
     )
+  })
+
+  it('runProfileManagerSmoke reports a broken window and a hang, once each', async () => {
+    const done = vi.fn()
+    runProfileManagerSmoke(() => {
+      throw new Error('window broke')
+    }, done)
+    await vi.waitFor(() =>
+      expect(done).toHaveBeenCalledWith('profile-manager-smoke: fail window broke', 1)
+    )
+    const hang = vi.fn()
+    const { window } = fakeWindow(() => false)
+    ;(
+      window as { webContents: { executeJavaScript: () => Promise<boolean> } }
+    ).webContents.executeJavaScript = () => new Promise(() => undefined)
+    runProfileManagerSmoke(() => window, hang, 30)
+    await vi.waitFor(() =>
+      expect(hang).toHaveBeenCalledWith('profile-manager-smoke: fail no result after 30 ms', 1)
+    )
+    expect(hang).toHaveBeenCalledTimes(1)
+    expect(done).toHaveBeenCalledTimes(1)
   })
 })

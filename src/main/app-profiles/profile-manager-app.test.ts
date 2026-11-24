@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
   isManager: false,
@@ -21,7 +21,8 @@ const h = vi.hoisted(() => ({
   registerIpc: vi.fn(),
   startMenu: vi.fn(),
   openWindow: vi.fn(),
-  smoke: vi.fn()
+  runSmoke: vi.fn(),
+  writeSync: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -36,9 +37,13 @@ vi.mock('./profile-manager', () => ({
   registerProfileManagerIpc: h.registerIpc,
   startProfilesMenu: h.startMenu
 }))
+vi.mock('node:fs', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  writeSync: h.writeSync
+}))
 vi.mock('./profile-manager-smoke', () => ({
   PROFILE_MANAGER_SMOKE_ENV: 'ORCA_PROFILE_MANAGER_SMOKE',
-  profileManagerSmoke: h.smoke
+  runProfileManagerSmoke: h.runSmoke
 }))
 vi.mock('./profile-manager-window', () => ({
   openProfileManagerWindow: h.openWindow,
@@ -104,6 +109,8 @@ function managerRendererSource(): { source: string; files: Set<string> } {
   }
   return { source, files: seen }
 }
+
+afterEach(() => vi.unstubAllEnvs())
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -173,28 +180,27 @@ describe('runProfileManagerApp', () => {
 
   it('in smoke mode, checks a hidden window with no Dock icon and exits with its result', async () => {
     vi.stubEnv('ORCA_PROFILE_MANAGER_SMOKE', '1')
-    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    const window = { webContents: { getURL: () => 'file:///x/out/renderer/profile-manager.html#' } }
-    h.openWindow.mockReturnValue(window)
-    for (const [problem, code] of [
-      [null, 0],
-      ['load failed: -6 ERR_FILE_NOT_FOUND', 1]
-    ] as const) {
-      vi.clearAllMocks()
-      h.openWindow.mockReturnValue(window)
-      h.smoke.mockResolvedValue(problem)
-      runProfileManagerApp()
-      await h.ready
-      await vi.waitFor(() => expect(h.app.exit).toHaveBeenCalledWith(code))
-      expect(h.openWindow).toHaveBeenCalledWith({ hidden: true })
-      expect(h.app.dock.hide).toHaveBeenCalled()
-      expect(h.startMenu).not.toHaveBeenCalled()
-      expect(log).toHaveBeenLastCalledWith(
-        problem
-          ? `profile-manager-smoke: fail ${problem}`
-          : 'profile-manager-smoke: ok file:///x/out/renderer/profile-manager.html#'
-      )
-    }
+    runProfileManagerApp()
+    await h.ready
+    await vi.waitFor(() => expect(h.runSmoke).toHaveBeenCalledTimes(1))
+    expect(h.app.dock.hide).toHaveBeenCalled()
+    expect(h.startMenu).not.toHaveBeenCalled()
+    // No window events keep the app or open another window during the check.
+    expect(h.app.on).not.toHaveBeenCalled()
+    const [open, done] = h.runSmoke.mock.calls[0] as [() => unknown, (l: string, c: number) => void]
+    open()
+    expect(h.openWindow).toHaveBeenCalledWith({ hidden: true })
+    done('profile-manager-smoke: fail x', 1)
+    expect(h.writeSync).toHaveBeenCalledWith(1, 'profile-manager-smoke: fail x\n')
+    expect(h.app.exit).toHaveBeenCalledWith(1)
+  })
+
+  it('in smoke mode, a second instance fails with a result line', () => {
+    vi.stubEnv('ORCA_PROFILE_MANAGER_SMOKE', '1')
+    h.hasLock = false
+    runProfileManagerApp()
+    expect(h.writeSync).toHaveBeenCalledWith(1, 'profile-manager-smoke: fail already running\n')
+    expect(h.app.exit).toHaveBeenCalledWith(1)
   })
 
   it('exits when another Profile Manager runs', () => {

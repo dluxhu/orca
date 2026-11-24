@@ -42,3 +42,32 @@ export async function profileManagerSmoke(
   }
   return problems[0] ?? `no heading after ${timeoutMs} ms (${contents.getURL() || 'no page'})`
 }
+
+/**
+ * Runs the check once and calls `done` once with the result line and the exit code. A hard timer
+ * and a catch make sure that `done` runs, also when the window breaks or never answers.
+ */
+export function runProfileManagerSmoke(
+  open: () => BrowserWindow,
+  done: (line: string, code: number) => void,
+  hardMs = 25_000
+): void {
+  let finished = false
+  const finish = (result: string, code: number): void => {
+    if (!finished) {
+      finished = true
+      clearTimeout(timer)
+      done(`profile-manager-smoke: ${result}`, code)
+    }
+  }
+  const timer = setTimeout(() => finish(`fail no result after ${hardMs} ms`, 1), hardMs)
+  void Promise.resolve()
+    .then(async () => {
+      const window = open()
+      const problem = await profileManagerSmoke(window)
+      finish(problem ? `fail ${problem}` : `ok ${window.webContents.getURL()}`, problem ? 1 : 0)
+    })
+    .catch((error: unknown) =>
+      finish(`fail ${error instanceof Error ? error.message : String(error)}`, 1)
+    )
+}
