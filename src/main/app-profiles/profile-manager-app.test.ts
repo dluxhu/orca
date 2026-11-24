@@ -70,7 +70,7 @@ function preloadSyncMethods(): Map<string, string> {
  * The source of the Manager renderer entry and every module that it imports: relative paths, the
  * `@/` and `@renderer/` aliases, side-effect imports and dynamic imports.
  */
-function managerRendererSource(): string {
+function managerRendererSource(): { source: string; files: Set<string> } {
   const rendererRoot = join(SRC, 'renderer', 'src')
   const seen = new Set<string>()
   const queue = [join(rendererRoot, 'profile-manager.tsx')]
@@ -96,7 +96,7 @@ function managerRendererSource(): string {
       }
     }
   }
-  return source
+  return { source, files: seen }
 }
 
 beforeEach(() => {
@@ -145,7 +145,9 @@ describe('runProfileManagerApp', () => {
   it('answers every sync channel that the Manager renderer can call', () => {
     expect(runProfileManagerApp()).toBe(true)
     const registered = new Set(h.ipcOn.mock.calls.map(([channel]) => channel as string))
-    const source = managerRendererSource()
+    const { source, files } = managerRendererSource()
+    // Only `@/components/ui/dialog` imports reach this module, so the walk follows the alias.
+    expect(files).toContain(join(SRC, 'renderer', 'src', 'components', 'ui', 'dialog.tsx'))
     const used = [...preloadSyncMethods()]
       .filter(([method]) => source.includes(`.${method}(`))
       .map(([, channel]) => channel)
