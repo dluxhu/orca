@@ -4,6 +4,7 @@ import { useAppStore } from '@/store/index'
 import { readRuntimeStatuses } from '@/store/slices/runtime-status/views/runtime-status-owner'
 import { runtimeTargetForInstallation } from '@/runtime/hosts/selection/runtime-target-for-installation'
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+import { showChatOpenUnavailable } from './chat-open-failure-toast'
 import {
   structuredSessionOpenFeedbackText,
   type StructuredSessionOpenFeedback
@@ -11,8 +12,9 @@ import {
 import { openOrchestrationDispatch } from './open-agent-message-sender'
 
 // A link that cannot open says so in a short notice, not as an error.
+// A chat that does not open shows the shared chat open toast.
 const notice: StructuredSessionOpenFeedback = {
-  unavailable: () => toast.info(structuredSessionOpenFeedbackText.unavailable()),
+  unavailable: (agent, context) => showChatOpenUnavailable(context, agent),
   gone: () => toast.info(structuredSessionOpenFeedbackText.gone()),
   hostCannotOpen: () => toast.info(structuredSessionOpenFeedbackText.hostCannotOpen()),
   notLocated: (agent) => toast.info(structuredSessionOpenFeedbackText.notLocated(agent))
