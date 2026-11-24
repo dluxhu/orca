@@ -8,7 +8,7 @@ export type ImportedPeerItem =
   | ({ kind: 'peer_mail' } & Pick<
       z.infer<typeof PeerMailRelayPayload>,
       'senderLabel' | 'body' | 'sender' | 'botAnswer'
-    >)
+    > & { ownInstallationId: string | undefined })
   /** A message filed in the mailbox of a Run this Orca coordinates on that server. */
   | { kind: 'worker_mail'; from: string; body: string }
 
@@ -34,6 +34,10 @@ export function presentImportedPeerItem(item: ImportedPeerItem): {
           })
         }
       : {}),
-    answerSenderSnapshot: peerMailSenderSnapshot(item.senderLabel, item.sender)
+    answerSenderSnapshot: peerMailSenderSnapshot(
+      item.senderLabel,
+      item.sender,
+      item.ownInstallationId
+    )
   }
 }
