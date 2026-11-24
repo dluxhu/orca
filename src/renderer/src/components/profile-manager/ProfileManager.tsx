@@ -148,7 +148,7 @@ export function ProfileManager(): React.JSX.Element {
               )}
             </p>
           </div>
-          <Button disabled={busy} onClick={startNew}>
+          <Button disabled={busy || !state} onClick={startNew}>
             <Plus />
             {t('profileManager.new.title', 'New profile')}
           </Button>
