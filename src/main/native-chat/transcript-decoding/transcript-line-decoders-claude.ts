@@ -25,6 +25,7 @@ import {
 } from '../../claude/structured/journal/claude-internal-message-content'
 import { NATIVE_CHAT_PROVIDER_TURN_START_PRESENTATION } from '../../../shared/native-chat/transcript/turns/native-chat-provider-turn-start'
 import { claudeLocalCommandReplyText } from '../../claude/transcripts/claude-local-command-reply'
+import { claudeCompactionRow } from '../../claude/structured/journal/claude-compaction-row'
 
 const MAX_EDIT_PATCH_HUNKS = 40
 const MAX_EDIT_PATCH_HUNK_LINES = 400
@@ -102,6 +103,16 @@ export function decodeClaudeTranscriptLine(
       timestamp,
       source: 'transcript',
       ...parent
+    }
+  }
+  const compaction = claudeCompactionRow(record)
+  if (compaction) {
+    return {
+      id: recordMessageId,
+      role: 'system',
+      blocks: [structuredAgentSessionStatusBlock(compaction)],
+      timestamp,
+      source: 'transcript'
     }
   }
   if (role !== 'user' && role !== 'assistant') {
