@@ -205,6 +205,23 @@ describe('ProfileManager', () => {
     expect(change).toHaveBeenCalledWith({ kind: 'rename', id: 'work', name: 'Orca - Job' })
   })
 
+  it('draws the dialogs on an opaque surface, so the list does not show through', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('dialog', { name: 'Edit Orca - Work' }).className).toContain(
+      'bg-popover'
+    )
+    cleanup()
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    openMore('Orca - Work')
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove profile…' }))
+    expect(screen.getByRole('dialog', { name: 'Remove Orca - Work?' }).className).toContain(
+      'bg-popover'
+    )
+  })
+
   it('removes from the "…" menu, with "Keep data" on by default', async () => {
     render(<ProfileManager />)
     await screen.findByText('Orca - Work')

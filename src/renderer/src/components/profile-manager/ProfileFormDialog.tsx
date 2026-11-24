@@ -100,7 +100,12 @@ export function ProfileFormDialog(props: {
 
   return (
     <Dialog open onOpenChange={(open) => (open ? null : props.onClose())}>
-      <DialogContent busy={props.busy} scrollable className="gap-0 p-0 sm:max-w-[980px]">
+      <DialogContent
+        busy={props.busy}
+        scrollable
+        surface="opaque-panel"
+        className="sm:max-w-[980px]"
+      >
         <DialogHeader className="gap-1 border-b px-6 py-5 text-left">
           <DialogTitle>
             {form.mode === 'new'
