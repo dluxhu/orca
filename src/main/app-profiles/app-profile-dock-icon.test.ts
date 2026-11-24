@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { largestIcnsPng, writeIcns } from '../../cli/app-profiles/app-profile-icns'
 
 const h = vi.hoisted(() => ({
-  exe: '',
+  userData: '',
   profile: null as { id: string } | null,
   createFromBuffer: vi.fn()
 }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => h.exe },
+  app: { getPath: (name: string) => (name === 'userData' ? h.userData : '') },
   nativeImage: { createFromBuffer: h.createFromBuffer }
 }))
 vi.mock('./app-profile', () => ({ getAppProfile: () => h.profile }))
@@ -25,23 +25,17 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation((png: Buffer) => ({ png, isEmpty: () => false }))
   dir = mkdtempSync(join(tmpdir(), 'dock-icon-'))
-  const contents = join(dir, 'Work.app', 'Contents')
-  mkdirSync(join(contents, 'MacOS'), { recursive: true })
-  mkdirSync(join(contents, 'Resources'))
-  h.exe = join(contents, 'MacOS', 'Orca')
-  writeFileSync(
-    join(contents, 'Info.plist'),
-    '<plist><dict><key>CFBundleIconFile</key><string>icon-0a1b2c3d.icns</string></dict></plist>'
-  )
+  h.userData = join(dir, 'work')
+  mkdirSync(h.userData)
   const img = { width: 16, height: 16, channels: 4, data: new Uint8Array(16 * 16 * 4).fill(200) }
   icns = writeIcns(img as never)
-  writeFileSync(join(contents, 'Resources', 'icon-0a1b2c3d.icns'), icns)
+  writeFileSync(join(h.userData, 'profile-icon.icns'), icns)
 })
 
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('ownDockIcon', () => {
-  it('reads the icon file that the profile bundle names, once', async () => {
+  it('reads the icon that the profile userData keeps, once', async () => {
     h.profile = { id: 'work' }
     const { ownDockIcon } = await import('./app-profile-dock-icon')
     const image = ownDockIcon()

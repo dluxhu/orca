@@ -20,6 +20,7 @@ import {
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
 import { fitAppIconToPlatformShape, ownDockIcon } from './platform-app-icon-shape'
+import { MAC_DOCK_ICON_SCRIPT } from '../../../shared/app-lifecycle/identity/mac-custom-icon-script'
 
 const isMac = process.platform === 'darwin'
 
@@ -50,17 +51,6 @@ type PersistMacDockIconOptions = {
   isDevApp?: boolean
   platform?: NodeJS.Platform
 }
-
-const MAC_DOCK_ICON_SCRIPT = [
-  'use framework "AppKit"',
-  'use scripting additions',
-  'set appPath to system attribute "ORCA_APP_BUNDLE_PATH"',
-  'set iconPath to system attribute "ORCA_APP_ICON_PATH"',
-  "set image to current application's NSImage's alloc()'s initWithContentsOfFile:iconPath",
-  'if image is missing value then error "Orca app icon image could not be loaded"',
-  "set ok to current application's NSWorkspace's sharedWorkspace()'s setIcon:image forFile:appPath options:0",
-  'if ok is false then error "Orca app icon could not be persisted"'
-]
 
 const MAC_DOCK_ICON_CLEAR_SCRIPT = [
   'use framework "AppKit"',
