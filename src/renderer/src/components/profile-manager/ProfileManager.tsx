@@ -14,8 +14,8 @@ import { ProfileFormDialog, type ProfileForm } from './ProfileFormDialog'
 import { ProfileRemoveForm } from './ProfileRemoveForm'
 import { ProfileRow } from './ProfileRow'
 
-/** The list reads the states again at this interval while the window shows. */
-export const PROFILE_STATE_POLL_MS = 3000
+/** The list reads the states again at this interval while the window shows. One read is cheap. */
+export const PROFILE_STATE_POLL_MS = 2000
 
 type Form = ProfileForm | { mode: 'remove'; row: AppProfileRow; keepData: boolean }
 
@@ -87,16 +87,20 @@ export function ProfileManager(): React.JSX.Element {
   useEffect(() => {
     void load()
     const onFocus = (): void => void load()
-    // Apps start and stop without a sign to this window, so it reads the states again.
-    const timer = setInterval(() => {
+    // macOS hides a covered window; the list is old when it shows again.
+    const onVisible = (): void => {
       if (document.visibilityState === 'visible') {
         void load()
       }
-    }, PROFILE_STATE_POLL_MS)
+    }
+    // Apps start and stop without a sign to this window, so it reads the states again.
+    const timer = setInterval(onVisible, PROFILE_STATE_POLL_MS)
     window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       clearInterval(timer)
       window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [load])
 
@@ -184,7 +188,13 @@ export function ProfileManager(): React.JSX.Element {
                 busy={busy}
                 onOpen={() => void api.open(row.id)}
                 onEdit={() =>
-                  setForm({ mode: 'edit', row, name: row.name, port: String(row.port) })
+                  setForm({
+                    mode: 'edit',
+                    row,
+                    name: row.name,
+                    port: String(row.port),
+                    startAtLogin: row.startAtLogin
+                  })
                 }
                 onShowInFinder={() => void api.showInFinder(row.id)}
                 onStartAtLogin={(enabled) =>

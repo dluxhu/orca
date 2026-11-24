@@ -32,7 +32,7 @@ export type ProfileForm =
       port: string
       copySettings: boolean
     }
-  | { mode: 'edit'; row: AppProfileRow; name: string; port: string }
+  | { mode: 'edit'; row: AppProfileRow; name: string; port: string; startAtLogin: boolean }
 
 export function ProfileFormDialog(props: {
   form: ProfileForm
@@ -84,6 +84,10 @@ export function ProfileFormDialog(props: {
             : []),
           ...(Number(form.port) !== form.row.port
             ? [{ kind: 'set-port' as const, id: form.row.id, port: Number(form.port) }]
+            : []),
+          // After set-port: the service installs on the new port.
+          ...(form.startAtLogin !== form.row.startAtLogin
+            ? [{ kind: 'start-at-login' as const, id: form.row.id, enabled: form.startAtLogin }]
             : [])
         ]
   const kept = form.mode === 'new' && (props.state?.keptIds.includes(form.id) ?? false)
@@ -173,6 +177,20 @@ export function ProfileFormDialog(props: {
                 .join(' ')}
               onChange={(port) => onChange({ ...form, port })}
             />
+            {form.mode === 'edit' ? (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="profile-start-at-login"
+                  checked={form.startAtLogin}
+                  onCheckedChange={(checked) =>
+                    onChange({ ...form, startAtLogin: checked === true })
+                  }
+                />
+                <Label htmlFor="profile-start-at-login">
+                  {t('profileManager.startAtLogin', 'Start at login')}
+                </Label>
+              </div>
+            ) : null}
             {/* Hook point: the icon picker of the profile icons work goes here. */}
           </div>
           {/* Hook point: the icon preview of the profile icons work goes here. */}
