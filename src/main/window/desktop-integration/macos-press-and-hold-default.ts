@@ -57,12 +57,16 @@ export function isOrcaPreferencesDomain(domain: string): boolean {
 export function readBundleIdentifierFromExecutablePath(execPath: string): string | null {
   try {
     const plist = readFileSync(join(dirname(dirname(execPath)), 'Info.plist'), 'utf8')
-    const match = /<key>CFBundleIdentifier<\/key>\s*<string>([^<]*)<\/string>/.exec(plist)
-    const identifier = match?.[1]?.trim()
-    return identifier ? identifier : null
+    return parseBundleIdentifier(plist)
   } catch {
     return null
   }
+}
+
+export function parseBundleIdentifier(plist: string): string | null {
+  const match = /<key>CFBundleIdentifier<\/key>\s*<string>([^<]*)<\/string>/.exec(plist)
+  const identifier = match?.[1]?.trim()
+  return identifier ? identifier : null
 }
 
 /** Failed probes cannot establish absence and must never authorize overwriting a preference. */
