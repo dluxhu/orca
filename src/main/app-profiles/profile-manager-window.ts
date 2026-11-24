@@ -24,13 +24,16 @@ export function openApp(appPath: string): void {
   })
 }
 
-/** Shows the one Profile Manager window of this app. */
-export function openProfileManagerWindow(): void {
+/** Shows the one Profile Manager window of this app. `startNew` also opens the New dialog. */
+export function openProfileManagerWindow(options: { startNew?: boolean } = {}): void {
   if (profileManagerWindow && !profileManagerWindow.isDestroyed()) {
     if (profileManagerWindow.isMinimized()) {
       profileManagerWindow.restore()
     }
     profileManagerWindow.focus()
+    if (options.startNew) {
+      profileManagerWindow.webContents.send('appProfiles:startNew')
+    }
     return
   }
   const window = new BrowserWindow({
@@ -55,9 +58,11 @@ export function openProfileManagerWindow(): void {
       profileManagerWindow = null
     }
   })
+  // A new window has no listener yet, so the URL hash asks for the New dialog.
+  const hash = options.startNew ? 'new' : ''
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html`)
+    void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html#${hash}`)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'))
+    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'), { hash })
   }
 }

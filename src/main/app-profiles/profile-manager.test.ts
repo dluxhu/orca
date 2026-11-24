@@ -6,15 +6,18 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl, reveal } = vi.hoisted(() => ({
-  reveal: vi.fn(),
-  appOn: vi.fn(),
-  launchctl: vi.fn(async () => ({ code: 113, out: '' })),
-  handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
-  rows: { current: [] as AppProfileRow[] },
-  isManager: { current: true },
-  profile: { current: null as { id: string; userDataPath: string } | null }
-}))
+const { handlers, rows, isManager, profile, appOn, launchctl, reveal, openWindow } = vi.hoisted(
+  () => ({
+    openWindow: vi.fn(),
+    reveal: vi.fn(),
+    appOn: vi.fn(),
+    launchctl: vi.fn(async () => ({ code: 113, out: '' })),
+    handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
+    rows: { current: [] as AppProfileRow[] },
+    isManager: { current: true },
+    profile: { current: null as { id: string; userDataPath: string } | null }
+  })
+)
 
 vi.mock('node:fs', async (original) => {
   const actual = await original<typeof Fs>()
@@ -35,7 +38,7 @@ vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
   openApp: vi.fn(),
-  openProfileManagerWindow: vi.fn()
+  openProfileManagerWindow: openWindow
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
   // One service read per list, as the real list does for each profile.
@@ -251,8 +254,26 @@ describe('profilesMenuItems', () => {
       [undefined, 'Orca - Home — Running in background', undefined],
       [undefined, 'Orca - Client', undefined],
       ['separator', undefined, undefined],
+      [undefined, 'New profile…', undefined],
       [undefined, 'Profile Manager…', undefined]
     ])
+  })
+
+  it('New profile… opens the window with the New dialog; Profile Manager… has Shift+Cmd+P', () => {
+    const items = profilesMenuItems()
+    const item = (label: string) => {
+      const found = items.find((candidate) => candidate.label === label)
+      if (!found) {
+        throw new Error(`No menu item ${label}`)
+      }
+      return found
+    }
+    openWindow.mockClear()
+    ;(item('New profile…').click as () => void)()
+    expect(openWindow).toHaveBeenCalledWith({ startNew: true })
+    ;(item('Profile Manager…').click as () => void)()
+    expect(openWindow).toHaveBeenLastCalledWith()
+    expect(item('Profile Manager…').accelerator).toBe('CommandOrControl+Shift+P')
   })
 })
 
