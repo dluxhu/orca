@@ -2044,7 +2044,8 @@
     "profileBackground": "Running in background",
     "profileDefault": "Default",
     "profileThisApp": "This app",
-    "profileSwitchTo": "Switch to"
+    "profileSwitchTo": "Switch to",
+    "profileNew": "New profile…"
   },
   "tray": {
     "openOrca": "Open Orca",

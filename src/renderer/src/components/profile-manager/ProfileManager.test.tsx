@@ -26,6 +26,13 @@ const open = vi.fn()
 const showInFinder = vi.fn()
 const iconPreview = vi.fn()
 const chooseIconFile = vi.fn()
+let startNew: (() => void) | null = null
+const onStartNew = (callback: () => void) => {
+  startNew = callback
+  return () => {
+    startNew = null
+  }
+}
 
 beforeEach(() => {
   appState = {
@@ -45,11 +52,22 @@ beforeEach(() => {
   chooseIconFile.mockReset().mockResolvedValue('/Users/me/logo.svg')
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { appProfiles: { getState, change, open, showInFinder, iconPreview, chooseIconFile } }
+    value: {
+      appProfiles: {
+        getState,
+        change,
+        open,
+        showInFinder,
+        iconPreview,
+        chooseIconFile,
+        onStartNew
+      }
+    }
   })
 })
 
 afterEach(() => {
+  window.location.hash = ''
   cleanup()
   vi.useRealTimers()
 })
@@ -72,7 +90,23 @@ const editWork = async (): Promise<void> => {
   fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
 }
 
+/** Clicks "New profile" after the list loads: the dialog defaults need it. */
+const clickNew = async (): Promise<void> => {
+  await screen.findByText('Orca - Work')
+  fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+}
+
 describe('ProfileManager', () => {
+  it('offers New profile only after the list loads, so the defaults miss no profile', async () => {
+    let loaded: (state: AppProfilesState) => void = () => {}
+    getState.mockReturnValueOnce(new Promise((resolve) => (loaded = resolve)))
+    render(<ProfileManager />)
+    const button = screen.getByRole('button', { name: 'New profile' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    await act(async () => loaded(appState))
+    expect(button.disabled).toBe(false)
+  })
+
   it("shows each app's own Dock icon from the main process", async () => {
     appState = { ...appState, icons: { default: 'data:image/png;base64,T1JDQQ==' } }
     render(<ProfileManager />)
@@ -86,7 +120,7 @@ describe('ProfileManager', () => {
 
   it('offers every badge style, and shows the preview on a light and a dark Dock', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     const styles = within(
       document.querySelector('[aria-labelledby="profile-icon-style"]') as HTMLElement
     ).getAllByRole('radio')
@@ -148,7 +182,7 @@ describe('ProfileManager', () => {
 
   it('makes the id from the name until the user edits the id, then creates the profile', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     const dialog = screen.getByRole('dialog', { name: 'New profile' })
     // A modal dialog: the list behind it is out of the accessibility tree.
     expect(screen.queryByRole('heading', { name: 'Your profiles' })).toBeNull()
@@ -182,7 +216,7 @@ describe('ProfileManager', () => {
       icon: { kind: 'badge', text: '2', style: 'ref-match' }
     }
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     expect(field('Badge character').value).toBe('3')
     const preview = (await screen.findByAltText('Preview of the icon')) as HTMLImageElement
     expect(preview.src).toBe('data:image/png;base64,UE5H')
@@ -216,7 +250,7 @@ describe('ProfileManager', () => {
       error: { message: 'A badge has one visible character' }
     })
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     expect((await screen.findByRole('alert')).textContent).toContain('one visible character')
   })
 
@@ -305,9 +339,25 @@ describe('ProfileManager', () => {
     expect(change).toHaveBeenCalledTimes(1)
   })
 
+  it('opens the New dialog when the window starts with #new, after the list loads', async () => {
+    window.location.hash = '#new'
+    render(<ProfileManager />)
+    const dialog = await screen.findByRole('dialog', { name: 'New profile' })
+    // The defaults come from the loaded list: the next free port.
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Server port').value).toBe('6864')
+  })
+
+  it('opens the New dialog on the Profiles > New profile… event of an open window', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => startNew?.())
+    expect(await screen.findByRole('dialog', { name: 'New profile' })).toBeTruthy()
+  })
+
   it('refuses a taken id before it calls the CLI', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     type('Profile id', 'Work')
     expect(screen.getByRole('alert').textContent).toContain('exists')
     expect(
@@ -358,7 +408,7 @@ describe('ProfileManager', () => {
 
   it('offers "Copy settings" only in an app that has settings, not in the Profile Manager app', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     expect(screen.getByLabelText('Copy settings from this app')).toBeTruthy()
     cleanup()
     appState = { ...appState, currentId: null }

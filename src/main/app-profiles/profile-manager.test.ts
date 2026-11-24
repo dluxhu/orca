@@ -308,12 +308,30 @@ describe('profilesMenuItems', () => {
       [undefined, 'Orca - Home — Running in background', undefined],
       [undefined, 'Orca - Client', undefined],
       ['separator', undefined, undefined],
+      [undefined, 'New profile…', undefined],
       [undefined, 'Profile Manager…', undefined]
     ])
     // Each profile item has its app's 18 pt icon.
     expect(items.filter((item) => item.label?.startsWith('Orca')).map((item) => item.icon)).toEqual(
       ['image-work', 'image-home', 'image-client']
     )
+  })
+
+  it('New profile… opens the window with the New dialog; Profile Manager… has Shift+Cmd+P', () => {
+    const items = profilesMenuItems()
+    const item = (label: string) => {
+      const found = items.find((candidate) => candidate.label === label)
+      if (!found) {
+        throw new Error(`No menu item ${label}`)
+      }
+      return found
+    }
+    showManager.mockClear()
+    ;(item('New profile…').click as () => void)()
+    expect(showManager).toHaveBeenCalledWith({ startNew: true })
+    ;(item('Profile Manager…').click as () => void)()
+    expect(showManager).toHaveBeenLastCalledWith()
+    expect(item('Profile Manager…').accelerator).toBe('CommandOrControl+Shift+P')
   })
 })
 
@@ -360,6 +378,7 @@ describe('Profiles > Profile Manager…', () => {
       [undefined, 'Default — Running', undefined],
       [undefined, 'Orca - Work', undefined],
       ['separator', undefined, undefined],
+      [undefined, 'New profile…', undefined],
       [undefined, 'Profile Manager…', undefined]
     ])
     expect((await readAppProfilesState()).currentId).toBeNull()

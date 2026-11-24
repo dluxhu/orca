@@ -33,6 +33,7 @@ vi.mock('electron', () => {
   return {
     app: { isPackaged: true, getPath: () => '/default-data', on: vi.fn() },
     BrowserWindow,
+    shell: { showItemInFolder: vi.fn() },
     dialog: {
       showOpenDialog: async (...args: unknown[]) => {
         h.dialogArgs.push(args)

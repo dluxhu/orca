@@ -9,14 +9,19 @@ const h = vi.hoisted(() => ({
   defaultApp: '',
   opened: [] as string[][],
   // A new window, or a focus of the one window.
-  shown: 0
+  shown: 0,
+  windows: [] as {
+    loadFile: ReturnType<typeof vi.fn>
+    webContents: { send: ReturnType<typeof vi.fn> }
+  }[]
 }))
 
 vi.mock('electron', () => {
   class BrowserWindow {
-    webContents = {}
+    webContents = { send: vi.fn() }
     constructor() {
       h.shown++
+      h.windows.push(this)
     }
     isDestroyed = () => false
     isMinimized = () => false
@@ -41,7 +46,7 @@ vi.mock('./app-profile', () => ({
   ownDefaultAppPath: async () => h.defaultApp
 }))
 
-import { showProfileManager } from './profile-manager-window'
+import { openProfileManagerWindow, showProfileManager } from './profile-manager-window'
 
 let dir: string
 const managerApp = (): string =>
@@ -53,9 +58,35 @@ beforeEach(() => {
   h.isManager = false
   h.opened.length = 0
   h.shown = 0
+  h.windows.length = 0
 })
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
+})
+
+// First: the window module keeps its one window for the rest of the file.
+describe('New profile…', () => {
+  it('starts a new Profile Manager instance with the argument; a running one gets it as second-instance', async () => {
+    mkdirSync(managerApp(), { recursive: true })
+    await showProfileManager({ startNew: true })
+    expect(h.opened).toEqual([
+      ['/usr/bin/open', '-n', '-a', managerApp(), '--args', '--new-profile']
+    ])
+  })
+
+  it('asks for the New dialog by the URL hash of a new window, and by an event to an open one', () => {
+    openProfileManagerWindow({ startNew: true })
+    expect(h.windows).toHaveLength(1)
+    const [window] = h.windows
+    expect(window.loadFile).toHaveBeenCalledWith(expect.stringMatching(/profile-manager\.html$/), {
+      hash: 'new'
+    })
+    openProfileManagerWindow()
+    expect(window.webContents.send).not.toHaveBeenCalled()
+    openProfileManagerWindow({ startNew: true })
+    expect(h.windows).toHaveLength(1)
+    expect(window.webContents.send).toHaveBeenCalledWith('appProfiles:startNew')
+  })
 })
 
 describe('showProfileManager', () => {

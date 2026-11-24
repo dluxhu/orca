@@ -17,11 +17,12 @@ import {
   appProfilesRoot,
   parseAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
-import type {
-  AppProfileChange,
-  AppProfileReply,
-  AppProfileRow,
-  AppProfilesState
+import {
+  appProfileIconFlags,
+  type AppProfileChange,
+  type AppProfileReply,
+  type AppProfileRow,
+  type AppProfilesState
 } from '../../shared/app-profiles/app-profile-rules'
 import { listAppProfiles } from '../../cli/app-profiles/app-profile-list'
 import {
@@ -32,7 +33,6 @@ import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
-import { appProfileIconFlags } from '../../shared/app-profiles/app-profile-rules'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
 import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
 import { appIcons, withAppIcons, type AppIcon } from './profile-manager-app-icon'
@@ -171,17 +171,17 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   }
 }
 
-/** Runs `action` on the app of the row `id`. The window sends only the id, never a path. */
-async function onAppOf(id: string, action: (appPath: string) => void): Promise<AppProfileReply> {
-  const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
-  if (!row) {
-    return { ok: false, error: { message: `No profile "${id}".` } }
+/** A handler that runs `action` on the app of a row id. The window sends the id, never a path. */
+const onAppOf =
+  (action: (appPath: string) => void) =>
+  async (id: string): Promise<AppProfileReply> => {
+    const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
+    if (!row) {
+      return { ok: false, error: { message: `No profile "${id}".` } }
+    }
+    action(row.appPath)
+    return { ok: true, result: { appPath: row.appPath } }
   }
-  action(row.appPath)
-  return { ok: true, result: { appPath: row.appPath } }
-}
-
-export const openAppProfile = (id: string): Promise<AppProfileReply> => onAppOf(id, openApp)
 
 function fromProfileManager<T extends unknown[], R>(
   handler: (...args: T) => Promise<R>
@@ -208,17 +208,14 @@ export function registerProfileManagerIpc(): void {
     fromProfileManager(async () => withAppIcons(await readAppProfilesState()))
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
-  ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
+  ipcMain.handle('appProfiles:open', fromProfileManager(onAppOf(openApp)))
   ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
   ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
     fromProfileManager(async () =>
       chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
     )(event)
   )
-  ipcMain.handle(
-    'appProfiles:showInFinder',
-    fromProfileManager((id: string) => onAppOf(id, (appPath) => shell.showItemInFolder(appPath)))
-  )
+  ipcMain.handle('appProfiles:showInFinder', fromProfileManager(onAppOf(shell.showItemInFolder)))
   // Settings in the main window changes only this app's own profile.
   const fromSettings =
     <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
@@ -306,8 +303,7 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
   const currentId = currentAppId()
   const stateLabel = {
     running: translateMain('menu.profileRunning', 'Running'),
-    background: translateMain('menu.profileBackground', 'Running in background'),
-    stopped: ''
+    background: translateMain('menu.profileBackground', 'Running in background')
   }
   const item = (row: AppProfileRow): MenuItemConstructorOptions => {
     const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
@@ -328,7 +324,13 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
       menuRows.filter((row) => row.id !== currentId)
     ),
     {
+      label: translateMain('menu.profileNew', 'New profile…'),
+      click: () => void showProfileManager({ startNew: true })
+    },
+    {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
+      // No default Orca shortcut uses Shift+Cmd+P.
+      accelerator: 'CommandOrControl+Shift+P',
       click: () => void showProfileManager()
     }
   ]

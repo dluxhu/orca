@@ -29,6 +29,24 @@ function newProfileName(t: Translate, taken: readonly string[]): string {
   return name
 }
 
+/** The first values of the New dialog. */
+function newForm(t: Translate, state: AppProfilesState | null): ProfileForm {
+  const profiles = state?.rows.filter((row) => row.id !== 'default') ?? []
+  const name = newProfileName(
+    t,
+    profiles.map((row) => row.name)
+  )
+  return {
+    mode: 'new',
+    name,
+    id: appProfileIdFromName(name),
+    idEdited: false,
+    port: String(nextAppProfilePort(profiles.map((row) => row.port))),
+    copySettings: false,
+    icon: editIcon(undefined, freeBadge(state, null))
+  }
+}
+
 const sectionHeading = 'text-[13px] font-semibold tracking-wide text-muted-foreground uppercase'
 const code = 'font-mono text-[0.95em]'
 
@@ -39,6 +57,8 @@ export function ProfileManager(): React.JSX.Element {
   const [form, setForm] = useState<Form | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Profiles > New profile…: the URL hash of a new window, or an event to the open window.
+  const [wantNew, setWantNew] = useState(() => window.location.hash === '#new')
   const loading = useRef(false)
 
   const load = useCallback(async () => {
@@ -71,11 +91,20 @@ export function ProfileManager(): React.JSX.Element {
     }
   }, [load])
 
+  useEffect(() => api?.onStartNew(() => setWantNew(true)), [api])
+
+  useEffect(() => {
+    // The defaults of the New dialog need the list.
+    if (wantNew && state) {
+      setWantNew(false)
+      setForm(newForm(t, state))
+      setMessage(null)
+    }
+  }, [wantNew, state, t])
+
   if (!api) {
     return <p className="p-6">{t('profileManager.macOnly', 'Profiles are only on macOS.')}</p>
   }
-  const profiles = state?.rows.filter((row) => row.id !== 'default') ?? []
-
   /** Runs the changes in order and stops at the first error. */
   const run = (changes: AppProfileChange[]): Promise<void> => {
     setBusy(true)
@@ -98,19 +127,7 @@ export function ProfileManager(): React.JSX.Element {
   }
 
   const startNew = (): void => {
-    const name = newProfileName(
-      t,
-      profiles.map((row) => row.name)
-    )
-    setForm({
-      mode: 'new',
-      name,
-      id: appProfileIdFromName(name),
-      idEdited: false,
-      port: String(nextAppProfilePort(profiles.map((row) => row.port))),
-      copySettings: false,
-      icon: editIcon(undefined, freeBadge(state, null))
-    })
+    setForm(newForm(t, state))
     setMessage(null)
   }
 
@@ -133,7 +150,7 @@ export function ProfileManager(): React.JSX.Element {
               )}
             </p>
           </div>
-          <Button disabled={busy} onClick={startNew}>
+          <Button disabled={busy || !state} onClick={startNew}>
             <Plus />
             {t('profileManager.new.title', 'New profile')}
           </Button>

@@ -19,6 +19,12 @@ export const appProfilesApi = {
     ipcRenderer.invoke('appProfiles:chooseIconFile', kind),
   showInFinder: (id: string): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:showInFinder', id),
+  /** Profiles > New profile… while the window is open. */
+  onStartNew: (callback: () => void): (() => void) => {
+    const listener = (): void => callback()
+    ipcRenderer.on('appProfiles:startNew', listener)
+    return () => ipcRenderer.removeListener('appProfiles:startNew', listener)
+  },
   /** "Start at login" of this app's own profile (Settings). */
   getOwnStartAtLogin: (): Promise<{ id: string; enabled: boolean }> =>
     ipcRenderer.invoke('appProfiles:ownStartAtLogin'),

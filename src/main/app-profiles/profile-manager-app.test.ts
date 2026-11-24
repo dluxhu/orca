@@ -34,7 +34,10 @@ vi.mock('./profile-manager', () => ({
   registerProfileManagerIpc: h.registerIpc,
   startProfilesMenu: h.startMenu
 }))
-vi.mock('./profile-manager-window', () => ({ openProfileManagerWindow: h.openWindow }))
+vi.mock('./profile-manager-window', () => ({
+  openProfileManagerWindow: h.openWindow,
+  PROFILE_MANAGER_NEW_ARG: '--new-profile'
+}))
 
 import { runProfileManagerApp } from './profile-manager-app'
 
@@ -112,7 +115,7 @@ describe('runProfileManagerApp', () => {
     expect(h.registerIpc).toHaveBeenCalledTimes(1)
     await h.ready
     await Promise.resolve()
-    expect(h.openWindow).toHaveBeenCalledTimes(1)
+    expect(h.openWindow).toHaveBeenCalledWith({ startNew: false })
     const rebuild = h.startMenu.mock.calls[0][0] as () => void
     rebuild()
     const menus = h.setMenu.mock.calls[0][0] as { label?: string; role?: string }[]
@@ -122,10 +125,12 @@ describe('runProfileManagerApp', () => {
       'Profiles',
       'windowMenu'
     ])
-    const on = new Map(h.app.on.mock.calls as [string, () => void][])
-    // A second start focuses the window of the first one.
-    on.get('second-instance')?.()
-    expect(h.openWindow).toHaveBeenCalledTimes(2)
+    const on = new Map(h.app.on.mock.calls as [string, (...args: unknown[]) => void][])
+    // A second start focuses the window of the first one, and passes on "New profile…".
+    on.get('second-instance')?.({}, ['/x/Orca Profile Manager', '--new-profile'])
+    expect(h.openWindow).toHaveBeenLastCalledWith({ startNew: true })
+    on.get('second-instance')?.({}, ['/x/Orca Profile Manager'])
+    expect(h.openWindow).toHaveBeenLastCalledWith({ startNew: false })
     on.get('window-all-closed')?.()
     expect(h.app.quit).toHaveBeenCalled()
   })
