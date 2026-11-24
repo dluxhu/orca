@@ -32,7 +32,10 @@ vi.mock('./custom-app-icon', () => ({
   getCustomAppIconRevision: () => 1,
   hasCustomAppIcon: () => false
 }))
-vi.mock('../../app-profiles/app-profile-dock-icon', () => ({ ownDockIcon: () => h.own }))
+vi.mock('../../app-profiles/app-profile-dock-icon', () => ({
+  ownDockIcon: () => h.own,
+  ownIconPath: () => '/data/work/profile-icon.icns'
+}))
 
 import { applyAppIcon, persistMacDockIcon } from './app-icon'
 
@@ -65,18 +68,30 @@ describe('applyAppIcon in a profile app', () => {
   })
 
   it.each(['classic', 'custom'])(
-    'keeps the Finder custom icon of the profile when %s is saved, and sets its own Dock icon',
+    'puts the profile Finder icon back when %s is saved, and sets its own Dock icon',
     async (choice) => {
       h.own = OWN
-      const execFile = vi.fn()
+      const execFile = vi.fn((...args: unknown[]) => {
+        ;(args.find((arg) => typeof arg === 'function') as (e: null) => void)(null)
+        return {}
+      })
       persistMacDockIcon(choice, {
         platform: 'darwin',
         isDevApp: false,
         appBundlePath: '/Apps/Work.app',
         execFile: execFile as never
       })
-      await vi.waitFor(() => expect(h.setIcon).toHaveBeenCalledWith(OWN))
-      expect(execFile).not.toHaveBeenCalled()
+      await vi.waitFor(() => expect(execFile).toHaveBeenCalledTimes(1))
+      expect(h.setIcon).toHaveBeenCalledWith(OWN)
+      // Only the custom icon script runs, with the kept icon; no clear and no xattr.
+      const [file, , options] = execFile.mock.calls[0] as [
+        string,
+        string[],
+        { env: NodeJS.ProcessEnv }
+      ]
+      expect(file).toBe('/usr/bin/osascript')
+      expect(options.env.ORCA_APP_ICON_PATH).toBe('/data/work/profile-icon.icns')
+      expect(options.env.ORCA_APP_BUNDLE_PATH).toBe('/Apps/Work.app')
     }
   )
 

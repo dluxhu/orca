@@ -19,7 +19,7 @@ import {
   type BuiltInAppIconId
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
-import { fitAppIconToPlatformShape, ownDockIcon } from './platform-app-icon-shape'
+import { fitAppIconToPlatformShape, ownDockIcon, ownIconPath } from './platform-app-icon-shape'
 import { MAC_DOCK_ICON_SCRIPT } from '../../../shared/app-lifecycle/identity/mac-custom-icon-script'
 
 const isMac = process.platform === 'darwin'
@@ -298,6 +298,8 @@ export function persistMacDockIcon(value: unknown, options: PersistMacDockIconOp
     const own = getAppIconPath(value) === APP_ICON_PATHS.classic && ownDockIcon()
     if (own) {
       app.dock?.setIcon(own)
+      // A built-in or imported icon before can have replaced the profile's Finder icon.
+      await runMacCustomIconCommand(execFile, appBundlePath, ownIconPath())
       return
     }
     if (iconId === 'classic') {

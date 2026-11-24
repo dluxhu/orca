@@ -554,7 +554,7 @@ So:
 
 | Layer | Tool | Why |
 | --- | --- | --- |
-| Raster core: masks, blur, resize, polygons, compositing, the styles | **plain TypeScript** on `Float32Array` / `Uint8ClampedArray` RGBA buffers (1024 x 1024) | Deterministic, so golden tests can compare it with the Python output. It runs in Node (vitest) and in the renderer. No new dependency. |
+| Raster core: masks, blur, resize, polygons, compositing, the styles | **plain TypeScript** on `Uint8Array` RGBA or alpha buffers (1024 x 1024), with `Float64Array` for the curl geometry | Deterministic, so golden tests can compare it with the Python output. It runs in Node (vitest) and in the renderer. No new dependency. |
 | Character badge (text to image) | **AppKit through `osascript -l JavaScript`** (`NSString` drawing, heavy system font, 1024 px sRGB bitmap) | Text needs a font rasterizer. AppKit has one, with emoji, and the CLI has no Chromium. |
 | Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `NSImage` in the same AppKit script | AppKit decodes all four. SVG needs no cairo. |
 | Decode an uploaded ICNS icon | used as it is; the default app's `.icns` is read by its largest PNG entry, else by `NSImage` | No conversion needed. |
@@ -629,21 +629,21 @@ added.
 
 ### Tests against dock-icon-badger's own output
 
-- **Fixtures,** made once on a development machine with the Python tool, and committed with the
-  tool's commit id and the command line:
-  - base: Orca's `resources/build/icon.png`;
-  - badges: a PNG of the character "2" (rendered once and committed, so both sides use the same
-    badge pixels), and one logo PNG with holes;
-  - output: one 1024 px PNG for each base x badge x style.
-- **Test:** vitest decodes the base and badge PNGs with `pngjs` (dev dependency), runs the
-  TypeScript core in Node, and compares with the Python PNG.
-- **Limit:** on premultiplied RGBA, at least 99.5 % of pixels differ by 8 or less (of 255) in each channel,
-  a mean absolute difference of 1.0 or less, and no pixel more than 48 off. On a failure, the test
-  writes a difference PNG for review.
-- **Primitive tests:** each primitive (blur, Lanczos, polygon fill) also has a small golden test
-  against Pillow output, so a failure points to one primitive and not to the whole style.
-- **Mutants:** change one curl constant (for example `ARC_MID`) or the blur sigma; the golden test
-  must turn red.
+- **Fixtures:** from the public dock-icon-badger repository at a fixed commit (named in
+  `badger.test.ts`): the base `samples/apps/Swirl.png`, the badge `samples/badges/beta.png`, and
+  the tool's own `web/thumbs/<style>.png` for each style (192 px). Pillow is not needed.
+- **Test:** vitest decodes the PNGs with `pngjs` (dev dependency), runs the TypeScript core in
+  Node, resizes the result to 192 px with the same Lanczos, and compares it with the thumb. Where
+  the reference used the SVG badge, the test pins the reference badge height.
+- **Limit:** on premultiplied RGBA, at least 99.8 % of pixels differ by 8 or less (of 255) in each
+  channel, a mean absolute difference of 0.2 or less, and no pixel more than 24 off. The 13 styles
+  measure at least 99.82 %, at most 0.068 and at most 15. On a failure, the test writes a
+  difference PNG for review.
+- **Primitive tests:** the blur has its own test (the standard deviation of a blurred step edge
+  equals the radius). Lanczos and the polygon fill have no separate golden test; the style goldens
+  cover them.
+- **Mutants:** change one curl constant (for example `ARC_MID`), the shadow opacity or the blur
+  sigma; a golden or the blur test must turn red.
 - The character text itself is drawn by AppKit and is not compared with Python. Its test checks
   only the size and position of the glyph box.
 

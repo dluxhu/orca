@@ -402,7 +402,8 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     expect(() =>
       setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, { env: env(), run, makeIcon })
     ).toThrow('"Work" runs.')
-    expect(read(icon(work))).toBe('icns 2')
+    expect(customIcons).toEqual([])
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
   })
 
   it('refuses when the app starts while the icon is made', () => {
@@ -418,7 +419,8 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
         { env: env(), run, makeIcon: starting }
       )
     ).toThrow('"Work" runs.')
-    expect(read(icon(work))).toBe('icns 2')
+    expect(customIcons).toEqual([])
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
   })
 
   it('changes nothing when macOS refuses the custom icon', () => {
