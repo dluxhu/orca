@@ -21,6 +21,7 @@ import {
 import { ensureAutoUpdaterConfigured } from '../../updater/lifecycle/main-window-updater'
 import { logStartupMilestone } from '../diagnostics/startup-diagnostics'
 import { browserManager } from '../../browser/guest-lifecycle/manager/browser-manager'
+import { profilesMenuItems, startProfilesMenu } from '../../app-profiles/profile-manager'
 
 export async function initializeMainProcessI18nAndMenu(): Promise<void> {
   const store = state.store
@@ -100,6 +101,12 @@ export async function initializeMainProcessI18nAndMenu(): Promise<void> {
         statusBarVisible: ui.statusBarVisible !== false
       }
     },
-    getKeybindings: () => state.core.keybindings?.getOverrides()
+    getKeybindings: () => state.core.keybindings?.getOverrides(),
+    ...(process.platform === 'darwin'
+      ? { getProfilesMenuItems: (shortcut: string) => profilesMenuItems(shortcut) }
+      : {})
   })
+  if (process.platform === 'darwin') {
+    startProfilesMenu(rebuildAppMenu)
+  }
 }

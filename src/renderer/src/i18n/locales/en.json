@@ -1443,7 +1443,12 @@
       "inlineBlameKeywordBlame": "blame",
       "inlineBlameKeywordGit": "git",
       "inlineBlameKeywordAuthor": "author",
-      "inlineBlameKeywordAnnotation": "annotation"
+      "inlineBlameKeywordAnnotation": "annotation",
+      "startAtLogin": {
+        "label": "Start at login",
+        "description": "Runs this profile's server from login, also when Orca is closed, so your other devices can connect.",
+        "error": "Start at login did not change: {{message}}"
+      }
     },
     "openInApp": {
       "preset": {
@@ -2032,7 +2037,15 @@
     "toggleFullScreen": "Toggle Full Screen",
     "undo": "Undo",
     "unhide": "Show All",
-    "zoom": "Zoom"
+    "zoom": "Zoom",
+    "profiles": "Profiles",
+    "profileManager": "Profile Manager…",
+    "profileRunning": "Running",
+    "profileBackground": "Running in background",
+    "profileDefault": "Default",
+    "profileThisApp": "This app",
+    "profileSwitchTo": "Switch to",
+    "profileNew": "New profile…"
   },
   "tray": {
     "openOrca": "Open Orca",
@@ -26426,6 +26439,7 @@
       "0fe8d02935": "Go back in browser",
       "2f207aa199": "Toggle word wrap",
       "e316152321": "Open settings",
+      "profileManager": "Open Profile Manager",
       "8a1982d598": "Force reload",
       "81bcb6ec24": "Open tasks",
       "67ce6cf5a0": "Reload browser page",
@@ -30924,6 +30938,69 @@
       "workerOwed": "An orchestration still waits on this chat",
       "home": "A managed agent's Home Chat can't be deleted"
     }
+  },
+  "profileManager": {
+    "title": "Orca Profile Manager",
+    "macOnly": "Profiles are only on macOS.",
+    "heading": "Profiles",
+    "intro": "Run several Orca apps at the same time. Each profile is an independent Mac app with its own windows, Dock icon, notifications, sign-ins and chats.",
+    "list": "Your profiles",
+    "defaultThisApp": "Default · this app",
+    "open": "Open",
+    "more": "More actions for {{name}}",
+    "showInFinder": "Show in Finder",
+    "cli": {
+      "heading": "Command line",
+      "intro": "An orca command goes to the profile of the terminal it runs in. In any other terminal it goes to the default profile. Put --profile <id> before the command to pick another one.",
+      "serve": "orca serve runs one server per profile, on the profile's own port."
+    },
+    "state": {
+      "running": "Running",
+      "background": "Running in background",
+      "stopped": "Stopped"
+    },
+    "field": {
+      "name": "App name",
+      "nameNote": "Shown in the Dock, the menu bar and notifications.",
+      "id": "Profile id",
+      "idNote": "Made from the name. Use it as orca … --profile {{id}}. It does not change later.",
+      "idKept": "A data folder for \"{{id}}\" exists. The new profile uses that data.",
+      "port": "Server port",
+      "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
+    },
+    "new": {
+      "title": "New profile",
+      "intro": "Orca makes a new Mac app for this profile. It runs next to your other profiles, with its own windows, Dock icon, notifications, sign-ins and chats.",
+      "copySettings": "Copy settings from this app",
+      "create": "Create profile",
+      "defaultName": "Orca - New Profile",
+      "defaultNameNumbered": "Orca - New Profile {{n}}"
+    },
+    "edit": {
+      "button": "Edit",
+      "title": "Edit {{name}}",
+      "nameNote": "The id and the data stay. Quit the profile first.",
+      "save": "Save"
+    },
+    "remove": {
+      "button": "Remove profile…",
+      "title": "Remove {{name}}?",
+      "note": "Orca moves the app to the Trash. Quit the profile first.",
+      "keepData": "Keep data (a new profile with the id \"{{id}}\" gets it back)",
+      "confirm": "Remove profile"
+    },
+    "cancel": "Cancel",
+    "rule": {
+      "idPattern": "Use 1 to 32 letters, digits and -, with a letter or digit first.",
+      "idReserved": "The id \"{{id}}\" is reserved.",
+      "idTaken": "A profile with the id \"{{id}}\" exists.",
+      "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
+      "nameTaken": "A profile with the name \"{{name}}\" exists.",
+      "portRange": "The port must be 1024 to 65535: {{port}}",
+      "portClash": "The port {{port}} is inside the port range of the default app or of another profile."
+    },
+    "startAtLogin": "Start at login",
+    "defaultName": "Default"
   },
   "activityBar": {
     "moveUp": "Move up",
