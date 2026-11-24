@@ -21,7 +21,9 @@ let icns: Buffer
 
 beforeEach(() => {
   vi.resetModules()
-  h.createFromBuffer.mockReset().mockImplementation((png: Buffer) => ({ png, isEmpty: () => false }))
+  h.createFromBuffer
+    .mockReset()
+    .mockImplementation((png: Buffer) => ({ png, isEmpty: () => false }))
   dir = mkdtempSync(join(tmpdir(), 'dock-icon-'))
   const contents = join(dir, 'Work.app', 'Contents')
   mkdirSync(join(contents, 'MacOS'), { recursive: true })

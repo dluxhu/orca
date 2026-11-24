@@ -19,7 +19,7 @@ export function swapBundleIcon(appPath: string, icns: Buffer, sign: () => void):
   const name = `icon-${createHash('sha256').update(icns).digest('hex').slice(0, 8)}.icns`
   const newPath = join(contents, 'Resources', name)
   // A profile made before icons has a link to the default app's icon.
-  const old = lstatSync(oldPath).isSymbolicLink()
+  const old: { link: string } | { bytes: Buffer } = lstatSync(oldPath).isSymbolicLink()
     ? { link: readlinkSync(oldPath) }
     : { bytes: readFileSync(oldPath) }
   rmSync(oldPath, { force: true })
