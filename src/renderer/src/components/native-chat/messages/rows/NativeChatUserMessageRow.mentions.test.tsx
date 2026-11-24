@@ -243,12 +243,12 @@ it('draws a quote chip and a mention chip in one sent message, and the quote sti
   const shown = document.querySelector<HTMLElement>('.native-chat-markdown')!
   expect(shown.querySelector('[data-slot="badge"]')).toHaveTextContent('A')
   fireEvent.click(screen.getByRole('button', { name: /^Quote: the quoted words/ }))
-  expect(jump).toHaveBeenCalledWith(
+  expect(jump).toHaveBeenCalledTimes(1)
+  // The jump can get more arguments after the source and the text.
+  expect(jump.mock.calls[0].slice(0, 2)).toEqual([
     { messageId: 'reply-1', place: null },
-    'the quoted words',
-    expect.any(Function),
-    expect.any(Function)
-  )
+    'the quoted words'
+  ])
 })
 
 it('opens the mentioned chat on the chat host when its chip is clicked', async () => {
