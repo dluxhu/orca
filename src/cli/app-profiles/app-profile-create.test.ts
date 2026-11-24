@@ -584,6 +584,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
 
   it('refuses an unknown id and a profile that runs', async () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    customIcons = []
     await expect(setAppProfileIcon('home', { kind: 'badge' }, opts())).rejects.toThrow(
       'No profile "home".'
     )
@@ -591,7 +592,9 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     await expect(setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())).rejects.toThrow(
       '"Work" runs.'
     )
-    expect(read(icon(work))).toBe('icns 2')
+    // set-icon writes the kept copy and the Finder custom icon; the signed bundle never changes.
+    expect(customIcons).toEqual([])
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
   })
 
   it('replaces a link at the icon copy in the data folder, and leaves its target alone', async () => {
@@ -608,6 +611,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
 
   it('refuses when the app starts while the icon is made', async () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    customIcons = []
     const starting = ((...args: unknown[]) => {
       writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
       return (makeIcon as (...a: unknown[]) => unknown)(...args)
@@ -615,7 +619,9 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     await expect(
       setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts({ makeIcon: starting }))
     ).rejects.toThrow('"Work" runs.')
-    expect(read(icon(work))).toBe('icns 2')
+    // set-icon writes the kept copy and the Finder custom icon; the signed bundle never changes.
+    expect(customIcons).toEqual([])
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
   })
 
   it('changes nothing when macOS refuses the custom icon', async () => {
