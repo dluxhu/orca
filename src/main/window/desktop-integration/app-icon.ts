@@ -294,11 +294,17 @@ export function persistMacDockIcon(value: unknown, options: PersistMacDockIconOp
     if (generation !== macDockIconPersistenceGeneration) {
       return
     }
+    // A profile app keeps the Finder custom icon of its profile (fork patch).
+    const own = getAppIconPath(value) === APP_ICON_PATHS.classic && ownDockIcon()
+    if (own) {
+      app.dock?.setIcon(own)
+      return
+    }
     if (iconId === 'classic') {
       const cleared = await clearMacCustomIconMetadata(execFile, appBundlePath)
       // Empty image reaches AppKit as nil, so the Dock draws the sharp bundle icns once no custom icon remains.
       if (cleared && generation === macDockIconPersistenceGeneration) {
-        app.dock?.setIcon(ownDockIcon() ?? nativeImage.createEmpty())
+        app.dock?.setIcon(nativeImage.createEmpty())
       }
       return
     }

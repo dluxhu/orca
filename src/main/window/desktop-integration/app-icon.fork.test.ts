@@ -64,8 +64,24 @@ describe('applyAppIcon in a profile app', () => {
     expect(h.setIcon).toHaveBeenCalledWith(h.image)
   })
 
-  it('sets its own icon again, not the cached bundle icon, after the default choice is saved', async () => {
-    h.own = OWN
+  it.each(['classic', 'custom'])(
+    'keeps the Finder custom icon of the profile when %s is saved, and sets its own Dock icon',
+    async (choice) => {
+      h.own = OWN
+      const execFile = vi.fn()
+      persistMacDockIcon(choice, {
+        platform: 'darwin',
+        isDevApp: false,
+        appBundlePath: '/Apps/Work.app',
+        execFile: execFile as never
+      })
+      await vi.waitFor(() => expect(h.setIcon).toHaveBeenCalledWith(OWN))
+      expect(execFile).not.toHaveBeenCalled()
+    }
+  )
+
+  it('clears an old custom icon in the default app, as upstream does', async () => {
+    h.own = null
     const execFile = vi.fn((...args: unknown[]) => {
       ;(args.find((arg) => typeof arg === 'function') as (e: null) => void)(null)
       return {}
@@ -73,9 +89,9 @@ describe('applyAppIcon in a profile app', () => {
     persistMacDockIcon('classic', {
       platform: 'darwin',
       isDevApp: false,
-      appBundlePath: '/Apps/Work.app',
+      appBundlePath: '/Apps/Orca.app',
       execFile: execFile as never
     })
-    await vi.waitFor(() => expect(h.setIcon).toHaveBeenCalledWith(OWN))
+    await vi.waitFor(() => expect(execFile).toHaveBeenCalled())
   })
 })
