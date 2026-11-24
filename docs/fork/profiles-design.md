@@ -571,8 +571,12 @@ Make the 10 iconset sizes (16 to 1024, with `@2x`) with the core's Lanczos resiz
 with a TypeScript writer: the `icns` header and one PNG entry for each size, as in the fallback
 writer of `write_icns` in `dock_icon_badger.py` (about 25 lines). It needs no tool and no
 temporary folder. `iconutil -c icns` (part of macOS) is the fallback if macOS refuses the file.
-Then sign again, `touch` the bundle and register it again with Launch Services, so the Dock and
-Finder show the new icon.
+`orca profiles create` writes the first icon into the bundle and signs once. A later icon change
+does not sign again: a new ad hoc signature changes the app's code identity, and the Keychain then
+asks the user again for the app's stored keys (owner decision, 2026-11-23). The change sets a
+Finder custom icon (NSWorkspace `setIcon:forFile:options:`, as Get Info does): it writes the
+bundle's `Icon\r` file and the FinderInfo flag, not the signed contents. The profile's userData
+keeps the icon (`profile-icon.icns`); the profile app sets its Dock tile from that copy at start.
 
 ### What the port needs
 
