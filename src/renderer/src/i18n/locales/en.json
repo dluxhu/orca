@@ -21492,6 +21492,7 @@
         "runLivePlan_one": "Updating the plan {{count}} time"
       },
       "rawPanel": {
+        "hideReply": "Hide raw messages for this reply",
         "image": "Image:",
         "label": "Raw messages",
         "sent": "Sent to agent",

@@ -80,17 +80,39 @@ function replyEntries(
   )
 }
 
-type RawLinkSource = { has: (messageId: string) => boolean; show: (messageId: string) => void }
+function showsReply(tabId: string, messageId: string): boolean {
+  return openTabs.has(tabId) && focusedTabs.get(tabId)?.messageId === messageId
+}
+
+/** Opens the tab's panel at the reply. Closes it when it already shows that reply. */
+function toggleReply(tabId: string, messageId: string): void {
+  if (showsReply(tabId, messageId)) {
+    openTabs.delete(tabId)
+    focusedTabs.delete(tabId)
+  } else {
+    openTabs.add(tabId)
+    focusedTabs.set(tabId, { messageId })
+  }
+  notify()
+}
+
+type RawLinkSource = { tabId: string; has: (messageId: string) => boolean }
 const NativeChatRawLinkContext = createContext<RawLinkSource | undefined>(undefined)
 
 /** The {} action under a reply. It shows only for a reply that has raw entries. */
 export function NativeChatRawLink({ messageId }: { messageId: string }): React.JSX.Element | null {
   const t = useTranslate()
   const source = useContext(NativeChatRawLinkContext)
+  const shown = useSyncExternalStore(
+    subscribe,
+    () => source !== undefined && showsReply(source.tabId, messageId)
+  )
   if (!source?.has(messageId)) {
     return null
   }
-  const label = t('components.native-chat.rawPanel.showReply', 'Show raw messages for this reply')
+  const label = shown
+    ? t('components.native-chat.rawPanel.hideReply', 'Hide raw messages for this reply')
+    : t('components.native-chat.rawPanel.showReply', 'Show raw messages for this reply')
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -98,7 +120,8 @@ export function NativeChatRawLink({ messageId }: { messageId: string }): React.J
           type="button"
           className="flex size-6 shrink-0 items-center justify-center rounded-md text-chat-foreground-faint transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={label}
-          onClick={() => source.show(messageId)}
+          aria-expanded={shown}
+          onClick={() => toggleReply(source.tabId, messageId)}
         >
           <Braces className="size-3.5" />
         </button>
@@ -285,12 +308,8 @@ export function NativeChatRawFrame({
   itemsRef.current = items
   const links = useMemo(
     (): RawLinkSource => ({
-      has: (messageId) => itemsRef.current.some((item) => item.itemId === messageId),
-      show: (messageId) => {
-        openTabs.add(tabId)
-        focusedTabs.set(tabId, { messageId })
-        notify()
-      }
+      tabId,
+      has: (messageId) => itemsRef.current.some((item) => item.itemId === messageId)
     }),
     [tabId]
   )

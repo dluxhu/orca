@@ -406,6 +406,26 @@ describe('the {} link under a reply', () => {
     expect(markedEntries()).toEqual(['t2', 'reply-2'])
   })
 
+  it('closes the panel when it already shows that reply, and moves it from another reply', () => {
+    render(<Transcript tabId="link-toggle" />)
+    const link = (reply: string) =>
+      within(screen.getByRole('region', { name: reply })).getByRole('button', {
+        name: /raw messages for this reply/
+      })
+    const panel = () => screen.queryByRole('region', { name: 'Raw messages' })
+    fireEvent.click(link('reply-1b'))
+    expect(link('reply-1b')).toHaveAccessibleName('Hide raw messages for this reply')
+    expect(link('reply-1b')).toHaveAttribute('aria-expanded', 'true')
+    expect(link('reply-2')).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(link('reply-2'))
+    expect(markedEntries()).toEqual(['t2', 'reply-2'])
+    expect(link('reply-1b')).toHaveAccessibleName(REPLY_LINK)
+    fireEvent.click(link('reply-2'))
+    expect(panel()).toBeNull()
+    expect(link('reply-2')).toHaveAccessibleName(REPLY_LINK)
+    expect(link('reply-2')).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('moves focus to the panel, so a screen reader names it', () => {
     render(<Transcript tabId="link-focus" />)
     const link = within(screen.getByRole('region', { name: 'reply-2' })).getByRole('button', {
