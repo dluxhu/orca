@@ -15,6 +15,7 @@ import { NativeChatRewindAction } from '../actions/NativeChatRewindAction'
 import type { NativeChatRewindSurface } from '../actions/use-native-chat-rewind-host'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
 import { plainNativeChatAgentMentions } from '../../markdown/native-chat-agent-mentions'
+import { nativeChatQuoteSourceProps } from '../../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
 import { NativeChatUserMessageFold } from './NativeChatUserMessageFold'
 import { NativeChatCodeBlock } from '../../markdown/code/NativeChatCodeBlock'
 import { NativeChatCopyButton } from '../actions/NativeChatCopyButton'
@@ -170,10 +171,12 @@ export function NativeChatUserMessageRow({
                       rowKey={message.id}
                       content={text}
                       variant="document"
+                      quoteChips
                       slackMentions={drawn !== undefined}
                       agentMentions={sent?.mentions}
                       className="text-sm"
                       renderCodeBlock={NativeChatCodeBlock}
+                      {...nativeChatQuoteSourceProps(message.id)}
                     />
                   )}
                 />
