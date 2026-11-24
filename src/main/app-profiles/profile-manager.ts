@@ -30,12 +30,12 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { translateMain } from '../i18n/main-i18n'
-import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
 import { registerProfileIconIpc } from './profile-manager-icon'
 import { appIcons, withAppIcons, type AppIcon } from './profile-manager-app-icon'
+import { registerOwnProfileIpc } from './profile-manager-settings'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
 /** The id of this app's row: null in the Profile Manager app, which is no row. */
@@ -194,14 +194,6 @@ function fromProfileManager<T extends unknown[], R>(
   }
 }
 
-/** "Start at login" of this app's own profile, as Settings shows it. */
-export async function readOwnStartAtLogin(): Promise<{ id: string; enabled: boolean }> {
-  const { rows, currentId } = await readAppProfilesState()
-  // The Profile Manager app has no Settings, so a null id does not come here.
-  const id = currentId ?? 'default'
-  return { id, enabled: rows.find((row) => row.id === id)?.startAtLogin === true }
-}
-
 export function registerProfileManagerIpc(): void {
   ipcMain.handle(
     'appProfiles:state',
@@ -211,24 +203,7 @@ export function registerProfileManagerIpc(): void {
   ipcMain.handle('appProfiles:open', fromProfileManager(onAppOf(openApp)))
   registerProfileIconIpc(fromProfileManager)
   ipcMain.handle('appProfiles:showInFinder', fromProfileManager(onAppOf(shell.showItemInFolder)))
-  // Settings in the main window changes only this app's own profile.
-  const fromSettings =
-    <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
-    (event: IpcMainInvokeEvent, ...args: T): Promise<R> =>
-      isTrustedUIRenderer(event.sender) || isProfileManagerRenderer(event.sender)
-        ? handler(...args)
-        : Promise.reject(new Error('Only an Orca window can do this.'))
-  ipcMain.handle('appProfiles:ownStartAtLogin', fromSettings(readOwnStartAtLogin))
-  ipcMain.handle(
-    'appProfiles:setOwnStartAtLogin',
-    fromSettings(async (enabled: unknown) =>
-      changeAppProfile({
-        kind: 'start-at-login',
-        id: (await readOwnStartAtLogin()).id,
-        enabled: enabled === true
-      })
-    )
-  )
+  registerOwnProfileIpc(readAppProfilesState, changeAppProfile)
 }
 
 // The Profiles menu. Electron menus are not live, so the rows are cached and the menu rebuilt.

@@ -294,10 +294,34 @@ describe('Profile Manager IPC', () => {
       'install'
     ])
     expect(h.execFileCalls[0].args).toContain('6768')
-    await expect(h.handlers.get('appProfiles:ownStartAtLogin')?.(settings)).resolves.toEqual({
+    await expect(h.handlers.get('appProfiles:ownProfile')?.(settings)).resolves.toEqual({
       id: 'default',
-      enabled: false
+      enabled: false,
+      port: 6768,
+      otherPorts: [6832, 6864],
+      serverRuns: false
     })
+  })
+
+  it("Settings sets the saved port of this app's own profile through orca profiles set-port", async () => {
+    writeRegistry()
+    h.profile = { id: 'home', userDataPath: join(root, 'profiles', 'home') }
+    registerProfileManagerIpc()
+    const settings = { sender: { trusted: true } }
+    await expect(h.handlers.get('appProfiles:ownProfile')?.(settings)).resolves.toMatchObject({
+      id: 'home',
+      port: 6864,
+      otherPorts: [6832]
+    })
+    await h.handlers.get('appProfiles:setOwnPort')?.(settings, 6900)
+    expect(h.execFileCalls[0].args.slice(1)).toEqual([
+      'profiles',
+      'set-port',
+      'home',
+      '--port',
+      '6900',
+      '--json'
+    ])
   })
 
   it("Settings in a profile app changes that profile's own service", async () => {

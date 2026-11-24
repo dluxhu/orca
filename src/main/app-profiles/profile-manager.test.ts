@@ -247,8 +247,9 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:iconParts',
       'appProfiles:chooseIconFile',
       'appProfiles:showInFinder',
-      'appProfiles:ownStartAtLogin',
-      'appProfiles:setOwnStartAtLogin'
+      'appProfiles:ownProfile',
+      'appProfiles:setOwnStartAtLogin',
+      'appProfiles:setOwnPort'
     ])
     await expect(handlers.get('appProfiles:state')?.({ sender: {} })).resolves.toMatchObject({
       currentId: 'default',
@@ -269,7 +270,11 @@ describe('registerProfileManagerIpc', () => {
       )
     }
     // Settings of this app: the main window or the Profile Manager window.
-    for (const channel of ['appProfiles:ownStartAtLogin', 'appProfiles:setOwnStartAtLogin']) {
+    for (const channel of [
+      'appProfiles:ownProfile',
+      'appProfiles:setOwnStartAtLogin',
+      'appProfiles:setOwnPort'
+    ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, true)).rejects.toThrow(
         'Only an Orca window'
       )

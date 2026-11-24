@@ -160,6 +160,19 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     expect(registry().profiles[0].name).toBe('Orca - Work')
   })
 
+  it('refuses while a server that its own service did not start runs', async () => {
+    const work = makeProfile()
+    writeRuntimePid(work.userDataPath, 4242)
+    const handStarted: ServeServiceRun = async (program) =>
+      program === '/bin/ps'
+        ? { code: 0, out: 'Orca --serve\n' }
+        : { code: 113, out: 'Could not find service' }
+    await expect(
+      renameAppProfile({ id: 'work', name: 'Job', ...deps(), serviceRun: handStarted })
+    ).rejects.toThrow('Stop that server')
+    expect(existsSync(work.appPath)).toBe(true)
+  })
+
   it('updates the app path in the serve unit, and stops and starts a running service', async () => {
     const work = makeProfile()
     const unit = serveServiceUnitOf(work.userDataPath, false, dir)
@@ -299,6 +312,25 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
     expect(portAtBootstrap).toContain('<string>7000</string>')
   })
 
+  it('changes the saved port while the profile app is open; the app does not use it', async () => {
+    const work = makeProfile()
+    writeRuntimePid(work.userDataPath, 4242)
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps() })
+    expect(result.port).toBe(7000)
+    expect(registry().profiles[0].port).toBe(7000)
+  })
+
+  it('refuses the saved port of another profile and the default port', async () => {
+    makeProfile()
+    makeProfile('Home')
+    for (const port of [6800, 6768]) {
+      await expect(setAppProfilePort({ id: 'home', port, ...deps() })).rejects.toThrow(
+        'inside the port range'
+      )
+    }
+    expect(registry().profiles.map((p) => p.port)).toEqual([6800, 6832])
+  })
+
   it('writes a valid port and refuses the range of another profile', async () => {
     makeProfile()
     makeProfile('Home')
@@ -403,6 +435,39 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['work', 'Orca - Work', 'running'],
       ['home', 'Home', 'background'],
       ['client', 'Client', 'stopped']
+    ])
+  })
+
+  it('a supervised service and a server of another launch agent are in the background', async () => {
+    const work = makeProfile()
+    const home = makeProfile('Home')
+    const client = makeProfile('Client')
+    // The service job is the supervisor (pid 9); the server that owns the runtime is its child.
+    writeRuntimePid(work.userDataPath, 10)
+    // A launch agent with another label starts this server.
+    writeRuntimePid(home.userDataPath, 20)
+    writeRuntimePid(client.userDataPath, 30)
+    const commands: Record<string, string> = {
+      '10': '/Apps/Orca - Work.app/Contents/MacOS/Orca --serve --port 6800\n',
+      '20': '/Apps/Home.app/Contents/MacOS/Orca --serve\n',
+      '30': '/Apps/Client.app/Contents/MacOS/Orca\n'
+    }
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps(),
+      serviceRun: async (program, args) =>
+        program === '/bin/ps'
+          ? { code: 0, out: commands[args.at(-1) ?? ''] ?? '' }
+          : args[1].endsWith(serveServiceUnitOf(work.userDataPath, false, dir).label)
+            ? { code: 0, out: 'pid = 9' }
+            : { code: 113, out: '' }
+    })
+    expect(rows.map((row) => [row.id, row.state])).toEqual([
+      ['default', 'stopped'],
+      ['work', 'background'],
+      ['home', 'background'],
+      ['client', 'running']
     ])
   })
 

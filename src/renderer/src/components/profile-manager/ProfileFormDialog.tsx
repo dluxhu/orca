@@ -48,7 +48,14 @@ export type ProfileForm =
       copySettings: boolean
       icon: IconSource
     }
-  | { mode: 'edit'; row: AppProfileRow; name: string; port: string; icon: IconSource }
+  | {
+      mode: 'edit'
+      row: AppProfileRow
+      name: string
+      port: string
+      startAtLogin: boolean
+      icon: IconSource
+    }
 
 export function ProfileFormDialog(props: {
   form: ProfileForm
@@ -107,6 +114,10 @@ export function ProfileFormDialog(props: {
           ...(JSON.stringify(form.icon) !==
           JSON.stringify(editIcon(form.row.icon, badge, form.row.userDataPath))
             ? [{ kind: 'set-icon' as const, id: form.row.id, icon: form.icon }]
+            : []),
+          // After set-port: the service installs on the new port.
+          ...(form.startAtLogin !== form.row.startAtLogin
+            ? [{ kind: 'start-at-login' as const, id: form.row.id, enabled: form.startAtLogin }]
             : [])
         ]
   const kept = form.mode === 'new' && (props.state?.keptIds.includes(form.id) ?? false)
@@ -196,6 +207,20 @@ export function ProfileFormDialog(props: {
                 .join(' ')}
               onChange={(port) => onChange({ ...form, port })}
             />
+            {form.mode === 'edit' ? (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="profile-start-at-login"
+                  checked={form.startAtLogin}
+                  onCheckedChange={(checked) =>
+                    onChange({ ...form, startAtLogin: checked === true })
+                  }
+                />
+                <Label htmlFor="profile-start-at-login">
+                  {t('profileManager.startAtLogin', 'Start at login')}
+                </Label>
+              </div>
+            ) : null}
             <ProfileIconPicker
               value={form.icon}
               defaultText={badge}

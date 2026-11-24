@@ -93,9 +93,16 @@ export function readLiveRuntimePort(
   return port > 0 ? port : null
 }
 
+/** `orca serve` starts the server as an Electron process with --serve. */
+async function isServeProcess(pid: number, run: ServeServiceRun): Promise<boolean> {
+  const result = await run('/bin/ps', ['-o', 'command=', '-p', String(pid)])
+  return result.code === 0 && / --serve(\s|$)/.test(result.out)
+}
+
 /**
- * "running": an Orca process other than the serve service owns the profile's runtime.
- * "background": only the serve service runs. "stopped": neither runs.
+ * "running": the profile app owns the profile's runtime.
+ * "background": only a server runs: the serve service, or a server that another launch agent
+ * or a terminal started. "stopped": neither runs.
  */
 export async function readAppProfileState(
   userDataPath: string,
@@ -104,13 +111,15 @@ export async function readAppProfileState(
 ): Promise<AppProfileState> {
   const isAlive = deps.isAlive ?? isProcessAlive
   const { label } = serveServiceUnitOf(userDataPath, isDefault, deps.home ?? homedir())
+  const run = deps.serviceRun ?? runServeServiceManager
   const servicePid = await readServeServicePid(label, {
     uid: deps.uid ?? process.getuid?.() ?? 0,
-    run: deps.serviceRun ?? runServeServiceManager
+    run
   })
   const pid = runtimePid(userDataPath)
-  if (pid !== null && pid !== servicePid && isAlive(pid)) {
-    return 'running'
+  if (pid !== null && isAlive(pid)) {
+    // A supervised service job is the supervisor; its child server owns the runtime.
+    return pid === servicePid || (await isServeProcess(pid, run)) ? 'background' : 'running'
   }
   return servicePid !== null && isAlive(servicePid) ? 'background' : 'stopped'
 }

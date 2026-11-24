@@ -403,6 +403,38 @@ describe('ProfileManager', () => {
     expect(document.getElementById('profile-field-port-help')?.textContent).toContain(other)
   })
 
+  it('Edit sets Start at login next to the port, after the port change', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Home')
+    fireEvent.click(within(rowOf('Orca - Home')).getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog', { name: 'Edit Orca - Home' })
+    const login = within(dialog).getByRole('checkbox', { name: 'Start at login' })
+    expect(login.getAttribute('aria-checked')).toBe('false')
+    type('Server port', '6864')
+    fireEvent.click(login)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(change.mock.calls).toEqual([
+        [{ kind: 'set-port', id: 'home', port: 6864 }],
+        [{ kind: 'start-at-login', id: 'home', enabled: true }]
+      ])
+    )
+  })
+
+  it('reads the states at once when the window shows again', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    getState.mockClear()
+    visibility.mockReturnValue('visible')
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => expect(getState).toHaveBeenCalledTimes(1))
+    visibility.mockRestore()
+    expect(PROFILE_STATE_POLL_MS).toBe(2000)
+  })
+
   it('draws the dialogs on an opaque surface, so the list does not show through', async () => {
     render(<ProfileManager />)
     await screen.findByText('Orca - Work')
