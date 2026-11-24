@@ -3,7 +3,9 @@ import {
   appProfileIdError,
   appProfileIdFromName,
   appProfileNameError,
+  appPortWarning,
   appProfilePortError,
+  defaultAppPortError,
   nextAppProfilePort
 } from './app-profile-rules'
 
@@ -32,8 +34,21 @@ describe('app profile rules', () => {
     }
     expect(appProfileNameError(' home ', ['Home'])).toMatch('exists')
     expect(appProfilePortError(6832, [6800])).toBeNull()
-    expect(appProfilePortError(6799, [])).toMatch('port range')
+    // The default app's saved port is taken; the ports near it only warn.
+    expect(appProfilePortError(6768, [])).toMatch('port range')
+    expect(appProfilePortError(6799, [])).toBeNull()
     expect(appProfilePortError(80, [])).toMatch('1024 to 65535')
+  })
+
+  it('warns about a port that a desktop app or a nearby server can take first, both ways', () => {
+    expect(appPortWarning(6768, [])).toMatch('6768 to 6799')
+    expect(appPortWarning(6799, [])).toMatch('6768 to 6799')
+    // A profile near the default app's saved port, and the default app near a profile's.
+    expect(appPortWarning(6830, [6800])).toMatch('31 ports')
+    expect(appPortWarning(6800, [6830])).toMatch('31 ports')
+    expect(appPortWarning(6832, [6800])).toBeNull()
+    expect(defaultAppPortError(6800, [6800])).toMatch('saves the port 6800')
+    expect(defaultAppPortError(6801, [6800])).toBeNull()
   })
 
   it('gives the texts to the translate function', () => {

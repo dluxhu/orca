@@ -140,8 +140,9 @@ function portRangeError(port: number, t: RuleTranslate): string | null {
 }
 
 /**
- * Null when the port is valid and outside the port range of the default app and of other profiles.
- * The default app's range is its port and its fallback ladder of the next 31 ports.
+ * Null when the port is valid, is not the default app's saved port, and is outside the port
+ * range of other profiles. A range is a port and its fallback ladder of the next 31 ports.
+ * Ports near the default app's give only a warning: appPortWarning.
  */
 export function appProfilePortError(
   port: number,
@@ -154,8 +155,7 @@ export function appProfilePortError(
     return range
   }
   const clash =
-    (port >= defaultPort && port < defaultPort + PORT_SPACING) ||
-    otherPorts.some((other) => Math.abs(other - port) < PORT_SPACING)
+    port === defaultPort || otherPorts.some((other) => Math.abs(other - port) < PORT_SPACING)
   return clash
     ? t(
         'profileManager.rule.portClash',
@@ -177,6 +177,30 @@ export function defaultAppPortError(
       ? t('profileManager.rule.portTaken', 'Another profile saves the port {{port}}.', { port })
       : null)
   )
+}
+
+/**
+ * A warning for a saved port that another Orca can take first, or null. Desktop apps listen on
+ * 6768 and its ladder. `nearPorts`: the saved ports of the other apps (both ways: a profile
+ * gives the default app's port, the default app gives the profiles' ports).
+ */
+export function appPortWarning(
+  port: number,
+  nearPorts: readonly number[],
+  t: RuleTranslate = english
+): string | null {
+  if (port >= DEFAULT_APP_PORT && port < DEFAULT_APP_PORT + PORT_SPACING) {
+    return t(
+      'profileManager.rule.portDesktop',
+      'Orca desktop apps also use the ports 6768 to 6799. A running desktop app can take this port first.'
+    )
+  }
+  return nearPorts.some((other) => other !== port && Math.abs(other - port) < PORT_SPACING)
+    ? t(
+        'profileManager.rule.portNear',
+        'The server of another Orca app can use the 31 ports after its own. It can take this port first.'
+      )
+    : null
 }
 
 /** The first port of the 6800, 6832, … series that no profile uses. */

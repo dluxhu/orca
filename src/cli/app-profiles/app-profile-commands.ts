@@ -149,7 +149,8 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
             : entry.serveServiceInstalled
               ? `\nInstall the serve service again: orca --profile ${entry.id} serve service install --port ${entry.port}`
               : ''
-      print(entry, json, `The port of "${entry.id}" is ${entry.port}.${note}`)
+      const warning = entry.warning ? `\n${entry.warning}` : ''
+      print(entry, json, `The port of "${entry.id}" is ${entry.port}.${note}${warning}`)
       return
     }
     case 'remove': {
