@@ -23,6 +23,7 @@ import { encodePng, largestIcnsPng } from './app-profile-icns'
 import { setAppProfileIcon } from './app-profile-set-icon'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
+import { setDefaultAppPort } from './app-profile-default-port'
 import { listAppProfiles } from './app-profile-list'
 
 const USAGE = `Usage:
@@ -33,7 +34,7 @@ const USAGE = `Usage:
       [--icon-file <file>]
   orca profiles icon-preview [--id <id>] [--icon-…] --json
   orca profiles icon-parts [--id <id>] [--icon-badge <char> | --icon-image <file>] --json
-  orca profiles set-port <id> --port <port>
+  orca profiles set-port <id|default> --port <port>
   orca profiles remove <id> [--keep-data]
   orca profiles list [--json]
   orca profiles manager`
@@ -197,7 +198,11 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
       if (port === undefined) {
         throw new RuntimeClientError('invalid_argument', USAGE)
       }
-      const entry = await setAppProfilePort({ id: oneId(parsed), port })
+      const id = oneId(parsed)
+      const entry =
+        id.toLowerCase() === 'default'
+          ? await setDefaultAppPort({ port, defaultUserDataPath: getPlatformUserDataPath() })
+          : await setAppProfilePort({ id, port })
       const note =
         entry.serveService === 'restarted'
           ? '\nThe serve service runs again, on the new port.'

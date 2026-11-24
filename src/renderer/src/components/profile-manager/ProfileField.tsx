@@ -14,6 +14,7 @@ export function Field(props: {
   /** Monospace text, for ids and ports. */
   mono?: boolean
   inputClassName?: string
+  disabled?: boolean
 }): React.JSX.Element {
   const id = `profile-field-${props.name}`
   return (
@@ -24,6 +25,7 @@ export function Field(props: {
       <Input
         id={id}
         value={props.value}
+        disabled={props.disabled}
         aria-invalid={props.error ? true : undefined}
         aria-describedby={props.error || props.note ? `${id}-help` : undefined}
         className={cn(props.mono && 'font-mono md:text-[13px]', props.inputClassName)}

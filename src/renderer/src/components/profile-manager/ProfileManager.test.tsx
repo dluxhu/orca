@@ -167,7 +167,7 @@ describe('ProfileManager', () => {
     expect(within(stopped).getByTestId('profile-status-dot').className).not.toContain('bg-')
   })
 
-  it('reads the states again every 3 s while the window shows, and not while it hides', async () => {
+  it('reads the states again at the poll interval while the window shows, and not while it hides', async () => {
     vi.useFakeTimers()
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
     render(<ProfileManager />)
@@ -306,19 +306,21 @@ describe('ProfileManager', () => {
         'work'
       )
     )
-    type('Server port', '6864')
+    // Work's server runs, so its port is read-only; a rename is the one change.
+    type('App name', 'Orca - Job')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
-    expect(change.mock.calls).toEqual([[{ kind: 'set-port', id: 'work', port: 6864 }]])
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
   })
 
   it('sends no set-icon when an edit keeps the icon', async () => {
     render(<ProfileManager />)
     await editWork()
-    type('Server port', '6864')
+    // Work's server runs, so its port is read-only; a rename is the one change.
+    type('App name', 'Orca - Job')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
-    expect(change.mock.calls).toEqual([[{ kind: 'set-port', id: 'work', port: 6864 }]])
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
   })
 
   it('sends a new icon of an edit as set-icon, with the own badge free for the preview', async () => {
@@ -387,16 +389,18 @@ describe('ProfileManager', () => {
   })
 
   it('shows the port that the running server listens on, and the saved port when it differs', async () => {
-    appState.rows[0] = { ...appState.rows[0], livePort: 6768 }
+    // The app does not use the saved port: no saved-port hint for it.
+    appState.rows[0] = { ...appState.rows[0], livePort: 6769 }
     appState.rows[1] = { ...appState.rows[1], livePort: 6768 }
     render(<ProfileManager />)
     await screen.findByText('Orca - Work')
     const other =
       'Running on 6768 (saved port 6800). A server started with --port uses that port, not the saved port.'
-    expect(within(rowOf('Orca')).getByText('Running on 6768')).toBeTruthy()
+    expect(within(rowOf('Orca')).getByText('Running on 6769')).toBeTruthy()
     expect(within(rowOf('Orca - Work')).getByText(other)).toBeTruthy()
-    // A stopped profile has no live port.
+    // A stopped profile shows its saved port.
     expect(within(rowOf('Orca - Home')).queryByText(/Running on/)).toBeNull()
+    expect(within(rowOf('Orca - Home')).getByText('Port 6832')).toBeTruthy()
     fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
     // The field keeps the saved port; its note tells the live one.
     expect(field('Server port').value).toBe('6800')
@@ -413,11 +417,50 @@ describe('ProfileManager', () => {
     type('Server port', '6864')
     fireEvent.click(login)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Change the port to 6864?' })).getByRole(
+        'button',
+        { name: 'Change port' }
+      )
+    )
     await waitFor(() =>
       expect(change.mock.calls).toEqual([
         [{ kind: 'set-port', id: 'home', port: 6864 }],
         [{ kind: 'start-at-login', id: 'home', enabled: true }]
       ])
+    )
+  })
+
+  it('Edit asks before a port change, as Settings does', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Home')
+    fireEvent.click(within(rowOf('Orca - Home')).getByRole('button', { name: 'Edit' }))
+    type('Server port', '6864')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    const confirm = await screen.findByRole('dialog', {
+      name: 'Change the port to 6864?',
+      description: 'Paired servers will need to be re-paired.'
+    })
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(confirm).getByRole('button', { name: 'Cancel' }))
+    )
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    expect(change).not.toHaveBeenCalled()
+    // The Edit dialog stays, with the typed port.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Change the port to 6864?' })).toBeNull()
+    )
+    expect(screen.getByRole('dialog', { name: 'Edit Orca - Home' })).toBeTruthy()
+    expect(field('Server port').value).toBe('6864')
+  })
+
+  it("Edit keeps the port read-only while the profile's server runs", async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
+    expect(field('Server port').disabled).toBe(true)
+    expect(document.getElementById('profile-field-port-help')?.textContent).toContain(
+      "Stop this profile's server to change its port."
     )
   })
 

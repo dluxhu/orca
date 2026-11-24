@@ -21,7 +21,7 @@ import {
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
-import { readAppProfileState, readServeServicePid, serveServiceUnitOf } from './app-profile-list'
+import { readAppProfileRuntime, serveServiceUnitOf, type RuntimeOwner } from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
   rewriteServeUnitPort,
@@ -72,6 +72,16 @@ export function rootOf(options: EditAppProfileOptions, action: string): string {
  * Finds the profile and refuses while its app (or a serve that is not the service) runs. The
  * caller holds the registry lock and changes nothing between this check and its change.
  */
+/** An edit stops and starts only the app's own service. It refuses a server that another started. */
+export function refuseOtherServer(owner: RuntimeOwner, name: string, action: string): void {
+  if (owner === 'server') {
+    throw new RuntimeClientError(
+      'profile_running',
+      `A server of "${name}" runs that its Start at login service did not start. Stop that server before you ${action} it.`
+    )
+  }
+}
+
 /** `appMayRun`: the change is safe while the profile app is open. */
 export async function prepare(
   options: EditAppProfileOptions,
@@ -95,7 +105,7 @@ export async function prepare(
   const entry = { ...found, appPath: located ?? found.appPath }
   const uid = options.uid ?? process.getuid?.() ?? 0
   const serviceRun = options.serviceRun ?? runServeServiceManager
-  const state = await readAppProfileState(entry.userDataPath, false, {
+  const { state, owner } = await readAppProfileRuntime(entry, false, {
     home,
     uid,
     serviceRun,
@@ -107,19 +117,7 @@ export async function prepare(
       `"${entry.name}" runs. Quit it, and stop its server, before you ${action} it.`
     )
   }
-  // An edit stops and starts only the profile's own service.
-  if (
-    state === 'background' &&
-    (await readServeServicePid(serveServiceUnitOf(entry.userDataPath, false, home).label, {
-      uid,
-      run: serviceRun
-    })) === null
-  ) {
-    throw new RuntimeClientError(
-      'profile_running',
-      `A server of "${entry.name}" runs that its Start at login service did not start. Stop that server before you ${action} it.`
-    )
-  }
+  refuseOtherServer(owner, entry.name, action)
   return {
     root,
     appsDir: resolve(appProfilesAppsDir(env, home)),
@@ -260,36 +258,57 @@ function setPortLocked(
 ): AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
   const error = appProfilePortError(
     port,
-    context.registry.profiles.filter((p) => p.id !== context.entry.id).map((p) => p.port)
+    context.registry.profiles.filter((p) => p.id !== context.entry.id).map((p) => p.port),
+    undefined,
+    context.registry.defaultPort
   )
   if (error) {
     throw new RuntimeClientError('invalid_argument', error)
   }
-  // Start at login keeps the profile's port. A loaded job restarts on it; others read it at load.
-  // A failed bootout stops here. The unit comes before the registry, so a failed unit write
-  // leaves both on the old port.
   const unit = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
+  return {
+    ...context.entry,
+    port,
+    ...movePort({ ...context, unit, loaded, port }, () =>
+      updateEntry(context, (registry) => ({
+        ...registry,
+        profiles: registry.profiles.map((profile) =>
+          profile.id === context.entry.id ? { ...profile, port } : profile
+        )
+      }))
+    )
+  }
+}
+
+/**
+ * Writes the new port to the Start at login unit, then `save`s it to profiles.json. A loaded job
+ * restarts on it; others read it at load. A failed bootout stops here. The unit comes before the
+ * registry, so a failed unit write leaves both on the old port.
+ */
+export function movePort(
+  options: {
+    run: RunTool
+    uid: number
+    unit: { label: string; unitPath: string }
+    loaded: boolean
+    port: number
+  },
+  save: () => void
+): { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
+  const { run, uid, unit, loaded } = options
   if (loaded) {
-    context.run('/bin/launchctl', ['bootout', `gui/${context.uid}/${unit.label}`])
+    run('/bin/launchctl', ['bootout', `gui/${uid}/${unit.label}`])
   }
   try {
-    const updated = rewriteServeUnitPort(unit.unitPath, port)
-    updateEntry(context, (registry) => ({
-      ...registry,
-      profiles: registry.profiles.map((profile) =>
-        profile.id === context.entry.id ? { ...profile, port } : profile
-      )
-    }))
-    const serveService: ServeServiceChange = loaded ? 'restarted' : updated ? 'updated' : 'none'
+    const updated = rewriteServeUnitPort(unit.unitPath, options.port)
+    save()
     return {
-      ...context.entry,
-      port,
       serveServiceInstalled: existsSync(unit.unitPath),
-      serveService
+      serveService: loaded ? 'restarted' : updated ? 'updated' : 'none'
     }
   } finally {
     if (loaded) {
-      context.run('/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
+      run('/bin/launchctl', ['bootstrap', `gui/${uid}`, unit.unitPath])
     }
   }
 }

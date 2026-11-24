@@ -47,6 +47,8 @@ export type AppProfileEntry = {
 export type AppProfileRegistry = {
   version: 1
   defaultAppPath: string
+  /** The default app's saved port. Without it, the default app uses DEFAULT_WS_PORT. */
+  defaultPort?: number
   urlHandler: { mode: 'ask' } | { mode: 'profile'; profileId: string }
   profiles: AppProfileEntry[]
 }
@@ -99,6 +101,25 @@ export function readAppProfileMarker(userDataPath: string): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * The saved port of the app of a userData folder: the profile's port, or the default app's
+ * defaultPort. `orca serve` uses it when no --port is given. Null when none is saved.
+ */
+export function savedAppPort(
+  userDataPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir()
+): number | null {
+  const registry = readAppProfileRegistry(appProfilesRoot(env, home))
+  const id = readAppProfileMarker(userDataPath)
+  const port =
+    id === null ? registry?.defaultPort : registry?.profiles.find((p) => p.id === id)?.port
+  // profiles.json is a user file.
+  return typeof port === 'number' && Number.isInteger(port) && port >= 1024 && port <= 65535
+    ? port
+    : null
 }
 
 /** Writes the marker when it is missing. serve and orcad find the profile only through it. */

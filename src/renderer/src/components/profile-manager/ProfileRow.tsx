@@ -18,12 +18,15 @@ function appName(appPath: string): string {
   return (appPath.split('/').pop() ?? appPath).replace(/\.app$/, '')
 }
 
-/** The port that the profile's server listens on, and the saved port when it differs. */
+/**
+ * The port that the profile's app or server listens on. For a server, also the saved port when
+ * it differs. The app does not use the saved port.
+ */
 export function livePortText(row: AppProfileRow, t: Translate): string | null {
   if (row.livePort === undefined) {
     return null
   }
-  return row.livePort === row.port
+  return row.livePort === row.port || row.state !== 'background'
     ? t('profileManager.port.running', 'Running on {{port}}', { port: row.livePort })
     : t(
         'profileManager.port.runningOther',
@@ -79,7 +82,8 @@ export function ProfileRow(props: {
   const { row } = props
   const isDefault = row.id === 'default'
   const name = isDefault ? appName(row.appPath) : row.name
-  const port = livePortText(row, t)
+  const port =
+    livePortText(row, t) ?? t('profileManager.port.saved', 'Port {{port}}', { port: row.port })
   return (
     <li className="flex flex-wrap items-center gap-4 px-4 py-3.5">
       {props.iconUrl ? (
@@ -102,7 +106,7 @@ export function ProfileRow(props: {
           <code className="font-mono text-foreground/80">{row.id}</code>
           <span className="min-w-0 break-all">{row.appPath}</span>
         </div>
-        {port ? <p className="text-xs text-muted-foreground">{port}</p> : null}
+        <p className="text-xs text-muted-foreground">{port}</p>
       </div>
       <ProfileStatus state={row.state} />
       <div className="flex gap-2">

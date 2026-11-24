@@ -299,6 +299,7 @@ describe('Profile Manager IPC', () => {
       enabled: false,
       port: 6768,
       otherPorts: [6832, 6864],
+      defaultPort: 6768,
       serverRuns: false
     })
   })

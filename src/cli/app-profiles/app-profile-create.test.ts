@@ -528,7 +528,11 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     uid: 501,
     run,
     makeIcon,
-    serviceRun: async () => ({ code: 113, out: 'Could not find service' }),
+    // A runtime pid is the Work app: `ps` gives its executable and its userData.
+    serviceRun: async (program) =>
+      program === '/bin/ps'
+        ? { code: 0, out: `1 Orca --user-data-dir=${join(dir, 'data', 'work')}\n` }
+        : { code: 113, out: 'Could not find service' },
     ...more
   })
 
