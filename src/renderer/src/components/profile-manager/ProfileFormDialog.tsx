@@ -29,6 +29,7 @@ import {
   ProfileIconPicker,
   ProfileIconPreview
 } from './ProfileIconPicker'
+import { livePortText } from './ProfileRow'
 
 /** The first badge character that no other profile uses. `row`: the profile that Edit changes. */
 export function freeBadge(state: AppProfilesState | null, row: AppProfileRow | null): string {
@@ -184,10 +185,15 @@ export function ProfileFormDialog(props: {
               label={t('profileManager.field.port', 'Server port')}
               value={form.port}
               error={portError}
-              note={t(
-                'profileManager.field.portNote',
-                "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
-              )}
+              note={[
+                t(
+                  'profileManager.field.portNote',
+                  "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
+                ),
+                form.mode === 'edit' ? livePortText(form.row, t) : null
+              ]
+                .filter(Boolean)
+                .join(' ')}
               onChange={(port) => onChange({ ...form, port })}
             />
             <ProfileIconPicker

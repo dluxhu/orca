@@ -9,13 +9,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { useTranslate } from '@/i18n/use-translate'
+import { useTranslate, type Translate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
 import type { AppProfileRow } from '../../../../shared/app-profiles/app-profile-rules'
 
 /** The app name of a bundle path: "/Applications/Orca.app" gives "Orca". */
 function appName(appPath: string): string {
   return (appPath.split('/').pop() ?? appPath).replace(/\.app$/, '')
+}
+
+/** The port that the profile's server listens on, and the saved port when it differs. */
+export function livePortText(row: AppProfileRow, t: Translate): string | null {
+  if (row.livePort === undefined) {
+    return null
+  }
+  return row.livePort === row.port
+    ? t('profileManager.port.running', 'Running on {{port}}', { port: row.livePort })
+    : t(
+        'profileManager.port.runningOther',
+        'Running on {{port}} (saved port {{saved}}). A server started with --port uses that port, not the saved port.',
+        { port: row.livePort, saved: row.port }
+      )
 }
 
 function ProfileStatus(props: { state: AppProfileRow['state'] }): React.JSX.Element {
@@ -65,6 +79,7 @@ export function ProfileRow(props: {
   const { row } = props
   const isDefault = row.id === 'default'
   const name = isDefault ? appName(row.appPath) : row.name
+  const port = livePortText(row, t)
   return (
     <li className="flex flex-wrap items-center gap-4 px-4 py-3.5">
       {props.iconUrl ? (
@@ -87,6 +102,7 @@ export function ProfileRow(props: {
           <code className="font-mono text-foreground/80">{row.id}</code>
           <span className="min-w-0 break-all">{row.appPath}</span>
         </div>
+        {port ? <p className="text-xs text-muted-foreground">{port}</p> : null}
       </div>
       <ProfileStatus state={row.state} />
       <div className="flex gap-2">

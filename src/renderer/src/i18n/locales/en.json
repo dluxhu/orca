@@ -30921,6 +30921,10 @@
       "port": "Server port",
       "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
     },
+    "port": {
+      "running": "Running on {{port}}",
+      "runningOther": "Running on {{port}} (saved port {{saved}}). A server started with --port uses that port, not the saved port."
+    },
     "new": {
       "title": "New profile",
       "intro": "Orca makes a new Mac app for this profile. It runs next to your other profiles, with its own windows, Dock icon, notifications, sign-ins and chats.",

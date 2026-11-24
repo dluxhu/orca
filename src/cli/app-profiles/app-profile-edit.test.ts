@@ -405,6 +405,34 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['client', 'Client', 'stopped']
     ])
   })
+
+  it("gives the port of the profile's live server, not the saved port", async () => {
+    const work = makeProfile()
+    const home = makeProfile('Home')
+    const client = makeProfile('Client')
+    const runtime = (userDataPath: string, pid: number, endpoint: string): void =>
+      writeFileSync(
+        join(userDataPath, 'orca-runtime.json'),
+        JSON.stringify({ pid, transports: [{ kind: 'websocket', endpoint }] })
+      )
+    // A service started with --port 6768 runs on that port, not on the saved 6800.
+    runtime(work.userDataPath, 10, 'ws://0.0.0.0:6768')
+    runtime(home.userDataPath, 20, 'ws://127.0.0.1:6832')
+    // A file that a stopped server left gives no port.
+    runtime(client.userDataPath, 30, 'ws://0.0.0.0:6864')
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps(),
+      isAlive: (pid) => pid !== 30
+    })
+    expect(rows.map((row) => [row.id, row.port, row.livePort])).toEqual([
+      ['default', 6768, undefined],
+      ['work', 6800, 6768],
+      ['home', 6832, 6832],
+      ['client', 6864, undefined]
+    ])
+  })
 })
 
 describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder', () => {

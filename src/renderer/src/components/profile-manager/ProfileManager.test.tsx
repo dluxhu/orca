@@ -386,6 +386,23 @@ describe('ProfileManager', () => {
     expect(change).toHaveBeenCalledWith({ kind: 'rename', id: 'work', name: 'Orca - Job' })
   })
 
+  it('shows the port that the running server listens on, and the saved port when it differs', async () => {
+    appState.rows[0] = { ...appState.rows[0], livePort: 6768 }
+    appState.rows[1] = { ...appState.rows[1], livePort: 6768 }
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    const other =
+      'Running on 6768 (saved port 6800). A server started with --port uses that port, not the saved port.'
+    expect(within(rowOf('Orca')).getByText('Running on 6768')).toBeTruthy()
+    expect(within(rowOf('Orca - Work')).getByText(other)).toBeTruthy()
+    // A stopped profile has no live port.
+    expect(within(rowOf('Orca - Home')).queryByText(/Running on/)).toBeNull()
+    fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
+    // The field keeps the saved port; its note tells the live one.
+    expect(field('Server port').value).toBe('6800')
+    expect(document.getElementById('profile-field-port-help')?.textContent).toContain(other)
+  })
+
   it('draws the dialogs on an opaque surface, so the list does not show through', async () => {
     render(<ProfileManager />)
     await screen.findByText('Orca - Work')

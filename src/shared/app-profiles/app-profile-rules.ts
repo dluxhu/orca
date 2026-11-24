@@ -18,7 +18,10 @@ export type AppProfileRow = {
   name: string
   appPath: string
   userDataPath: string
+  /** The saved port (profiles.json). */
   port: number
+  /** The port that the profile's live server listens on. Absent when no server runs. */
+  livePort?: number
   state: AppProfileState
   /** The profile's own serve service is installed (`orca serve service install`). */
   startAtLogin: boolean
