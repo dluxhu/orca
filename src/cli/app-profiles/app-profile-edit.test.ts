@@ -63,7 +63,7 @@ const run: RunTool = (program, args) => {
   return execFileSync(program, args, { encoding: 'utf8' })
 }
 
-/** The fake process table that `ps -o ppid=,command=` reads, by pid. */
+/** The fake process table that `ps -o ppid=,etime=` reads, by pid: "<ppid> <etime>". */
 let processes: Map<number, string>
 
 const serviceRun: ServeServiceRun = async (program, args) => {
@@ -490,13 +490,40 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     expect(registry().profiles.map((p) => p.id)).toEqual(['work'])
   })
 
-  it("refuses while the profile's own service runs, so its server writes no data then", async () => {
+  it("stops and removes the profile's own running service before it moves the data", async () => {
     const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, 'unit')
     servicePid = 777
     writeRuntimePid(work.userDataPath, 777, { role: 'serve' })
+    const order: string[] = []
+    const recording: RunTool = (program, args) => {
+      order.push(args[0])
+      return run(program, args)
+    }
+    const result = await removeAppProfile({
+      id: 'work',
+      keepData: false,
+      trash: (path) => {
+        order.push(`trash ${path === work.userDataPath ? 'data' : 'app'}`)
+        trash(path)
+      },
+      ...deps(),
+      run: recording
+    })
+    expect(result.serveService).toBe('removed')
+    expect(existsSync(unit.unitPath)).toBe(false)
+    expect(order.indexOf('bootout')).toBeLessThan(order.indexOf('trash data'))
+    expect(order.indexOf('bootout')).toBeGreaterThanOrEqual(0)
+  })
+
+  it('refuses while a server runs that its service did not start', async () => {
+    const work = makeProfile()
+    servicePid = 9
+    writeRuntimePid(work.userDataPath, 4242, { role: 'serve' })
     await expect(
       removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
-    ).rejects.toThrow('serve service uninstall')
+    ).rejects.toThrow('Stop that server')
     expect(trashed).toEqual([])
   })
 
@@ -549,6 +576,8 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     const reused = makeProfile('Reused')
     const stale = makeProfile('Stale')
     const orcad = makeProfile('Orcad')
+    const days = makeProfile('Days')
+    const older = makeProfile('Older')
     // The service job (9) is the supervisor (11); its child server owns the runtime.
     writeRuntimePid(work.userDataPath, 10, { role: 'serve', ppid: 11 })
     processes.set(11, '9 00:02')
@@ -566,6 +595,14 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       runtime: { transports: [{ kind: 'websocket', endpoint: 'ws://0.0.0.0:6960' }] }
     })
     writeRuntimePid(orcad.userDataPath, 70, { role: 'orcad' })
+    // An elapsed time with days: the pid started a day ago, after a file of three days ago.
+    writeRuntimePid(days.userDataPath, 80, { etime: '1-02:00:00' })
+    const threeDaysAgo = new Date(Date.now() - 3 * 86_400_000)
+    utimesSync(join(days.userDataPath, 'orca-runtime.json'), threeDaysAgo, threeDaysAgo)
+    // The same days format for a file older than its pid's start: the owner.
+    writeRuntimePid(older.userDataPath, 90, { etime: '3-00:00:00' })
+    const dayAgo = new Date(Date.now() - 86_400_000)
+    utimesSync(join(older.userDataPath, 'orca-runtime.json'), dayAgo, dayAgo)
     const rows = await listAppProfiles({
       defaultAppPath: app,
       defaultUserDataPath: join(dir, 'default-data'),
@@ -585,7 +622,9 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['legacy', 'running', undefined],
       ['reused', 'stopped', undefined],
       ['stale', 'stopped', undefined],
-      ['orcad', 'background', undefined]
+      ['orcad', 'background', undefined],
+      ['days', 'stopped', undefined],
+      ['older', 'running', undefined]
     ])
   })
 
