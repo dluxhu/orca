@@ -66,10 +66,14 @@ function preloadSyncMethods(): Map<string, string> {
   return methods
 }
 
-/** The source of the Manager renderer entry and every module that it imports by a relative path. */
+/**
+ * The source of the Manager renderer entry and every module that it imports: relative paths, the
+ * `@/` and `@renderer/` aliases, side-effect imports and dynamic imports.
+ */
 function managerRendererSource(): string {
+  const rendererRoot = join(SRC, 'renderer', 'src')
   const seen = new Set<string>()
-  const queue = [join(SRC, 'renderer', 'src', 'profile-manager.tsx')]
+  const queue = [join(rendererRoot, 'profile-manager.tsx')]
   let source = ''
   while (queue.length > 0) {
     const file = queue.pop() as string
@@ -79,11 +83,14 @@ function managerRendererSource(): string {
     seen.add(file)
     const text = readFileSync(file, 'utf8')
     source += text
-    for (const [, spec] of text.matchAll(/from '(\.{1,2}\/[^']+)'/g)) {
-      const base = resolve(dirname(file), spec)
-      const found = ['.ts', '.tsx', '/index.ts', '/index.tsx']
+    const specs = text.matchAll(/(?:from|import|import\()\s*'((?:\.{1,2}|@|@renderer)\/[^']+)'/g)
+    for (const [, spec] of specs) {
+      const base = spec.startsWith('@')
+        ? join(rendererRoot, spec.replace(/^@(renderer)?\//, ''))
+        : resolve(dirname(file), spec)
+      const found = ['', '.ts', '.tsx', '/index.ts', '/index.tsx']
         .map((ext) => base + ext)
-        .find((path) => existsSync(path))
+        .find((path) => /\.tsx?$/.test(path) && existsSync(path))
       if (found) {
         queue.push(found)
       }
@@ -143,12 +150,17 @@ describe('runProfileManagerApp', () => {
       .filter(([method]) => source.includes(`.${method}(`))
       .map(([, channel]) => channel)
     // An unanswered sendSync blocks the renderer until the event is collected: about 40 s.
-    expect(used).toContain('settings:get-sync')
+    expect(used).toEqual(
+      expect.arrayContaining(['settings:get-sync', 'browser:reserveGuestDiscard'])
+    )
     expect(used.filter((channel) => !registered.has(channel))).toEqual([])
-    const reply = h.ipcOn.mock.calls.find(([channel]) => channel === 'settings:get-sync')?.[1]
-    const event = { returnValue: undefined as unknown }
-    reply?.(event)
-    expect(event.returnValue).toBeNull()
+    const reply = (channel: string): unknown => {
+      const event = { returnValue: undefined as unknown }
+      h.ipcOn.mock.calls.find(([name]) => name === channel)?.[1](event)
+      return event.returnValue
+    }
+    expect(reply('settings:get-sync')).toBeNull()
+    expect(reply('browser:reserveGuestDiscard')).toBe(false)
   })
 
   it('exits when another Profile Manager runs', () => {
