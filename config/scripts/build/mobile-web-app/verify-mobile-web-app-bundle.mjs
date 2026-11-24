@@ -45,7 +45,9 @@ export const MOBILE_WEB_APP_HOST_CATALOG_MAX_BYTES = 384 * 1024
 // names count as eager. The phone shell still downloads each on-demand file to disk once per bundle
 // update (shellDownloadedAssets), so this budget also bounds that download.
 // Eager: main's own fence. 10.90625 MiB since a size pass took the page to 11,252,196 bytes (2026-11-22).
-export const MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES = 10.90625 * 1024 * 1024
+// Fork: 32 KiB more for the fork patches' phone page code: the bare #number setting, the compaction
+// divider copy, and the shared mention, quote, raw view and launch code. Upstream's fence stays below it.
+export const MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES = 10.90625 * 1024 * 1024 + 32 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_BYTES = 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_FILE_BYTES = 128 * 1024
 
