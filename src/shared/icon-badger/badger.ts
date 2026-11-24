@@ -11,7 +11,7 @@ import { Logo } from './logo'
 import { APPLE_SHADOW, S, masks, normalizeIcon, shadow } from './normalize'
 import { CORNER, DD, R2, VV, bez, edgeRing, fromChannels, paper } from './helpers'
 import { stFrosted, stLiquidGlass, stRound, stTintTile, stWhiteTile } from './styles-tile'
-import { stStamp } from './styles-stamp'
+import { stSticker, stStamp } from './styles-stamp'
 import { stPageCurl, stRolled } from './styles-curl'
 
 // ---------------------------------------------------------------- constants (dock_icon_badger.py)
@@ -197,6 +197,7 @@ export const ICON_STYLES = [
   'tint-tile',
   'frosted',
   'round',
+  'sticker',
   'stamp',
   'liquid-glass',
   'page-curl',
@@ -215,6 +216,7 @@ const STYLES: Record<IconStyle, Render> = {
   'tint-tile': (icon, _, logo) => stTintTile(icon, logo),
   frosted: (icon, _, logo) => stFrosted(icon, logo),
   round: (icon, _, logo) => stRound(icon, logo),
+  sticker: (icon, _, logo) => stSticker(icon, logo),
   stamp: (icon, _, logo) => stStamp(icon, logo),
   'liquid-glass': (icon, _, logo) => stLiquidGlass(icon, logo),
   'page-curl': (_, flat, logo) => stPageCurl(flat, logo, 'page-curl'),
