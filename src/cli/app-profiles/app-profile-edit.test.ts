@@ -192,6 +192,16 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     expect(existsSync(work.appPath)).toBe(true)
   })
 
+  it("restarts the profile's own supervised service: its server is the job's grandchild", async () => {
+    const work = makeProfile()
+    file(serveServiceUnitOf(work.userDataPath, false, dir).unitPath, 'unit')
+    servicePid = 9
+    writeRuntimePid(work.userDataPath, 10, { args: '--serve', ppid: 11 })
+    processes.set(11, '9 /Apps/orca serve --supervise')
+    const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('restarted')
+  })
+
   it('updates the app path in the serve unit, and stops and starts a running service', async () => {
     const work = makeProfile()
     const unit = serveServiceUnitOf(work.userDataPath, false, dir)
