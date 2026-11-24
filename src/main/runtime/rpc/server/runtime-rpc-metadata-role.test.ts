@@ -35,4 +35,23 @@ describe('the runtime file', () => {
       }
     }
   )
+
+  it('names an Electron `orca serve` (--serve in argv) without a role option as serve', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-role-'))
+    const argv = process.argv
+    process.argv = [...argv, '--serve']
+    // The constructor reads argv.
+    const server = new OrcaRuntimeRpcServer({
+      runtime: new OrcaRuntimeService(),
+      methods: STATUS_METHODS,
+      userDataPath
+    })
+    process.argv = argv
+    await server.start()
+    try {
+      expect(readRuntimeMetadata(userDataPath)?.role).toBe('serve')
+    } finally {
+      await server.stop()
+    }
+  })
 })
