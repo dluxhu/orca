@@ -19,6 +19,7 @@ import {
 import { getRepositoryFormatterSearchEntry } from './RepositoryFormatterSection'
 import { getRepositoryAgentTrustSearchEntry } from './RepositoryAgentTrustSection'
 import { getRepositoryBrowserProfileSearchEntry } from './RepositoryBrowserProfileSection'
+import { getRepositoryChatReferenceLinksSearchEntry } from './source-control/RepositoryChatReferenceLinksSection'
 import { getRepositoryWorkspaceCleanupSearchEntry } from './workspace-cleanup/repository-workspace-cleanup-search'
 
 type RepositoryPaneSearchOptions = {
@@ -238,7 +239,7 @@ export function getRepositoryPaneSearchEntries(
     parts.icon
   ]
   if (parts.github) {
-    entries.push(parts.github)
+    entries.push(parts.github, getRepositoryChatReferenceLinksSearchEntry(t))
   }
   if (parts.fork) {
     entries.push(parts.fork)
@@ -278,7 +279,7 @@ export function getRepositoryPaneSearchMetadata(
     parts.icon
   ]
   if (parts.github) {
-    identity.push(parts.github)
+    identity.push(parts.github, getRepositoryChatReferenceLinksSearchEntry(t))
   }
   if (parts.fork) {
     identity.push(parts.fork)

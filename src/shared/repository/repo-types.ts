@@ -65,6 +65,8 @@ export type Repo = {
   executionHostId?: 'local' | `ssh:${string}` | `runtime:${string}` | null
   /** Absent means auto; writers omit on creation for persisted-record compatibility. */
   issueSourcePreference?: IssueSourcePreference
+  /** Absent means on: native chat links a bare `#123` to this repo. Off: only `owner/repo#123` links. */
+  linkBareReferencesInChat?: boolean
   /** Host-owned Jira project default; users can override it in each composer. */
   defaultJiraProject?: JiraProjectReference | null
   /** Bind host/login only; resolve a short-lived gh token at spawn and inject into that child’s environment. */

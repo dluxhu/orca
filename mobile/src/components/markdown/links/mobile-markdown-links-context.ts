@@ -9,6 +9,8 @@ export type MobileMarkdownLinks = {
   fileLinks: NativeChatFileLinkExistence | null
   /** Where bare `#123` points; null leaves it text. */
   githubRepo: GitHubRepoReference | null
+  /** False: only `owner/repo#123` links; the project turned bare `#123` links off. */
+  linkBareGitHubReferences?: boolean
 }
 
 export const MobileMarkdownLinksContext = createContext<MobileMarkdownLinks | null>(null)
