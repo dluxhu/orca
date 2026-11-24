@@ -106,7 +106,7 @@ function publishDeepLink(link: DeepLink): void {
 function requestDesktopActivation(argv: readonly string[] = []): void {
   // `orca profiles manager` asks for the Profile Manager window only.
   if (argv.includes(PROFILE_MANAGER_ARG)) {
-    void app.whenReady().then(openProfileManagerWindow)
+    void app.whenReady().then(() => openProfileManagerWindow())
     return
   }
   state.deepLinks.capture(argv, publishDeepLink)
@@ -215,7 +215,7 @@ if (preflightReady) {
   state.deepLinks.capture(process.argv)
   state.pluginInstallLinks.capture(process.argv)
   if (process.argv.includes(PROFILE_MANAGER_ARG)) {
-    void app.whenReady().then(openProfileManagerWindow)
+    void app.whenReady().then(() => openProfileManagerWindow())
   }
   // The first renderer pulls on mount; nothing listens this early.
   state.osOpenedDocuments.capture(process.argv)
