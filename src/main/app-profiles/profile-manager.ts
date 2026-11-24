@@ -285,7 +285,11 @@ export function startProfilesMenu(rebuild: () => void): void {
   app.on('did-become-active', () => void refreshProfilesMenu(false))
 }
 
-export function profilesMenuItems(): MenuItemConstructorOptions[] {
+/**
+ * The Profiles menu. `managerShortcut`: the shortcut text of the app.profileManager keybinding,
+ * shown as a hint. Without it (the Profile Manager app has no keybindings), a native accelerator.
+ */
+export function profilesMenuItems(managerShortcut?: string): MenuItemConstructorOptions[] {
   const currentId = currentAppId()
   const stateLabel = {
     running: translateMain('menu.profileRunning', 'Running'),
@@ -315,9 +319,8 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
       click: () => void showProfileManager({ startNew: true })
     },
     {
-      label: translateMain('menu.profileManager', 'Profile Manager…'),
-      // No default Orca shortcut uses Shift+Cmd+P.
-      accelerator: 'CommandOrControl+Shift+P',
+      label: `${translateMain('menu.profileManager', 'Profile Manager…')}${managerShortcut ? `\t${managerShortcut}` : ''}`,
+      ...(managerShortcut === undefined ? { accelerator: 'CommandOrControl+Shift+P' } : {}),
       click: () => void showProfileManager()
     }
   ]

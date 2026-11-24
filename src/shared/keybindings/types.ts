@@ -34,6 +34,7 @@ export type KeybindingActionId =
   | 'worktree.navigateDown'
   | 'app.settings'
   | 'app.forceReload'
+  | 'app.profileManager'
   | 'workspace.create'
   | 'workspace.rename'
   | 'workspace.delete'

@@ -10,7 +10,8 @@ const h = vi.hoisted(() => ({
   windows: [] as { webContents: object }[],
   execFileCalls: [] as { file: string; args: string[]; options: Record<string, unknown> }[],
   stdout: '{"ok":true,"result":{}}',
-  profile: null as null | { id: string; userDataPath: string }
+  profile: null as null | { id: string; userDataPath: string },
+  reveal: vi.fn()
 }))
 
 vi.mock('electron', () => {
@@ -30,7 +31,7 @@ vi.mock('electron', () => {
   return {
     app: { isPackaged: true, getPath: () => '/default-data', on: vi.fn() },
     BrowserWindow,
-    shell: { showItemInFolder: vi.fn() },
+    shell: { showItemInFolder: h.reveal },
     nativeTheme: { shouldUseDarkColors: false },
     ipcMain: {
       handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
@@ -97,7 +98,8 @@ describe('Profile Manager IPC', () => {
     for (const [channel, arg] of [
       ['appProfiles:state', undefined],
       ['appProfiles:change', change],
-      ['appProfiles:open', 'work']
+      ['appProfiles:open', 'work'],
+      ['appProfiles:showInFinder', 'work']
     ] as const) {
       await expect(h.handlers.get(channel)?.(other, arg)).rejects.toThrow(
         'Only the Profile Manager window'
@@ -246,6 +248,21 @@ describe('Profile Manager IPC', () => {
       launcher,
       '--json'
     ])
+  })
+
+  it('Show in Finder shows the registry app of an id; a path as id shows nothing', async () => {
+    writeRegistry()
+    h.reveal.mockClear()
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    const show = h.handlers.get('appProfiles:showInFinder')
+    await expect(show?.(manager, 'work')).resolves.toMatchObject({ ok: true })
+    expect(h.reveal.mock.calls).toEqual([['/Apps/Profiles/Orca - Work.app']])
+    await expect(show?.(manager, '/Apps/Profiles/Orca - Work.app')).resolves.toMatchObject({
+      ok: false
+    })
+    expect(h.reveal).toHaveBeenCalledTimes(1)
   })
 
   it('runs no CLI for an unknown id', async () => {

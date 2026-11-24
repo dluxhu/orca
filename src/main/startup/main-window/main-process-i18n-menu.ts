@@ -102,7 +102,9 @@ export async function initializeMainProcessI18nAndMenu(): Promise<void> {
       }
     },
     getKeybindings: () => state.core.keybindings?.getOverrides(),
-    ...(process.platform === 'darwin' ? { getProfilesMenuItems: profilesMenuItems } : {})
+    ...(process.platform === 'darwin'
+      ? { getProfilesMenuItems: (shortcut: string) => profilesMenuItems(shortcut) }
+      : {})
   })
   if (process.platform === 'darwin') {
     startProfilesMenu(rebuildAppMenu)
