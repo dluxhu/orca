@@ -35,3 +35,6 @@ export function fitAppIconToPlatformShape(
     height: outputSide
   })
 }
+
+// Fork patch: app-icon.ts is at its line limit, so it imports this from here.
+export { keepsBundleIcon } from '../../app-profiles/app-profile-dock-icon'
