@@ -26,6 +26,8 @@ import {
   file,
   installProfileEditHarness,
   registry,
+  env,
+  deps,
   makeProfile,
   writeRuntimePid
 } from './app-profile-edit.test-support'
