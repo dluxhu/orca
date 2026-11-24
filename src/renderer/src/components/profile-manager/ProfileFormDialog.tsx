@@ -21,6 +21,7 @@ import {
   type AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
 import { Field } from './ProfileField'
+import { livePortText } from './ProfileRow'
 
 export type ProfileForm =
   | {
@@ -161,10 +162,15 @@ export function ProfileFormDialog(props: {
               label={t('profileManager.field.port', 'Server port')}
               value={form.port}
               error={portError}
-              note={t(
-                'profileManager.field.portNote',
-                "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
-              )}
+              note={[
+                t(
+                  'profileManager.field.portNote',
+                  "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
+                ),
+                form.mode === 'edit' ? livePortText(form.row, t) : null
+              ]
+                .filter(Boolean)
+                .join(' ')}
               onChange={(port) => onChange({ ...form, port })}
             />
             {/* Hook point: the icon picker of the profile icons work goes here. */}
