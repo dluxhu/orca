@@ -19,7 +19,7 @@ import {
   type BuiltInAppIconId
 } from '../../../shared/app-lifecycle/identity/app-icon'
 import { getCustomAppIconPath, getCustomAppIconRevision, hasCustomAppIcon } from './custom-app-icon'
-import { fitAppIconToPlatformShape } from './platform-app-icon-shape'
+import { fitAppIconToPlatformShape, keepsBundleIcon } from './platform-app-icon-shape'
 
 const isMac = process.platform === 'darwin'
 
@@ -327,7 +327,7 @@ export function applyAppIcon(value: unknown): void {
   if (image.isEmpty()) {
     return
   }
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' && !keepsBundleIcon(getAppIconPath(value), APP_ICON_PATHS)) {
     app.dock?.setIcon(image)
   }
   for (const window of BrowserWindow.getAllWindows()) {
