@@ -5,7 +5,13 @@ import { mkdirSync, watch } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { app, ipcMain, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from 'electron'
+import {
+  app,
+  ipcMain,
+  shell,
+  type IpcMainInvokeEvent,
+  type MenuItemConstructorOptions
+} from 'electron'
 import {
   APP_PROFILE_MARKER,
   appProfilesRoot,
@@ -164,14 +170,17 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   }
 }
 
-export async function openAppProfile(id: string): Promise<AppProfileReply> {
+/** Runs `action` on the app of the row `id`. The window sends only the id, never a path. */
+async function onAppOf(id: string, action: (appPath: string) => void): Promise<AppProfileReply> {
   const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
   if (!row) {
     return { ok: false, error: { message: `No profile "${id}".` } }
   }
-  openApp(row.appPath)
-  return { ok: true, result: { opened: row.appPath } }
+  action(row.appPath)
+  return { ok: true, result: { appPath: row.appPath } }
 }
+
+export const openAppProfile = (id: string): Promise<AppProfileReply> => onAppOf(id, openApp)
 
 function fromProfileManager<T extends unknown[], R>(
   handler: (...args: T) => Promise<R>
@@ -204,6 +213,10 @@ export function registerProfileManagerIpc(): void {
     fromProfileManager(async () =>
       chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
     )(event)
+  )
+  ipcMain.handle(
+    'appProfiles:showInFinder',
+    fromProfileManager((id: string) => onAppOf(id, (appPath) => shell.showItemInFolder(appPath)))
   )
   // Settings in the main window changes only this app's own profile.
   const fromSettings =
@@ -293,17 +306,24 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
     background: translateMain('menu.profileBackground', 'Running in background'),
     stopped: ''
   }
+  const item = (row: AppProfileRow): MenuItemConstructorOptions => {
+    const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
+    const click = (): void => openApp(row.appPath)
+    return row.id === currentId
+      ? { label: name, type: 'checkbox', checked: true, click }
+      : { label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`, click }
+  }
+  const section = (label: string, rows: AppProfileRow[]): MenuItemConstructorOptions[] =>
+    rows.length > 0 ? [{ type: 'header', label }, ...rows.map(item), { type: 'separator' }] : []
   return [
-    ...menuRows.map((row): MenuItemConstructorOptions => {
-      const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
-      return {
-        label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`,
-        type: 'checkbox',
-        checked: row.id === currentId,
-        click: () => openApp(row.appPath)
-      }
-    }),
-    ...(menuRows.length > 0 ? [{ type: 'separator' } as const] : []),
+    ...section(
+      translateMain('menu.profileThisApp', 'This app'),
+      menuRows.filter((row) => row.id === currentId)
+    ),
+    ...section(
+      translateMain('menu.profileSwitchTo', 'Switch to'),
+      menuRows.filter((row) => row.id !== currentId)
+    ),
     {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
       click: () => void showProfileManager()

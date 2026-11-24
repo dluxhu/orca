@@ -6,8 +6,9 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, showManager } =
+const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, showManager, reveal } =
   vi.hoisted(() => ({
+    reveal: vi.fn(),
     managerApp: { current: false },
     showManager: vi.fn(async () => {}),
     appOn: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('node:fs', async (original) => {
 })
 vi.mock('electron', () => ({
   app: { isPackaged: true, getPath: () => '/default-data', on: appOn },
+  shell: { showItemInFolder: reveal },
   ipcMain: {
     handle: (channel: string, handler: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
       handlers.set(channel, handler)
@@ -231,6 +233,7 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:open',
       'appProfiles:iconPreview',
       'appProfiles:chooseIconFile',
+      'appProfiles:showInFinder',
       'appProfiles:ownStartAtLogin',
       'appProfiles:setOwnStartAtLogin'
     ])
@@ -243,7 +246,8 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:change',
       'appProfiles:open',
       'appProfiles:iconPreview',
-      'appProfiles:chooseIconFile'
+      'appProfiles:chooseIconFile',
+      'appProfiles:showInFinder'
     ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, 'work')).rejects.toThrow(
         'Only the Profile Manager window'
@@ -255,6 +259,17 @@ describe('registerProfileManagerIpc', () => {
         'Only an Orca window'
       )
     }
+  })
+
+  it('Show in Finder shows the app of the id, and nothing for an unknown id', async () => {
+    rows.current = [row('default', 'Orca', 'running'), row('work', 'Orca - Work', 'stopped')]
+    reveal.mockClear()
+    registerProfileManagerIpc()
+    const show = handlers.get('appProfiles:showInFinder')
+    await expect(show?.({ sender: {} }, 'work')).resolves.toMatchObject({ ok: true })
+    expect(reveal).toHaveBeenCalledWith('/apps/Orca - Work.app')
+    await expect(show?.({ sender: {} }, 'nope')).resolves.toMatchObject({ ok: false })
+    expect(reveal).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -271,13 +286,16 @@ describe('profilesMenuItems', () => {
     startProfilesMenu(rebuild)
     await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
     const items = profilesMenuItems()
-    expect(items.map((item) => [item.label, item.checked])).toEqual([
-      ['Default — Running', false],
-      ['Orca - Work — Running', true],
-      ['Orca - Home — Running in background', false],
-      ['Orca - Client', false],
-      [undefined, undefined],
-      ['Profile Manager…', undefined]
+    expect(items.map((item) => [item.type, item.label, item.checked])).toEqual([
+      ['header', 'This app', undefined],
+      ['checkbox', 'Orca - Work', true],
+      ['separator', undefined, undefined],
+      ['header', 'Switch to', undefined],
+      [undefined, 'Default — Running', undefined],
+      [undefined, 'Orca - Home — Running in background', undefined],
+      [undefined, 'Orca - Client', undefined],
+      ['separator', undefined, undefined],
+      [undefined, 'Profile Manager…', undefined]
     ])
   })
 })
@@ -319,11 +337,13 @@ describe('Profiles > Profile Manager…', () => {
     const rebuild = vi.fn()
     startProfilesMenu(rebuild)
     await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
-    expect(profilesMenuItems().map((item) => item.checked)).toEqual([
-      false,
-      false,
-      undefined,
-      undefined
+    // No "This app" section: every app is under "Switch to", with no check.
+    expect(profilesMenuItems().map((item) => [item.type, item.label, item.checked])).toEqual([
+      ['header', 'Switch to', undefined],
+      [undefined, 'Default — Running', undefined],
+      [undefined, 'Orca - Work', undefined],
+      ['separator', undefined, undefined],
+      [undefined, 'Profile Manager…', undefined]
     ])
     expect((await readAppProfilesState()).currentId).toBeNull()
   })

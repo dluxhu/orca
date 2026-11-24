@@ -17,6 +17,8 @@ export const appProfilesApi = {
     ipcRenderer.invoke('appProfiles:iconPreview', icon, id),
   chooseIconFile: (kind: 'image' | 'file'): Promise<string | null> =>
     ipcRenderer.invoke('appProfiles:chooseIconFile', kind),
+  showInFinder: (id: string): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:showInFinder', id),
   /** "Start at login" of this app's own profile (Settings). */
   getOwnStartAtLogin: (): Promise<{ id: string; enabled: boolean }> =>
     ipcRenderer.invoke('appProfiles:ownStartAtLogin'),

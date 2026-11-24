@@ -2042,7 +2042,9 @@
     "profileManager": "Profile Manager…",
     "profileRunning": "Running",
     "profileBackground": "Running in background",
-    "profileDefault": "Default"
+    "profileDefault": "Default",
+    "profileThisApp": "This app",
+    "profileSwitchTo": "Switch to"
   },
   "tray": {
     "openOrca": "Open Orca",
@@ -30892,10 +30894,17 @@
     "title": "Orca Profile Manager",
     "macOnly": "Profiles are only on macOS.",
     "heading": "Profiles",
-    "intro": "Each profile is its own Mac app with its own windows, Dock icon, sign-ins and chats.",
+    "intro": "Run several Orca apps at the same time. Each profile is an independent Mac app with its own windows, Dock icon, notifications, sign-ins and chats.",
     "list": "Your profiles",
-    "thisApp": " · this app",
+    "defaultThisApp": "Default · this app",
     "open": "Open",
+    "more": "More actions for {{name}}",
+    "showInFinder": "Show in Finder",
+    "cli": {
+      "heading": "Command line",
+      "intro": "An orca command goes to the profile of the terminal it runs in. In any other terminal it goes to the default profile. Put --profile <id> before the command to pick another one.",
+      "serve": "orca serve runs one server per profile, on the profile's own port."
+    },
     "state": {
       "running": "Running",
       "background": "Running in background",
@@ -30905,12 +30914,14 @@
       "name": "App name",
       "nameNote": "Shown in the Dock, the menu bar and notifications.",
       "id": "Profile id",
-      "idNote": "The data folder and the bundle id use it. It does not change later.",
+      "idNote": "Made from the name. Use it as orca … --profile {{id}}. It does not change later.",
       "idKept": "A data folder for \"{{id}}\" exists. The new profile uses that data.",
-      "port": "Server port"
+      "port": "Server port",
+      "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
     },
     "new": {
       "title": "New profile",
+      "intro": "Orca makes a new Mac app for this profile. It runs next to your other profiles, with its own windows, Dock icon, notifications, sign-ins and chats.",
       "copySettings": "Copy settings from this app",
       "create": "Create profile",
       "defaultName": "Orca - New Profile",
@@ -30918,15 +30929,12 @@
     },
     "edit": {
       "button": "Edit",
-      "label": "Edit profile",
       "title": "Edit {{name}}",
       "nameNote": "The id and the data stay. Quit the profile first.",
       "save": "Save"
     },
     "remove": {
-      "button": "Remove",
-      "buttonLabel": "Remove {{name}}",
-      "label": "Remove profile",
+      "button": "Remove profile…",
       "title": "Remove {{name}}?",
       "note": "Orca moves the app to the Trash. Quit the profile first.",
       "keepData": "Keep data (a new profile with the id \"{{id}}\" gets it back)",
@@ -30950,11 +30958,11 @@
       "modeImage": "Badge image",
       "modeFile": "Own icon",
       "badge": "Badge character",
-      "badgeNote": "One letter, digit or emoji.",
+      "badgeNote": "Default: the next number that no profile uses (2, 3, 4, …). A letter or an emoji also works.",
       "chooseImage": "Choose a badge image…",
       "chooseFile": "Choose an icon file…",
-      "imageNote": "PNG, JPEG, WebP, SVG or ICNS.",
-      "fileNote": "ICNS or PNG, used as it is.",
+      "imageNote": "PNG, JPEG, WebP, SVG or ICNS. Orca puts it in the corner.",
+      "fileNote": "A 1024 × 1024 PNG or an ICNS file. It replaces the Orca icon; no badge.",
       "style": "Badge style",
       "styleRefMatch": "Page curl",
       "styleRefMatchBigger": "Page curl, bigger",
