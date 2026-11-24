@@ -40,10 +40,15 @@ let calls: string[][]
 /** The pid of the loaded serve service job, or null when launchctl knows no job. */
 let servicePid: number | null
 let failRegister: boolean
+/** For each `lsregister -f`: true when its bundle exists at that time. */
+let registeredBundleExists: boolean[] = []
 
 // Real ditto, plutil and cp; codesign, lsregister, launchctl, tccutil and security are recorded.
 const run: RunTool = (program, args) => {
   calls.push([program, ...args])
+  if (program.endsWith('lsregister') && args[0] === '-f') {
+    registeredBundleExists.push(existsSync(args[1]))
+  }
   if (program.endsWith('codesign')) {
     return args[0] === '-d' ? '<plist><dict/></plist>' : ''
   }
@@ -67,6 +72,7 @@ function file(path: string, content: string): void {
 }
 
 beforeEach(() => {
+  registeredBundleExists = []
   dir = mkdtempSync(join(tmpdir(), 'orca-profile-edit-'))
   app = join(dir, 'Orca.app')
   const contents = join(app, 'Contents')
@@ -593,5 +599,7 @@ describe.skipIf(process.platform !== 'darwin')('rename rolls back a failed unit 
       ['-u', newPath],
       ['-f', work.appPath]
     ])
+    // The old bundle is back before Launch Services registers it.
+    expect(registeredBundleExists.at(-1)).toBe(true)
   })
 })

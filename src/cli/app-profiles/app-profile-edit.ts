@@ -202,9 +202,10 @@ function renameLocked(
         }
         serveService = 'none'
       }
+      // Launch Services registers the bundle that exists: the old path, after the move back.
       tryRun(run, LSREGISTER, ['-u', newPath])
-      tryRun(run, LSREGISTER, ['-f', oldPath])
       renameSync(newPath, oldPath)
+      tryRun(run, LSREGISTER, ['-f', oldPath])
       throw failure
     }
   } finally {

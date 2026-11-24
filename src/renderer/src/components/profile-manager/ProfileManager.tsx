@@ -103,6 +103,11 @@ export function ProfileManager(): React.JSX.Element {
   useEffect(() => api?.onStartNew(() => setWantNew(true)), [api])
 
   useEffect(() => {
+    // The New dialog shows already: the request is done.
+    if (wantNew && form?.mode === 'new') {
+      setWantNew(false)
+      return
+    }
     // The defaults of the New dialog need the list. An open dialog keeps its input; New waits.
     if (wantNew && state && !form) {
       setWantNew(false)
