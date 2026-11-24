@@ -43,6 +43,7 @@ import { PREFLIGHT_METHODS } from './preflight/preflight'
 import { COMPUTER_METHODS } from './computer/computer'
 import { SESSION_TAB_METHODS } from './session-tabs/session-tabs'
 import { NATIVE_CHAT_METHODS } from './native-chat/native-chat'
+import { NATIVE_CHAT_MENTION_SESSION_METHODS } from './native-chat/native-chat-mention-sessions'
 import { FILE_METHODS } from './files/files'
 import { GIT_METHODS } from './source-control/git/git'
 import { GITHUB_METHODS } from './source-control/github/github'
@@ -222,6 +223,7 @@ const SERVICE_RPC_METHODS = [
   // Switch point: a window-owned build registers no layout command.
   ...(ORCA_LAYOUT_OWNER_IS_MAIN ? [...LAYOUT_APPLY_METHODS, ...LAYOUT_VIEW_REPORT_METHODS] : []),
   ...NATIVE_CHAT_METHODS,
+  ...NATIVE_CHAT_MENTION_SESSION_METHODS,
   ...FILE_METHODS,
   ...GIT_METHODS,
   ...GITHUB_METHODS,
