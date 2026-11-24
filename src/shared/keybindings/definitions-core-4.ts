@@ -5,6 +5,16 @@ const WINDOWS_LINUX_TOGGLE_BINDINGS = ['Mod+Shift+F11', 'Mod+Shift+J']
 
 export const KEYBINDING_DEFINITION_CORE_4: readonly KeybindingDefinition[] = [
   {
+    // Fork patch: Profiles > Profile Manager…, see docs/fork/profiles-design.md. Profiles are macOS only.
+    id: 'app.profileManager',
+    title: 'Open Profile Manager',
+    group: 'Global',
+    scope: 'global',
+    searchKeywords: ['shortcut', 'profiles', 'profile manager'],
+    defaultBindings: { darwin: ['Mod+Shift+P'], linux: [], win32: [] },
+    conflictGroup: 'menu'
+  },
+  {
     id: 'terminal.expandPane',
     title: 'Expand / collapse pane',
     group: 'Terminal Panes',
