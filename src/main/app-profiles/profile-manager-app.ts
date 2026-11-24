@@ -2,7 +2,7 @@
 // Profile Manager window. It starts no main window, runtime, agents, serve or updater, and takes
 // no profile lock. See docs/fork/profiles-design.md, section 4.
 import { join } from 'node:path'
-import { app, Menu } from 'electron'
+import { app, ipcMain, Menu } from 'electron'
 import {
   appProfilesRoot,
   PROFILE_MANAGER_APP_NAME,
@@ -41,6 +41,14 @@ export function runProfileManagerApp(): boolean {
   app.on('activate', openProfileManagerWindow)
   app.on('window-all-closed', () => app.quit())
   registerProfileManagerIpc()
+  // A renderer blocks on a sync call until it gets a reply. This mode loads no settings, so the
+  // window keeps the system theme. It has no browser guests to discard.
+  ipcMain.on('settings:get-sync', (event) => {
+    event.returnValue = null
+  })
+  ipcMain.on('browser:reserveGuestDiscard', (event) => {
+    event.returnValue = false
+  })
   void app.whenReady().then(() => {
     startProfilesMenu(applyMenu)
     openProfileManagerWindow()
