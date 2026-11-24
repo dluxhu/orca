@@ -588,7 +588,7 @@ counted).
 | Badge image | `Logo` (`sized`, `on_white`), `fill_holes`, `key_out_white` | about 45 | ref-match |
 | Curl | `grid`, `_paper`, `page_curl`, `st_ref_match` | 70 | ref-match |
 | Parameters and `.icns` | `style_params`, `write_icns` | about 35 | ref-match |
-| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | later, one style per change |
+| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | ported, except `sticker` (see below) |
 | Not ported | CLI, preview sheet, SVG rendering through cairo, `.app` and `.iconset` loading, the web UI server | about 110 | — |
 
 So `ref-match` needs about 300 lines of Python. Pillow and numpy give some parts that TypeScript
@@ -609,6 +609,19 @@ all 14 styles. Put the core in `src/shared/icon-badger/` (no Electron import), t
 I/O and the AppKit text badge in `src/cli/app-profiles/` (the CLI build keeps them; electron-vite
 replaces `out/main`). Keep the MIT
 notice of dock-icon-badger in the ported files.
+
+### Ported styles
+
+The port has 13 styles (`ICON_STYLES` in `src/shared/icon-badger/badger.ts`): `ref-match` (the
+default), `ref-match-bigger`, `white-tile`, `tint-tile`, `frosted`, `round`, `stamp`,
+`liquid-glass`, `page-curl`, `page-curl-small`, `gentle-curve`, `rolled-cylinder` and `round-peel`.
+Each one has a golden test against the tool's `web/thumbs/<style>.png`.
+
+**Known gap: `sticker`.** The port does not meet the limit with the PNG test badge: its badge size
+search picks a different die-cut box than the reference, which used the SVG badge. It meets the limit
+only with a position offset that the production code does not have. So `sticker` is not in
+`ICON_STYLES`. A badge from an SVG source can remove the difference; check that before the style is
+added.
 
 ### Tests against dock-icon-badger's own output
 
