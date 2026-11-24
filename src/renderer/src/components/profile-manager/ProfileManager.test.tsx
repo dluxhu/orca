@@ -235,7 +235,7 @@ describe('ProfileManager', () => {
 
   it('offers "Copy settings" only in an app that has settings, not in the Profile Manager app', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     expect(screen.getByLabelText('Copy settings from this app')).toBeTruthy()
     cleanup()
     appState = { ...appState, currentId: null }
