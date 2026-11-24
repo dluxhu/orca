@@ -32,7 +32,7 @@ export type AppProfileRow = {
 /** What makes a profile icon: a badge character, a badge image file or a full icon file. */
 export type AppProfileIconSource =
   // No text: the first free character (nextBadgeText).
-  | { kind: 'badge'; text?: string; style?: IconStyle }
+  | { kind: 'badge'; text?: string; style?: IconStyle; color?: string }
   | { kind: 'image'; path: string; style?: IconStyle }
   | { kind: 'file'; path: string }
 

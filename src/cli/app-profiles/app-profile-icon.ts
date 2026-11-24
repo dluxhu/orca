@@ -8,6 +8,7 @@ import { ICON_STYLES, renderBadgedIcon, type IconStyle } from '../../shared/icon
 import type { Img } from '../../shared/icon-badger/raster'
 import { decodePng, encodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
 import {
+  APP_PROFILE_BADGE_COLOR,
   APP_PROFILE_BADGE_FILE,
   APP_PROFILE_ICON_FILE,
   readPlistString,
@@ -33,7 +34,7 @@ export function isIconStyle(value: string): value is IconStyle {
   return (ICON_STYLES as readonly string[]).includes(value)
 }
 
-/** The icon of the `--icon-badge`, `--icon-style`, `--icon-image` and `--icon-file` flags. */
+/** The icon of the `--icon-badge`, `--icon-style`, `--icon-color`, `--icon-image` and `--icon-file` flags. */
 export function appProfileIconSourceFromFlags(
   value: (flag: string) => string | undefined
 ): AppProfileIconSource | undefined {
@@ -41,11 +42,18 @@ export function appProfileIconSourceFromFlags(
   const style = value('--icon-style')
   const image = value('--icon-image')
   const file = value('--icon-file')
+  const color = value('--icon-color')?.toLowerCase()
   if ([text, image, file].filter((v) => v !== undefined).length > 1) {
     throw new Error('Use only one of --icon-badge, --icon-image and --icon-file.')
   }
   if (style !== undefined && !isIconStyle(style)) {
     throw new Error(`--icon-style must be one of: ${ICON_STYLES.join(', ')}.`)
+  }
+  if (color !== undefined && !/^#[0-9a-f]{6}$/.test(color)) {
+    throw new Error('--icon-color must be #rrggbb, for example #2563eb.')
+  }
+  if (color !== undefined && text === undefined && (image ?? file) !== undefined) {
+    throw new Error('--icon-color applies only to a badge character.')
   }
   if (file !== undefined) {
     if (style !== undefined) {
@@ -56,8 +64,8 @@ export function appProfileIconSourceFromFlags(
   if (image !== undefined) {
     return { kind: 'image', path: resolve(image), style }
   }
-  if (text !== undefined || style !== undefined) {
-    return { kind: 'badge', text, style }
+  if (text !== undefined || style !== undefined || color !== undefined) {
+    return { kind: 'badge', text, style, ...(color ? { color } : {}) }
   }
   return undefined
 }
@@ -73,7 +81,7 @@ const graphemes = (text: string): number =>
 const APPKIT_RASTERIZER = `
 ObjC.import('AppKit')
 function run(argv) {
-  const [mode, value] = argv
+  const [mode, value, hex] = argv
   const size = 1024
   let rep = $.NSBitmapImageRep.alloc.initWithBitmapDataPlanesPixelsWidePixelsHighBitsPerSampleSamplesPerPixelHasAlphaIsPlanarColorSpaceNameBytesPerRowBitsPerPixel(null, size, size, 8, 4, true, false, $.NSDeviceRGBColorSpace, 0, 0)
   rep = rep.bitmapImageRepByRetaggingWithColorSpace($.NSColorSpace.sRGBColorSpace)
@@ -83,7 +91,8 @@ function run(argv) {
   $.NSGraphicsContext.setCurrentContext(context)
   if (mode === 'text') {
     const font = $.NSFont.systemFontOfSizeWeight(700, $.NSFontWeightHeavy)
-    const color = $.NSColor.colorWithSRGBRedGreenBlueAlpha(15 / 255, 23 / 255, 42 / 255, 1)
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    const color = $.NSColor.colorWithSRGBRedGreenBlueAlpha(r, g, b, 1)
     const attrs = $({ NSFont: font, NSColor: color })
     const text = $(value)
     const box = text.sizeWithAttributes(attrs)
@@ -101,15 +110,24 @@ function run(argv) {
 }
 `
 
-/** A 1024 x 1024 RGBA image of a text (the badge character) or of an image file. */
+/** A 1024 x 1024 RGBA image of a text (the badge character, in `color`) or of an image file. */
 export function rasterizeWithAppKit(
   mode: 'text' | 'file',
   value: string,
-  run: RunTool = runTool
+  run: RunTool = runTool,
+  color = APP_PROFILE_BADGE_COLOR
 ): Img {
   let out: string
   try {
-    out = run('/usr/bin/osascript', ['-l', 'JavaScript', '-e', APPKIT_RASTERIZER, mode, value])
+    out = run('/usr/bin/osascript', [
+      '-l',
+      'JavaScript',
+      '-e',
+      APPKIT_RASTERIZER,
+      mode,
+      value,
+      color
+    ])
   } catch (error) {
     // The tool error holds the whole script; give its stderr only.
     const stderr = String((error as { stderr?: unknown }).stderr ?? '').trim()
@@ -170,7 +188,7 @@ export function appProfileIconParts(
   const text = source.kind === 'badge' ? badgeTextOf(source, used) : ''
   const badge =
     source.kind === 'badge'
-      ? rasterizeWithAppKit('text', text, run)
+      ? rasterizeWithAppKit('text', text, run, source.color)
       : rasterizeWithAppKit('file', source.path, run)
   return { base: readAppIcon(defaultAppPath, run), badge, text }
 }
@@ -203,7 +221,8 @@ export function makeAppProfileIcon(
   const { base, badge, text } = appProfileIconParts(defaultAppPath, source, used, run)
   const img = renderBadgedIcon(base, badge, style)
   if (source.kind === 'badge') {
-    return { icns: writeIcns(img), icon: { kind: 'badge', text, style } }
+    const color = source.color ? { color: source.color } : {}
+    return { icns: writeIcns(img), icon: { kind: 'badge', text, style, ...color } }
   }
   return { icns: writeIcns(img), icon: { kind: 'image', style }, badgePng: encodePng(badge) }
 }
