@@ -1,7 +1,7 @@
 // App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
@@ -16,6 +16,11 @@ export const APP_PROFILE_PLIST_ROOT_KEY = 'OrcaAppProfilesRoot'
 export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
 /** The argument that makes an Orca app open its Profile Manager window. */
 export const PROFILE_MANAGER_ARG = '--orca-profile-manager'
+/** The Info.plist key and value that make a bundle the Profile Manager app. */
+export const APP_ROLE_PLIST_KEY = 'OrcaAppRole'
+export const PROFILE_MANAGER_ROLE = 'profile-manager'
+/** The Profile Manager app's userData folder in the profiles root. */
+export const PROFILE_MANAGER_USER_DATA = '.manager'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
@@ -36,6 +41,29 @@ export type AppProfileRegistry = {
   defaultPort?: number
   urlHandler: { mode: 'ask' } | { mode: 'profile'; profileId: string }
   profiles: AppProfileEntry[]
+}
+
+/**
+ * The name of the Profile Manager app. The build script
+ * config/scripts/desktop-distribution/macos/macos-profile-manager-app.cjs has its own copy of this
+ * name and of the role; its test checks that they agree.
+ */
+export const PROFILE_MANAGER_APP_NAME = 'Orca Profile Manager'
+
+/** The Profile Manager app inside a default app. The release build makes it. */
+export function profileManagerAppPath(defaultAppPath: string): string {
+  return join(defaultAppPath, 'Contents', 'Applications', `${PROFILE_MANAGER_APP_NAME}.app`)
+}
+
+/**
+ * True for the Profile Manager app: its Info.plist role, or its place in a default app. The place
+ * alone is enough, so a copy of Orca in that place never takes the default app's data.
+ */
+export function isProfileManagerBundle(plist: string | null, bundlePath: string): boolean {
+  return (
+    (plist !== null && readPlistString(plist, APP_ROLE_PLIST_KEY) === PROFILE_MANAGER_ROLE) ||
+    bundlePath === profileManagerAppPath(resolve(bundlePath, '..', '..', '..'))
+  )
 }
 
 export function appProfilesRoot(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
