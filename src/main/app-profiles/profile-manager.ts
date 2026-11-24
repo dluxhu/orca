@@ -163,17 +163,17 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
   }
 }
 
-/** Runs `action` on the app of the row `id`. The window sends only the id, never a path. */
-async function onAppOf(id: string, action: (appPath: string) => void): Promise<AppProfileReply> {
-  const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
-  if (!row) {
-    return { ok: false, error: { message: `No profile "${id}".` } }
+/** A handler that runs `action` on the app of a row id. The window sends the id, never a path. */
+const onAppOf =
+  (action: (appPath: string) => void) =>
+  async (id: string): Promise<AppProfileReply> => {
+    const row = (await readAppProfilesState()).rows.find((candidate) => candidate.id === id)
+    if (!row) {
+      return { ok: false, error: { message: `No profile "${id}".` } }
+    }
+    action(row.appPath)
+    return { ok: true, result: { appPath: row.appPath } }
   }
-  action(row.appPath)
-  return { ok: true, result: { appPath: row.appPath } }
-}
-
-export const openAppProfile = (id: string): Promise<AppProfileReply> => onAppOf(id, openApp)
 
 function fromProfileManager<T extends unknown[], R>(
   handler: (...args: T) => Promise<R>
@@ -198,11 +198,8 @@ export function registerProfileManagerIpc(): void {
     fromProfileManager(() => readAppProfilesState())
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
-  ipcMain.handle('appProfiles:open', fromProfileManager(openAppProfile))
-  ipcMain.handle(
-    'appProfiles:showInFinder',
-    fromProfileManager((id: string) => onAppOf(id, (appPath) => shell.showItemInFolder(appPath)))
-  )
+  ipcMain.handle('appProfiles:open', fromProfileManager(onAppOf(openApp)))
+  ipcMain.handle('appProfiles:showInFinder', fromProfileManager(onAppOf(shell.showItemInFolder)))
   // Settings in the main window changes only this app's own profile.
   const fromSettings =
     <T extends unknown[], R>(handler: (...args: T) => Promise<R>) =>
