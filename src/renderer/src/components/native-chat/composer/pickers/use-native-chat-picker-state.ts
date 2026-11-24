@@ -6,7 +6,6 @@ import {
 } from '../editor/native-chat-composer-input'
 import {
   useCallback,
-  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -34,7 +33,9 @@ import {
 import type { NativeChatPickerItem } from '../../../../../../shared/native-chat/input/composer/native-chat-picker-items'
 import { nativeChatPickerCommands } from '../../../../../../shared/native-chat/input/commands/native-chat-skill-visibility'
 import { useNativeChatSkills } from './use-native-chat-skills'
+import { completeNativeChatMention, type NativeChatMentionSession } from './native-chat-mentions'
 import { useNativeChatPreferredSuggestion } from './use-native-chat-preferred-suggestion'
+import { useNativeChatPickerOpenEvents } from './use-native-chat-picker-open-events'
 import { useNativeChatPickerDismissal } from './use-native-chat-picker-dismissal'
 import { nativeChatFileMentionToken } from './native-chat-file-mention-token'
 import { emitNativeChatPickerItemAccepted } from '@/components/native-chat/telemetry/native-chat-telemetry'
@@ -51,6 +52,8 @@ export type NativeChatPickerState = {
   /** `token` replaces the file-reference form, e.g. a room's `@Name`; with `from`, it replaces
    *  `from` to the caret wherever the menu is (a bot's chats filter on text with spaces). */
   completeMention: (path: string, token?: Parameters<typeof applyMention>[4], from?: number) => void
+  /** Puts a chat or terminal chip where the `@query` is. */
+  completeSessionMention: (session: NativeChatMentionSession) => void
   dismiss: (triggerKey: string) => void
   handleDraftOrCaretChange: (value: string, caret: number) => void
   /** Arrow-key highlight moves; a catalog refresh keeps the row they land on until the next edit. */
@@ -98,8 +101,6 @@ export function useNativeChatPickerState(args: {
     sessionSkills,
     commandAvailable,
     mentionNameMatches,
-    onPickerOpened,
-    onPickerDemand,
     skillsChecking = false,
     textareaRef,
     setDraft,
@@ -134,7 +135,6 @@ export function useNativeChatPickerState(args: {
   useNativeChatPickerContext(dismissalContext, () => {
     skillOriginRef.current = null
   })
-  const lastOpenKeyRef = useRef<string | null>(null)
   const derive = useCallback(
     (value: string, at: number, dismissedTriggerKey: string | null) =>
       deriveComposerAutocomplete(
@@ -176,23 +176,7 @@ export function useNativeChatPickerState(args: {
     setActiveSuggestion
   )
 
-  useEffect(() => {
-    if (autocomplete.mode !== 'slash') {
-      lastOpenKeyRef.current = null
-      return
-    }
-    const openKey = `${dismissalContext}:${autocomplete.triggerKey}`
-    if (lastOpenKeyRef.current !== openKey) {
-      lastOpenKeyRef.current = openKey
-      onPickerOpened?.()
-    }
-  }, [agent, autocomplete, dismissalContext, onPickerOpened])
-
-  const menuOpen = autocomplete.mode === 'slash'
-  useEffect(() => {
-    onPickerDemand?.(menuOpen)
-    return () => onPickerDemand?.(false)
-  }, [dismissalContext, menuOpen, onPickerDemand])
+  useNativeChatPickerOpenEvents(args, autocomplete, dismissalContext)
 
   // The editor may be ahead of this render when a key lands just before the pick.
   const liveDraft = useCallback((): [string, number] => {
@@ -252,6 +236,15 @@ export function useNativeChatPickerState(args: {
     [autocomplete, commitCompletion, liveDraft, mentionNameMatches, terminalTabId, textareaRef]
   )
 
+  const completeSessionMention = useCallback(
+    (session: NativeChatMentionSession) => {
+      if (!disabledRef.current && autocomplete.mode === 'mention') {
+        completeNativeChatMention(textareaRef.current, session, liveDraft(), commitCompletion)
+      }
+    },
+    [autocomplete, commitCompletion, liveDraft, textareaRef]
+  )
+
   const handleDraftOrCaretChange = useCallback(
     (value: string, nextCaret: number) => {
       const firstToken = value.split(/\s/, 1)[0] ?? ''
@@ -304,6 +297,7 @@ export function useNativeChatPickerState(args: {
     isPickedSkill,
     completeItem,
     completeMention,
+    completeSessionMention,
     dismiss,
     handleDraftOrCaretChange,
     navigateSuggestion
