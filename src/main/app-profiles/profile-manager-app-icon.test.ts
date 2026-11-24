@@ -59,36 +59,61 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true })
 })
 
+const width = (call: number): number => createFromBuffer.mock.calls[call][0].readUInt32BE(16)
+const defaultApp = (): { id: string; appPath: string; userDataPath: string } => ({
+  id: 'default',
+  appPath: app,
+  userDataPath: join(root, 'default-data')
+})
+const work = (): { id: string; appPath: string; userDataPath: string } => ({
+  id: 'work',
+  appPath: app,
+  userDataPath: join(root, 'work-data')
+})
+function writeKept(userDataPath: string, sizes: number[], time = Date.now()): void {
+  mkdirSync(userDataPath, { recursive: true })
+  writeFileSync(join(userDataPath, 'profile-icon.icns'), icns(sizes))
+  utimesSync(join(userDataPath, 'profile-icon.icns'), new Date(), new Date(time))
+}
+
 describe('appIcon', () => {
   it("uses the largest PNG of the bundle's own icon file", async () => {
     writeApp('AppIcon', [16, 64, 32])
     // A decoy at the default name: the plist names AppIcon.icns.
     writeFileSync(join(app, 'Contents', 'Resources', 'icon.icns'), icns([8]))
-    const icon = await appIcon(app)
+    const icon = await appIcon(defaultApp())
     const png = createFromBuffer.mock.calls[0][0]
-    expect(png.readUInt32BE(16)).toBe(64)
+    expect(width(0)).toBe(64)
     expect(icon?.list).toBe(`data:image/png;base64,${png.toString('base64')}`)
   })
 
-  it('reads the files again only when the icon file changes', async () => {
+  it('shows the icon that a profile keeps, and reads it again only when set-icon writes it', async () => {
     writeApp('icon', [32])
-    await appIcon(app)
-    await appIcon(app)
+    writeKept(work().userDataPath, [256], Date.now() - 60_000)
+    await appIcon(work())
+    await appIcon(work())
     expect(createFromBuffer).toHaveBeenCalledTimes(2)
-    // A set-icon writes a new file: a new mtime.
-    writeFileSync(join(app, 'Contents', 'Resources', 'icon.icns'), icns([128]))
-    utimesSync(
-      join(app, 'Contents', 'Resources', 'icon.icns'),
-      new Date(),
-      new Date(Date.now() + 5000)
-    )
-    await appIcon(app)
+    expect(width(0)).toBe(256)
+    // set-icon writes the kept copy again: a new mtime. The signed bundle does not change.
+    writeKept(work().userDataPath, [128])
+    await appIcon(work())
     expect(createFromBuffer).toHaveBeenCalledTimes(4)
-    expect(createFromBuffer.mock.calls[2][0].readUInt32BE(16)).toBe(128)
+    expect(width(2)).toBe(128)
+  })
+
+  it('takes the bundle icon without a kept icon; the default app never takes a kept one', async () => {
+    writeApp('icon', [32])
+    await appIcon(work())
+    expect(width(0)).toBe(32)
+    writeKept(defaultApp().userDataPath, [256])
+    createFromBuffer.mockClear()
+    await appIcon({ ...defaultApp(), appPath: app })
+    // The default app reads the same bundle file as before: the cached icon, no new read.
+    expect(createFromBuffer).not.toHaveBeenCalled()
   })
 
   it('gives no icon for a missing bundle, and the state has no entry for it', async () => {
-    expect(await appIcon(join(root, 'Gone.app'))).toBeNull()
+    expect(await appIcon({ ...work(), appPath: join(root, 'Gone.app') })).toBeNull()
     writeApp('icon', [32])
     const state = await withAppIcons({
       currentId: 'default',
