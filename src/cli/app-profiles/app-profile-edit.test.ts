@@ -28,6 +28,7 @@ import {
   env,
   registry,
   read,
+  deps,
   makeProfile,
   writeRuntimePid
 } from './app-profile-edit.test-support'
