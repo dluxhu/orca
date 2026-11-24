@@ -19,7 +19,7 @@ const h = vi.hoisted(() => ({
 vi.mock('electron', () => {
   class BrowserWindow {
     webContents = { send: vi.fn(), isLoadingMainFrame: vi.fn(() => false) }
-    constructor() {
+    constructor(public options: unknown) {
       h.shown++
       h.windows.push(this)
     }
@@ -31,7 +31,11 @@ vi.mock('electron', () => {
     loadFile = vi.fn(async () => {})
     loadURL = vi.fn(async () => {})
   }
-  return { app: { isPackaged: true }, BrowserWindow, nativeTheme: { shouldUseDarkColors: false } }
+  return {
+    app: { isPackaged: true, getAppPath: () => '/App/app.asar' },
+    BrowserWindow,
+    nativeTheme: { shouldUseDarkColors: false }
+  }
 })
 vi.mock('node:child_process', async (original) => ({
   ...(await original<typeof ChildProcess>()),
@@ -78,6 +82,17 @@ describe('New profile…', () => {
     openProfileManagerWindow({ startNew: true })
     expect(h.windows).toHaveLength(1)
     const [window] = h.windows
+    // From the app path, also when the bundler puts the module into a chunk.
+    expect(
+      (window as unknown as { options: { webPreferences: { preload: string } } }).options
+        .webPreferences.preload
+    ).toBe('/App/app.asar/out/preload/index.js')
+    expect(window.loadFile).toHaveBeenCalledWith(
+      '/App/app.asar/out/renderer/profile-manager.html',
+      {
+        hash: 'new'
+      }
+    )
     expect(window.loadFile).toHaveBeenCalledWith(expect.stringMatching(/profile-manager\.html$/), {
       hash: 'new'
     })
@@ -96,9 +111,7 @@ describe('New profile…', () => {
       hash: 'new'
     })
   })
-})
 
-describe('showProfileManager', () => {
   it('opens the Profile Manager app inside the default app, without -n', async () => {
     mkdirSync(managerApp(), { recursive: true })
     await showProfileManager()

@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
     setName: vi.fn(),
     requestSingleInstanceLock: vi.fn(),
     exit: vi.fn(),
+    dock: { hide: vi.fn() },
     quit: vi.fn(),
     on: vi.fn(),
     whenReady: vi.fn()
@@ -19,7 +20,8 @@ const h = vi.hoisted(() => ({
   setMenu: vi.fn(),
   registerIpc: vi.fn(),
   startMenu: vi.fn(),
-  openWindow: vi.fn()
+  openWindow: vi.fn(),
+  smoke: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -33,6 +35,10 @@ vi.mock('./profile-manager', () => ({
   profilesMenuItems: () => [{ label: 'Profile Manager…' }],
   registerProfileManagerIpc: h.registerIpc,
   startProfilesMenu: h.startMenu
+}))
+vi.mock('./profile-manager-smoke', () => ({
+  PROFILE_MANAGER_SMOKE_ENV: 'ORCA_PROFILE_MANAGER_SMOKE',
+  profileManagerSmoke: h.smoke
 }))
 vi.mock('./profile-manager-window', () => ({
   openProfileManagerWindow: h.openWindow,
@@ -163,6 +169,32 @@ describe('runProfileManagerApp', () => {
     }
     expect(reply('settings:get-sync')).toBeNull()
     expect(reply('browser:reserveGuestDiscard')).toBe(false)
+  })
+
+  it('in smoke mode, checks a hidden window with no Dock icon and exits with its result', async () => {
+    vi.stubEnv('ORCA_PROFILE_MANAGER_SMOKE', '1')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const window = { webContents: { getURL: () => 'file:///x/out/renderer/profile-manager.html#' } }
+    h.openWindow.mockReturnValue(window)
+    for (const [problem, code] of [
+      [null, 0],
+      ['load failed: -6 ERR_FILE_NOT_FOUND', 1]
+    ] as const) {
+      vi.clearAllMocks()
+      h.openWindow.mockReturnValue(window)
+      h.smoke.mockResolvedValue(problem)
+      runProfileManagerApp()
+      await h.ready
+      await vi.waitFor(() => expect(h.app.exit).toHaveBeenCalledWith(code))
+      expect(h.openWindow).toHaveBeenCalledWith({ hidden: true })
+      expect(h.app.dock.hide).toHaveBeenCalled()
+      expect(h.startMenu).not.toHaveBeenCalled()
+      expect(log).toHaveBeenLastCalledWith(
+        problem
+          ? `profile-manager-smoke: fail ${problem}`
+          : 'profile-manager-smoke: ok file:///x/out/renderer/profile-manager.html#'
+      )
+    }
   })
 
   it('exits when another Profile Manager runs', () => {

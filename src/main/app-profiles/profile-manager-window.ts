@@ -23,7 +23,9 @@ export function isProfileManagerRenderer(sender: WebContents): boolean {
 export const PROFILE_MANAGER_NEW_ARG = '--new-profile'
 
 /** Shows the one Profile Manager window of this app. `startNew` also opens the New dialog. */
-export function openProfileManagerWindow(options: { startNew?: boolean } = {}): void {
+export function openProfileManagerWindow(
+  options: { startNew?: boolean; hidden?: boolean } = {}
+): BrowserWindow {
   if (profileManagerWindow && !profileManagerWindow.isDestroyed()) {
     if (profileManagerWindow.isMinimized()) {
       profileManagerWindow.restore()
@@ -35,7 +37,7 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
     } else if (options.startNew) {
       profileManagerWindow.webContents.send('appProfiles:startNew')
     }
-    return
+    return profileManagerWindow
   }
   const window = new BrowserWindow({
     width: 900,
@@ -46,14 +48,16 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0a0a0a' : '#ffffff',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(app.getAppPath(), 'out', 'preload', 'index.js'),
       sandbox: true,
       webviewTag: false
     }
   })
   installPrivilegedWindowNavigationPolicy(window.webContents)
   profileManagerWindow = window
-  window.once('ready-to-show', () => window.show())
+  if (!options.hidden) {
+    window.once('ready-to-show', () => window.show())
+  }
   window.on('closed', () => {
     if (profileManagerWindow === window) {
       profileManagerWindow = null
@@ -61,13 +65,17 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
   })
   // A new window has no listener yet, so the URL hash asks for the New dialog.
   loadPage(window, options.startNew ? 'new' : '')
+  return window
 }
 
 function loadPage(window: BrowserWindow, hash: string): void {
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html#${hash}`)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'), { hash })
+    // From the app path, not from __dirname: the bundler can put this module into out/main/chunks.
+    void window.loadFile(join(app.getAppPath(), 'out', 'renderer', 'profile-manager.html'), {
+      hash
+    })
   }
 }
 
