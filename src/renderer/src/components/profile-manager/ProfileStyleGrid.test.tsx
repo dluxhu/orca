@@ -96,4 +96,21 @@ describe('ProfileStyleGrid', () => {
     expect(h.render).not.toHaveBeenCalled()
     expect(h.iconParts).not.toHaveBeenCalled()
   })
+
+  it('reads an image badge again on the next open: set-icon can write a new file at the same path', async () => {
+    const image = { kind: 'image' as const, path: '/data/work/profile-icon-badge.png' }
+    const first = render(
+      <ProfileStyleGrid value={{ ...image, style: 'stamp' }} style="stamp" onChange={() => {}} />
+    )
+    await waitFor(() => expect(h.render).toHaveBeenCalledTimes(ICON_STYLES.length))
+    first.unmount()
+    h.render.mockClear()
+    h.iconParts.mockClear()
+    render(
+      <ProfileStyleGrid value={{ ...image, style: 'stamp' }} style="stamp" onChange={() => {}} />
+    )
+    expect(tile('Stamp').querySelector('img')).toBeNull()
+    await waitFor(() => expect(h.render).toHaveBeenCalledTimes(ICON_STYLES.length))
+    expect(h.iconParts).toHaveBeenCalledTimes(1)
+  })
 })

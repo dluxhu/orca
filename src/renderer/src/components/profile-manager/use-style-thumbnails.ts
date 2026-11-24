@@ -24,6 +24,7 @@ function badgeInput(source: AppProfileIconSource): string | null {
 
 export function useStyleThumbnails(source: AppProfileIconSource, selected: IconStyle): Thumbnails {
   const key = badgeInput(source)
+  const reusable = source.kind === 'badge'
   const [thumbnails, setThumbnails] = useState<Thumbnails>({})
   const first = useRef(selected)
   const sourceRef = useRef(source)
@@ -78,8 +79,16 @@ export function useStyleThumbnails(source: AppProfileIconSource, selected: IconS
       // A new badge input or a closed dialog drops the work for this input at once.
       current = false
       stopThumbnails()
+      // An image file can change at the same path (set-icon writes the kept badge again), so
+      // only a badge character keeps its thumbnails and parts for the next open.
+      if (!reusable) {
+        done.delete(key)
+        if (parts?.key === key) {
+          parts = null
+        }
+      }
     }
-  }, [key])
+  }, [key, reusable])
 
   return thumbnails
 }

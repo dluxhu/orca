@@ -10,7 +10,10 @@ export const THUMBNAIL_PX = 96
 /** The two 1024 px inputs of a badged icon. */
 export type IconParts = { base: Img; badge: Img }
 
-export type ThumbnailMessage = { parts: IconParts } | { style: IconStyle }
+export type ThumbnailMessage = { parts: IconParts } | { style: IconStyle; id: number }
+
+/** The worker's reply to one style request, with the request id. */
+export type ThumbnailReply = { id: number } & ({ img: Img } | { error: string })
 
 export function styleThumbnail(parts: IconParts, style: IconStyle): Img {
   return resize(renderBadgedIcon(parts.base, parts.badge, style), THUMBNAIL_PX, THUMBNAIL_PX)
