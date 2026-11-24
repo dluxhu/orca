@@ -12,11 +12,13 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { AppProfileEntry } from '../../shared/app-profiles/app-profile-paths'
 import {
-  APP_PROFILE_ICON_FILE,
-  type AppProfileEntry
-} from '../../shared/app-profiles/app-profile-paths'
-import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
+  appIconFileName,
+  keepProfileIcon,
+  makeAppProfileIcon,
+  type AppProfileIconSource
+} from './app-profile-icon'
 import { LSREGISTER } from './app-profile-create'
 import { prepare, rootOf, updateEntry, type EditAppProfileOptions } from './app-profile-edit'
 import { withRegistryLockAsync } from './app-profile-registry'
@@ -85,9 +87,7 @@ export async function setAppProfileIcon(
     } finally {
       rmSync(temporary, { recursive: true, force: true })
     }
-    // The write must not follow a link in the data folder.
-    rmSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), { force: true })
-    writeFileSync(join(entry.userDataPath, APP_PROFILE_ICON_FILE), made.icns)
+    keepProfileIcon(entry.userDataPath, made)
     updateEntry(refreshed, (current) => ({
       ...current,
       profiles: current.profiles.map((profile) =>

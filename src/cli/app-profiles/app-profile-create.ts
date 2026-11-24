@@ -18,7 +18,6 @@ import {
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
-  APP_PROFILE_ICON_FILE,
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILE_SETTINGS_SEED,
@@ -41,7 +40,12 @@ import {
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
-import { appIconFileName, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
+import {
+  appIconFileName,
+  keepProfileIcon,
+  makeAppProfileIcon,
+  type AppProfileIconSource
+} from './app-profile-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
@@ -232,9 +236,7 @@ export function createAppProfile(
         // Kept data can hold a seed of an earlier create; this create copies no settings.
         rmSync(seed, { force: true })
       }
-      // Kept data can hold a link here; the write must not follow it.
-      rmSync(join(userDataPath, APP_PROFILE_ICON_FILE), { force: true })
-      writeFileSync(join(userDataPath, APP_PROFILE_ICON_FILE), made.icns)
+      keepProfileIcon(userDataPath, made)
       const entry: AppProfileEntry = {
         id,
         name,

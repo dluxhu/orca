@@ -554,6 +554,26 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     ])
   })
 
+  it('keeps an uploaded badge as PNG, so that the Edit form can start from it', async () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    const badge = join(work.userDataPath, 'profile-icon-badge.png')
+    // The source can be the kept badge itself: its bytes are read before the write.
+    const imageIcon = ((_app: string, source: { path: string }) => ({
+      icns: Buffer.from('icns image'),
+      icon: { kind: 'image', style: 'ref-match' },
+      badgePng: Buffer.from(`png of ${readFileSync(source.path, 'utf8')}`)
+    })) as never
+    writeFileSync(join(dir, 'logo.svg'), 'logo')
+    const image = (path: string) => ({ kind: 'image' as const, path })
+    await setAppProfileIcon('work', image(join(dir, 'logo.svg')), opts({ makeIcon: imageIcon }))
+    expect(read(badge)).toBe('png of logo')
+    await setAppProfileIcon('work', image(badge), opts({ makeIcon: imageIcon }))
+    expect(read(badge)).toBe('png of png of logo')
+    // A badge character has no badge image.
+    await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
+    expect(existsSync(badge)).toBe(false)
+  })
+
   it('refuses an unknown id and a profile that runs', async () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     await expect(setAppProfileIcon('home', { kind: 'badge' }, opts())).rejects.toThrow(
