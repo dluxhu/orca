@@ -151,6 +151,13 @@ export class StructuredAgentSessionAdapterRouter implements Adapter {
 
   confirmIdle = (id: string) => this.liveOwnerOrNull(id)?.confirmIdle?.(id)
 
+  /** Routed by agent: the chat has no live owner before it opens. */
+  turnOnRemoteControlAtOpen: NonNullable<Adapter['turnOnRemoteControlAtOpen']> = (input) =>
+    this.agents.registration(input.agent)?.adapter.turnOnRemoteControlAtOpen?.(input) ?? false
+
+  remoteControl: NonNullable<Adapter['remoteControl']> = (input) =>
+    this.liveOwnerOrNull(input.sessionId)?.remoteControl?.(input) ?? Promise.resolve(null)
+
   liveTurnId = (sessionId: string): string | null | undefined =>
     this.liveOwnerOrNull(sessionId)?.liveTurnId?.(sessionId)
 
