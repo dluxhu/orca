@@ -34,7 +34,7 @@ import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
-import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
+import { registerProfileIconIpc } from './profile-manager-icon'
 import { appIcons, withAppIcons, type AppIcon } from './profile-manager-app-icon'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
@@ -209,12 +209,7 @@ export function registerProfileManagerIpc(): void {
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(onAppOf(openApp)))
-  ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
-  ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
-    fromProfileManager(async () =>
-      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
-    )(event)
-  )
+  registerProfileIconIpc(fromProfileManager)
   ipcMain.handle('appProfiles:showInFinder', fromProfileManager(onAppOf(shell.showItemInFolder)))
   // Settings in the main window changes only this app's own profile.
   const fromSettings =

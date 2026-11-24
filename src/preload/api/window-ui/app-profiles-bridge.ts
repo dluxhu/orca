@@ -15,6 +15,9 @@ export const appProfilesApi = {
   /** The reply's result is `{ png: <base64 PNG>, icon }`. */
   iconPreview: (icon: AppProfileIconSource, id?: string | null): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:iconPreview', icon, id),
+  /** The reply's result is `{ base, badge }`: base64 PNGs at 1024 px. */
+  iconParts: (icon: AppProfileIconSource, id?: string | null): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:iconParts', icon, id),
   chooseIconFile: (kind: 'image' | 'file'): Promise<string | null> =>
     ipcRenderer.invoke('appProfiles:chooseIconFile', kind),
   showInFinder: (id: string): Promise<AppProfileReply> =>

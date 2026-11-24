@@ -1,6 +1,6 @@
 // The icon parts of the Profile Manager: the preview and the file choice.
 // See docs/fork/profiles-design.md, section 8.
-import { BrowserWindow, dialog, type WebContents } from 'electron'
+import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import type {
   AppProfileIconSource,
   AppProfileReply
@@ -20,6 +20,20 @@ export function previewAppProfileIcon(
   return runCli([
     'profiles',
     'icon-preview',
+    ...(id ? ['--id', id] : []),
+    ...appProfileIconFlags(icon),
+    '--json'
+  ])
+}
+
+/** The base icon and the badge image of a badge source, as base64 PNGs, for the style thumbnails. */
+export function appProfileIconParts(
+  icon: AppProfileIconSource,
+  id?: string | null
+): Promise<AppProfileReply> {
+  return runCli([
+    'profiles',
+    'icon-parts',
     ...(id ? ['--id', id] : []),
     ...appProfileIconFlags(icon),
     '--json'
@@ -51,4 +65,19 @@ export async function chooseAppProfileIconFile(
     ? dialog.showOpenDialog(parent, options)
     : dialog.showOpenDialog(options))
   return result.canceled ? null : (result.filePaths[0] ?? null)
+}
+
+/** The sender check of the Profile Manager IPC calls. */
+export type ProfileManagerGuard = <T extends unknown[], R>(
+  handler: (...args: T) => Promise<R>
+) => (event: IpcMainInvokeEvent, ...args: T) => Promise<R>
+
+export function registerProfileIconIpc(fromProfileManager: ProfileManagerGuard): void {
+  ipcMain.handle('appProfiles:iconPreview', fromProfileManager(previewAppProfileIcon))
+  ipcMain.handle('appProfiles:iconParts', fromProfileManager(appProfileIconParts))
+  ipcMain.handle('appProfiles:chooseIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
+    fromProfileManager(async () =>
+      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
+    )(event)
+  )
 }

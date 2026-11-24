@@ -244,6 +244,7 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:change',
       'appProfiles:open',
       'appProfiles:iconPreview',
+      'appProfiles:iconParts',
       'appProfiles:chooseIconFile',
       'appProfiles:showInFinder',
       'appProfiles:ownStartAtLogin',
@@ -259,6 +260,7 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:change',
       'appProfiles:open',
       'appProfiles:iconPreview',
+      'appProfiles:iconParts',
       'appProfiles:chooseIconFile',
       'appProfiles:showInFinder'
     ]) {

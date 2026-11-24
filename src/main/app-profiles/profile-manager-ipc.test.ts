@@ -160,6 +160,22 @@ describe('Profile Manager IPC', () => {
     ])
   })
 
+  it('gets the base icon and the badge image of a badge from the CLI, once per call', async () => {
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    h.stdout = '{"ok":true,"result":{"base":"QkFTRQ==","badge":"QkFER0U="}}'
+    const reply = await h.handlers.get('appProfiles:iconParts')?.(
+      manager,
+      { kind: 'badge', text: '3', style: 'stamp' },
+      null
+    )
+    expect(reply).toEqual({ ok: true, result: { base: 'QkFTRQ==', badge: 'QkFER0U=' } })
+    expect(h.execFileCalls.map((call) => call.args.slice(1))).toEqual([
+      ['profiles', 'icon-parts', '--icon-badge', '3', '--icon-style', 'stamp', '--json']
+    ])
+  })
+
   it('runs the CLI as Node with the name as one argument, without a shell', async () => {
     registerProfileManagerIpc()
     openProfileManagerWindow()

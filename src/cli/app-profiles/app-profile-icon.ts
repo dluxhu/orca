@@ -141,6 +141,40 @@ export function readAppIcon(appPath: string, run: RunTool = runTool): Img {
   return img && img.width === 1024 ? img : rasterizeWithAppKit('file', path, run)
 }
 
+/** The badge character of a badge source: its own, else the first free one. One visible character. */
+function badgeTextOf(
+  source: AppProfileIconSource & { kind: 'badge' },
+  used: readonly (AppProfileIcon | undefined)[]
+): string {
+  const text = source.text ?? nextBadgeText(used)
+  // One character: a wider badge does not fit under the curl (dock-icon-badger refuses it too).
+  if (/^[\p{C}\p{Z}]*$/u.test(text) || graphemes(text) !== 1) {
+    throw new Error(`A badge has one visible character: ${JSON.stringify(text)}`)
+  }
+  return text
+}
+
+/**
+ * The two inputs of a badged icon at 1024 px: the default app's icon and the badge image. The
+ * Profile Manager renders the style thumbnails from them.
+ */
+export function appProfileIconParts(
+  defaultAppPath: string,
+  source: AppProfileIconSource & { kind: 'badge' | 'image' },
+  used: readonly (AppProfileIcon | undefined)[] = [],
+  run: RunTool = runTool
+): { base: Img; badge: Img; text: string } {
+  if (source.kind === 'image' && !existsSync(source.path)) {
+    throw new Error(`No file ${source.path}`)
+  }
+  const text = source.kind === 'badge' ? badgeTextOf(source, used) : ''
+  const badge =
+    source.kind === 'badge'
+      ? rasterizeWithAppKit('text', text, run)
+      : rasterizeWithAppKit('file', source.path, run)
+  return { base: readAppIcon(defaultAppPath, run), badge, text }
+}
+
 /**
  * The .icns of a profile icon, and the registry `icon` field that describes it. `used` holds the
  * icons of the other profiles, for the default badge character.
@@ -151,15 +185,10 @@ export function makeAppProfileIcon(
   used: readonly (AppProfileIcon | undefined)[] = [],
   run: RunTool = runTool
 ): { icns: Buffer; icon: AppProfileIcon; badgePng?: Buffer } {
-  if (source.kind !== 'badge' && !existsSync(source.path)) {
-    throw new Error(`No file ${source.path}`)
-  }
-  const text = source.kind === 'badge' ? (source.text ?? nextBadgeText(used)) : ''
-  // One character: a wider badge does not fit under the curl (dock-icon-badger refuses it too).
-  if (source.kind === 'badge' && (/^[\p{C}\p{Z}]*$/u.test(text) || graphemes(text) !== 1)) {
-    throw new Error(`A badge has one visible character: ${JSON.stringify(text)}`)
-  }
   if (source.kind === 'file') {
+    if (!existsSync(source.path)) {
+      throw new Error(`No file ${source.path}`)
+    }
     const icns =
       extname(source.path).toLowerCase() === '.icns'
         ? readFileSync(source.path)
@@ -171,11 +200,8 @@ export function makeAppProfileIcon(
     return { icns, icon: { kind: 'file' } }
   }
   const style = source.style ?? 'ref-match'
-  const badge =
-    source.kind === 'badge'
-      ? rasterizeWithAppKit('text', text, run)
-      : rasterizeWithAppKit('file', source.path, run)
-  const img = renderBadgedIcon(readAppIcon(defaultAppPath, run), badge, style)
+  const { base, badge, text } = appProfileIconParts(defaultAppPath, source, used, run)
+  const img = renderBadgedIcon(base, badge, style)
   if (source.kind === 'badge') {
     return { icns: writeIcns(img), icon: { kind: 'badge', text, style } }
   }

@@ -9,6 +9,13 @@ import type {
 import { ICON_STYLES } from '../../../../shared/icon-badger/badger'
 import { PROFILE_STATE_POLL_MS, ProfileManager } from './ProfileManager'
 
+// ProfileStyleGrid.test.tsx covers the thumbnails.
+vi.mock('./profile-icon-thumbnail-client', () => ({
+  decodeParts: async () => ({}),
+  renderThumbnail: async () => 'data:image/png;base64,VEhVTUI=',
+  stopThumbnails: () => {}
+}))
+
 const row = (id: string, name: string, state: AppProfileRow['state'], port: number) => ({
   id,
   name,
@@ -60,6 +67,7 @@ beforeEach(() => {
         showInFinder,
         iconPreview,
         chooseIconFile,
+        iconParts: async () => ({ ok: true, result: { base: '', badge: '' } }),
         onStartNew
       }
     }

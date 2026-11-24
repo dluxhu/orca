@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useTranslate } from '@/i18n/use-translate'
-import { ICON_STYLES, type IconStyle } from '../../../../shared/icon-badger/badger'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
 import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile-paths'
 import {
@@ -13,6 +12,7 @@ import {
   APP_PROFILE_ICON_FILE
 } from '../../../../shared/app-profiles/app-profile-icon-files'
 import { Field } from './ProfileField'
+import { ProfileStyleGrid } from './ProfileStyleGrid'
 
 /** True when the choice is complete: a badge character, or a chosen file. */
 export function iconChoiceReady(icon: AppProfileIconSource): boolean {
@@ -44,8 +44,6 @@ function fileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-const smallCaps = 'text-xs font-semibold tracking-wide text-muted-foreground uppercase'
-
 export function ProfileIconPicker(props: {
   value: AppProfileIconSource
   onChange: (icon: AppProfileIconSource) => void
@@ -56,11 +54,6 @@ export function ProfileIconPicker(props: {
   const api = window.api.appProfiles
   const { value, onChange } = props
   const style = value.kind === 'file' ? undefined : (value.style ?? 'ref-match')
-  // A style without a name here shows its id.
-  const styleLabels: Partial<Record<string, string>> = {
-    'ref-match': t('profileManager.icon.styleRefMatch', 'Page curl'),
-    'ref-match-bigger': t('profileManager.icon.styleRefMatchBigger', 'Page curl, bigger')
-  }
   const choose = (kind: 'image' | 'file'): void => {
     void api?.chooseIconFile(kind).then((path) => {
       if (path) {
@@ -134,32 +127,12 @@ export function ProfileIconPicker(props: {
           </span>
         </div>
       )}
-      {style ? (
-        <>
-          <span id="profile-icon-style" className={smallCaps}>
-            {t('profileManager.icon.style', 'Badge style')}
-          </span>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
-            spacing={2}
-            className="flex-wrap"
-            aria-labelledby="profile-icon-style"
-            value={style}
-            onValueChange={(next) => {
-              if (value.kind !== 'file' && (ICON_STYLES as readonly string[]).includes(next)) {
-                onChange({ ...value, style: next as IconStyle })
-              }
-            }}
-          >
-            {ICON_STYLES.map((id) => (
-              <ToggleGroupItem key={id} value={id}>
-                {styleLabels[id] ?? id}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </>
+      {value.kind !== 'file' && style ? (
+        <ProfileStyleGrid
+          value={value}
+          style={style}
+          onChange={(next) => onChange({ ...value, style: next })}
+        />
       ) : null}
     </div>
   )
