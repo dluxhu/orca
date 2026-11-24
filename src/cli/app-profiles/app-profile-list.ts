@@ -28,6 +28,10 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { isProcessAlive } from './app-profile-registry'
+import { readOrcadInstanceLockRecord } from '../../main/orcad/instance-lock/orcad-instance-lock-record'
+
+// ORCAD_LOCK_FILE_NAME: that module brings the whole lock code.
+const ORCAD_LOCK_FILE = 'orcad.lock'
 
 export type AppProfileListDeps = {
   env?: NodeJS.ProcessEnv
@@ -73,56 +77,105 @@ function readRuntime(userDataPath: string): RuntimeMetadata | null {
   }
 }
 
-function runtimePid(userDataPath: string): number | null {
-  return readRuntime(userDataPath)?.pid ?? null
+/** Who owns the profile's runtime file. */
+export type RuntimeOwner =
+  /** No live process of this profile: a stale file, or a pid that another process took. */
+  | 'none'
+  | 'app'
+  /** A server of the profile that its own serve service did not start. */
+  | 'server'
+  /** The server of the profile's own serve service. */
+  | 'service'
+
+export type AppProfileRuntime = {
+  state: AppProfileState
+  owner: RuntimeOwner
+  /** The port of the owner's WebSocket listener, as pairing advertises it. */
+  livePort: number | null
 }
 
-/**
- * The port of the WebSocket listener of the profile's live runtime, as pairing advertises it.
- * A service started with --port listens there, not on the saved port.
- */
-export function readLiveRuntimePort(
-  userDataPath: string,
-  isAlive: (pid: number) => boolean = isProcessAlive
-): number | null {
-  const runtime = readRuntime(userDataPath)
-  if (!runtime || !isAlive(runtime.pid)) {
-    return null
+type ProcessRow = { ppid: number; command: string }
+
+async function readProcess(pid: number, run: ServeServiceRun): Promise<ProcessRow | null> {
+  const result = await run('/bin/ps', ['-o', 'ppid=,command=', '-p', String(pid)])
+  const match = result.code === 0 ? /^\s*(\d+)\s+(.+)$/s.exec(result.out) : null
+  return match ? { ppid: Number(match[1]), command: match[2].trim() } : null
+}
+
+// The service job is the server's supervisor: its parent, or a few levels up.
+const SERVICE_DEPTH = 3
+
+async function classifyOwner(
+  pid: number,
+  profile: { userDataPath: string; appPath: string },
+  servicePid: number | null,
+  run: ServeServiceRun
+): Promise<RuntimeOwner> {
+  const row = await readProcess(pid, run)
+  if (!row) {
+    return 'none'
   }
+  const lock = readOrcadInstanceLockRecord(join(profile.userDataPath, ORCAD_LOCK_FILE))
+  // An Electron serve takes the desktop role; only orcad holds the orcad role.
+  const orcad = lock?.pid === pid && lock.role !== 'desktop'
+  const command = ` ${row.command} `
+  const ours =
+    orcad ||
+    command.startsWith(` ${profile.appPath}/Contents/`) ||
+    command.includes(` --user-data-dir=${profile.userDataPath} `)
+  if (!ours) {
+    return 'none'
+  }
+  let current = pid
+  let parent: ProcessRow | null = row
+  for (let depth = 0; servicePid !== null && depth <= SERVICE_DEPTH; depth++) {
+    if (current === servicePid) {
+      return 'service'
+    }
+    if (!parent || parent.ppid <= 1) {
+      break
+    }
+    current = parent.ppid
+    parent = await readProcess(current, run)
+  }
+  // `orca serve` starts the Electron server with a --serve token (not --serve-port).
+  return orcad || command.includes(' --serve ') ? 'server' : 'app'
+}
+
+function webSocketPort(runtime: RuntimeMetadata): number | null {
   const endpoint = findTransport(runtime, 'websocket')?.endpoint ?? ''
   const port = Number(/:(\d+)$/.exec(endpoint)?.[1])
   return port > 0 ? port : null
 }
 
-/** `orca serve` starts the server as an Electron process with --serve. */
-async function isServeProcess(pid: number, run: ServeServiceRun): Promise<boolean> {
-  const result = await run('/bin/ps', ['-o', 'command=', '-p', String(pid)])
-  return result.code === 0 && / --serve(\s|$)/.test(result.out)
-}
-
 /**
- * "running": the profile app owns the profile's runtime.
- * "background": only a server runs: the serve service, or a server that another launch agent
- * or a terminal started. "stopped": neither runs.
+ * The owner of the profile's runtime, its state and its live port.
+ * "running": the profile app. "background": only a server runs: the serve service, or a server
+ * that another launch agent or a terminal started. "stopped": neither runs.
  */
-export async function readAppProfileState(
-  userDataPath: string,
+export async function readAppProfileRuntime(
+  profile: { userDataPath: string; appPath: string },
   isDefault: boolean,
   deps: AppProfileListDeps = {}
-): Promise<AppProfileState> {
+): Promise<AppProfileRuntime> {
   const isAlive = deps.isAlive ?? isProcessAlive
-  const { label } = serveServiceUnitOf(userDataPath, isDefault, deps.home ?? homedir())
+  const { label } = serveServiceUnitOf(profile.userDataPath, isDefault, deps.home ?? homedir())
   const run = deps.serviceRun ?? runServeServiceManager
   const servicePid = await readServeServicePid(label, {
     uid: deps.uid ?? process.getuid?.() ?? 0,
     run
   })
-  const pid = runtimePid(userDataPath)
-  if (pid !== null && isAlive(pid)) {
-    // A supervised service job is the supervisor; its child server owns the runtime.
-    return pid === servicePid || (await isServeProcess(pid, run)) ? 'background' : 'running'
+  const runtime = readRuntime(profile.userDataPath)
+  const owner =
+    runtime && isAlive(runtime.pid)
+      ? await classifyOwner(runtime.pid, profile, servicePid, run)
+      : 'none'
+  const serviceRuns = servicePid !== null && isAlive(servicePid)
+  return {
+    state: owner === 'app' ? 'running' : owner !== 'none' || serviceRuns ? 'background' : 'stopped',
+    owner,
+    livePort: runtime && owner !== 'none' ? webSocketPort(runtime) : null
   }
-  return servicePid !== null && isAlive(servicePid) ? 'background' : 'stopped'
 }
 
 /** The default app first, then the profiles in the registry order. */
@@ -157,11 +210,11 @@ export async function listAppProfiles(
   const home = options.home ?? homedir()
   return Promise.all(
     rows.map(async (row) => {
-      const livePort = readLiveRuntimePort(row.userDataPath, options.isAlive)
+      const { state, livePort } = await readAppProfileRuntime(row, row.id === 'default', options)
       return {
         ...row,
         ...(livePort === null ? {} : { livePort }),
-        state: await readAppProfileState(row.userDataPath, row.id === 'default', options),
+        state,
         startAtLogin: existsSync(
           serveServiceUnitOf(row.userDataPath, row.id === 'default', home).unitPath
         )

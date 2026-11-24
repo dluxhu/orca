@@ -1,4 +1,5 @@
 // The New profile and Edit dialogs of the Profile Manager: docs/fork/profiles-design.md, section 4.
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -22,6 +23,7 @@ import {
 } from '../../../../shared/app-profiles/app-profile-rules'
 import { Field } from './ProfileField'
 import { livePortText } from './ProfileRow'
+import { PortChangeConfirm } from './PortChangeConfirm'
 
 export type ProfileForm =
   | {
@@ -91,6 +93,10 @@ export function ProfileFormDialog(props: {
             ? [{ kind: 'start-at-login' as const, id: form.row.id, enabled: form.startAtLogin }]
             : [])
         ]
+  const serverRuns = form.mode === 'edit' && form.row.state === 'background'
+  const portChange = changes.find((change) => change.kind === 'set-port')
+  // A port change asks first, as in Settings.
+  const [confirmPort, setConfirmPort] = useState<number | null>(null)
   const kept = form.mode === 'new' && (props.state?.keptIds.includes(form.id) ?? false)
   const idNote = kept
     ? t(
@@ -166,13 +172,20 @@ export function ProfileFormDialog(props: {
               inputClassName="w-[120px]"
               label={t('profileManager.field.port', 'Server port')}
               value={form.port}
+              disabled={serverRuns}
               error={portError}
               note={[
                 t(
                   'profileManager.field.portNote',
                   "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
                 ),
-                form.mode === 'edit' ? livePortText(form.row, t) : null
+                form.mode === 'edit' ? livePortText(form.row, t) : null,
+                serverRuns
+                  ? t(
+                      'profileManager.field.portServerRuns',
+                      "Stop this profile's server to change its port."
+                    )
+                  : null
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -220,7 +233,7 @@ export function ProfileFormDialog(props: {
               disabled={
                 props.busy || changes.length === 0 || Boolean(nameError ?? idError ?? portError)
               }
-              onClick={() => props.onRun(changes)}
+              onClick={() => (portChange ? setConfirmPort(portChange.port) : props.onRun(changes))}
             >
               {form.mode === 'new'
                 ? t('profileManager.new.create', 'Create profile')
@@ -228,6 +241,16 @@ export function ProfileFormDialog(props: {
             </Button>
           </div>
         </DialogFooter>
+        {/* Inside the content, so that Radix keeps the Edit dialog open under it. */}
+        <PortChangeConfirm
+          port={confirmPort}
+          busy={props.busy}
+          onCancel={() => setConfirmPort(null)}
+          onConfirm={() => {
+            setConfirmPort(null)
+            props.onRun(changes)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

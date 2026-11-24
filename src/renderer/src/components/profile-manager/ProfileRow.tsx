@@ -18,12 +18,15 @@ function appName(appPath: string): string {
   return (appPath.split('/').pop() ?? appPath).replace(/\.app$/, '')
 }
 
-/** The port that the profile's server listens on, and the saved port when it differs. */
+/**
+ * The port that the profile's app or server listens on. For a server, also the saved port when
+ * it differs. The app does not use the saved port.
+ */
 export function livePortText(row: AppProfileRow, t: Translate): string | null {
   if (row.livePort === undefined) {
     return null
   }
-  return row.livePort === row.port
+  return row.livePort === row.port || row.state !== 'background'
     ? t('profileManager.port.running', 'Running on {{port}}', { port: row.livePort })
     : t(
         'profileManager.port.runningOther',

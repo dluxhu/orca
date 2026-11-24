@@ -1453,9 +1453,6 @@
         "label": "Port",
         "description": "The saved port of this profile's server. The server uses it at its next start.",
         "serverRuns": "Stop this profile's server to change its port.",
-        "confirmTitle": "Change the port to {{port}}?",
-        "confirmNote": "Paired servers will need to be re-paired.",
-        "confirm": "Change port",
         "error": "The port did not change: {{message}}"
       }
     },
@@ -30928,7 +30925,13 @@
       "idNote": "Made from the name. Use it as orca … --profile {{id}}. It does not change later.",
       "idKept": "A data folder for \"{{id}}\" exists. The new profile uses that data.",
       "port": "Server port",
-      "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
+      "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port.",
+      "portServerRuns": "Stop this profile's server to change its port."
+    },
+    "portConfirm": {
+      "title": "Change the port to {{port}}?",
+      "note": "Paired servers will need to be re-paired.",
+      "confirm": "Change port"
     },
     "port": {
       "saved": "Port {{port}}",

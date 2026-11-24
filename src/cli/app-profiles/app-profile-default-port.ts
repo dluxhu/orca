@@ -16,7 +16,7 @@ import {
   type EditAppProfileOptions,
   type ServeServiceChange
 } from './app-profile-edit'
-import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
+import { readAppProfileRuntime, serveServiceUnitOf } from './app-profile-list'
 import { withRegistryLockAsync, writeRegistry } from './app-profile-registry'
 
 export async function setDefaultAppPort(
@@ -48,20 +48,12 @@ export async function setDefaultAppPort(
     const uid = options.uid ?? process.getuid?.() ?? 0
     const serviceRun = options.serviceRun ?? runServeServiceManager
     const unit = serveServiceUnitOf(userDataPath, true, home)
-    const state = await readAppProfileState(userDataPath, true, {
-      home,
-      uid,
-      serviceRun,
-      isAlive: options.isAlive
-    })
-    if (state === 'background') {
-      await refuseOtherServer(unit.label, {
-        uid,
-        run: serviceRun,
-        name: 'Default',
-        action: 'edit'
-      })
-    }
+    const { owner } = await readAppProfileRuntime(
+      { userDataPath, appPath: registry.defaultAppPath },
+      true,
+      { home, uid, serviceRun, isAlive: options.isAlive }
+    )
+    refuseOtherServer(owner, 'Default', 'edit')
     const loaded = (await serviceRun('launchctl', ['print', `gui/${uid}/${unit.label}`])).code === 0
     const port = options.port
     const moved = movePort({ run: options.run ?? runTool, uid, unit, loaded, port }, () =>

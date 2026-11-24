@@ -62,10 +62,18 @@ const run: RunTool = (program, args) => {
   return execFileSync(program, args, { encoding: 'utf8' })
 }
 
-const serviceRun: ServeServiceRun = async (_program, args) =>
-  servicePid !== null && args[0] === 'print'
+/** The fake process table that `ps -o ppid=,command=` reads, by pid. */
+let processes: Map<number, string>
+
+const serviceRun: ServeServiceRun = async (program, args) => {
+  if (program === '/bin/ps') {
+    const row = processes.get(Number(args.at(-1)))
+    return row ? { code: 0, out: `${row}\n` } : { code: 1, out: '' }
+  }
+  return servicePid !== null && args[0] === 'print'
     ? { code: 0, out: `state = running\n\tpid = ${servicePid}\n` }
     : { code: 113, out: 'Could not find service' }
+}
 
 function file(path: string, content: string): void {
   mkdirSync(join(path, '..'), { recursive: true })
@@ -85,6 +93,7 @@ beforeEach(() => {
   file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
   calls = []
   servicePid = null
+  processes = new Map()
   failRegister = false
   vi.stubEnv('HOME', dir)
 })
@@ -111,8 +120,24 @@ function makeProfile(name = 'Orca - Work', id?: string) {
   return entry
 }
 
-function writeRuntimePid(userDataPath: string, pid: number): void {
-  writeFileSync(join(userDataPath, 'orca-runtime.json'), JSON.stringify({ pid }))
+/**
+ * A live process of the profile owns its runtime: its app, or its server with `args` '--serve'.
+ * `runtime`: more fields of orca-runtime.json.
+ */
+function writeRuntimePid(
+  userDataPath: string,
+  pid: number,
+  options: { args?: string; ppid?: number; runtime?: object } = {}
+): void {
+  writeFileSync(
+    join(userDataPath, 'orca-runtime.json'),
+    JSON.stringify({ pid, ...options.runtime })
+  )
+  const args = options.args ? ` ${options.args}` : ''
+  processes.set(
+    pid,
+    `${options.ppid ?? 1} /Apps/Orca.app/Contents/MacOS/Orca${args} --user-data-dir=${userDataPath}`
+  )
 }
 
 describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
@@ -155,13 +180,14 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
 
   it('refuses while a server that its own service did not start runs', async () => {
     const work = makeProfile()
-    writeRuntimePid(work.userDataPath, 4242)
-    const handStarted: ServeServiceRun = async (program) =>
-      program === '/bin/ps'
-        ? { code: 0, out: 'Orca --serve\n' }
-        : { code: 113, out: 'Could not find service' }
+    // The service job runs (pid 9), but the server that owns the runtime is not its child.
+    servicePid = 9
+    writeRuntimePid(work.userDataPath, 4242, { args: '--serve' })
+    await expect(renameAppProfile({ id: 'work', name: 'Job', ...deps() })).rejects.toThrow(
+      'Stop that server'
+    )
     await expect(
-      renameAppProfile({ id: 'work', name: 'Job', ...deps(), serviceRun: handStarted })
+      removeAppProfile({ id: 'work', keepData: true, trash: () => {}, ...deps() })
     ).rejects.toThrow('Stop that server')
     expect(existsSync(work.appPath)).toBe(true)
   })
@@ -463,10 +489,12 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       defaultAppPath: app,
       defaultUserDataPath: defaultUserData,
       ...deps(),
-      serviceRun: async (_program, args) =>
-        args[1].endsWith(serveServiceUnitOf(home.userDataPath, false, dir).label)
-          ? { code: 0, out: 'pid = 20' }
-          : { code: 113, out: '' }
+      serviceRun: async (program, args) =>
+        program === '/bin/ps'
+          ? serviceRun(program, args)
+          : args[1].endsWith(serveServiceUnitOf(home.userDataPath, false, dir).label)
+            ? { code: 0, out: 'pid = 20' }
+            : { code: 113, out: '' }
     })
     expect(rows.map((row) => row.startAtLogin)).toEqual([false, false, true, false])
     expect(rows.map((row) => [row.id, row.name, row.state])).toEqual([
@@ -477,64 +505,72 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     ])
   })
 
-  it('a supervised service and a server of another launch agent are in the background', async () => {
-    const work = makeProfile()
+  it('classifies the owner of each runtime from its process', async () => {
+    const work = makeProfile('Work')
     const home = makeProfile('Home')
     const client = makeProfile('Client')
-    // The service job is the supervisor (pid 9); the server that owns the runtime is its child.
-    writeRuntimePid(work.userDataPath, 10)
+    const flag = makeProfile('Flag')
+    const reused = makeProfile('Reused')
+    const stale = makeProfile('Stale')
+    // The service job (9) is the supervisor (11); its child server owns the runtime.
+    writeRuntimePid(work.userDataPath, 10, { args: '--serve', ppid: 11 })
+    processes.set(11, '9 /Apps/orca serve --supervise')
     // A launch agent with another label starts this server.
-    writeRuntimePid(home.userDataPath, 20)
+    writeRuntimePid(home.userDataPath, 20, { args: '--serve' })
     writeRuntimePid(client.userDataPath, 30)
-    const commands: Record<string, string> = {
-      '10': '/Apps/Orca - Work.app/Contents/MacOS/Orca --serve --port 6800\n',
-      '20': '/Apps/Home.app/Contents/MacOS/Orca --serve\n',
-      '30': '/Apps/Client.app/Contents/MacOS/Orca\n'
-    }
+    // --serve-port is no --serve token.
+    writeRuntimePid(flag.userDataPath, 40, { args: '--serve-port=6800' })
+    // Another process took the pid of an old runtime file.
+    writeRuntimePid(reused.userDataPath, 50)
+    processes.set(50, '1 /usr/bin/vim notes.txt')
+    // The pid of the runtime file is dead.
+    writeRuntimePid(stale.userDataPath, 60, {
+      runtime: { transports: [{ kind: 'websocket', endpoint: 'ws://0.0.0.0:6960' }] }
+    })
     const rows = await listAppProfiles({
       defaultAppPath: app,
       defaultUserDataPath: join(dir, 'default-data'),
       ...deps(),
+      isAlive: (pid) => pid !== 60,
       serviceRun: async (program, args) =>
-        program === '/bin/ps'
-          ? { code: 0, out: commands[args.at(-1) ?? ''] ?? '' }
-          : args[1].endsWith(serveServiceUnitOf(work.userDataPath, false, dir).label)
-            ? { code: 0, out: 'pid = 9' }
-            : { code: 113, out: '' }
+        program === '/bin/ps' ||
+        !args[1].endsWith(serveServiceUnitOf(work.userDataPath, false, dir).label)
+          ? serviceRun(program, args)
+          : { code: 0, out: 'pid = 9' }
     })
-    expect(rows.map((row) => [row.id, row.state])).toEqual([
-      ['default', 'stopped'],
-      ['work', 'background'],
-      ['home', 'background'],
-      ['client', 'running']
+    expect(rows.map((row) => [row.id, row.state, row.livePort])).toEqual([
+      ['default', 'stopped', undefined],
+      ['work', 'background', undefined],
+      ['home', 'background', undefined],
+      ['client', 'running', undefined],
+      ['flag', 'running', undefined],
+      ['reused', 'stopped', undefined],
+      ['stale', 'stopped', undefined]
     ])
   })
 
-  it("gives the port of the profile's live server, not the saved port", async () => {
+  it("gives the port of the profile's live app or server, not the saved port", async () => {
     const work = makeProfile()
     const home = makeProfile('Home')
     const client = makeProfile('Client')
-    const runtime = (userDataPath: string, pid: number, endpoint: string): void =>
-      writeFileSync(
-        join(userDataPath, 'orca-runtime.json'),
-        JSON.stringify({ pid, transports: [{ kind: 'websocket', endpoint }] })
-      )
-    // A service started with --port 6768 runs on that port, not on the saved 6800.
-    runtime(work.userDataPath, 10, 'ws://0.0.0.0:6768')
-    runtime(home.userDataPath, 20, 'ws://127.0.0.1:6832')
+    const ws = (endpoint: string) => ({ transports: [{ kind: 'websocket', endpoint }] })
+    // A server started with --port 6768 runs on that port, not on the saved 6800.
+    writeRuntimePid(work.userDataPath, 10, { args: '--serve', runtime: ws('ws://0.0.0.0:6768') })
+    // The app listens on its own port.
+    writeRuntimePid(home.userDataPath, 20, { runtime: ws('ws://127.0.0.1:6769') })
     // A file that a stopped server left gives no port.
-    runtime(client.userDataPath, 30, 'ws://0.0.0.0:6864')
+    writeRuntimePid(client.userDataPath, 30, { runtime: ws('ws://0.0.0.0:6864') })
     const rows = await listAppProfiles({
       defaultAppPath: app,
       defaultUserDataPath: join(dir, 'default-data'),
       ...deps(),
       isAlive: (pid) => pid !== 30
     })
-    expect(rows.map((row) => [row.id, row.port, row.livePort])).toEqual([
-      ['default', 6768, undefined],
-      ['work', 6800, 6768],
-      ['home', 6832, 6832],
-      ['client', 6864, undefined]
+    expect(rows.map((row) => [row.id, row.port, row.livePort, row.state])).toEqual([
+      ['default', 6768, undefined, 'stopped'],
+      ['work', 6800, 6768, 'background'],
+      ['home', 6832, 6769, 'running'],
+      ['client', 6864, undefined, 'stopped']
     ])
   })
 })
