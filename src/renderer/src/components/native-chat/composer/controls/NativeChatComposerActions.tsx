@@ -5,8 +5,13 @@ import { ArrowUp, CornerDownRight, ListEnd, Save, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslate } from '@/i18n/use-translate'
-import { getScreenSubmitShortcutLabel } from '@/lib/keyboard/screen-submit-shortcut'
+import {
+  getScreenSubmitAltShortcutLabel,
+  getScreenSubmitShortcutLabel
+} from '@/lib/keyboard/screen-submit-shortcut'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
+import { useAppStore } from '@/store'
+import { nativeChatSendsWithModEnter } from '../../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 import type { NativeChatFollowUpBehavior } from '../../../../../../shared/native-chat/input/composer/native-chat-follow-up-behavior'
 import type {
   SessionOptionDescriptor,
@@ -122,15 +127,20 @@ export const NativeChatComposerActions = memo(function NativeChatComposerActions
     }
   }
   const sendReason = stops ? null : (sendBlockedReason ?? null)
+  // While Cmd/Ctrl+Enter sends, the other way of sending is Cmd/Ctrl+Alt+Enter.
+  const sendWithModEnter = useAppStore((state) => nativeChatSendsWithModEnter(state.settings))
+  const alternateShortcut = sendWithModEnter
+    ? getScreenSubmitAltShortcutLabel()
+    : getScreenSubmitShortcutLabel()
   const sendHint =
     sendReason ??
     (!stops && alternateSend
       ? alternateSend === 'steer'
         ? t('components.native-chat.composer.alternateSteerHint', '{{shortcut}} to steer', {
-            shortcut: getScreenSubmitShortcutLabel()
+            shortcut: alternateShortcut
           })
         : t('components.native-chat.composer.alternateQueueHint', '{{shortcut}} to queue', {
-            shortcut: getScreenSubmitShortcutLabel()
+            shortcut: alternateShortcut
           })
       : null)
   const steerPreviewLabel =

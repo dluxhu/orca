@@ -11,8 +11,7 @@ import { NativeChatImageAttachmentPreview } from '../../attachments/chips/Native
 
 import { useNativeChatComposerDraftUnsaved } from '../../drafts/use-native-chat-draft-unsaved'
 import { useNativeChatComposerGlow } from '../../native-chat-composer-glow'
-import { nativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
-import { useTranslate } from '@/i18n/use-translate'
+import { useNativeChatComposerPlaceholder } from '../controls/native-chat-composer-placeholder'
 import { useLatestHandler } from '@/lib/use-latest-handler'
 import type { NativeChatComposerFieldProps } from '../../native-chat-composer-field-props'
 import { imeComposedSegment } from '@/lib/text-input/ime/ime-composed-segment'
@@ -82,7 +81,6 @@ export function NativeChatComposerField({
   workspaceFooter,
   sideChat
 }: NativeChatComposerFieldProps): React.JSX.Element {
-  const t = useTranslate()
   const draftNotSaved = useNativeChatComposerDraftUnsaved(draftScopeKey)
   const glowing = useNativeChatComposerGlow(draftScopeKey)
   const optionCount =
@@ -115,6 +113,15 @@ export function NativeChatComposerField({
   const editorSelect = useLatestHandler(onTextareaSelect)
   // An open picker takes Tab first, so the suggestion only shows and accepts while none is.
   const suggestion = autocomplete.mode === 'none' ? promptSuggestion : undefined
+  const placeholder = useNativeChatComposerPlaceholder({
+    hasPty,
+    canSend,
+    afterStop,
+    editing: editSession !== undefined,
+    goal: goalMode?.active === true,
+    hint: placeholderHint ?? suggestion ?? idleHint,
+    launchPrompt: launchPrompt?.placeholder
+  })
   const editorKeyDownCapture = useLatestHandler((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (
       !imeEnterGesture.ownsKeyDown(event) &&
@@ -273,21 +280,7 @@ export function NativeChatComposerField({
                   ? `${pickerListboxId}-option-${Math.min(activeSuggestion, optionCount - 1)}`
                   : undefined
               }
-              placeholder={
-                launchPrompt
-                  ? launchPrompt.placeholder
-                  : editSession
-                    ? t('components.native-chat.queuedMessages.editMessage', 'Edit message')
-                    : goalMode?.active
-                      ? t(
-                          'components.native-chat.goal.placeholder',
-                          'Describe your goal, define measurable outcomes for best results'
-                        )
-                      : (placeholderHint ??
-                        suggestion ??
-                        idleHint ??
-                        nativeChatComposerPlaceholder(hasPty, canSend, afterStop, t))
-              }
+              placeholder={placeholder}
               // Let layout handle wrapping and touch targets; scroll after eight lines (a launch prompt: one line growing to six) without JavaScript measurement.
               // An empty launch prompt also grows to fit a wrapping placeholder: a paragraph-wide float that keeps its height, with a zero-width margin box so the caret line stays put.
               className={cn(
