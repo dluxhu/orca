@@ -4,26 +4,17 @@
 // Ported from dock-icon-badger (https://github.com/dluxhu/dock-icon-badger), MIT License,
 // Copyright (c) 2026 Balazs Szabo. The functions keep the Python names, so a diff against
 // dock_icon_badger.py stays easy.
-import {
-  type Img,
-  alphaComposite,
-  channel,
-  fillPolygon,
-  minFilter,
-  newImg,
-  point,
-  putAlpha,
-  subtract
-} from './raster'
+import { type Img, alphaComposite, channel, fillPolygon, minFilter, newImg } from './raster'
 import { resize } from './resample'
 import { type Pt, clip, interp, linspace, pyRound, ss_, u8 } from './py'
-import { BODY } from './squircle'
 import { Logo } from './logo'
-import { APPLE_SHADOW, M, S, masks, normalizeIcon, shadow } from './normalize'
+import { APPLE_SHADOW, S, masks, normalizeIcon, shadow } from './normalize'
+import { CORNER, DD, R2, VV, bez, edgeRing, fromChannels, paper } from './helpers'
+import { stFrosted, stLiquidGlass, stRound, stTintTile, stWhiteTile } from './styles-tile'
+import { stStamp } from './styles-stamp'
+import { stPageCurl, stRolled } from './styles-curl'
 
 // ---------------------------------------------------------------- constants (dock_icon_badger.py)
-const CORNER = M + BODY
-
 export const ARC_MID = 0.522
 const FLAP_TIP = [0.974, -0.068] as const
 const FLAP_CTRL_UPPER = [0.821, 0.175] as const
@@ -41,52 +32,7 @@ const FLAP_EDGE = [0.12, 3] as const
 const OVERLAP = [0.08, 0.16] as const
 const LOGO_MAX = 0.62
 const LOGO_BODY_MARGIN = 41
-
-function bez(p0: Pt, p1: Pt, p2: Pt, n = 80): Pt[] {
-  return linspace(0, 1, n).map((t) => [
-    (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
-    (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]
-  ])
-}
-
-function edgeRing(mask: Img, op: number, w = 5): Img {
-  const e = subtract(mask, minFilter(mask, w))
-  const r = newImg(mask.width, mask.height, 4)
-  putAlpha(
-    r,
-    point(e, (v) => v * op)
-  )
-  return r
-}
-
-/** An RGBA image from per-pixel float channels, like `Image.fromarray(np.dstack(...).astype("uint8"))`. */
-function fromChannels(fn: (x: number, y: number) => [number, number, number, number]): Img {
-  const out = newImg(S, S, 4)
-  for (let y = 0; y < S; y++) {
-    for (let x = 0; x < S; x++) {
-      const v = fn(x, y)
-      const i = (y * S + x) * 4
-      for (let c = 0; c < 4; c++) {
-        out.data[i + c] = u8(v[c])
-      }
-    }
-  }
-  return out
-}
-
-// ---------------------------------------------------------------- page curls
-
-const R2 = Math.SQRT2
 const C = CORNER
-const DD = (x: number, y: number): number => (C - x + (C - y)) / R2
-const VV = (x: number, y: number): number => (x - y) / R2
-
-function paper(L: number, top: number, fall: number): Img {
-  return fromChannels((_, y) => {
-    const g = top - fall * clip((y - (C - L)) / L, 0, 1)
-    return [g, g, g + 2, 255]
-  })
-}
 
 /**
  * ref-match: concave page edge (circular arc) and teardrop flap; the badge tucked under the curl.
@@ -243,21 +189,51 @@ export function pageCurl(
 
 // ---------------------------------------------------------------- styles
 
-export const ICON_STYLES = ['ref-match', 'ref-match-bigger'] as const
+/** The style ids of dock-icon-badger. */
+export const ICON_STYLES = [
+  'ref-match',
+  'ref-match-bigger',
+  'white-tile',
+  'tint-tile',
+  'frosted',
+  'round',
+  'stamp',
+  'liquid-glass',
+  'page-curl',
+  'page-curl-small',
+  'gentle-curve',
+  'rolled-cylinder',
+  'round-peel'
+] as const
 export type IconStyle = (typeof ICON_STYLES)[number]
 
-const CURLS: Record<IconStyle, [number, number]> = {
-  'ref-match': [700, 0.78],
-  'ref-match-bigger': [760, 0.84]
+type Render = (icon: Img, flat: Img, logo: Logo, badgeHeight?: number) => Img
+const STYLES: Record<IconStyle, Render> = {
+  'ref-match': (_, flat, logo, h) => pageCurl(flat, logo, 700, 0.78, 0.04, h).img,
+  'ref-match-bigger': (_, flat, logo, h) => pageCurl(flat, logo, 760, 0.84, 0.04, h).img,
+  'white-tile': (icon, _, logo) => stWhiteTile(icon, logo),
+  'tint-tile': (icon, _, logo) => stTintTile(icon, logo),
+  frosted: (icon, _, logo) => stFrosted(icon, logo),
+  round: (icon, _, logo) => stRound(icon, logo),
+  stamp: (icon, _, logo) => stStamp(icon, logo),
+  'liquid-glass': (icon, _, logo) => stLiquidGlass(icon, logo),
+  'page-curl': (_, flat, logo) => stPageCurl(flat, logo, 'page-curl'),
+  'page-curl-small': (_, flat, logo) => stPageCurl(flat, logo, 'page-curl-small'),
+  'gentle-curve': (_, flat, logo, h) => stRolled(flat, logo, 'gentle-curve', h),
+  'rolled-cylinder': (_, flat, logo, h) => stRolled(flat, logo, 'rolled-cylinder', h),
+  'round-peel': (_, flat, logo, h) => stRolled(flat, logo, 'round-peel', h)
 }
 
-/** One badged icon, 1024 x 1024 RGBA. `app` is the app icon, `badge` the badge image. */
+/**
+ * One badged icon, 1024 x 1024 RGBA. `app` is the app icon, `badge` the badge image.
+ * `badgeHeight` fixes the badge height of the styles that search for it: ref-match and the rolled curls.
+ */
 export function renderBadgedIcon(
   app: Img,
   badge: Img,
   style: IconStyle = 'ref-match',
   badgeHeight?: number
 ): Img {
-  const [L, k] = CURLS[style]
-  return pageCurl(normalizeIcon(app).flat, new Logo(badge), L, k, 0.04, badgeHeight).img
+  const { icon, flat } = normalizeIcon(app)
+  return STYLES[style](icon, flat, new Logo(badge), badgeHeight)
 }
