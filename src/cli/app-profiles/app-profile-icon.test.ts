@@ -208,10 +208,20 @@ describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () =
       join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
       join(app, 'Contents', 'Resources', 'icon.icns')
     )
-    const made = makeAppProfileIcon(app, { kind: 'badge', color: '#2563eb' }, [
-      { kind: 'badge', text: '2', style: 'ref-match' }
-    ])
+    // The real tools, with their arguments kept: the badge drawing must get the colour.
+    const calls: string[][] = []
+    const run = (program: string, args: string[]): string => {
+      calls.push(args)
+      return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    }
+    const made = makeAppProfileIcon(
+      app,
+      { kind: 'badge', color: '#2563eb' },
+      [{ kind: 'badge', text: '2', style: 'ref-match' }],
+      run
+    )
     expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
+    expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
     const icns = join(dir, 'profile.icns')
     writeFileSync(icns, made.icns)
     execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
