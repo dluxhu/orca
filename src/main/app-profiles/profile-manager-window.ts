@@ -19,13 +19,19 @@ export function isProfileManagerRenderer(sender: WebContents): boolean {
   )
 }
 
-/** Shows the one Profile Manager window of this app. */
-export function openProfileManagerWindow(): void {
+/** The Profile Manager app argument that opens the New dialog. */
+export const PROFILE_MANAGER_NEW_ARG = '--new-profile'
+
+/** Shows the one Profile Manager window of this app. `startNew` also opens the New dialog. */
+export function openProfileManagerWindow(options: { startNew?: boolean } = {}): void {
   if (profileManagerWindow && !profileManagerWindow.isDestroyed()) {
     if (profileManagerWindow.isMinimized()) {
       profileManagerWindow.restore()
     }
     profileManagerWindow.focus()
+    if (options.startNew) {
+      profileManagerWindow.webContents.send('appProfiles:startNew')
+    }
     return
   }
   const window = new BrowserWindow({
@@ -50,16 +56,19 @@ export function openProfileManagerWindow(): void {
       profileManagerWindow = null
     }
   })
+  // A new window has no listener yet, so the URL hash asks for the New dialog.
+  const hash = options.startNew ? 'new' : ''
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html`)
+    void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}/profile-manager.html#${hash}`)
   } else {
-    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'))
+    void window.loadFile(join(__dirname, '../renderer/profile-manager.html'), { hash })
   }
 }
 
-/** Brings the app to the front, or starts it. */
-export function openApp(appPath: string): void {
-  execFile('/usr/bin/open', ['-a', appPath], (error) => {
+/** Brings the app to the front, or starts it. `args` start a new instance with them. */
+export function openApp(appPath: string, args: string[] = []): void {
+  const open = args.length > 0 ? ['-n', '-a', appPath, '--args', ...args] : ['-a', appPath]
+  execFile('/usr/bin/open', open, (error) => {
     if (error) {
       console.warn('[profiles] open failed:', error.message)
     }
@@ -70,17 +79,18 @@ export function openApp(appPath: string): void {
  * Opens the Profile Manager app, which `open` starts once and brings to the front after that.
  * This app's own window serves in the Manager app and where the build has no Manager app (dev).
  */
-export async function showProfileManager(): Promise<void> {
+export async function showProfileManager(options: { startNew?: boolean } = {}): Promise<void> {
   if (isProfileManagerApp()) {
-    openProfileManagerWindow()
+    openProfileManagerWindow(options)
     return
   }
   const managerApp = profileManagerAppPath(await ownDefaultAppPath())
   try {
     await access(managerApp)
   } catch {
-    openProfileManagerWindow()
+    openProfileManagerWindow(options)
     return
   }
-  openApp(managerApp)
+  // A running Manager app gets the argument through its single-instance lock (second-instance).
+  openApp(managerApp, options.startNew ? [PROFILE_MANAGER_NEW_ARG] : [])
 }

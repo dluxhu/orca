@@ -11,7 +11,7 @@ import {
 import { translateMain } from '../i18n/main-i18n'
 import { isProfileManagerApp } from './app-profile'
 import { profilesMenuItems, registerProfileManagerIpc, startProfilesMenu } from './profile-manager'
-import { openProfileManagerWindow } from './profile-manager-window'
+import { openProfileManagerWindow, PROFILE_MANAGER_NEW_ARG } from './profile-manager-window'
 
 function applyMenu(): void {
   Menu.setApplicationMenu(
@@ -37,8 +37,10 @@ export function runProfileManagerApp(): boolean {
     app.exit(0)
     return true
   }
-  app.on('second-instance', openProfileManagerWindow)
-  app.on('activate', openProfileManagerWindow)
+  app.on('second-instance', (_event, argv) =>
+    openProfileManagerWindow({ startNew: argv.includes(PROFILE_MANAGER_NEW_ARG) })
+  )
+  app.on('activate', () => openProfileManagerWindow())
   app.on('window-all-closed', () => app.quit())
   registerProfileManagerIpc()
   // A renderer blocks on a sync call until it gets a reply. This mode loads no settings, so the
@@ -51,7 +53,7 @@ export function runProfileManagerApp(): boolean {
   })
   void app.whenReady().then(() => {
     startProfilesMenu(applyMenu)
-    openProfileManagerWindow()
+    openProfileManagerWindow({ startNew: process.argv.includes(PROFILE_MANAGER_NEW_ARG) })
   })
   return true
 }

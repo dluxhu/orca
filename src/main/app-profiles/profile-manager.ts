@@ -314,7 +314,13 @@ export function profilesMenuItems(): MenuItemConstructorOptions[] {
       menuRows.filter((row) => row.id !== currentId)
     ),
     {
+      label: translateMain('menu.profileNew', 'New profile…'),
+      click: () => void showProfileManager({ startNew: true })
+    },
+    {
       label: translateMain('menu.profileManager', 'Profile Manager…'),
+      // No default Orca shortcut uses Shift+Cmd+P.
+      accelerator: 'CommandOrControl+Shift+P',
       click: () => void showProfileManager()
     }
   ]

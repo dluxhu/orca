@@ -23,6 +23,13 @@ const getState = vi.fn()
 const change = vi.fn()
 const open = vi.fn()
 const showInFinder = vi.fn()
+let startNew: (() => void) | null = null
+const onStartNew = (callback: () => void) => {
+  startNew = callback
+  return () => {
+    startNew = null
+  }
+}
 
 beforeEach(() => {
   appState = {
@@ -40,11 +47,12 @@ beforeEach(() => {
   showInFinder.mockReset().mockResolvedValue({ ok: true, result: {} })
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { appProfiles: { getState, change, open, showInFinder } }
+    value: { appProfiles: { getState, change, open, showInFinder, onStartNew } }
   })
 })
 
 afterEach(() => {
+  window.location.hash = ''
   cleanup()
   vi.useRealTimers()
 })
@@ -140,6 +148,22 @@ describe('ProfileManager', () => {
       })
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('opens the New dialog when the window starts with #new, after the list loads', async () => {
+    window.location.hash = '#new'
+    render(<ProfileManager />)
+    const dialog = await screen.findByRole('dialog', { name: 'New profile' })
+    // The defaults come from the loaded list: the next free port.
+    expect(within(dialog).getByLabelText<HTMLInputElement>('Server port').value).toBe('6864')
+  })
+
+  it('opens the New dialog on the Profiles > New profile… event of an open window', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => startNew?.())
+    expect(await screen.findByRole('dialog', { name: 'New profile' })).toBeTruthy()
   })
 
   it('refuses a taken id before it calls the CLI', async () => {
