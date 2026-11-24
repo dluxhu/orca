@@ -3,6 +3,7 @@ import type { Translate } from '../../../../i18n/mobile-i18n'
 export function nativeChatNoticeCopy(t: Translate) {
   return {
     compaction: t('chat.notice.compaction', 'Context compacted'),
+    compactionAutomatic: t('chat.notice.compactionAutomatic', 'Context compacted automatically'),
     contextCleared: t('chat.notice.contextCleared', 'Context cleared'),
     forkedFrom: t('chat.notice.forkedFrom', 'Forked from'),
     plan: t('chat.notice.plan', 'Plan'),

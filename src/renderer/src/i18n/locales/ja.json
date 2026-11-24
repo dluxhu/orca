@@ -20083,6 +20083,7 @@
       "notices": {
         "contextCleared": "コンテキストをクリアしました",
         "compaction": "圧縮されたコンテキスト",
+        "compactionAutomatic": "コンテキストを自動的に圧縮しました",
         "details": "詳細",
         "plan": "プラン",
         "historyRepaired": "このチャットの履歴の一部を読み込めませんでした。",
