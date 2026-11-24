@@ -13,6 +13,7 @@ import { DialogCancel } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
 import {
   appProfilePortError,
+  defaultAppPortError,
   type AppProfileReply,
   type OwnAppProfile
 } from '../../../../../shared/app-profiles/app-profile-rules'
@@ -82,23 +83,18 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
     })
   }
 
-  const isDefault = own.id === 'default'
-  const portReadOnly = isDefault
-    ? t('settings.general.profilePort.default', 'The default app always uses port {{port}}.', {
-        port: own.port
-      })
-    : own.serverRuns
-      ? t(
-          'settings.general.profilePort.serverRuns',
-          "Stop this profile's server to change its port."
-        )
-      : null
+  const portReadOnly = own.serverRuns
+    ? t('settings.general.profilePort.serverRuns', "Stop this profile's server to change its port.")
+    : null
+  const ruleError = (port: number): string | null =>
+    own.id === 'default'
+      ? defaultAppPortError(port, own.otherPorts, t)
+      : appProfilePortError(port, own.otherPorts, t, own.defaultPort)
   // A hand edit of profiles.json can give two profiles one port.
-  const savedClash = isDefault ? null : appProfilePortError(own.port, own.otherPorts, t)
-  const shownPortError = portError ?? savedClash
+  const shownPortError = portError ?? ruleError(own.port)
 
   const askPort = (port: number): void => {
-    const rule = appProfilePortError(port, own.otherPorts, t)
+    const rule = ruleError(port)
     if (rule) {
       setPortError(rule)
       setPortKey((key) => key + 1)

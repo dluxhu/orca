@@ -6,14 +6,20 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { StartAtLoginSetting } from './StartAtLoginSetting'
 
 let enabled: boolean
-let own: { id: string; port: number; otherPorts: number[]; serverRuns: boolean }
+let own: {
+  id: string
+  port: number
+  otherPorts: number[]
+  defaultPort: number
+  serverRuns: boolean
+}
 const setOwnStartAtLogin = vi.fn()
 const setOwnPort = vi.fn()
 const getOwnProfile = vi.fn(async () => ({ ...own, enabled }))
 
 beforeEach(() => {
   enabled = true
-  own = { id: 'work', port: 6800, otherPorts: [6832], serverRuns: false }
+  own = { id: 'work', port: 6800, otherPorts: [6832], defaultPort: 6768, serverRuns: false }
   setOwnPort.mockReset().mockImplementation(async (port: number) => {
     own = { ...own, port }
     return { ok: true, result: {} }
@@ -93,19 +99,41 @@ describe('StartAtLoginSetting', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('6768')
   })
 
-  it('keeps the port read-only while the server runs, and in the default app', async () => {
+  it('keeps the port read-only while the server runs', async () => {
     own = { ...own, serverRuns: true }
     show('')
     const port = await screen.findByRole('spinbutton', { name: 'Port' })
     expect((port as HTMLInputElement).disabled).toBe(true)
     expect(screen.getByText("Stop this profile's server to change its port.")).toBeTruthy()
-    cleanup()
-    own = { id: 'default', port: 6768, otherPorts: [6800], serverRuns: false }
+  })
+
+  it('the default app changes its port too, and refuses the saved port of a profile', async () => {
+    own = { id: 'default', port: 6768, otherPorts: [6800], defaultPort: 6768, serverRuns: false }
     show('')
-    expect(
-      ((await screen.findByRole('spinbutton', { name: 'Port' })) as HTMLInputElement).disabled
-    ).toBe(true)
-    expect(screen.getByText('The default app always uses port 6768.')).toBeTruthy()
+    const port = await screen.findByRole('spinbutton', { name: 'Port' })
+    expect((port as HTMLInputElement).disabled).toBe(false)
+    // Its own built-in port is no clash.
+    expect(screen.queryByRole('alert')).toBeNull()
+    fireEvent.change(port, { target: { value: '6800' } })
+    fireEvent.blur(port)
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Another profile saves the port 6800.'
+    )
+    // Next to a profile's port is fine for the default app.
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Port' }), {
+      target: { value: '6769' }
+    })
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Port' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Change port' })
+    )
+    await waitFor(() => expect(setOwnPort).toHaveBeenCalledWith(6769))
+  })
+
+  it("a profile's range check follows the default app's saved port", async () => {
+    own = { ...own, port: 6768, defaultPort: 6769 }
+    show('')
+    await screen.findByRole('spinbutton', { name: 'Port' })
     expect(screen.queryByRole('alert')).toBeNull()
   })
 

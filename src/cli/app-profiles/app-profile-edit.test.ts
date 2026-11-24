@@ -17,10 +17,11 @@ import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervis
 import { createAppProfile, type RunTool } from './app-profile-create'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
+import { setDefaultAppPort } from './app-profile-default-port'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
-import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
+import { locateAppProfileApp, savedAppPort } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -218,16 +219,63 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
 })
 
 describe.skipIf(process.platform !== 'darwin')('the default app', () => {
-  it('cannot be renamed, removed or get another port', async () => {
+  const defaultData = (): string => join(dir, 'default-data')
+
+  it('cannot be renamed or removed', async () => {
     makeProfile()
     for (const attempt of [
       () => renameAppProfile({ id: 'default', name: 'Job', ...deps() }),
-      () => removeAppProfile({ id: 'Default', keepData: false, trash: () => {}, ...deps() }),
-      () => setAppProfilePort({ id: 'default', port: 7000, ...deps() })
+      () => removeAppProfile({ id: 'Default', keepData: false, trash: () => {}, ...deps() })
     ]) {
       await expect(attempt()).rejects.toThrow('The default app is not a profile')
     }
     expect(calls).toEqual([])
+  })
+
+  it('saves its own port; a profile may then take the built-in 6768', async () => {
+    const work = makeProfile()
+    const result = await setDefaultAppPort({
+      port: 6769,
+      defaultUserDataPath: defaultData(),
+      ...deps()
+    })
+    expect(result).toMatchObject({ id: 'default', port: 6769, serveService: 'none' })
+    expect(JSON.parse(read(join(dir, 'data', 'profiles.json'))).defaultPort).toBe(6769)
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: defaultData(),
+      ...deps()
+    })
+    expect(rows[0]).toMatchObject({ id: 'default', port: 6769 })
+    expect(savedAppPort(defaultData(), env(), dir)).toBe(6769)
+    expect(savedAppPort(work.userDataPath, env(), dir)).toBe(6800)
+    // The default app's range follows its saved port.
+    await setAppProfilePort({ id: 'work', port: 6768, ...deps() })
+    expect(registry().profiles[0].port).toBe(6768)
+    // A profile keeps the saved ports of other profiles: no rewrite of its entry.
+    expect(JSON.parse(read(join(dir, 'data', 'profiles.json'))).defaultPort).toBe(6769)
+  })
+
+  it('refuses the saved port of a profile', async () => {
+    makeProfile()
+    await expect(
+      setDefaultAppPort({ port: 6800, defaultUserDataPath: defaultData(), ...deps() })
+    ).rejects.toThrow('Another profile saves the port 6800.')
+    expect(JSON.parse(read(join(dir, 'data', 'profiles.json'))).defaultPort).toBeUndefined()
+  })
+
+  it('moves its loaded Start at login service to the new port', async () => {
+    makeProfile()
+    const unit = serveServiceUnitOf(defaultData(), true, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6768</string>')
+    servicePid = 777
+    const result = await setDefaultAppPort({
+      port: 6769,
+      defaultUserDataPath: defaultData(),
+      ...deps()
+    })
+    expect(result.serveService).toBe('restarted')
+    expect(read(unit.unitPath)).toContain('<string>6769</string>')
   })
 })
 

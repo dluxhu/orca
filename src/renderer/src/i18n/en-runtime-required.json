@@ -3511,7 +3511,8 @@
       "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
-      "portRange": "The port must be 1024 to 65535: {{port}}"
+      "portRange": "The port must be 1024 to 65535: {{port}}",
+      "portTaken": "Another profile saves the port {{port}}."
     }
   },
   "plugins": {

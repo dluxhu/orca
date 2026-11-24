@@ -57,7 +57,8 @@ export function ProfileFormDialog(props: {
   const portError = appProfilePortError(
     Number(form.port),
     others.map((row) => row.port),
-    t
+    t,
+    props.state?.rows.find((row) => row.id === 'default')?.port
   )
   const idError =
     form.mode === 'new'

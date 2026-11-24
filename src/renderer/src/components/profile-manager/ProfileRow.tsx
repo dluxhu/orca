@@ -77,7 +77,8 @@ export function ProfileRow(props: {
   const { row } = props
   const isDefault = row.id === 'default'
   const name = isDefault ? appName(row.appPath) : row.name
-  const port = livePortText(row, t)
+  const port =
+    livePortText(row, t) ?? t('profileManager.port.saved', 'Port {{port}}', { port: row.port })
   return (
     <li className="flex flex-wrap items-center gap-4 px-4 py-3.5">
       <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
@@ -95,7 +96,7 @@ export function ProfileRow(props: {
           <code className="font-mono text-foreground/80">{row.id}</code>
           <span className="min-w-0 break-all">{row.appPath}</span>
         </div>
-        {port ? <p className="text-xs text-muted-foreground">{port}</p> : null}
+        <p className="text-xs text-muted-foreground">{port}</p>
       </div>
       <ProfileStatus state={row.state} />
       <div className="flex gap-2">

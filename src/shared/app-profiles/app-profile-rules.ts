@@ -1,8 +1,8 @@
 // Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
 
-// The default app uses 6768 and its fallback ladder up to 6799.
-const DEFAULT_APP_PORTS = { first: 6768, last: 6799 }
+/** The built-in port of the default app (DEFAULT_WS_PORT). profiles.json can save another. */
+export const DEFAULT_APP_PORT = 6768
 const PROFILE_PORT_BASE = 6800
 const PORT_SPACING = 32
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,31}$/
@@ -43,6 +43,8 @@ export type OwnAppProfile = {
   port: number
   /** The saved ports of the other profiles, without the default app. */
   otherPorts: number[]
+  /** The default app's saved port. */
+  defaultPort: number
   /** A server of the profile runs, so its port must not change now. */
   serverRuns: boolean
 }
@@ -131,17 +133,28 @@ export function appProfileNameError(
   return null
 }
 
-/** Null when the port is valid and outside the port range of the default app and of other profiles. */
+function portRangeError(port: number, t: RuleTranslate): string | null {
+  return !Number.isInteger(port) || port < 1024 || port > 65535
+    ? t('profileManager.rule.portRange', 'The port must be 1024 to 65535: {{port}}', { port })
+    : null
+}
+
+/**
+ * Null when the port is valid and outside the port range of the default app and of other profiles.
+ * The default app's range is its port and its fallback ladder of the next 31 ports.
+ */
 export function appProfilePortError(
   port: number,
   otherPorts: readonly number[],
-  t: RuleTranslate = english
+  t: RuleTranslate = english,
+  defaultPort = DEFAULT_APP_PORT
 ): string | null {
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-    return t('profileManager.rule.portRange', 'The port must be 1024 to 65535: {{port}}', { port })
+  const range = portRangeError(port, t)
+  if (range) {
+    return range
   }
   const clash =
-    (port >= DEFAULT_APP_PORTS.first && port <= DEFAULT_APP_PORTS.last) ||
+    (port >= defaultPort && port < defaultPort + PORT_SPACING) ||
     otherPorts.some((other) => Math.abs(other - port) < PORT_SPACING)
   return clash
     ? t(
@@ -150,6 +163,20 @@ export function appProfilePortError(
         { port }
       )
     : null
+}
+
+/** Null when the default app can save the port: valid, and no profile saves it. */
+export function defaultAppPortError(
+  port: number,
+  profilePorts: readonly number[],
+  t: RuleTranslate = english
+): string | null {
+  return (
+    portRangeError(port, t) ??
+    (profilePorts.includes(port)
+      ? t('profileManager.rule.portTaken', 'Another profile saves the port {{port}}.', { port })
+      : null)
+  )
 }
 
 /** The first port of the 6800, 6832, … series that no profile uses. */

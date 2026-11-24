@@ -40,7 +40,8 @@ function newForm(t: Translate, state: AppProfilesState | null): ProfileForm {
     name,
     id: appProfileIdFromName(name),
     idEdited: false,
-    port: String(nextAppProfilePort(profiles.map((row) => row.port))),
+    // The default app's row is in the list too: its port range is taken.
+    port: String(nextAppProfilePort(state?.rows.map((row) => row.port) ?? [])),
     copySettings: false
   }
 }

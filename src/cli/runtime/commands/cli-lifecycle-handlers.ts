@@ -12,6 +12,7 @@ import { resolveCliStatusCaller } from '../status/status-caller'
 import { getServeSuperviseValidationError } from '../serve/supervision/serve-supervised-service'
 import { getOptionalServePort } from './serve-port-flag'
 import { resolveLaunchUserDataPath } from '../profile/launch-user-data-path'
+import { savedAppPort } from '../../../shared/app-profiles/app-profile-paths'
 import { getServeOptionValidationError } from '../../../shared/remote-runtime/serve-supervisor/serve-option-validation'
 
 function envRecord(): Record<string, string> {
@@ -137,7 +138,9 @@ export const CORE_HANDLERS: Record<string, CommandHandler> = {
     if (validationError) {
       throw new RuntimeClientError('invalid_argument', validationError)
     }
-    const port = getOptionalServePort(flags)
+    // Without --port: the saved port of the profile, or of the default app.
+    const saved = flags.has('port') ? null : savedAppPort(resolveLaunchUserDataPath())
+    const port = getOptionalServePort(flags) ?? (saved === null ? null : String(saved))
     const pairingAddressValue = flags.get('pairing-address')
     reenterPackagedElectron()
     const exitCode = await serveOrcaApp({
