@@ -70,7 +70,23 @@ const openMore = (name: string): void => {
   })
 }
 
+/** Clicks "New profile" after the list loads: the dialog defaults need it. */
+const clickNew = async (): Promise<void> => {
+  await screen.findByText('Orca - Work')
+  fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+}
+
 describe('ProfileManager', () => {
+  it('offers New profile only after the list loads, so the defaults miss no profile', async () => {
+    let loaded: (state: AppProfilesState) => void = () => {}
+    getState.mockReturnValueOnce(new Promise((resolve) => (loaded = resolve)))
+    render(<ProfileManager />)
+    const button = screen.getByRole('button', { name: 'New profile' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    await act(async () => loaded(appState))
+    expect(button.disabled).toBe(false)
+  })
+
   it('lists every app with its state; Open opens it', async () => {
     render(<ProfileManager />)
     expect(await screen.findByText('Running in background')).toBeTruthy()
@@ -123,7 +139,7 @@ describe('ProfileManager', () => {
 
   it('makes the id from the name until the user edits the id, then creates the profile', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     const dialog = screen.getByRole('dialog', { name: 'New profile' })
     // A modal dialog: the list behind it is out of the accessibility tree.
     expect(screen.queryByRole('heading', { name: 'Your profiles' })).toBeNull()
@@ -168,7 +184,7 @@ describe('ProfileManager', () => {
 
   it('refuses a taken id before it calls the CLI', async () => {
     render(<ProfileManager />)
-    fireEvent.click(await screen.findByRole('button', { name: 'New profile' }))
+    await clickNew()
     type('Profile id', 'Work')
     expect(screen.getByRole('alert').textContent).toContain('exists')
     expect(
