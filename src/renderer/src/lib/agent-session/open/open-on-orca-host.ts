@@ -11,7 +11,7 @@ import {
 } from './activate-ai-vault-structured-session'
 import { openOrchestrationDispatch } from './open-agent-message-sender'
 
-// A link that cannot open says so in a short notice, not as an error.
+// A link that is gone or cannot open here says so in a short notice, not as an error.
 // A chat that does not open shows the shared chat open toast.
 const notice: StructuredSessionOpenFeedback = {
   unavailable: (agent, context) => showChatOpenUnavailable(context, agent),
