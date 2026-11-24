@@ -17,7 +17,9 @@ import { projectTurnItemHistory } from './history/structured-agent-session-turn-
 import { defineMethod } from '../../core'
 import {
   ensureStructuredHostInstalled as ensureHostInstalled,
+  clientReadsAndSendsOnly,
   requireInstalledStructuredHost as requireInstalledHost,
+  requireReadSendStructuredHost,
   requireStructuredCapability,
   requireStructuredCleanupHost,
   requireStructuredSessionHost as requireSessionHost,
@@ -170,7 +172,9 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
     permission: 'workspace',
     params: HistoryParams,
     handler: async (params, ctx) => {
-      const host = await requireInstalledHost(ctx, params.sessionId)
+      const host = clientReadsAndSendsOnly(ctx)
+        ? await requireReadSendStructuredHost(ctx, params.sessionId)
+        : await requireInstalledHost(ctx, params.sessionId)
       return projectReceiptDeviceHistory(
         projectTurnItemHistory(
           queuedImages.projectQueuedImageCardHistory(
