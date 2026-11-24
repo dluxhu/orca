@@ -15,6 +15,10 @@ try {
   // The system theme stays.
 }
 applyStartupAppTheme(settings)
+// The window follows a change of the system appearance.
+window
+  .matchMedia('(prefers-color-scheme: dark)')
+  .addEventListener('change', () => applyStartupAppTheme(settings))
 document.title = translate('profileManager.title', 'Orca Profile Manager')
 
 const rootElement = document.getElementById('root')
