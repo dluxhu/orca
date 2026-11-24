@@ -1,11 +1,12 @@
 // Settings of this app's own profile: Start at login and the saved port.
 // See docs/fork/profiles-design.md, section 4.
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import type {
-  AppProfileChange,
-  AppProfileReply,
-  AppProfilesState,
-  OwnAppProfile
+import {
+  DEFAULT_APP_PORT,
+  type AppProfileChange,
+  type AppProfileReply,
+  type AppProfilesState,
+  type OwnAppProfile
 } from '../../shared/app-profiles/app-profile-rules'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { isProfileManagerRenderer } from './profile-manager-window'
@@ -26,6 +27,7 @@ export function ownAppProfile({ rows, currentId }: AppProfilesState): OwnAppProf
     otherPorts: rows
       .filter((row) => row.id !== own.id && row.id !== 'default')
       .map((row) => row.port),
+    defaultPort: rows.find((row) => row.id === 'default')?.port ?? DEFAULT_APP_PORT,
     serverRuns: own.state === 'background'
   }
 }

@@ -214,8 +214,9 @@ describe('ProfileManager', () => {
       'Running on 6768 (saved port 6800). A server started with --port uses that port, not the saved port.'
     expect(within(rowOf('Orca')).getByText('Running on 6768')).toBeTruthy()
     expect(within(rowOf('Orca - Work')).getByText(other)).toBeTruthy()
-    // A stopped profile has no live port.
+    // A stopped profile shows its saved port.
     expect(within(rowOf('Orca - Home')).queryByText(/Running on/)).toBeNull()
+    expect(within(rowOf('Orca - Home')).getByText('Port 6832')).toBeTruthy()
     fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
     // The field keeps the saved port; its note tells the live one.
     expect(field('Server port').value).toBe('6800')

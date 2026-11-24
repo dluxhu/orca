@@ -9,7 +9,11 @@ import {
   readAppProfileRegistry,
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
-import type { AppProfileRow, AppProfileState } from '../../shared/app-profiles/app-profile-rules'
+import {
+  DEFAULT_APP_PORT,
+  type AppProfileRow,
+  type AppProfileState
+} from '../../shared/app-profiles/app-profile-rules'
 import {
   findTransport,
   getRuntimeMetadataPath,
@@ -24,9 +28,6 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { isProcessAlive } from './app-profile-registry'
-
-/** The default profile's port (DEFAULT_WS_PORT). */
-const DEFAULT_APP_PORT = 6768
 
 export type AppProfileListDeps = {
   env?: NodeJS.ProcessEnv
@@ -139,7 +140,7 @@ export async function listAppProfiles(
       name: 'Default',
       appPath: defaultAppPath,
       userDataPath: options.defaultUserDataPath,
-      port: DEFAULT_APP_PORT
+      port: registry?.defaultPort ?? DEFAULT_APP_PORT
     },
     ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => {
       // A rename in Finder changes only the file name; the app shows that name.

@@ -33,6 +33,7 @@ import {
 } from '../../shared/app-profiles/app-profile-paths'
 import {
   appProfileIdError,
+  DEFAULT_APP_PORT,
   appProfileIdFromName,
   appProfileNameError,
   appProfilePortError,
@@ -95,7 +96,8 @@ export function createAppProfile(
       profiles: []
     }
     const ports = registry.profiles.map((profile) => profile.port)
-    const port = options.port ?? nextAppProfilePort(ports)
+    const port =
+      options.port ?? nextAppProfilePort([...ports, registry.defaultPort ?? DEFAULT_APP_PORT])
     const error =
       appProfileNameError(
         name,
@@ -105,7 +107,7 @@ export function createAppProfile(
         id,
         registry.profiles.map((profile) => profile.id)
       ) ??
-      appProfilePortError(port, ports)
+      appProfilePortError(port, ports, undefined, registry.defaultPort)
     if (error) {
       throw new RuntimeClientError('invalid_argument', error)
     }

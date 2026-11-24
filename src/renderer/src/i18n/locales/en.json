@@ -1452,7 +1452,6 @@
       "profilePort": {
         "label": "Port",
         "description": "The saved port of this profile's server. The server uses it at its next start.",
-        "default": "The default app always uses port {{port}}.",
         "serverRuns": "Stop this profile's server to change its port.",
         "confirmTitle": "Change the port to {{port}}?",
         "confirmNote": "Paired servers will need to be re-paired.",
@@ -30932,6 +30931,7 @@
       "portNote": "This profile's server and remote devices use this port. Each profile has its own. Default: the next free port."
     },
     "port": {
+      "saved": "Port {{port}}",
       "running": "Running on {{port}}",
       "runningOther": "Running on {{port}} (saved port {{saved}}). A server started with --port uses that port, not the saved port."
     },
@@ -30964,7 +30964,8 @@
       "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
       "portRange": "The port must be 1024 to 65535: {{port}}",
-      "portClash": "The port {{port}} is inside the port range of the default app or of another profile."
+      "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
+      "portTaken": "Another profile saves the port {{port}}."
     },
     "startAtLogin": "Start at login",
     "defaultName": "Default"
