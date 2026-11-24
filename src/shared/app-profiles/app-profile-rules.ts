@@ -25,8 +25,8 @@ export type AppProfileRow = {
 /** What the Profile Manager window gets from the main process. */
 export type AppProfilesState = {
   rows: AppProfileRow[]
-  /** The id of the app that shows the Profile Manager. */
-  currentId: string
+  /** The id of the app that shows the Profile Manager. Null in the Profile Manager app. */
+  currentId: string | null
   /** Ids of data folders that "Keep data" left. A new profile with such an id uses the folder. */
   keptIds: string[]
 }

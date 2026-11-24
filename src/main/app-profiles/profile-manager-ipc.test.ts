@@ -67,7 +67,11 @@ vi.mock('../ipc/ui', () => ({
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
-vi.mock('./app-profile', () => ({ getAppProfile: () => h.profile }))
+vi.mock('./app-profile', () => ({
+  getAppProfile: () => h.profile,
+  isProfileManagerApp: () => false,
+  ownDefaultAppPath: async () => '/apps/Orca.app'
+}))
 vi.mock('../window/security/privileged-window-navigation', () => ({
   installPrivilegedWindowNavigationPolicy: vi.fn()
 }))

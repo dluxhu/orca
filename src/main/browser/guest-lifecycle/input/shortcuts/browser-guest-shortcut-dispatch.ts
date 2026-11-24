@@ -12,7 +12,7 @@ import type { BrowserPageTabShortcut } from '../../../../../shared/browser/guest
 import type { ResolveRenderer } from '../../browser-guest-renderer-target'
 import { matchesGuestTabShortcut } from './browser-guest-tab-shortcut'
 import { textInputOwnsComposition } from '../../../../../shared/keybindings/text-input-shortcut-policy'
-import { openProfileManagerWindow } from '../../../../app-profiles/profile-manager-window'
+import { showProfileManager } from '../../../../app-profiles/profile-manager-window'
 
 export type ShouldForwardDictationShortcut = () => boolean
 export type IsMobileEmulatorEnabled = () => boolean
@@ -220,7 +220,7 @@ export function forwardGuestShortcutInput(
   } else if (action?.type === 'openSettings') {
     renderer.send('ui:openSettings')
   } else if (action?.type === 'openProfileManager') {
-    openProfileManagerWindow()
+    void showProfileManager()
   } else if (action?.type === 'forceReload') {
     renderer.reloadIgnoringCache()
   } else if (action?.type === 'jumpToWorktreeIndex') {

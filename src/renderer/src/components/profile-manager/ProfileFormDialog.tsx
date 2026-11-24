@@ -173,7 +173,8 @@ export function ProfileFormDialog(props: {
         </div>
         {props.alert ? <div className="px-6 pb-4">{props.alert}</div> : null}
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 border-t px-6 py-4 sm:justify-between">
-          {form.mode === 'new' ? (
+          {/* The Profile Manager app has no settings of its own to copy. */}
+          {form.mode === 'new' && props.state?.currentId !== null ? (
             <div className="flex items-center gap-2">
               <Checkbox
                 id="profile-copy-settings"

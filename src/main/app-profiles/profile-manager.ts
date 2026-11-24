@@ -4,7 +4,7 @@
 import { mkdirSync, watch } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import {
   app,
   ipcMain,
@@ -31,25 +31,27 @@ import {
 import { translateMain } from '../i18n/main-i18n'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { mainProcessState as state } from '../startup/main-process-state'
-import { getAppProfile } from './app-profile'
+import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
-import {
-  isProfileManagerRenderer,
-  openApp,
-  openProfileManagerWindow
-} from './profile-manager-window'
+import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
+
+/** The id of this app's row: null in the Profile Manager app, which is no row. */
+function currentAppId(): string | null {
+  return isProfileManagerApp() ? null : (getAppProfile()?.id ?? 'default')
+}
 
 export async function readAppProfilesState(
   options: { serviceRun?: ServeServiceRun } = {}
 ): Promise<AppProfilesState> {
-  const profile = getAppProfile()
+  const currentId = currentAppId()
   const rows = await listAppProfiles({
     env: profilesEnv(),
     serviceRun: options.serviceRun,
-    // Without profiles.json there are no profiles, and this app is the default app.
-    defaultAppPath: resolve(process.execPath, '..', '..', '..'),
+    // Used when there is no profiles.json yet.
+    defaultAppPath: await ownDefaultAppPath(),
     // The default app's userData, as the CLI's getPlatformUserDataPath gives it on macOS.
-    defaultUserDataPath: profile ? join(app.getPath('appData'), 'orca') : app.getPath('userData')
+    defaultUserDataPath:
+      currentId === 'default' ? app.getPath('userData') : join(app.getPath('appData'), 'orca')
   })
   const taken = new Set(rows.map((row) => row.id.toLowerCase()))
   const root = profilesRoot()
@@ -67,7 +69,7 @@ export async function readAppProfilesState(
       marker.toLowerCase() === names[index].toLowerCase() &&
       !taken.has(marker.toLowerCase())
   )
-  return { rows, currentId: profile?.id ?? 'default', keptIds }
+  return { rows, currentId, keptIds }
 }
 
 /** Where a "Start at login" service runs: the profile's port and the default app's stable `orca`. */
@@ -189,7 +191,9 @@ function fromProfileManager<T extends unknown[], R>(
 /** "Start at login" of this app's own profile, as Settings shows it. */
 export async function readOwnStartAtLogin(): Promise<{ id: string; enabled: boolean }> {
   const { rows, currentId } = await readAppProfilesState()
-  return { id: currentId, enabled: rows.find((row) => row.id === currentId)?.startAtLogin === true }
+  // The Profile Manager app has no Settings, so a null id does not come here.
+  const id = currentId ?? 'default'
+  return { id, enabled: rows.find((row) => row.id === id)?.startAtLogin === true }
 }
 
 export function registerProfileManagerIpc(): void {
@@ -286,7 +290,7 @@ export function startProfilesMenu(rebuild: () => void): void {
  * shown as a hint. Without it (the Profile Manager app has no keybindings), a native accelerator.
  */
 export function profilesMenuItems(managerShortcut?: string): MenuItemConstructorOptions[] {
-  const currentId = getAppProfile()?.id ?? 'default'
+  const currentId = currentAppId()
   const stateLabel = {
     running: translateMain('menu.profileRunning', 'Running'),
     background: translateMain('menu.profileBackground', 'Running in background'),
@@ -312,12 +316,12 @@ export function profilesMenuItems(managerShortcut?: string): MenuItemConstructor
     ),
     {
       label: translateMain('menu.profileNew', 'New profile…'),
-      click: () => openProfileManagerWindow({ startNew: true })
+      click: () => void showProfileManager({ startNew: true })
     },
     {
       label: `${translateMain('menu.profileManager', 'Profile Manager…')}${managerShortcut ? `\t${managerShortcut}` : ''}`,
       ...(managerShortcut === undefined ? { accelerator: 'CommandOrControl+Shift+P' } : {}),
-      click: () => openProfileManagerWindow()
+      click: () => void showProfileManager()
     }
   ]
 }
