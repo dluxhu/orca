@@ -30,6 +30,7 @@ vi.mock('electron', () => {
   return {
     app: { isPackaged: true, getPath: () => '/default-data', on: vi.fn() },
     BrowserWindow,
+    shell: { showItemInFolder: vi.fn() },
     nativeTheme: { shouldUseDarkColors: false },
     ipcMain: {
       handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
