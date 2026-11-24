@@ -57,21 +57,33 @@ export function ProfileManager(): React.JSX.Element {
   const [form, setForm] = useState<Form | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [readError, setReadError] = useState<string | null>(null)
   // Profiles > New profile…: the URL hash of a new window, or an event to the open window.
   const [wantNew, setWantNew] = useState(() => window.location.hash === '#new')
   const loading = useRef(false)
+  const again = useRef(false)
 
-  const load = useCallback(async () => {
+  /** The one read of the list. A call during a read asks for one more read after it. */
+  const load = useCallback(async (): Promise<void> => {
     if (!api) {
       return
     }
+    if (loading.current) {
+      again.current = true
+      return
+    }
     loading.current = true
-    await api
-      .getState()
-      .then(setState)
-      .finally(() => {
-        loading.current = false
-      })
+    do {
+      again.current = false
+      await api.getState().then(
+        (next) => {
+          setState(next)
+          setReadError(null)
+        },
+        (error: unknown) => setReadError(error instanceof Error ? error.message : String(error))
+      )
+    } while (again.current)
+    loading.current = false
   }, [api])
 
   useEffect(() => {
@@ -79,8 +91,7 @@ export function ProfileManager(): React.JSX.Element {
     const onFocus = (): void => void load()
     // Apps start and stop without a sign to this window, so it reads the states again.
     const timer = setInterval(() => {
-      // A slow read never stacks up behind the poll.
-      if (document.visibilityState === 'visible' && !loading.current) {
+      if (document.visibilityState === 'visible') {
         void load()
       }
     }, PROFILE_STATE_POLL_MS)
@@ -94,13 +105,13 @@ export function ProfileManager(): React.JSX.Element {
   useEffect(() => api?.onStartNew(() => setWantNew(true)), [api])
 
   useEffect(() => {
-    // The defaults of the New dialog need the list.
-    if (wantNew && state) {
+    // The defaults of the New dialog need the list. An open dialog keeps its input; New waits.
+    if (wantNew && state && !form) {
       setWantNew(false)
       setForm(newForm(t, state))
       setMessage(null)
     }
-  }, [wantNew, state, t])
+  }, [wantNew, state, form, t])
 
   if (!api) {
     return <p className="p-6">{t('profileManager.macOnly', 'Profiles are only on macOS.')}</p>
@@ -131,9 +142,10 @@ export function ProfileManager(): React.JSX.Element {
     setMessage(null)
   }
 
-  const alert = message ? (
+  const shown = message ?? readError
+  const alert = shown ? (
     <p role="alert" className="rounded-md border border-destructive p-3 text-sm text-destructive">
-      {message}
+      {shown}
     </p>
   ) : null
 

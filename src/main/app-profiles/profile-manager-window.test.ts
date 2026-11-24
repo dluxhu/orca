@@ -12,13 +12,13 @@ const h = vi.hoisted(() => ({
   shown: 0,
   windows: [] as {
     loadFile: ReturnType<typeof vi.fn>
-    webContents: { send: ReturnType<typeof vi.fn> }
+    webContents: { send: ReturnType<typeof vi.fn>; isLoadingMainFrame: ReturnType<typeof vi.fn> }
   }[]
 }))
 
 vi.mock('electron', () => {
   class BrowserWindow {
-    webContents = { send: vi.fn() }
+    webContents = { send: vi.fn(), isLoadingMainFrame: vi.fn(() => false) }
     constructor() {
       h.shown++
       h.windows.push(this)
@@ -86,6 +86,15 @@ describe('New profile…', () => {
     openProfileManagerWindow({ startNew: true })
     expect(h.windows).toHaveLength(1)
     expect(window.webContents.send).toHaveBeenCalledWith('appProfiles:startNew')
+    // A window that still loads has no listener: it loads again with the hash.
+    window.loadFile.mockClear()
+    window.webContents.send.mockClear()
+    window.webContents.isLoadingMainFrame.mockReturnValue(true)
+    openProfileManagerWindow({ startNew: true })
+    expect(window.webContents.send).not.toHaveBeenCalled()
+    expect(window.loadFile).toHaveBeenCalledWith(expect.stringMatching(/profile-manager\.html$/), {
+      hash: 'new'
+    })
   })
 })
 

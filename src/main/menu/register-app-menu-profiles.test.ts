@@ -61,4 +61,18 @@ describe('registerAppMenu Profiles menu', () => {
     registerAppMenu({ ...handlers, getProfilesMenuItems: () => [] })
     expect(labels()).not.toContain('Profiles')
   })
+
+  it('passes the shortcut of the app.profileManager keybinding to the Profiles menu', () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin' })
+    const getItems = vi.fn(() => [{ label: 'Profile Manager…' }])
+    registerAppMenu({ ...handlers, getProfilesMenuItems: getItems })
+    expect(getItems).toHaveBeenCalledWith('⌘⇧P')
+    registerAppMenu({
+      ...handlers,
+      getProfilesMenuItems: getItems,
+      getKeybindings: () => ({ 'app.profileManager': [] })
+    })
+    // The house text of an unbound action, as the View menu hints show it.
+    expect(getItems).toHaveBeenLastCalledWith('Unassigned')
+  })
 })

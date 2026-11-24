@@ -45,7 +45,7 @@ type RegisterAppMenuOptions = AppMenuQuitHandlers & {
   // app.name stays stable for Keychain; menus use the per-branch development label.
   appMenuLabel?: string
   /** Fork patch: the items of the top-level Profiles menu (macOS). See docs/fork/profiles-design.md. */
-  getProfilesMenuItems?: () => Electron.MenuItemConstructorOptions[]
+  getProfilesMenuItems?: (managerShortcut: string) => Electron.MenuItemConstructorOptions[]
 }
 
 function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
@@ -297,7 +297,10 @@ function buildAndApplyMenu(options: RegisterAppMenuOptions): void {
     ]
   }
 
-  const profilesItems = isMac ? options.getProfilesMenuItems?.() : undefined
+  // Display hint only, as in the View menu: the keybinding runs in main, and the user can change it.
+  const profilesItems = isMac
+    ? options.getProfilesMenuItems?.(shortcutLabel('app.profileManager'))
+    : undefined
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac ? [macAppMenu] : []),
     ...(isMac ? [] : [fileMenu]),

@@ -335,6 +335,16 @@ describe('profilesMenuItems', () => {
     expect(showManager).toHaveBeenLastCalledWith()
     expect(item('Profile Manager…').accelerator).toBe('CommandOrControl+Shift+P')
   })
+
+  it('the main app shows the keybinding as a hint, with no native accelerator', () => {
+    const items = profilesMenuItems('⌘⇧P')
+    const manager = items.find((item) => item.label?.startsWith('Profile Manager…'))
+    expect(manager?.label).toBe('Profile Manager…\t⌘⇧P')
+    expect(manager?.accelerator).toBeUndefined()
+    // An unbound action: no hint, and still no accelerator.
+    const unbound = profilesMenuItems('').find((item) => item.label === 'Profile Manager…')
+    expect(unbound?.accelerator).toBeUndefined()
+  })
 })
 
 describe('Profiles menu refresh on activation', () => {

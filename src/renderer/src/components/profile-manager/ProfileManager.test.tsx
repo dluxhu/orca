@@ -409,6 +409,8 @@ describe('ProfileManager', () => {
     openMore('Orca - Work')
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove profile…' }))
     const dialog = screen.getByRole('dialog', { name: 'Remove Orca - Work?' })
+    // A modal dialog: the list behind it is out of the accessibility tree.
+    expect(screen.queryByRole('heading', { name: 'Your profiles' })).toBeNull()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Remove profile' }))
     await waitFor(() =>
       expect(change).toHaveBeenCalledWith({ kind: 'remove', id: 'work', keepData: true })
@@ -444,5 +446,67 @@ describe('ProfileManager', () => {
     expect(screen.queryByLabelText('Copy settings from this app')).toBeNull()
     expect(screen.queryByText('Default · this app')).toBeNull()
     expect(screen.getByText('Default')).toBeTruthy()
+  })
+
+  it('reads one list at a time: a read that does not return blocks the poll and focus', async () => {
+    vi.useFakeTimers()
+    getState.mockReset().mockReturnValue(new Promise(() => {}))
+    render(<ProfileManager />)
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+      await vi.advanceTimersByTimeAsync(PROFILE_STATE_POLL_MS * 2)
+    })
+    expect(getState).toHaveBeenCalledTimes(1)
+  })
+
+  it('a read during a read gives one more read after it, so the newest list wins', async () => {
+    let first: (state: AppProfilesState) => void = () => {}
+    getState.mockReset().mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+    const newer = { ...appState, rows: [appState.rows[0]] }
+    getState.mockResolvedValueOnce(newer)
+    render(<ProfileManager />)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(getState).toHaveBeenCalledTimes(1)
+    await act(async () => first(appState))
+    await waitFor(() => expect(getState).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('Orca - Work')).toBeNull())
+  })
+
+  it('shows a failed read in the alert', async () => {
+    getState.mockReset().mockRejectedValue(new Error('The profiles folder is gone.'))
+    render(<ProfileManager />)
+    expect((await screen.findByRole('alert')).textContent).toBe('The profiles folder is gone.')
+  })
+
+  it('stops the poll and the listeners when it unmounts', async () => {
+    vi.useFakeTimers()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    const { unmount } = render(<ProfileManager />)
+    await act(async () => {})
+    expect(startNew).not.toBeNull()
+    unmount()
+    getState.mockClear()
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+      await vi.advanceTimersByTimeAsync(PROFILE_STATE_POLL_MS * 2)
+    })
+    expect(getState).not.toHaveBeenCalled()
+    expect(startNew).toBeNull()
+    visibility.mockRestore()
+  })
+
+  it('New profile… waits while Edit is open, and keeps the typed input', async () => {
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
+    type('App name', 'Orca - Job')
+    act(() => startNew?.())
+    expect(screen.getByRole('dialog', { name: 'Edit Orca - Work' })).toBeTruthy()
+    expect(field('App name').value).toBe('Orca - Job')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('dialog', { name: 'New profile' })).toBeTruthy()
   })
 })
