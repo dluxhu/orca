@@ -2,6 +2,10 @@ import { markdownMathSelectionText } from '../../../markdown/markdown-math-selec
 
 /** Only agent-reply prose marked with this attribute may be quoted, in desktop and phone chat. */
 export const NATIVE_CHAT_QUOTE_SOURCE_PROPS = { 'data-native-chat-quote-source': '' } as const
+/** The desktop message's attribute: its value is the message id, so a quote can find its source. */
+export function nativeChatQuoteSourceProps(messageId: string): Record<string, string> {
+  return { 'data-native-chat-quote-source': messageId }
+}
 /** The same attribute as react-native-web's `dataSet`, for the phone's chat page. */
 export const NATIVE_CHAT_QUOTE_SOURCE_DATASET = { nativeChatQuoteSource: '' } as const
 
@@ -38,9 +42,10 @@ export function nativeChatSelectionText(selection: Selection, root: Element): st
   return fragment.textContent ?? ''
 }
 
+/** `sourceElement` is the reply that holds the selection. */
 export function readNativeChatQuotableSelection(
   root: HTMLElement
-): { text: string; range: Range } | null {
+): { text: string; range: Range; sourceElement: Element } | null {
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount !== 1) {
     return null
@@ -55,7 +60,7 @@ export function readNativeChatQuotableSelection(
     return null
   }
   const text = nativeChatSelectionText(selection, root).trim()
-  return text === '' ? null : { text, range }
+  return text === '' ? null : { text, range, sourceElement: source }
 }
 
 // Triple-click ranges can end outside the reply; check selected text edges instead of range endpoints.
@@ -95,4 +100,13 @@ export function formatNativeChatQuote(text: string): string {
 export function appendNativeChatQuote(draft: string, quote: string): string {
   const kept = draft.trimEnd()
   return kept === '' ? quote : `${kept}\n\n${quote}`
+}
+
+/** The text of a quote that `formatNativeChatQuote` wrote, without its `>` marks. */
+export function quotedText(quote: string): string {
+  return quote
+    .trim()
+    .split('\n')
+    .map((line) => line.replace(/^ {0,3}> ?/, ''))
+    .join('\n')
 }

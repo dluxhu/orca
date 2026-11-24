@@ -21414,6 +21414,7 @@
         "agentPillLabel": "Agent: {{name}}",
         "chatPillLabel": "Chat: {{name}}",
         "terminalPillLabel": "Terminal: {{name}}",
+        "quotePillLabel": "Quote: {{text}}",
         "backToBots": "Back to bots",
         "botChats": "Chats",
         "botChatsCount": "{{name}}'s chats, {{chatCount}}",
@@ -21908,6 +21909,7 @@
       "dismissDeliveryNotice": "Dismiss",
       "editDeliveryNotice": "Edit",
       "addSelectionToChat": "Add to chat",
+      "quoteSourceMissing": "The source of this quote is not available.",
       "messageNotSent": "Message not sent",
       "messageSending": "Sending…",
       "userMessage": {
