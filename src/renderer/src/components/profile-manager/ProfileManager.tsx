@@ -243,7 +243,8 @@ export function ProfileManager(): React.JSX.Element {
       ...(Number(form.port) !== form.row.port
         ? [{ kind: 'set-port' as const, id: form.row.id, port: Number(form.port) }]
         : []),
-      ...(JSON.stringify(form.icon) !== JSON.stringify(editIcon(form.row.icon, badgeFor(form.row)))
+      ...(JSON.stringify(form.icon) !==
+      JSON.stringify(editIcon(form.row.icon, badgeFor(form.row), form.row.userDataPath))
         ? [{ kind: 'set-icon' as const, id: form.row.id, icon: form.icon }]
         : [])
     ]
@@ -383,7 +384,7 @@ export function ProfileManager(): React.JSX.Element {
                       row,
                       name: row.name,
                       port: String(row.port),
-                      icon: editIcon(row.icon, badgeFor(row))
+                      icon: editIcon(row.icon, badgeFor(row), row.userDataPath)
                     })
                   }
                 >

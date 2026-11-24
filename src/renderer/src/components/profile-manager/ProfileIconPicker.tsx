@@ -8,6 +8,10 @@ import { useTranslate } from '@/i18n/use-translate'
 import type { IconStyle } from '../../../../shared/icon-badger/badger'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
 import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile-paths'
+import {
+  APP_PROFILE_BADGE_FILE,
+  APP_PROFILE_ICON_FILE
+} from '../../../../shared/app-profiles/app-profile-icon-files'
 import { Field } from './ProfileField'
 
 const STYLES: IconStyle[] = ['ref-match', 'ref-match-bigger']
@@ -18,16 +22,24 @@ export function iconChoiceReady(icon: AppProfileIconSource): boolean {
 }
 
 /**
- * The first choice of a form: the profile's own badge, else a new badge. An uploaded image or icon
- * has no path in the registry.
+ * The first choice of a form: the profile's saved icon, else a new badge. An uploaded badge or icon
+ * comes from its copy in the profile's userData.
  */
 export function editIcon(
   icon: AppProfileIcon | undefined,
-  defaultText: string
+  defaultText: string,
+  userDataPath = ''
 ): AppProfileIconSource {
-  return icon?.kind === 'badge'
-    ? { kind: 'badge', text: icon.text, style: icon.style }
-    : { kind: 'badge', text: defaultText, style: 'ref-match' }
+  if (icon?.kind === 'badge') {
+    return { kind: 'badge', text: icon.text, style: icon.style }
+  }
+  if (icon?.kind === 'image') {
+    return { kind: 'image', path: `${userDataPath}/${APP_PROFILE_BADGE_FILE}`, style: icon.style }
+  }
+  if (icon?.kind === 'file') {
+    return { kind: 'file', path: `${userDataPath}/${APP_PROFILE_ICON_FILE}` }
+  }
+  return { kind: 'badge', text: defaultText, style: 'ref-match' }
 }
 
 function fileName(path: string): string {

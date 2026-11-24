@@ -158,6 +158,30 @@ describe('ProfileManager', () => {
     expect(field('Badge character').value).toBe('2')
   })
 
+  it.each([
+    [{ kind: 'image', style: 'ref-match-bigger' }, 'Badge image', 'profile-icon-badge.png'],
+    [{ kind: 'file' }, 'Own icon', 'profile-icon.icns']
+  ] as const)('starts an edit from the saved %o icon', async (icon, mode, file) => {
+    appState.rows[1] = { ...appState.rows[1], icon }
+    render(<ProfileManager />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('radio', { name: mode }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText(file)).toBeTruthy()
+    const path = `/data/work/${file}`
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        icon.kind === 'image'
+          ? { kind: 'image', path, style: 'ref-match-bigger' }
+          : { kind: 'file', path },
+        'work'
+      )
+    )
+    type('Server port', '6864')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'set-port', id: 'work', port: 6864 }]])
+  })
+
   it('sends no set-icon when an edit keeps the icon', async () => {
     render(<ProfileManager />)
     fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
