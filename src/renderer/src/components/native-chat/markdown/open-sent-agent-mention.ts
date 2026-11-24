@@ -10,7 +10,7 @@ import {
 import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { SentAgentMention } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
-// A mention that cannot open says so in a short notice, not as an error.
+// A mention that is gone or cannot open here says so in a short notice, not as an error.
 // A chat that does not open shows the shared chat open toast.
 const notice: StructuredSessionOpenFeedback = {
   unavailable: (agent, context) => showChatOpenUnavailable(context, agent),
