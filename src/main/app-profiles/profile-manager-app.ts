@@ -12,6 +12,7 @@ import { translateMain } from '../i18n/main-i18n'
 import { isProfileManagerApp } from './app-profile'
 import { profilesMenuItems, registerProfileManagerIpc, startProfilesMenu } from './profile-manager'
 import { openProfileManagerWindow, PROFILE_MANAGER_NEW_ARG } from './profile-manager-window'
+import { PROFILE_MANAGER_SMOKE_ENV, profileManagerSmoke } from './profile-manager-smoke'
 
 function applyMenu(): void {
   Menu.setApplicationMenu(
@@ -52,6 +53,16 @@ export function runProfileManagerApp(): boolean {
     event.returnValue = false
   })
   void app.whenReady().then(() => {
+    if (process.env[PROFILE_MANAGER_SMOKE_ENV]) {
+      app.dock?.hide()
+      const window = openProfileManagerWindow({ hidden: true })
+      void profileManagerSmoke(window).then((problem) => {
+        const url = window.webContents.getURL()
+        console.log(`profile-manager-smoke: ${problem ? `fail ${problem}` : `ok ${url}`}`)
+        app.exit(problem ? 1 : 0)
+      })
+      return
+    }
     startProfilesMenu(applyMenu)
     openProfileManagerWindow({ startNew: process.argv.includes(PROFILE_MANAGER_NEW_ARG) })
   })

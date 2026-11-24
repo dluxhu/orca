@@ -23,7 +23,9 @@ export function isProfileManagerRenderer(sender: WebContents): boolean {
 export const PROFILE_MANAGER_NEW_ARG = '--new-profile'
 
 /** Shows the one Profile Manager window of this app. `startNew` also opens the New dialog. */
-export function openProfileManagerWindow(options: { startNew?: boolean } = {}): void {
+export function openProfileManagerWindow(
+  options: { startNew?: boolean; hidden?: boolean } = {}
+): BrowserWindow {
   if (profileManagerWindow && !profileManagerWindow.isDestroyed()) {
     if (profileManagerWindow.isMinimized()) {
       profileManagerWindow.restore()
@@ -35,7 +37,7 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
     } else if (options.startNew) {
       profileManagerWindow.webContents.send('appProfiles:startNew')
     }
-    return
+    return profileManagerWindow
   }
   const window = new BrowserWindow({
     width: 900,
@@ -53,7 +55,9 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
   })
   installPrivilegedWindowNavigationPolicy(window.webContents)
   profileManagerWindow = window
-  window.once('ready-to-show', () => window.show())
+  if (!options.hidden) {
+    window.once('ready-to-show', () => window.show())
+  }
   window.on('closed', () => {
     if (profileManagerWindow === window) {
       profileManagerWindow = null
@@ -61,6 +65,7 @@ export function openProfileManagerWindow(options: { startNew?: boolean } = {}): 
   })
   // A new window has no listener yet, so the URL hash asks for the New dialog.
   loadPage(window, options.startNew ? 'new' : '')
+  return window
 }
 
 function loadPage(window: BrowserWindow, hash: string): void {
