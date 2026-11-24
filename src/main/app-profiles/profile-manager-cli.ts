@@ -22,7 +22,8 @@ export function runCli(args: string[]): Promise<AppProfileReply> {
     execFile(
       process.execPath,
       [cli, ...args],
-      { env: { ...profilesEnv(), ELECTRON_RUN_AS_NODE: '1' } },
+      // An icon preview is a 1024 px PNG in base64.
+      { env: { ...profilesEnv(), ELECTRON_RUN_AS_NODE: '1' }, maxBuffer: 32 * 1024 * 1024 },
       (error, stdout) => {
         try {
           done(JSON.parse(stdout) as AppProfileReply)

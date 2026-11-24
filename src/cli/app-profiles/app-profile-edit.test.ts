@@ -15,11 +15,18 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { createAppProfile, type RunTool } from './app-profile-create'
+
+// Icons have their own tests; a profile here gets a fixed one.
+const makeIcon = (() => ({
+  icns: Buffer.from('icns 2'),
+  icon: { kind: 'badge', text: '2', style: 'ref-match' }
+})) as never
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
+import { setAppProfileIcon } from './app-profile-set-icon'
 import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
@@ -29,6 +36,7 @@ const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string>
   <key>CFBundleExecutable</key><string>Orca</string>
   <key>CFBundleName</key><string>Orca</string>
+  <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundleDisplayName</key><string>Orca @dLux</string>
 </dict>
 </plist>
@@ -55,7 +63,7 @@ const run: RunTool = (program, args) => {
   if (program.endsWith('lsregister') && args[0] === '-f' && failRegister) {
     throw new Error('lsregister -f failed')
   }
-  if (/(lsregister|launchctl|tccutil|security)$/.test(program)) {
+  if (/(lsregister|launchctl|tccutil|security)$/.test(program) || program === '/usr/bin/env') {
     return ''
   }
   return execFileSync(program, args, { encoding: 'utf8' })
@@ -105,7 +113,7 @@ const deps = () => ({ env: env(), home: dir, uid: 501, run, serviceRun, isAlive:
 const read = (path: string): string => readFileSync(path, 'utf8')
 
 function makeProfile(name = 'Orca - Work', id?: string) {
-  const entry = createAppProfile({ name, id, defaultAppPath: app, env: env(), run })
+  const entry = createAppProfile({ makeIcon, name, id, defaultAppPath: app, env: env(), run })
   calls = []
   return entry
 }
@@ -347,6 +355,7 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     writeFileSync(join(work.userDataPath, 'orca-data.json'), 'old chats')
     await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
     const again = createAppProfile({
+      makeIcon,
       name: 'Orca - Work again',
       id: 'work',
       defaultAppPath: app,
@@ -483,7 +492,39 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
       defaultUserDataPath: join(dir, 'default-data'),
       ...deps()
     })
-    expect(rows[1]).toMatchObject({ id: 'work', name: 'Orca - Finder', appPath: finderPath() })
+    expect(rows[1]).toMatchObject({
+      id: 'work',
+      name: 'Orca - Finder',
+      appPath: finderPath(),
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    })
+  })
+
+  it('set-icon gives the renamed app its icon, also after a rename while the icon is made', async () => {
+    renameInFinder()
+    const later = join(dir, 'apps', 'Orca - Later.app')
+    // The bundle of the last custom icon call.
+    const iconTarget = (): string | undefined =>
+      calls
+        .findLast((call) => call[0] === '/usr/bin/env')
+        ?.find((arg) => arg.startsWith('ORCA_APP_BUNDLE_PATH='))
+        ?.slice('ORCA_APP_BUNDLE_PATH='.length)
+    const made = (text: string, move?: () => void) =>
+      (() => {
+        move?.()
+        return {
+          icns: Buffer.from(`icns ${text}`),
+          icon: { kind: 'badge', text, style: 'ref-match' }
+        }
+      }) as never
+    await setAppProfileIcon('work', { kind: 'badge' }, { ...deps(), makeIcon: made('Q') })
+    expect(iconTarget()).toBe(finderPath())
+    await setAppProfileIcon(
+      'work',
+      { kind: 'badge' },
+      { ...deps(), makeIcon: made('R', () => renameSync(finderPath(), later)) }
+    )
+    expect(iconTarget()).toBe(later)
   })
 
   it('serve, open and rename find the renamed app', async () => {

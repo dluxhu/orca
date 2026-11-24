@@ -10,7 +10,8 @@ import {
   type AppProfileRow,
   type AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
-import { ProfileFormDialog, type ProfileForm } from './ProfileFormDialog'
+import { freeBadge, ProfileFormDialog, type ProfileForm } from './ProfileFormDialog'
+import { editIcon } from './ProfileIconPicker'
 import { ProfileRemoveForm } from './ProfileRemoveForm'
 import { ProfileRow } from './ProfileRow'
 
@@ -41,7 +42,8 @@ function newForm(t: Translate, state: AppProfilesState | null): ProfileForm {
     id: appProfileIdFromName(name),
     idEdited: false,
     port: String(nextAppProfilePort(profiles.map((row) => row.port))),
-    copySettings: false
+    copySettings: false,
+    icon: editIcon(undefined, freeBadge(state, null))
   }
 }
 
@@ -180,11 +182,18 @@ export function ProfileManager(): React.JSX.Element {
               <ProfileRow
                 key={row.id}
                 row={row}
+                iconUrl={state?.icons?.[row.id]}
                 current={row.id === state?.currentId}
                 busy={busy}
                 onOpen={() => void api.open(row.id)}
                 onEdit={() =>
-                  setForm({ mode: 'edit', row, name: row.name, port: String(row.port) })
+                  setForm({
+                    mode: 'edit',
+                    row,
+                    name: row.name,
+                    port: String(row.port),
+                    icon: editIcon(row.icon, freeBadge(state, row), row.userDataPath)
+                  })
                 }
                 onShowInFinder={() => void api.showInFinder(row.id)}
                 onStartAtLogin={(enabled) =>

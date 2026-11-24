@@ -16,11 +16,26 @@ import {
   appProfileNameError,
   appProfilePortError,
   appProfileIdFromName,
+  nextBadgeText,
   type AppProfileChange,
+  type AppProfileIconSource as IconSource,
   type AppProfileRow,
   type AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
 import { Field } from './ProfileField'
+import {
+  editIcon,
+  iconChoiceReady,
+  ProfileIconPicker,
+  ProfileIconPreview
+} from './ProfileIconPicker'
+
+/** The first badge character that no other profile uses. `row`: the profile that Edit changes. */
+export function freeBadge(state: AppProfilesState | null, row: AppProfileRow | null): string {
+  return nextBadgeText(
+    (state?.rows ?? []).filter((other) => other.id !== row?.id).map((other) => other.icon)
+  )
+}
 
 export type ProfileForm =
   | {
@@ -30,8 +45,9 @@ export type ProfileForm =
       idEdited: boolean
       port: string
       copySettings: boolean
+      icon: IconSource
     }
-  | { mode: 'edit'; row: AppProfileRow; name: string; port: string }
+  | { mode: 'edit'; row: AppProfileRow; name: string; port: string; icon: IconSource }
 
 export function ProfileFormDialog(props: {
   form: ProfileForm
@@ -66,6 +82,8 @@ export function ProfileFormDialog(props: {
           t
         )
       : null
+  const row = form.mode === 'edit' ? form.row : null
+  const badge = freeBadge(props.state, row)
   const changes: AppProfileChange[] =
     form.mode === 'new'
       ? [
@@ -74,7 +92,8 @@ export function ProfileFormDialog(props: {
             name: form.name.trim(),
             id: form.id,
             port: Number(form.port),
-            copySettings: form.copySettings
+            copySettings: form.copySettings,
+            icon: form.icon
           }
         ]
       : [
@@ -83,6 +102,10 @@ export function ProfileFormDialog(props: {
             : []),
           ...(Number(form.port) !== form.row.port
             ? [{ kind: 'set-port' as const, id: form.row.id, port: Number(form.port) }]
+            : []),
+          ...(JSON.stringify(form.icon) !==
+          JSON.stringify(editIcon(form.row.icon, badge, form.row.userDataPath))
+            ? [{ kind: 'set-icon' as const, id: form.row.id, icon: form.icon }]
             : [])
         ]
   const kept = form.mode === 'new' && (props.state?.keptIds.includes(form.id) ?? false)
@@ -167,9 +190,17 @@ export function ProfileFormDialog(props: {
               )}
               onChange={(port) => onChange({ ...form, port })}
             />
-            {/* Hook point: the icon picker of the profile icons work goes here. */}
+            <ProfileIconPicker
+              value={form.icon}
+              defaultText={badge}
+              onChange={(icon) => onChange({ ...form, icon })}
+            />
           </div>
-          {/* Hook point: the icon preview of the profile icons work goes here. */}
+          <ProfileIconPreview
+            value={form.icon}
+            profileId={row?.id}
+            appIcon={props.state?.icons?.default}
+          />
         </div>
         {props.alert ? <div className="px-6 pb-4">{props.alert}</div> : null}
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 border-t px-6 py-4 sm:justify-between">
@@ -194,7 +225,10 @@ export function ProfileFormDialog(props: {
             </Button>
             <Button
               disabled={
-                props.busy || changes.length === 0 || Boolean(nameError ?? idError ?? portError)
+                props.busy ||
+                changes.length === 0 ||
+                Boolean(nameError ?? idError ?? portError) ||
+                !iconChoiceReady(form.icon)
               }
               onClick={() => props.onRun(changes)}
             >

@@ -32,6 +32,18 @@ vi.mock('electron', () => ({
   }
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
+// The icons come from the real bundle files; profile-manager-app-icon.test.ts covers that.
+vi.mock('./profile-manager-app-icon', () => {
+  const icons = async (rows: AppProfileRow[]) =>
+    new Map(rows.map((row) => [row.id, { list: `url-${row.id}`, menu: `image-${row.id}` }]))
+  return {
+    appIcons: icons,
+    withAppIcons: async (state: { rows: AppProfileRow[] }) => ({
+      ...state,
+      icons: Object.fromEntries([...(await icons(state.rows))].map(([id, i]) => [id, i.list]))
+    })
+  }
+})
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
 vi.mock('./app-profile', () => ({
   getAppProfile: () => profile.current,
@@ -144,6 +156,37 @@ describe('profileCommandArgs', () => {
   })
 })
 
+describe('profileCommandArgs for icons', () => {
+  it('gives create and set-icon the --icon flags of the chosen icon', () => {
+    expect(
+      profileCommandArgs({
+        kind: 'create',
+        name: 'Orca - Work',
+        id: 'work',
+        port: 6800,
+        copySettings: false,
+        icon: { kind: 'badge', text: 'W', style: 'ref-match-bigger' }
+      })
+    ).toEqual([
+      'profiles',
+      'create',
+      'Orca - Work',
+      '--id',
+      'work',
+      '--port',
+      '6800',
+      '--icon-badge',
+      'W',
+      '--icon-style',
+      'ref-match-bigger',
+      '--json'
+    ])
+    expect(
+      profileCommandArgs({ kind: 'set-icon', id: 'work', icon: { kind: 'file', path: '/i.icns' } })
+    ).toEqual(['profiles', 'set-icon', 'work', '--icon-file', '/i.icns', '--json'])
+  })
+})
+
 describe('profileCommandArgs for Start at login', () => {
   it("installs and removes that profile's own serve service, on its port", () => {
     const service = { port: 6832, command: '/Apps/Orca.app/Contents/Resources/bin/orca' }
@@ -200,18 +243,25 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:state',
       'appProfiles:change',
       'appProfiles:open',
+      'appProfiles:iconPreview',
+      'appProfiles:iconParts',
+      'appProfiles:chooseIconFile',
       'appProfiles:showInFinder',
       'appProfiles:ownStartAtLogin',
       'appProfiles:setOwnStartAtLogin'
     ])
     await expect(handlers.get('appProfiles:state')?.({ sender: {} })).resolves.toMatchObject({
-      currentId: 'default'
+      currentId: 'default',
+      icons: { default: 'url-default' }
     })
     isManager.current = false
     for (const channel of [
       'appProfiles:state',
       'appProfiles:change',
       'appProfiles:open',
+      'appProfiles:iconPreview',
+      'appProfiles:iconParts',
+      'appProfiles:chooseIconFile',
       'appProfiles:showInFinder'
     ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, 'work')).rejects.toThrow(
@@ -263,6 +313,10 @@ describe('profilesMenuItems', () => {
       [undefined, 'New profile…', undefined],
       [undefined, 'Profile Manager…', undefined]
     ])
+    // Each profile item has its app's 18 pt icon.
+    expect(items.filter((item) => item.label?.startsWith('Orca')).map((item) => item.icon)).toEqual(
+      ['image-work', 'image-home', 'image-client']
+    )
   })
 
   it('New profile… opens the window with the New dialog; Profile Manager… has Shift+Cmd+P', () => {
