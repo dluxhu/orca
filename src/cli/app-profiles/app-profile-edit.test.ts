@@ -522,6 +522,9 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     const flag = makeProfile('Flag')
     const reused = makeProfile('Reused')
     const stale = makeProfile('Stale')
+    const orcad = makeProfile('Orcad')
+    const garbled = makeProfile('Garbled')
+    const helper = makeProfile('Helper')
     // The service job (9) is the supervisor (11); its child server owns the runtime.
     writeRuntimePid(work.userDataPath, 10, { args: '--serve', ppid: 11 })
     processes.set(11, '9 /Apps/orca serve --supervise')
@@ -537,6 +540,16 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
     writeRuntimePid(stale.userDataPath, 60, {
       runtime: { transports: [{ kind: 'websocket', endpoint: 'ws://0.0.0.0:6960' }] }
     })
+    // orcad of the profile, with no readable lock record: its path tells it.
+    writeRuntimePid(orcad.userDataPath, 70)
+    processes.set(70, `1 ${orcad.appPath}/Contents/Resources/orcad/node orcad.js`)
+    // A lock file that is there but unreadable can be orcad's.
+    writeRuntimePid(garbled.userDataPath, 80)
+    processes.set(80, `1 ${garbled.appPath}/Contents/MacOS/Orca`)
+    writeFileSync(join(garbled.userDataPath, 'orcad.lock'), '{')
+    // Only Contents/MacOS holds the app's executable.
+    writeRuntimePid(helper.userDataPath, 90)
+    processes.set(90, `1 ${helper.appPath}/Contents/Frameworks/helper`)
     const rows = await listAppProfiles({
       defaultAppPath: app,
       defaultUserDataPath: join(dir, 'default-data'),
@@ -555,7 +568,10 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['client', 'running', undefined],
       ['flag', 'running', undefined],
       ['reused', 'stopped', undefined],
-      ['stale', 'stopped', undefined]
+      ['stale', 'stopped', undefined],
+      ['orcad', 'background', undefined],
+      ['garbled', 'background', undefined],
+      ['helper', 'stopped', undefined]
     ])
   })
 

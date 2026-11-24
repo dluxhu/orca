@@ -115,13 +115,19 @@ async function classifyOwner(
   if (!row) {
     return 'none'
   }
-  const lock = readOrcadInstanceLockRecord(join(profile.userDataPath, ORCAD_LOCK_FILE))
-  // An Electron serve takes the desktop role; only orcad holds the orcad role.
-  const orcad = lock?.pid === pid && lock.role !== 'desktop'
+  const lockPath = join(profile.userDataPath, ORCAD_LOCK_FILE)
+  const lock = readOrcadInstanceLockRecord(lockPath)
+  // A lock that is there but unreadable can be orcad's: take it as a server, so no port changes.
+  const unreadableLock = lock === null && existsSync(lockPath)
   const command = ` ${row.command} `
+  // An Electron serve takes the desktop role; only orcad holds the orcad role.
+  const orcad =
+    unreadableLock ||
+    (lock?.pid === pid && lock.role !== 'desktop') ||
+    command.startsWith(` ${profile.appPath}/Contents/Resources/orcad/`)
   const ours =
     orcad ||
-    command.startsWith(` ${profile.appPath}/Contents/`) ||
+    command.startsWith(` ${profile.appPath}/Contents/MacOS/`) ||
     command.includes(` --user-data-dir=${profile.userDataPath} `)
   if (!ours) {
     return 'none'
