@@ -68,8 +68,13 @@ describe('StartAtLoginSetting', () => {
     expect((port as HTMLInputElement).value).toBe('6800')
     fireEvent.change(port, { target: { value: '6864' } })
     fireEvent.blur(port)
-    const dialog = await screen.findByRole('dialog')
-    expect(dialog.textContent).toContain('Paired servers will need to be re-paired.')
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Change the port to 6864?',
+      description: 'Paired servers will need to be re-paired.'
+    })
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Cancel' }))
+    )
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(setOwnPort).not.toHaveBeenCalled()
     // Cancel puts the field back to the saved port.

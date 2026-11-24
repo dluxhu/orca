@@ -21,7 +21,7 @@ import {
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
-import { readAppProfileState, readServeServicePid, serveServiceUnitOf } from './app-profile-list'
+import { readAppProfileRuntime, serveServiceUnitOf, type RuntimeOwner } from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
   rewriteServeUnitPort,
@@ -73,14 +73,11 @@ export function rootOf(options: EditAppProfileOptions, action: string): string {
  * caller holds the registry lock and changes nothing between this check and its change.
  */
 /** An edit stops and starts only the app's own service. It refuses a server that another started. */
-export async function refuseOtherServer(
-  label: string,
-  options: { uid: number; run: ServeServiceRun; name: string; action: string }
-): Promise<void> {
-  if ((await readServeServicePid(label, options)) === null) {
+export function refuseOtherServer(owner: RuntimeOwner, name: string, action: string): void {
+  if (owner === 'server') {
     throw new RuntimeClientError(
       'profile_running',
-      `A server of "${options.name}" runs that its Start at login service did not start. Stop that server before you ${options.action} it.`
+      `A server of "${name}" runs that its Start at login service did not start. Stop that server before you ${action} it.`
     )
   }
 }
@@ -108,7 +105,7 @@ export async function prepare(
   const entry = { ...found, appPath: located ?? found.appPath }
   const uid = options.uid ?? process.getuid?.() ?? 0
   const serviceRun = options.serviceRun ?? runServeServiceManager
-  const state = await readAppProfileState(entry.userDataPath, false, {
+  const { state, owner } = await readAppProfileRuntime(entry, false, {
     home,
     uid,
     serviceRun,
@@ -120,14 +117,7 @@ export async function prepare(
       `"${entry.name}" runs. Quit it, and stop its server, before you ${action} it.`
     )
   }
-  if (state === 'background') {
-    await refuseOtherServer(serveServiceUnitOf(entry.userDataPath, false, home).label, {
-      uid,
-      run: serviceRun,
-      name: entry.name,
-      action
-    })
-  }
+  refuseOtherServer(owner, entry.name, action)
   return {
     root,
     appsDir: resolve(appProfilesAppsDir(env, home)),

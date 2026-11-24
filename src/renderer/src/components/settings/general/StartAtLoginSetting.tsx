@@ -1,15 +1,5 @@
 // "Start at login" and "Port" of this app's own profile. See docs/fork/profiles-design.md, section 4.
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { DialogCancel } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
 import {
   appProfilePortError,
@@ -17,6 +7,7 @@ import {
   type AppProfileReply,
   type OwnAppProfile
 } from '../../../../../shared/app-profiles/app-profile-rules'
+import { PortChangeConfirm } from '../../profile-manager/PortChangeConfirm'
 import { NumberField, SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { matchesSettingsSearch } from '../search/settings-search'
@@ -142,49 +133,23 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
           {shownPortError}
         </p>
       ) : null}
-      <Dialog open={newPort !== null} onOpenChange={(open) => (open ? null : cancelPort())}>
-        <DialogContent size="confirm" busy={busy} initialFocus="cancel">
-          <DialogHeader>
-            <DialogTitle>
-              {t('settings.general.profilePort.confirmTitle', 'Change the port to {{port}}?', {
-                port: newPort ?? ''
-              })}
-            </DialogTitle>
-            <DialogDescription>
-              {t(
-                'settings.general.profilePort.confirmNote',
-                'Paired servers will need to be re-paired.'
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogCancel>{t('profileManager.cancel', 'Cancel')}</DialogCancel>
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => {
-                const port = newPort
-                setNewPort(null)
-                if (port !== null) {
-                  void apply(
-                    () => api.setOwnPort(port),
-                    (message) =>
-                      setPortError(
-                        t(
-                          'settings.general.profilePort.error',
-                          'The port did not change: {{message}}',
-                          { message }
-                        )
-                      )
-                  )
-                }
-              }}
-            >
-              {t('settings.general.profilePort.confirm', 'Change port')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PortChangeConfirm
+        port={newPort}
+        busy={busy}
+        onCancel={cancelPort}
+        onConfirm={(port) => {
+          setNewPort(null)
+          void apply(
+            () => api.setOwnPort(port),
+            (message) =>
+              setPortError(
+                t('settings.general.profilePort.error', 'The port did not change: {{message}}', {
+                  message
+                })
+              )
+          )
+        }}
+      />
     </SettingsGroup>
   )
 }
