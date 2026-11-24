@@ -328,4 +328,16 @@ describe('ProfileManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(await screen.findByRole('dialog', { name: 'New profile' })).toBeTruthy()
   })
+
+  it('New profile… while the New dialog shows changes nothing, also after Cancel', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    type('App name', 'Orca - Mine')
+    act(() => startNew?.())
+    expect(field('App name').value).toBe('Orca - Mine')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
 })
