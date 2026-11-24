@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import {
   APP_PROFILE_PLIST_ID_KEY,
   appProfilesRoot,
+  locateAppProfileApp,
   readAppProfileMarker,
   readAppProfileRegistry,
   readPlistString
@@ -48,10 +49,13 @@ export function selectAppProfile(argv: string[], env: NodeJS.ProcessEnv = proces
   const markerId = userDataPath ? readAppProfileMarker(userDataPath) : null
   // serve, orcad and the app that this CLI starts get the target profile's folders, or none.
   applyAppProfileHomes(markerId ? userDataPath! : null, env)
-  const target = markerId
+  const entry = markerId
     ? // The userData folder is <root>/<id>, so profiles.json is next to it.
       readAppProfileRegistry(dirname(userDataPath!))?.profiles.find((p) => p.id === markerId)
-        ?.appPath
+    : undefined
+  const target = markerId
+    ? // A rename in Finder leaves the registry path behind; the embedded id finds the app.
+      (entry && locateAppProfileApp(entry)) || undefined
     : id === 'default'
       ? readAppProfileRegistry(root)?.defaultAppPath
       : undefined

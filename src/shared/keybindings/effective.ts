@@ -224,6 +224,7 @@ const MAIN_PROCESS_INTERCEPTED_ACTIONS: Partial<
   'zoom.reset': 'beforeBrowserChords',
   'app.settings': 'afterBrowserChords',
   'app.forceReload': 'afterBrowserChords',
+  'app.profileManager': 'afterBrowserChords',
   'worktree.palette': 'afterBrowserChords',
   'sidebar.left.toggle': 'afterBrowserChords',
   'sidebar.right.toggle': 'afterBrowserChords',
