@@ -1448,6 +1448,16 @@
         "label": "Start at login",
         "description": "Runs this profile's server from login, also when Orca is closed, so your other devices can connect.",
         "error": "Start at login did not change: {{message}}"
+      },
+      "profilePort": {
+        "label": "Port",
+        "description": "The saved port of this profile's server. The server uses it at its next start.",
+        "default": "The default app always uses port {{port}}.",
+        "serverRuns": "Stop this profile's server to change its port.",
+        "confirmTitle": "Change the port to {{port}}?",
+        "confirmNote": "Paired servers will need to be re-paired.",
+        "confirm": "Change port",
+        "error": "The port did not change: {{message}}"
       }
     },
     "openInApp": {

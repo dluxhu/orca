@@ -1,9 +1,10 @@
-// The Profile Manager window's calls, and the Start at login setting of this app's own profile.
+// The Profile Manager window's calls, and the Settings of this app's own profile.
 import { ipcRenderer } from 'electron'
 import type {
   AppProfileChange,
   AppProfileReply,
-  AppProfilesState
+  AppProfilesState,
+  OwnAppProfile
 } from '../../../shared/app-profiles/app-profile-rules'
 
 export const appProfilesApi = {
@@ -19,11 +20,12 @@ export const appProfilesApi = {
     ipcRenderer.on('appProfiles:startNew', listener)
     return () => ipcRenderer.removeListener('appProfiles:startNew', listener)
   },
-  /** "Start at login" of this app's own profile (Settings). */
-  getOwnStartAtLogin: (): Promise<{ id: string; enabled: boolean }> =>
-    ipcRenderer.invoke('appProfiles:ownStartAtLogin'),
+  /** This app's own profile: Start at login and the saved port (Settings). */
+  getOwnProfile: (): Promise<OwnAppProfile> => ipcRenderer.invoke('appProfiles:ownProfile'),
   setOwnStartAtLogin: (enabled: boolean): Promise<AppProfileReply> =>
-    ipcRenderer.invoke('appProfiles:setOwnStartAtLogin', enabled)
+    ipcRenderer.invoke('appProfiles:setOwnStartAtLogin', enabled),
+  setOwnPort: (port: number): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:setOwnPort', port)
 }
 
 export type AppProfilesApi = typeof appProfilesApi

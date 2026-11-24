@@ -34,6 +34,19 @@ export type AppProfilesState = {
   keptIds: string[]
 }
 
+/** This app's own profile, for Settings. */
+export type OwnAppProfile = {
+  id: string
+  /** Start at login. */
+  enabled: boolean
+  /** The saved port. */
+  port: number
+  /** The saved ports of the other profiles, without the default app. */
+  otherPorts: number[]
+  /** A server of the profile runs, so its port must not change now. */
+  serverRuns: boolean
+}
+
 /** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
 export type AppProfileChange =
   | { kind: 'create'; name: string; id: string; port: number; copySettings: boolean }

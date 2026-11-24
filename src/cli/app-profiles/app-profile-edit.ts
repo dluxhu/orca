@@ -21,7 +21,7 @@ import {
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
-import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
+import { readAppProfileState, readServeServicePid, serveServiceUnitOf } from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
   rewriteServeUnitPort,
@@ -72,7 +72,12 @@ export function rootOf(options: EditAppProfileOptions, action: string): string {
  * Finds the profile and refuses while its app (or a serve that is not the service) runs. The
  * caller holds the registry lock and changes nothing between this check and its change.
  */
-export async function prepare(options: EditAppProfileOptions, action: string): Promise<Context> {
+/** `appMayRun`: the change is safe while the profile app is open. */
+export async function prepare(
+  options: EditAppProfileOptions,
+  action: string,
+  appMayRun = false
+): Promise<Context> {
   const env = options.env ?? process.env
   const home = options.home ?? homedir()
   const root = appProfilesRoot(env, home)
@@ -88,23 +93,38 @@ export async function prepare(options: EditAppProfileOptions, action: string): P
   // A rename in Finder leaves the registry path behind; the embedded id finds the app.
   const located = locateAppProfileApp(found)
   const entry = { ...found, appPath: located ?? found.appPath }
+  const uid = options.uid ?? process.getuid?.() ?? 0
+  const serviceRun = options.serviceRun ?? runServeServiceManager
   const state = await readAppProfileState(entry.userDataPath, false, {
     home,
-    uid: options.uid,
-    serviceRun: options.serviceRun,
+    uid,
+    serviceRun,
     isAlive: options.isAlive
   })
-  if (state === 'running') {
+  if (state === 'running' && !appMayRun) {
     throw new RuntimeClientError(
       'profile_running',
       `"${entry.name}" runs. Quit it, and stop its server, before you ${action} it.`
+    )
+  }
+  // An edit stops and starts only the profile's own service.
+  if (
+    state === 'background' &&
+    (await readServeServicePid(serveServiceUnitOf(entry.userDataPath, false, home).label, {
+      uid,
+      run: serviceRun
+    })) === null
+  ) {
+    throw new RuntimeClientError(
+      'profile_running',
+      `A server of "${entry.name}" runs that its Start at login service did not start. Stop that server before you ${action} it.`
     )
   }
   return {
     root,
     appsDir: resolve(appProfilesAppsDir(env, home)),
     home,
-    uid: options.uid ?? process.getuid?.() ?? 0,
+    uid,
     run: options.run ?? runTool,
     entry,
     located,
@@ -219,12 +239,13 @@ function renameLocked(
   return { ...entry, name, appPath: newPath, serveService }
 }
 
-/** Changes the port of the profile's desktop endpoint and server. */
+/** Changes the saved port: the port of the profile's server. */
 export async function setAppProfilePort(
   options: EditAppProfileOptions & { port: number }
 ): Promise<AppProfileEntry & { serveServiceInstalled: boolean; serveService: ServeServiceChange }> {
   return withRegistryLockAsync(rootOf(options, 'edit'), async () => {
-    const context = await prepare(options, 'edit')
+    // The app does not use the saved port; the server uses it at its next start.
+    const context = await prepare(options, 'edit', true)
     const { label } = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
     const run = options.serviceRun ?? runServeServiceManager
     const loaded = (await run('launchctl', ['print', `gui/${context.uid}/${label}`])).code === 0

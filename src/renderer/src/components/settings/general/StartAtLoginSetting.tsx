@@ -1,22 +1,42 @@
-// "Start at login": this app's own profile's serve service. See docs/fork/profiles-design.md, section 4.
+// "Start at login" and "Port" of this app's own profile. See docs/fork/profiles-design.md, section 4.
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { DialogCancel } from '@/components/ui/dialog-parts'
 import { useTranslate } from '@/i18n/use-translate'
-import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
+import {
+  appProfilePortError,
+  type AppProfileReply,
+  type OwnAppProfile
+} from '../../../../../shared/app-profiles/app-profile-rules'
+import { NumberField, SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { matchesSettingsSearch } from '../search/settings-search'
 
 export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Element | null {
   const t = useTranslate()
   const api = window.api.appProfiles
-  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [own, setOwn] = useState<OwnAppProfile | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [portError, setPortError] = useState<string | null>(null)
+  /** The port that waits for the confirm dialog. */
+  const [newPort, setNewPort] = useState<number | null>(null)
+  // A new key puts the typed text of the port field back to the saved port.
+  const [portKey, setPortKey] = useState(0)
 
   useEffect(() => {
     void api
-      ?.getOwnStartAtLogin()
-      .then((own) => setEnabled(own.enabled))
-      .catch(() => setEnabled(null))
+      ?.getOwnProfile()
+      .then(setOwn)
+      .catch(() => setOwn(null))
   }, [api])
 
   const label = t('settings.general.startAtLogin.label', 'Start at login')
@@ -24,24 +44,73 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
     'settings.general.startAtLogin.description',
     "Runs this profile's server from login, also when Orca is closed, so your other devices can connect."
   )
-  if (!api || enabled === null || !matchesSettingsSearch(query, [{ title: label, description }])) {
+  const portLabel = t('settings.general.profilePort.label', 'Port')
+  const portDescription = t(
+    'settings.general.profilePort.description',
+    "The saved port of this profile's server. The server uses it at its next start."
+  )
+  if (
+    !api ||
+    own === null ||
+    !matchesSettingsSearch(query, [
+      { title: label, description },
+      { title: portLabel, description: portDescription }
+    ])
+  ) {
     return null
   }
 
-  const change = (next: boolean): Promise<void> => {
+  /** Runs one change, then reads the profile again: the state comes from the CLI, not the input. */
+  const apply = (
+    send: () => Promise<AppProfileReply>,
+    onError: (message: string) => void
+  ): Promise<void> => {
     setBusy(true)
     setError(null)
+    setPortError(null)
     const set = async (): Promise<void> => {
-      const reply = await api.setOwnStartAtLogin(next)
+      const reply = await send()
       if (!reply.ok) {
-        setError(reply.error.message)
+        onError(reply.error.message)
       }
     }
     // Promise.finally: React Compiler cannot compile a try/finally statement.
     return set().finally(async () => {
-      setEnabled((await api.getOwnStartAtLogin()).enabled)
+      setOwn(await api.getOwnProfile())
+      setPortKey((key) => key + 1)
       setBusy(false)
     })
+  }
+
+  const isDefault = own.id === 'default'
+  const portReadOnly = isDefault
+    ? t('settings.general.profilePort.default', 'The default app always uses port {{port}}.', {
+        port: own.port
+      })
+    : own.serverRuns
+      ? t(
+          'settings.general.profilePort.serverRuns',
+          "Stop this profile's server to change its port."
+        )
+      : null
+  // A hand edit of profiles.json can give two profiles one port.
+  const savedClash = isDefault ? null : appProfilePortError(own.port, own.otherPorts, t)
+  const shownPortError = portError ?? savedClash
+
+  const askPort = (port: number): void => {
+    const rule = appProfilePortError(port, own.otherPorts, t)
+    if (rule) {
+      setPortError(rule)
+      setPortKey((key) => key + 1)
+      return
+    }
+    setPortError(null)
+    setNewPort(port)
+  }
+
+  const cancelPort = (): void => {
+    setNewPort(null)
+    setPortKey((key) => key + 1)
   }
 
   return (
@@ -49,9 +118,9 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
       <SettingsSwitchRow
         label={label}
         description={description}
-        checked={enabled}
+        checked={own.enabled}
         disabled={busy}
-        onChange={() => void change(!enabled)}
+        onChange={() => void apply(() => api.setOwnStartAtLogin(!own.enabled), setError)}
       />
       {error ? (
         <p role="alert" className="px-4 pb-3 text-xs text-destructive">
@@ -60,6 +129,66 @@ export function StartAtLoginSetting({ query }: { query: string }): React.JSX.Ele
           })}
         </p>
       ) : null}
+      <NumberField
+        key={portKey}
+        label={portLabel}
+        description={portReadOnly ?? portDescription}
+        value={own.port}
+        min={1024}
+        max={65535}
+        integer
+        disabled={busy || portReadOnly !== null}
+        disabledReason={portReadOnly ?? undefined}
+        onChange={askPort}
+      />
+      {shownPortError ? (
+        <p role="alert" className="px-4 pb-3 text-xs text-destructive">
+          {shownPortError}
+        </p>
+      ) : null}
+      <Dialog open={newPort !== null} onOpenChange={(open) => (open ? null : cancelPort())}>
+        <DialogContent size="confirm" busy={busy} initialFocus="cancel">
+          <DialogHeader>
+            <DialogTitle>
+              {t('settings.general.profilePort.confirmTitle', 'Change the port to {{port}}?', {
+                port: newPort ?? ''
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                'settings.general.profilePort.confirmNote',
+                'Paired servers will need to be re-paired.'
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogCancel>{t('profileManager.cancel', 'Cancel')}</DialogCancel>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                const port = newPort
+                setNewPort(null)
+                if (port !== null) {
+                  void apply(
+                    () => api.setOwnPort(port),
+                    (message) =>
+                      setPortError(
+                        t(
+                          'settings.general.profilePort.error',
+                          'The port did not change: {{message}}',
+                          { message }
+                        )
+                      )
+                  )
+                }
+              }}
+            >
+              {t('settings.general.profilePort.confirm', 'Change port')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SettingsGroup>
   )
 }
