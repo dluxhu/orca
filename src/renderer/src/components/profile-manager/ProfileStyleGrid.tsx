@@ -25,6 +25,7 @@ export function ProfileStyleGrid(props: {
     frosted: t('profileManager.icon.styleFrosted', 'Frosted'),
     round: t('profileManager.icon.styleRound', 'Round'),
     stamp: t('profileManager.icon.styleStamp', 'Stamp'),
+    sticker: t('profileManager.icon.styleSticker', 'Sticker'),
     'liquid-glass': t('profileManager.icon.styleLiquidGlass', 'Liquid glass'),
     'page-curl': t('profileManager.icon.stylePageCurl', 'Curled page'),
     'page-curl-small': t('profileManager.icon.stylePageCurlSmall', 'Curled page, small'),

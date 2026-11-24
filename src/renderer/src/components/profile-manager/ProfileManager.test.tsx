@@ -331,14 +331,13 @@ describe('ProfileManager', () => {
     )
     type('Badge character', 'W')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() =>
-      expect(change).toHaveBeenCalledWith({
-        kind: 'set-icon',
-        id: 'work',
-        icon: { kind: 'badge', text: 'W', style: 'ref-match' }
-      })
-    )
-    expect(change).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    // A saved icon without a colour gives no color key.
+    expect(change.mock.calls[0][0]).toStrictEqual({
+      kind: 'set-icon',
+      id: 'work',
+      icon: { kind: 'badge', text: 'W', style: 'ref-match' }
+    })
   })
 
   it('starts with the default character colour, and creates with a swatch colour', async () => {
@@ -366,16 +365,77 @@ describe('ProfileManager', () => {
     )
   })
 
-  it('makes one preview for a quick series of changes', async () => {
+  /** Opens the New dialog under fake timers and waits for its first preview. */
+  const newWithFakeTimers = async (): Promise<HTMLElement> => {
+    vi.useFakeTimers()
+    render(<ProfileManager />)
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
+    expect(iconPreview).toHaveBeenCalledTimes(1)
+    iconPreview.mockClear()
+    return screen.getByRole('group', { name: 'Character color' })
+  }
+  const advance = async (ms: number): Promise<void> => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('makes one preview 300 ms after the last of a quick series of changes', async () => {
+    const colors = await newWithFakeTimers()
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await advance(200)
+    fireEvent.click(within(colors).getByRole('button', { name: 'Green' }))
+    await advance(299)
+    expect(iconPreview).not.toHaveBeenCalled()
+    await advance(1)
+    expect(iconPreview.mock.calls).toEqual([
+      [{ kind: 'badge', text: '2', style: 'ref-match', color: '#16a34a' }, undefined]
+    ])
+  })
+
+  it('starts no preview for a change inside the delay when Save follows', async () => {
+    change.mockReturnValue(new Promise(() => {}))
+    const colors = await newWithFakeTimers()
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await advance(100)
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await advance(1000)
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(iconPreview).not.toHaveBeenCalled()
+  })
+
+  it('keeps the last preview while Save runs', async () => {
+    change.mockReturnValue(new Promise(() => {}))
+    await newWithFakeTimers()
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await advance(1000)
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(screen.getAllByAltText('Preview of the icon')).toHaveLength(1)
+    expect(iconPreview).not.toHaveBeenCalled()
+  })
+
+  it('never shows a late reply over the preview of a newer choice', async () => {
+    let late: (reply: unknown) => void = () => {}
+    iconPreview
+      .mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+      .mockResolvedValueOnce({ ok: true, result: { png: 'TkVX' } })
     render(<ProfileManager />)
     await clickNew()
-    const colors = screen.getByRole('group', { name: 'Character color' })
-    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
-    fireEvent.click(within(colors).getByRole('button', { name: 'Green' }))
     await waitFor(() => expect(iconPreview).toHaveBeenCalledTimes(1))
-    expect(iconPreview).toHaveBeenLastCalledWith(
-      { kind: 'badge', text: '2', style: 'ref-match', color: '#16a34a' },
-      undefined
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Character color' })).getByRole('button', {
+        name: 'Blue'
+      })
+    )
+    const preview = (await screen.findByAltText('Preview of the icon')) as HTMLImageElement
+    expect(preview.src).toBe('data:image/png;base64,TkVX')
+    await act(async () => late({ ok: true, result: { png: 'T0xE' } }))
+    expect((screen.getByAltText('Preview of the icon') as HTMLImageElement).src).toBe(
+      'data:image/png;base64,TkVX'
     )
   })
 
@@ -384,6 +444,11 @@ describe('ProfileManager', () => {
     await clickNew()
     fireEvent.click(screen.getByRole('button', { name: 'Custom color' }))
     fireEvent.change(await screen.findByLabelText('Hex'), { target: { value: '#123456' } })
+    expect(
+      screen
+        .getByRole('button', { name: 'Custom color', hidden: true })
+        .getAttribute('aria-pressed')
+    ).toBe('true')
     await waitFor(() =>
       expect(iconPreview).toHaveBeenLastCalledWith(
         { kind: 'badge', text: '2', style: 'ref-match', color: '#123456' },
@@ -409,16 +474,15 @@ describe('ProfileManager', () => {
         'work'
       )
     )
-    // The default swatch stores no colour.
+    // The default swatch stores no colour: the icon has no color key.
     fireEvent.click(within(colors).getByRole('button', { name: 'Dark' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() =>
-      expect(change).toHaveBeenCalledWith({
-        kind: 'set-icon',
-        id: 'work',
-        icon: { kind: 'badge', text: '2', style: 'ref-match' }
-      })
-    )
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls[0][0]).toStrictEqual({
+      kind: 'set-icon',
+      id: 'work',
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    })
   })
 
   it('opens the New dialog when the window starts with #new, after the list loads', async () => {

@@ -253,6 +253,7 @@ export function ProfileFormDialog(props: {
             value={form.icon}
             profileId={row?.id}
             appIcon={props.state?.icons?.default}
+            busy={props.busy}
           />
         </div>
         {props.alert ? <div className="px-6 pb-4">{props.alert}</div> : null}

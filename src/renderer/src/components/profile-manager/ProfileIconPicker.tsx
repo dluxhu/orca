@@ -33,7 +33,8 @@ export function editIcon(
   userDataPath = ''
 ): AppProfileIconSource {
   if (icon?.kind === 'badge') {
-    return { kind: 'badge', text: icon.text, style: icon.style, color: icon.color }
+    const color = icon.color ? { color: icon.color } : {}
+    return { kind: 'badge', text: icon.text, style: icon.style, ...color }
   }
   if (icon?.kind === 'image') {
     return { kind: 'image', path: `${userDataPath}/${APP_PROFILE_BADGE_FILE}`, style: icon.style }
@@ -118,6 +119,7 @@ function BadgeColors(props: {
             <button
               type="button"
               aria-label={custom}
+              aria-pressed={isCustom}
               title={custom}
               className="flex size-5 cursor-pointer items-center justify-center rounded-full border border-border bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
             >
@@ -194,7 +196,14 @@ export function ProfileIconPicker(props: {
               onChange={(text) => onChange({ ...value, text })}
             />
           </div>
-          <BadgeColors color={value.color} onChange={(color) => onChange({ ...value, color })} />
+          <BadgeColors
+            color={value.color}
+            onChange={(color) => {
+              // The default colour is no color key, as the saved icon has it.
+              const { color: _old, ...rest } = value
+              onChange(color ? { ...rest, color } : rest)
+            }}
+          />
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
@@ -248,6 +257,8 @@ export function ProfileIconPreview(props: {
   profileId?: string | null
   /** The default app's icon, shown next to the preview as in the Dock. */
   appIcon?: string
+  /** Save runs: no new preview starts, and the last one stays. */
+  busy?: boolean
 }): React.JSX.Element {
   const t = useTranslate()
   const api = window.api.appProfiles
@@ -258,6 +269,9 @@ export function ProfileIconPreview(props: {
   useEffect(() => {
     if (!api || !ready) {
       setPreview(null)
+      return
+    }
+    if (props.busy) {
       return
     }
     let current = true
@@ -279,7 +293,7 @@ export function ProfileIconPreview(props: {
       current = false
       clearTimeout(timer)
     }
-  }, [api, key, ready, props.profileId])
+  }, [api, key, ready, props.profileId, props.busy])
 
   return (
     <aside

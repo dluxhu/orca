@@ -25,6 +25,8 @@ describe('ProfileStyleGrid', () => {
       const img = screen.getByTitle(style).querySelector('img')
       expect(img?.getAttribute('src')).toMatch(new RegExp(`/profile-icon-styles/${style}\\.png$`))
       expect(img?.className).toContain('size-12')
+      // A style without a translated name shows its id: every style has a name.
+      expect(screen.getByTitle(style).textContent).not.toBe(style)
     }
   })
 
