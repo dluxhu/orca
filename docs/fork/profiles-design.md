@@ -656,6 +656,8 @@ with the reference's box and bounding box at the normal limit.
 - **Uploaded full icon:** PNG or ICNS, used as it is.
 - **Default character:** the first of "2" to "9", then "A" to "Z", that no other profile uses.
   Default style: `ref-match`.
+- **Character colour:** `#0f172a`. `--icon-color <#rrggbb>` sets another one; the registry keeps it
+  in the badge `icon` field as `color`.
 
 ## 9. Ids, rename and remove
 

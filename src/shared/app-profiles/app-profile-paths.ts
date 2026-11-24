@@ -18,11 +18,16 @@ export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
 /** The source of the profile icon: a badge character, an uploaded badge image or an uploaded icon. */
 export type AppProfileIcon =
-  | { kind: 'badge'; text: string; style: IconStyle }
+  // color: #rrggbb; none is APP_PROFILE_BADGE_COLOR.
+  | { kind: 'badge'; text: string; style: IconStyle; color?: string }
   | { kind: 'image'; style: IconStyle }
   | { kind: 'file' }
 
-export { APP_PROFILE_BADGE_FILE, APP_PROFILE_ICON_FILE } from './app-profile-icon-files'
+export {
+  APP_PROFILE_BADGE_COLOR,
+  APP_PROFILE_BADGE_FILE,
+  APP_PROFILE_ICON_FILE
+} from './app-profile-icon-files'
 
 export type AppProfileEntry = {
   id: string

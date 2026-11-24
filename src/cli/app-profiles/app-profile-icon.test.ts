@@ -59,6 +59,25 @@ describe('profile icon sources', () => {
     )
   })
 
+  it('reads --icon-color as a #rrggbb colour of a badge character', () => {
+    expect(flags({ '--icon-badge': 'Q', '--icon-color': '#DC2626' })).toEqual({
+      kind: 'badge',
+      text: 'Q',
+      style: undefined,
+      color: '#dc2626'
+    })
+    expect(flags({ '--icon-color': '#2563eb' })).toMatchObject({ kind: 'badge', color: '#2563eb' })
+    for (const color of ['red', '#fff', '#12345g', '2563eb', '#2563eb00']) {
+      expect(() => flags({ '--icon-color': color })).toThrow('--icon-color must be #rrggbb')
+    }
+    expect(() => flags({ '--icon-image': 'a.png', '--icon-color': '#2563eb' })).toThrow(
+      '--icon-color applies only to a badge character'
+    )
+    expect(() => flags({ '--icon-file': 'a.png', '--icon-color': '#2563eb' })).toThrow(
+      '--icon-color applies only to a badge character'
+    )
+  })
+
   it('refuses a badge that is not one visible character, and a missing file', () => {
     const app = join(dir, 'none.app')
     for (const text of ['', ' ', 'AB', '\u200b', '\u0007', '\u00a0']) {
@@ -133,6 +152,22 @@ describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () =
     expect(Math.abs((y0 + y1) / 2 - 512)).toBeLessThan(120)
   })
 
+  it('draws the badge character in the given colour, else in the default dark colour', () => {
+    // The colour of the most opaque pixel: the glyph inside, not its anti-aliased edge.
+    const ink = (color?: string): number[] => {
+      const { data } = rasterizeWithAppKit('text', 'X', undefined, color)
+      let best = 0
+      for (let p = 3; p < data.length; p += 4) {
+        if (data[p] > data[best + 3]) {
+          best = p - 3
+        }
+      }
+      return [...data.subarray(best, best + 3)]
+    }
+    expect(ink('#dc2626')).toEqual([0xdc, 0x26, 0x26])
+    expect(ink()).toEqual([0x0f, 0x17, 0x2a])
+  })
+
   it('badges the Orca icon and writes an .icns that macOS reads', { timeout: 120_000 }, () => {
     const app = join(dir, 'Orca.app')
     mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
@@ -144,10 +179,20 @@ describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () =
       join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
       join(app, 'Contents', 'Resources', 'icon.icns')
     )
-    const made = makeAppProfileIcon(app, { kind: 'badge' }, [
-      { kind: 'badge', text: '2', style: 'ref-match' }
-    ])
-    expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match' })
+    // The real tools, with their arguments kept: the badge drawing must get the colour.
+    const calls: string[][] = []
+    const run = (program: string, args: string[]): string => {
+      calls.push(args)
+      return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    }
+    const made = makeAppProfileIcon(
+      app,
+      { kind: 'badge', color: '#2563eb' },
+      [{ kind: 'badge', text: '2', style: 'ref-match' }],
+      run
+    )
+    expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
+    expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
     const icns = join(dir, 'profile.icns')
     writeFileSync(icns, made.icns)
     execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
