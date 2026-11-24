@@ -1,6 +1,6 @@
 // Rename and port change of a profile: docs/fork/profiles-design.md, section 9.
 // app-profile-remove.ts uses the shared steps here (lock, state check, registry write).
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, renameSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import {
@@ -20,7 +20,7 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
-import { defaultAppOf, LSREGISTER, runTool, type RunTool } from './app-profile-create'
+import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
 import { readAppProfileState, serveServiceUnitOf } from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
@@ -131,9 +131,8 @@ export function updateEntry(
 }
 
 /**
- * Changes the name only: the app file name, CFBundleDisplayName and the registry name. The id,
- * the bundle id and the data folder stay. The new signature has a new code hash, so macOS asks
- * again for the privacy grants and the Keychain item.
+ * Changes the name only: the app file name and the registry name. The id, the bundle id, the data
+ * folder and the signed bundle contents stay, so the privacy grants and the Keychain access stay.
  */
 export async function renameAppProfile(
   options: EditAppProfileOptions & { name: string }
@@ -175,40 +174,12 @@ function renameLocked(
   if (context.inBackground) {
     run('/bin/launchctl', ['bootout', target])
   }
-  const plistPath = (app: string): string => join(app, 'Contents', 'Info.plist')
-  const entitlements = `${dirname(oldPath)}/.${entry.id}.entitlements.plist`
-  const sign = (app: string): void => {
-    // Ad hoc, no --deep, as `orca profiles create` signs.
-    run('/usr/bin/codesign', [
-      '--force',
-      '-s',
-      '-',
-      '-i',
-      entry.bundleId,
-      '--entitlements',
-      entitlements,
-      app
-    ])
-  }
   let serveService: ServeServiceChange = 'none'
   try {
-    writeFileSync(
-      entitlements,
-      run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', defaultAppOf(oldPath)])
-    )
-    const originalPlist = readFileSync(plistPath(oldPath))
+    // Only the bundle moves, as a Finder rename does. Finder and the Dock show the file name. The
+    // signed contents stay: a new signature would make the Keychain ask again for the app's keys.
     renameSync(oldPath, newPath)
     try {
-      run('/usr/bin/plutil', [
-        '-replace',
-        'CFBundleDisplayName',
-        '-string',
-        name,
-        plistPath(newPath)
-      ])
-      sign(newPath)
-      // No --strict: the bundle links to the default app's files, and --strict refuses them.
-      run('/usr/bin/codesign', ['--verify', newPath])
       tryRun(run, LSREGISTER, ['-u', oldPath])
       run(LSREGISTER, ['-f', newPath])
       // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
@@ -222,7 +193,7 @@ function renameLocked(
         )
       }))
     } catch (failure) {
-      // Put everything back: the unit, Launch Services, the old name, Info.plist, a valid signature.
+      // Put everything back: the unit, Launch Services and the old name.
       if (serveService === 'updated') {
         try {
           rewriteServeUnitAppPath(unit.unitPath, newPath, oldPath)
@@ -234,21 +205,9 @@ function renameLocked(
       tryRun(run, LSREGISTER, ['-u', newPath])
       tryRun(run, LSREGISTER, ['-f', oldPath])
       renameSync(newPath, oldPath)
-      writeFileSync(plistPath(oldPath), originalPlist)
-      tryRun(run, '/usr/bin/codesign', [
-        '--force',
-        '-s',
-        '-',
-        '-i',
-        entry.bundleId,
-        '--entitlements',
-        entitlements,
-        oldPath
-      ])
       throw failure
     }
   } finally {
-    rmSync(entitlements, { force: true })
     if (context.inBackground) {
       tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
     }
