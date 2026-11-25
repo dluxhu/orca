@@ -62,6 +62,19 @@ export const serviceRun: ServeServiceRun = async (program, args) => {
     : { code: 113, out: 'Could not find service' }
 }
 
+/** `lsappinfo info -only ApplicationType <pid>` as macOS prints it (captured on macOS 27). */
+export function lsappinfoOut(type: 'Foreground' | 'UIElement'): string {
+  const front = type === 'Foreground' ? ' (in front) ' : ' '
+  return [
+    `[ NULL ]  ASN:0x0-0x10010:${front}`,
+    '    bundleID=[ NULL ] ',
+    '    bundle path=[ NULL ] ',
+    '    executable path=[ NULL ] ',
+    ` !cgsConnection !signalled type="${type}" flavor=[ NULL ]  Version=[ NULL ]  Arch=!!none `,
+    ''
+  ].join('\n')
+}
+
 export function file(path: string, content: string): void {
   mkdirSync(join(path, '..'), { recursive: true })
   writeFileSync(path, content, { mode: 0o755 })

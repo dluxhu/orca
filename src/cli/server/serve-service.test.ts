@@ -109,6 +109,16 @@ describe('orca serve service', () => {
     expect(existsSync(copy)).toBe(false)
   })
 
+  it('removes a left copy when an install writes the LaunchAgent again (fork)', async () => {
+    const d = deps('darwin')
+    await installServeService({ command: null, dryRun: false, start: false }, d)
+    await uninstallServeService(d, { keepRunning: true })
+    const copy = join(home, 'profile', 'serve-service-unit.plist')
+    expect(existsSync(copy)).toBe(true)
+    await installServeService({ command: null, dryRun: false, start: false }, d)
+    expect(existsSync(copy)).toBe(false)
+  })
+
   it('skips a profile launcher and refuses a bare Linux orca', async () => {
     const scoped = join(home, 'profile', 'cli', 'bin')
     await mkdir(scoped, { recursive: true })

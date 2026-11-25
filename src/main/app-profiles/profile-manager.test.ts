@@ -12,7 +12,7 @@ const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, showMa
     managerApp: { current: false },
     showManager: vi.fn(async () => {}),
     appOn: vi.fn(),
-    launchctl: vi.fn(async () => ({ code: 113, out: '' })),
+    launchctl: vi.fn(async (_program: string, _args: string[]) => ({ code: 113, out: '' })),
     handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
     rows: { current: [] as AppProfileRow[] },
     isManager: { current: true },
@@ -45,11 +45,13 @@ vi.mock('./profile-manager-window', () => ({
   showProfileManager: showManager
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
-  // One service read per list, as the real list does for each profile.
+  // One service read and one Dock state read per list, as the real list does for a server.
   listAppProfiles: async (options: {
     serviceRun?: (program: string, args: string[]) => Promise<unknown>
   }) => {
-    await (options.serviceRun ?? launchctl)('launchctl', ['print', 'gui/501/x'])
+    const run = options.serviceRun ?? launchctl
+    await run('launchctl', ['print', 'gui/501/x'])
+    await run('/usr/bin/lsappinfo', ['info', '-only', 'ApplicationType', '10'])
     return rows.current
   }
 }))
@@ -332,7 +334,7 @@ describe('profilesMenuItems', () => {
 })
 
 describe('Profiles menu refresh on activation', () => {
-  it('reads the service states again only after a minute', async () => {
+  it('reads the service states again only after a minute; the Dock state at once', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       const rebuild = vi.fn()
@@ -342,11 +344,16 @@ describe('Profiles menu refresh on activation', () => {
       const activate = appOn.mock.calls.findLast(([event]) => event === 'did-become-active')?.[1]
       activate()
       await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(2))
-      expect(launchctl).not.toHaveBeenCalled()
+      // A Dock click can open a server's window at any time: lsappinfo is never cached.
+      expect(launchctl.mock.calls.map(([program]) => program)).toEqual(['/usr/bin/lsappinfo'])
+      launchctl.mockClear()
       vi.setSystemTime(Date.now() + 61_000)
       activate()
       await vi.waitFor(() => expect(rebuild).toHaveBeenCalledTimes(3))
-      expect(launchctl).toHaveBeenCalledTimes(1)
+      expect(launchctl.mock.calls.map(([program]) => program)).toEqual([
+        'launchctl',
+        '/usr/bin/lsappinfo'
+      ])
     } finally {
       vi.useRealTimers()
     }

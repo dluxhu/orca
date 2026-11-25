@@ -421,11 +421,13 @@ in place of the defaults.
   `serve service install --no-start` writes it, `serve service uninstall --keep-running` moves it
   to `<userData>/serve-service-unit.plist` (`serveUnitCopyPath`). launchd does not read that copy at
   login. A running app or service keeps running. A full `uninstall` removes both files.
-- **Service buttons.** A row whose app does not run has "Start background service" or "Stop
-  background service". They run the install or uninstall now, then put the Start at login choice
+- **Service buttons.** A row whose app does not run has one of two buttons:
+  "Start background service" or "Stop background service". They run the install or uninstall now, then put the Start at login choice
   back. With Start at login off, the running job has only the userData copy. The app's quit step,
   `rename` and `set-port` use the LaunchAgent file, else the copy (`serveJobFileOf`), so the job
-  comes back after the app quits and keeps the new path or port.
+  comes back after the app quits and keeps the new path or port. A loaded job with neither file
+  (made by an older build) is not stopped: it keeps running on the old path or port. An install
+  that writes the LaunchAgent removes the copy, and a remove with "Keep data" removes it too.
 - **Open.** Each row has "Open", the default profile's row too: `open -b <bundleId>`. It brings the
   profile to the front with a window, or starts it.
 - **Messages.** Use the profile's unix socket and token from `orca-runtime.json`, as the CLI does
