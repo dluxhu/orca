@@ -65,6 +65,7 @@ import {
 import { SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE } from '../../shared/app-lifecycle/launch/single-instance-exit-code'
 import { configureAppProfileStartup } from '../app-profiles/app-profile-startup'
 import { takeProfileFromServer } from '../app-profiles/app-profile-serve-exclusion'
+import { refreshOutdatedProfileApp } from '../app-profiles/app-profile-refresh'
 import { setAppEnvironment } from '../../shared/app-lifecycle/app-environment'
 import { ElectronAppEnvironment } from '../host/electron-app-environment'
 import { installMainProcessTreeKillGate } from '../pty/process-retirement/own-chromium-tree-kill-guard'
@@ -227,6 +228,10 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
     setSpawnObserver(recordSubprocessSpawn)
   }
   startMainThreadChurnProbe({ extraStats: () => ({ diffCache: settledDiffCache.stats() }) })
+  // Before the server check: a running server keeps its mapped runtime while the bundle changes.
+  if (appProfile && !state.isServeMode && refreshOutdatedProfileApp()) {
+    return false
+  }
   // Before the instance locks: an Electron serve holds the same locks.
   if (appProfile && !state.isServeMode && !takeProfileFromServer(getCanonicalUserDataPath())) {
     app.exit(SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE)

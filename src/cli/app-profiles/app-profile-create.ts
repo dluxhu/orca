@@ -12,14 +12,12 @@ import {
   realpathSync,
   renameSync,
   rmSync,
-  symlinkSync,
-  writeFileSync
+  symlinkSync
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import {
   APP_PROFILE_PLIST_ID_KEY,
-  APP_PROFILE_PLIST_ROOT_KEY,
   APP_PROFILE_SETTINGS_SEED,
   appProfilesAppsDir,
   appProfilesRoot,
@@ -40,6 +38,12 @@ import {
   nextAppProfilePort
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
+import {
+  applyProfilePlist,
+  copyAppRuntime,
+  copyDefaultPlist,
+  signProfileBundle
+} from './app-profile-bundle'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
 import {
   appIconFileName,
@@ -51,8 +55,6 @@ import {
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
-const NOTIFICATION_HELPER = 'orca-notification-status'
-const ELECTRON_FRAMEWORK = 'Electron Framework.framework'
 
 /** Runs a tool and returns its stdout; throws when it fails. */
 export type RunTool = (program: string, args: string[]) => string
@@ -128,29 +130,17 @@ export function createAppProfile(
     if (existsSync(appPath)) {
       throw new RuntimeClientError('invalid_argument', `${appPath} exists.`)
     }
-    const template = join(source, 'Resources', 'profile-template', NOTIFICATION_HELPER)
-    if (!existsSync(template)) {
-      throw new RuntimeClientError(
-        'invalid_argument',
-        `${defaultApp} has no profile notification helper. It is too old for profiles.`
-      )
-    }
-
     // Build in a temporary folder and move the bundle in place when it is complete.
     const staging = mkdtempSync(join(appsDir, `.${id}.staging-`))
     try {
       const bundle = join(staging, `${name}.app`)
       const contents = join(bundle, 'Contents')
-      for (const folder of ['MacOS', 'Frameworks', 'Resources']) {
-        mkdirSync(join(contents, folder), { recursive: true })
-      }
+      mkdirSync(join(contents, 'Resources'), { recursive: true })
       const plistPath = join(contents, 'Info.plist')
-      run('/usr/bin/ditto', [join(source, 'Info.plist'), plistPath])
-      run('/usr/bin/plutil', ['-convert', 'xml1', plistPath])
+      const defaultPlist = copyDefaultPlist(source, plistPath, run)
       if (existsSync(join(source, 'PkgInfo'))) {
         run('/usr/bin/ditto', [join(source, 'PkgInfo'), join(contents, 'PkgInfo')])
       }
-      const defaultPlist = readFileSync(plistPath, 'utf8')
       const defaultAppId = readPlistString(defaultPlist, 'CFBundleIdentifier')
       const executable = readPlistString(defaultPlist, 'CFBundleExecutable')
       if (!defaultAppId || !executable) {
@@ -158,28 +148,7 @@ export function createAppProfile(
       }
       const bundleId = `${defaultAppId}.profile.${id}`
 
-      // No executable is a link: codesign --force could follow it and sign the default app's file.
-      const helpers: string[] = []
-      for (const entry of readdirSync(join(source, 'MacOS'))) {
-        const from = entry === NOTIFICATION_HELPER ? template : join(source, 'MacOS', entry)
-        run('/usr/bin/ditto', [from, join(contents, 'MacOS', entry)])
-        if (entry !== executable) {
-          helpers.push(join(contents, 'MacOS', entry))
-        }
-      }
-      // Electron helper apps are copies, so they find the profile as their main bundle. Helpers
-      // crash at start when the Electron framework is a link (slice 1, U4), so it is an APFS clone.
-      for (const entry of readdirSync(join(source, 'Frameworks'))) {
-        const from = join(source, 'Frameworks', entry)
-        const to = join(contents, 'Frameworks', entry)
-        if (entry.endsWith('.app')) {
-          run('/usr/bin/ditto', [from, to])
-        } else if (entry === ELECTRON_FRAMEWORK) {
-          run('/bin/cp', ['-cR', from, to])
-        } else {
-          symlinkSync(from, to)
-        }
-      }
+      const helpers = copyAppRuntime(source, contents, executable, run)
       for (const entry of readdirSync(join(source, 'Resources'))) {
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }
@@ -194,42 +163,9 @@ export function createAppProfile(
       rmSync(iconPath, { force: true })
       writeFileSync(iconPath, made.icns)
 
-      const plutil = (...args: string[]): void => {
-        run('/usr/bin/plutil', [...args, plistPath])
-      }
-      plutil('-replace', 'CFBundleIdentifier', '-string', bundleId)
-      plutil('-replace', 'CFBundleDisplayName', '-string', name)
-      plutil('-replace', APP_PROFILE_PLIST_ID_KEY, '-string', id)
-      if (options.pinRoot) {
-        plutil('-replace', APP_PROFILE_PLIST_ROOT_KEY, '-string', root)
-      }
-      // Only the Profile Manager takes orca: links. The asar integrity fuse is off.
-      for (const key of ['CFBundleURLTypes', 'ElectronAsarIntegrity']) {
-        if (readPlistKeyExists(readFileSync(plistPath, 'utf8'), key)) {
-          plutil('-remove', key)
-        }
-      }
-
-      // Ad hoc, no --deep (the helper apps keep their signatures), no hardened runtime
-      // (library validation would refuse the default app's frameworks).
-      const entitlements = join(staging, 'entitlements.plist')
-      writeFileSync(
-        entitlements,
-        run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', defaultApp])
-      )
-      for (const helper of helpers) {
-        run('/usr/bin/codesign', ['--force', '-s', '-', '-i', bundleId, helper])
-      }
-      run('/usr/bin/codesign', [
-        '--force',
-        '-s',
-        '-',
-        '-i',
-        bundleId,
-        '--entitlements',
-        entitlements,
-        bundle
-      ])
+      const pinnedRoot = options.pinRoot ? root : undefined
+      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot }, run)
+      signProfileBundle(bundle, defaultApp, bundleId, helpers, staging, run)
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
       ensureAppProfileMarker(userDataPath, id)
@@ -322,8 +258,4 @@ export function defaultAppOf(appPath: string): string {
     return appPath
   }
   return resolve(realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar')), '..', '..', '..')
-}
-
-function readPlistKeyExists(xml: string, key: string): boolean {
-  return xml.includes(`<key>${key}</key>`)
 }
