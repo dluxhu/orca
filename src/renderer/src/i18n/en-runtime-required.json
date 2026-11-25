@@ -3493,6 +3493,7 @@
       "idReserved": "The id \"{{id}}\" is reserved.",
       "idTaken": "A profile with the id \"{{id}}\" exists.",
       "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
+      "nameLong": "The profile name is too long: at most {{max}} bytes.",
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
       "portRange": "The port must be 1024 to 65535: {{port}}",
