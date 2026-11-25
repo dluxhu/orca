@@ -35,7 +35,8 @@ import {
   applyProfilePlist,
   copyAppRuntime,
   copyDefaultPlist,
-  signProfileBundle
+  signProfileBundle,
+  templateKeyOf
 } from './app-profile-bundle'
 
 const LSREGISTER =
@@ -155,7 +156,8 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       }
 
       const pinnedRoot = options.pinRoot ? root : undefined
-      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot }, run)
+      const templateKey = templateKeyOf(defaultApp, run)
+      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot, templateKey }, run)
       signProfileBundle(bundle, defaultApp, bundleId, helpers, staging, run)
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
