@@ -62,9 +62,17 @@ beforeEach(() => {
   file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
   file(join(contents, 'MacOS', 'orca-keyboard-layout'), 'layout')
   file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
+  const helper = join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents')
+  file(join(helper, 'MacOS', 'Orca Helper (Renderer)'), 'helper')
   file(
-    join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents', 'MacOS', 'h'),
-    'helper'
+    join(helper, 'Info.plist'),
+    `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleExecutable</key><string>Orca Helper (Renderer)</string>
+  <key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux.helper.Renderer</string>
+</dict></plist>
+`
   )
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
@@ -124,7 +132,16 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(readFileSync(join(contents, 'MacOS', 'orca-notification-status'), 'utf8')).toBe(
       'profile variant'
     )
-    expect(isLink(join(contents, 'Frameworks', 'Orca Helper (Renderer).app'))).toBe(false)
+    // The helpers carry the profile name: Electron finds them as <CFBundleName> Helper*.app.
+    const helper = join(contents, 'Frameworks', 'Orca - Work Helper (Renderer).app')
+    expect(isLink(helper)).toBe(false)
+    expect(existsSync(join(contents, 'Frameworks', 'Orca Helper (Renderer).app'))).toBe(false)
+    expect(
+      readFileSync(join(helper, 'Contents', 'MacOS', 'Orca - Work Helper (Renderer)'), 'utf8')
+    ).toBe('helper')
+    expect(plistValue(join(helper, 'Contents', 'Info.plist'), 'CFBundleExecutable')).toBe(
+      'Orca - Work Helper (Renderer)'
+    )
     // The Electron framework is a clone: helpers crash when it is a link (slice 1, U4).
     expect(isLink(join(contents, 'Frameworks', 'Electron Framework.framework'))).toBe(false)
     expect(
@@ -144,15 +161,25 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     const plist = join(contents, 'Info.plist')
     expect(plistValue(plist, 'CFBundleIdentifier')).toBe(entry.bundleId)
     expect(plistValue(plist, 'CFBundleDisplayName')).toBe('Orca - Work')
-    expect(plistValue(plist, 'CFBundleName')).toBe('Orca')
+    // The bold menu-bar name, and the name of Electron's helper lookup.
+    expect(plistValue(plist, 'CFBundleName')).toBe('Orca - Work')
+    expect(
+      existsSync(
+        join(contents, 'Frameworks', `${plistValue(plist, 'CFBundleName')} Helper (Renderer).app`)
+      )
+    ).toBe(true)
     expect(plistValue(plist, 'OrcaAppProfileId')).toBe('work')
     expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBe(join(dir, 'data'))
     expect(plistValue(plist, 'CFBundleURLTypes')).toBeNull()
     expect(plistValue(plist, 'ElectronAsarIntegrity')).toBeNull()
     expect(plistValue(plist, 'CFBundleDocumentTypes.0.CFBundleTypeRole')).toBe('Editor')
 
-    // Small executables first, then the bundle; ad hoc, no --deep, no hardened runtime.
-    const signs = calls.filter((call) => call[0].endsWith('codesign') && call[1] === '--force')
+    // The renamed helper app, with its own entitlements; the small executables; the bundle. Ad hoc,
+    // no --deep, no hardened runtime.
+    const all = calls.filter((call) => call[0].endsWith('codesign') && call[1] === '--force')
+    expect(all[0].slice(1, 5)).toEqual(['--force', '-s', '-', '--entitlements'])
+    expect(all[0].at(-1)).toMatch(/Orca - Work Helper \(Renderer\)\.app$/)
+    const signs = all.slice(1)
     expect(signs.map((call) => call.at(-1))).toEqual([
       expect.stringMatching(/MacOS\/orca-keyboard-layout$/),
       expect.stringMatching(/MacOS\/orca-notification-status$/),

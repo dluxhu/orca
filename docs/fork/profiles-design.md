@@ -560,7 +560,7 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
     own service again when it starts (section 4).
   - `autoInstallOnAppQuit` (`src/main/updater/lifecycle/updater-setup.ts:156` (fork)) stays off while
     a profile runs, so a quit of the default app alone does not install it.
-- **When the thin bundle must change.** The Profile Manager stores a `templateKey`: a hash of
+- **When the thin bundle must change** (plan; see Refresh for what is built). A `templateKey`: a hash of
   - the Electron version;
   - the release cdhashes of the copied executables: `orca-notification-status` (profile variant),
     `orca-keyboard-layout`, `orca-process-footprint`;
@@ -574,18 +574,33 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   - An Orca update with the same Electron version and the same small executables: no rebuild.
   - An Electron upgrade: the helper copies and the main executable must match the framework, so a
     rebuild and one more set of prompts.
-- **Refresh (built, 2026-11-25).** A profile app copies the runtime once, at create, so after an
-  Orca update it runs the old Electron runtime with the new `app.asar`. At start, before the server
-  check, a profile app compares the version of its copies (`CFBundleShortVersionString` and
-  `CFBundleVersion` in its own `Info.plist`) with the default app's (`refreshAppProfileBundle`,
-  `app-profile-bundle.ts`; `refreshOutdatedProfileApp`, `app-profile-refresh.ts`). Same version: no
-  work. Another version: it clones its bundle next to it, copies the executables, the helper apps,
-  the Electron framework and the `Info.plist` of the default app into the clone again, sets the
-  profile keys, links new `Resources` entries, signs the clone ad hoc, and swaps it in. The data,
-  the icon files and the Finder custom icon stay. Then the app starts again. A failure leaves the
-  bundle as it was: the app shows the error and starts with the old runtime. A serve start does not
-  refresh. Known gap: the version, not the `templateKey` above, decides, so each Orca update signs
-  again and the Keychain asks once more for each profile.
+- **Refresh (built, 2026-11-25).** A profile app copies the runtime at create, so after an Orca
+  update it can run an old Electron runtime with the new `app.asar`. Its `Info.plist` records the
+  template key of its copies (`OrcaProfileTemplateKey`, `templateKeyOf` in `app-profile-bundle.ts`):
+  a hash of the Electron framework version, the cdhash of each executable in `MacOS` and of the
+  profile's notification helper, and the names in `Frameworks` and `Resources`. A new signature of
+  the same code keeps the cdhash. At start, before the server check, the profile app compares the
+  key of the default app with its own (`refreshOutdatedProfileApp`, `app-profile-refresh.ts`).
+  `<userData>/profile-runtime-check.txt` keeps the default app version of the last check, so a
+  start with the same version reads no executables.
+  - Same key: no work and no new signature, so the Keychain does not ask again.
+  - Another key: the app clones its bundle next to it, copies the executables, the helper apps,
+    the Electron framework and the `Info.plist` of the default app into the clone again, sets the
+    profile keys, links new `Resources` entries, signs the clone ad hoc, and swaps it in. The data,
+    the icon files and the Finder custom icon stay. Then the app starts again. The new signature
+    makes the Keychain ask once more.
+  - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
+  - A serve start does not refresh.
+- **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and
+  Electron finds its helpers as `Frameworks/<CFBundleName> Helper*.app`. So create and refresh
+  (`copyAppRuntime`) set `CFBundleName` to the profile name, and copy each helper app as
+  `<profile name> Helper (…).app`, with its executable and `Info.plist` renamed, signed again ad hoc
+  with its own entitlements.
+  - A rename in the Profile Manager or in Finder does not sign again (no Keychain prompt): the Dock
+    and the window show the new name at once. The bold menu-bar name follows at the next refresh:
+    a refresh also runs when `CFBundleName` differs from the app's file name.
+  - Accepted (owner, 2026-11-25): the helpers lose the default app's signature, so macOS can ask
+    once again for privacy permissions (for example the microphone) in each profile.
 - If the default app moves or is renamed, the links break. There is no "Repair" in v1 (owner): the
   user makes the profile again with the same name. A new profile with the id of an existing data
   folder uses that folder again (section 9).
