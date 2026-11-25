@@ -48,9 +48,13 @@ export function classifyProfileServer(
   return { kind: 'hand-started', pids: [holder.pid] }
 }
 
-// shortcut: one synchronous `ps` before ready, where nothing can await; slice 5 moves it to an async start.
+// shortcut: synchronous `ps` and `launchctl` before ready, where nothing can await; slice 5 moves them to an async start.
+function runSync(program: string, args: string[]): { status: number | null; stdout: string } {
+  return spawnSync(program, args, { encoding: 'utf8' })
+}
+
 function readProcessTable(): ProcessRow[] {
-  const out = spawnSync('/bin/ps', ['-axo', 'pid=,ppid=,command='], { encoding: 'utf8' }).stdout
+  const out = runSync('/bin/ps', ['-axo', 'pid=,ppid=,command=']).stdout
   return (out ?? '').split('\n').flatMap((line) => {
     const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line)
     return match ? [{ pid: Number(match[1]), ppid: Number(match[2]), command: match[3] }] : []
@@ -90,10 +94,12 @@ export function takeProfileFromServer(userDataPath: string): boolean {
     const uid = process.getuid?.() ?? 0
     const label = `${SERVE_LAUNCHD_LABEL_PREFIX}.${serveProfileSuffix(userDataPath)}`
     const unitPath = join(homedir(), 'Library', 'LaunchAgents', `${label}.plist`)
-    if (existsSync(unitPath)) {
-      launchctl(['bootout', `gui/${uid}/${label}`])
-      // Detached, so it runs after this process has exited.
-      app.once('will-quit', () => launchctl(['bootstrap', `gui/${uid}`, unitPath]))
+    // The job can be loaded without its file, so bootout runs in every case.
+    if (runSync('/bin/launchctl', ['bootout', `gui/${uid}/${label}`]).status === 0) {
+      if (existsSync(unitPath)) {
+        // Detached, so it runs after this process has exited.
+        app.once('will-quit', () => launchctl(['bootstrap', `gui/${uid}`, unitPath]))
+      }
       if (waitForExit(server.pid)) {
         return true
       }
