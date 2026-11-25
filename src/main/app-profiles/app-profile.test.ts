@@ -8,7 +8,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
@@ -247,7 +247,13 @@ describe('ensureAppProfileMarker', () => {
 })
 
 describe('isProfileManagerBundle', () => {
-  const nested = '/Applications/Orca.app/Contents/Applications/Orca Profile Manager.app'
+  // Native absolute paths: the check builds the place with resolve() and join().
+  const nested = join(
+    resolve('/Applications/Orca.app'),
+    'Contents',
+    'Applications',
+    'Orca Profile Manager.app'
+  )
   const role = '<dict><key>OrcaAppRole</key><string>profile-manager</string></dict>'
   const plain = '<dict><key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string></dict>'
 
