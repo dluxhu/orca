@@ -29,6 +29,7 @@ import {
   type ServeServiceRun
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { isProcessAlive } from './app-profile-registry'
+import { settlePreRefresh } from './app-profile-bundle-refresh'
 
 export type AppProfileListDeps = {
   env?: NodeJS.ProcessEnv
@@ -240,6 +241,12 @@ export async function listAppProfiles(
       port: registry?.defaultPort ?? DEFAULT_APP_PORT
     },
     ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => {
+      try {
+        // A refresh that stopped between its two renames left only <app>.pre-refresh.
+        settlePreRefresh(appPath, false)
+      } catch {
+        // The next list tries again.
+      }
       // A rename in Finder changes only the file name; the app shows that name.
       const found = locateAppProfileApp({ id, appPath })
       return {

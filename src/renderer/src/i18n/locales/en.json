@@ -31004,6 +31004,7 @@
       "idTaken": "A profile with the id \"{{id}}\" exists.",
       "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
       "nameTaken": "A profile with the name \"{{name}}\" exists.",
+      "nameLong": "The profile name is too long: at most {{max}} bytes.",
       "portRange": "The port must be 1024 to 65535: {{port}}",
       "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
       "portTaken": "Another profile saves the port {{port}}.",

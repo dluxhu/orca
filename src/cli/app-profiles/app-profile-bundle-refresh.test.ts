@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import type * as Fs from 'node:fs'
 import {
   existsSync,
   lstatSync,
@@ -11,9 +12,34 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { refreshAppProfileBundle } from './app-profile-bundle'
+
+const h = vi.hoisted(() => ({ failSwap: false }))
+vi.mock('node:fs', async (original) => {
+  const fs = await original<typeof Fs>()
+  return {
+    ...fs,
+    // The second rename of the swap: the new bundle into the app's place.
+    renameSync: (from: Fs.PathLike, to: Fs.PathLike) => {
+      if (
+        h.failSwap &&
+        String(from).includes('.refresh-') &&
+        String(to).endsWith('/apps/Work.app')
+      ) {
+        throw new Error('rename failed')
+      }
+      return fs.renameSync(from, to)
+    }
+  }
+})
+
+import {
+  preRefreshPathOf,
+  refreshAppProfileBundle,
+  settlePreRefresh,
+  signWithoutFinderInfo
+} from './app-profile-bundle-refresh'
 import { createAppProfile, type RunTool } from './app-profile-create'
 
 const plist = (version: string): string => `<?xml version="1.0" encoding="UTF-8"?>
@@ -35,15 +61,39 @@ let dir: string
 let app: string
 let calls: string[][]
 let failSign: boolean
+/** Each signed path, its entitlements, and whether it had Finder information at that time. */
+let signed: { path: string; entitlements: string | null; finderInfo: boolean }[]
 
-// Real ditto, cp and plutil; codesign and lsregister are recorded.
+const FINDER_INFO = '0000000000000000040000000000000000000000000000000000000000000000'
+const finderInfoOf = (path: string): string =>
+  execFileSync(
+    '/bin/sh',
+    ['-c', '/usr/bin/xattr -px com.apple.FinderInfo "$0" 2>/dev/null || true', path],
+    {
+      encoding: 'utf8'
+    }
+  ).replace(/\s+/g, '')
+
+// Real ditto, cp, plutil and xattr; codesign and lsregister are recorded.
 const run: RunTool = (program, args) => {
   calls.push([program, ...args])
   if (program.endsWith('codesign')) {
+    if (args[0] === '-d') {
+      // Each helper has its own entitlements; the renderer has JIT.
+      const of = args.at(-1) ?? ''
+      return `<plist>${basename(of)}${of.includes('(Renderer)') ? ' allow-jit' : ''}</plist>`
+    }
     if (failSign && args[0] === '--force') {
       throw new Error('codesign failed')
     }
-    return args[0] === '-d' ? '<plist><dict/></plist>' : ''
+    const at = args.indexOf('--entitlements')
+    const path = args.at(-1) ?? ''
+    signed.push({
+      path,
+      entitlements: at === -1 ? null : readFileSync(args[at + 1], 'utf8'),
+      finderInfo: finderInfoOf(path) !== ''
+    })
+    return ''
   }
   if (program.endsWith('lsregister')) {
     return ''
@@ -67,9 +117,11 @@ function defaultApp(version: string, code = version): void {
   const framework = join(contents, 'Frameworks', 'Electron Framework.framework')
   file(join(framework, 'x'), `fw ${code}`)
   file(join(framework, 'Resources', 'Info.plist'), plist(`electron ${code}`))
-  const helper = join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents')
-  file(join(helper, 'MacOS', 'Orca Helper (Renderer)'), `h ${code}`)
-  file(join(helper, 'Info.plist'), plist(code))
+  for (const type of ['', ' (Renderer)', ' (GPU)', ' (Plugin)']) {
+    const helper = join(contents, 'Frameworks', `Orca Helper${type}.app`, 'Contents')
+    file(join(helper, 'MacOS', `Orca Helper${type}`), `h ${code}`)
+    file(join(helper, 'Info.plist'), plist(code))
+  }
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), `asar ${version}`)
   file(join(contents, 'Resources', 'profile-template', 'orca-notification-status'), 'profile')
@@ -80,7 +132,9 @@ beforeEach(() => {
   app = join(dir, 'Orca.app')
   defaultApp('1.0')
   calls = []
+  signed = []
   failSign = false
+  h.failSwap = false
   vi.stubEnv('HOME', dir)
 })
 
@@ -156,14 +210,14 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(read(join(contents, 'Resources', 'own.icns'))).toBe('own icon')
     expect(lstatSync(join(contents, 'Resources', 'new.pak')).isSymbolicLink()).toBe(true)
     // The new bundle is signed before it takes the app's place.
-    expect(calls.at(-1)?.[0]).toBe('/usr/bin/codesign')
-    expect(calls.at(-1)?.at(-1)).toMatch(/\/\.work\.refresh-[^/]+\/Work\.app$/)
-    // The data folder is not touched, and nothing is left next to the app.
+    expect(signed.at(-1)?.path).toMatch(/\/\.work\.refresh-[^/]+\/Work\.app$/)
+    // The data folder is not touched. The previous bundle stays until the next start.
     expect(existsSync(join(entry.userDataPath, 'orca-app-profile.json'))).toBe(true)
-    expect(readdirSync(join(dir, 'apps'))).toEqual(['Work.app'])
-    // The version is recorded: the next start does no work.
+    expect(readdirSync(join(dir, 'apps')).sort()).toEqual(['Work.app', 'Work.app.pre-refresh'])
+    // The key is recorded: the next start does no work, and removes the previous bundle.
     calls = []
     expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(false)
+    expect(readdirSync(join(dir, 'apps'))).toEqual(['Work.app'])
   })
 
   it('does not sign again after a rename alone', () => {
@@ -196,6 +250,85 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(existsSync(join(contents, 'Frameworks', 'Work Helper (Renderer).app'))).toBe(false)
   })
 
+  it('gives each helper type its own name and entitlements, not those of the main app', () => {
+    const { entry, contents } = make()
+    defaultApp('2.0')
+    refreshAppProfileBundle(entry.appPath, app, run)
+    for (const type of ['', ' (Renderer)', ' (GPU)', ' (Plugin)']) {
+      const helper = join(contents, 'Frameworks', `Work Helper${type}.app`)
+      for (const name of ['CFBundleExecutable', 'CFBundleName', 'CFBundleDisplayName']) {
+        expect(key(join(helper, 'Contents', 'Info.plist'), name)).toBe(`Work Helper${type}`)
+      }
+      const sign = signed.find((entry) => entry.path.endsWith(`/Work Helper${type}.app`))
+      expect(sign?.entitlements).toBe(
+        `<plist>Orca Helper${type}.app${type === ' (Renderer)' ? ' allow-jit' : ''}</plist>`
+      )
+    }
+  })
+
+  it('signs the bundle without its Finder information and puts it back', () => {
+    const { entry } = make()
+    // set-icon gives every profile a Finder custom icon.
+    execFileSync('/usr/bin/xattr', ['-wx', 'com.apple.FinderInfo', FINDER_INFO, entry.appPath])
+    defaultApp('2.0')
+    expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(true)
+    const bundleSign = signed.at(-1)
+    expect(bundleSign?.path).toMatch(/\/Work\.app$/)
+    expect(bundleSign?.finderInfo).toBe(false)
+    expect(finderInfoOf(entry.appPath)).toBe(FINDER_INFO)
+  })
+
+  it('refreshes when the check file names an older version (p1)', () => {
+    const { entry } = make()
+    const check = join(dir, 'check.txt')
+    writeFileSync(check, '1.0')
+    defaultApp('2.0')
+    expect(refreshAppProfileBundle(entry.appPath, app, run, check)).toBe(true)
+  })
+
+  it('checks again when a needed copy is missing, whatever the check file says', () => {
+    const { entry, contents } = make()
+    const check = join(dir, 'check.txt')
+    refreshAppProfileBundle(entry.appPath, app, run, check)
+    rmSync(join(contents, 'Frameworks', 'Work Helper (Renderer).app'), { recursive: true })
+    expect(refreshAppProfileBundle(entry.appPath, app, run, check)).toBe(true)
+    expect(existsSync(join(contents, 'Frameworks', 'Work Helper (Renderer).app'))).toBe(true)
+  })
+
+  it('keeps the check file when a refresh fails (p2)', () => {
+    const { entry } = make()
+    const check = join(dir, 'check.txt')
+    refreshAppProfileBundle(entry.appPath, app, run, check)
+    const before = read(check)
+    defaultApp('2.0')
+    failSign = true
+    expect(() => refreshAppProfileBundle(entry.appPath, app, run, check)).toThrow()
+    expect(read(check)).toBe(before)
+  })
+
+  it('puts the app back when the new bundle cannot take its place (o2)', () => {
+    const { entry, contents } = make()
+    defaultApp('2.0')
+    h.failSwap = true
+    expect(() => refreshAppProfileBundle(entry.appPath, app, run)).toThrow('rename failed')
+    expect(read(join(contents, 'MacOS', 'Orca'))).toBe('main 1.0')
+    expect(readdirSync(join(dir, 'apps'))).toEqual(['Work.app'])
+  })
+
+  it('removes a previous bundle after the start, or puts it back when the app is missing', () => {
+    const { entry } = make()
+    const previous = preRefreshPathOf(entry.appPath)
+    mkdirSync(previous)
+    settlePreRefresh(entry.appPath, false)
+    expect(existsSync(previous)).toBe(true)
+    settlePreRefresh(entry.appPath)
+    expect(existsSync(previous)).toBe(false)
+    renameSync(entry.appPath, previous)
+    settlePreRefresh(entry.appPath)
+    expect(existsSync(join(entry.appPath, 'Contents', 'Info.plist'))).toBe(true)
+    expect(existsSync(previous)).toBe(false)
+  })
+
   it('gives a clear error and leaves the bundle as it was when a step fails', () => {
     const { entry, contents } = make()
     defaultApp('2.0')
@@ -206,5 +339,30 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(read(join(contents, 'MacOS', 'Orca'))).toBe('main 1.0')
     expect(key(join(contents, 'Info.plist'), 'CFBundleVersion')).toBe('1.0')
     expect(readdirSync(join(dir, 'apps'))).toEqual(['Work.app'])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('signWithoutFinderInfo', () => {
+  // A real ad hoc signature of a small real bundle, in the temp folder only.
+  const realRun: RunTool = (program, args) => execFileSync(program, args, { encoding: 'utf8' })
+  const bundle = (): string => {
+    const path = join(dir, 'Probe.app')
+    file(
+      join(path, 'Contents', 'Info.plist'),
+      plist('1').replace('<string>Orca</string>', '<string>probe</string>')
+    )
+    mkdirSync(join(path, 'Contents', 'MacOS'), { recursive: true })
+    execFileSync('/bin/cp', ['/usr/bin/true', join(path, 'Contents', 'MacOS', 'probe')])
+    execFileSync('/usr/bin/xattr', ['-wx', 'com.apple.FinderInfo', FINDER_INFO, path])
+    return path
+  }
+  const sign = (path: string) => () => realRun('/usr/bin/codesign', ['--force', '-s', '-', path])
+
+  it('lets codesign sign a bundle with a Finder custom icon, and keeps the icon flag', () => {
+    const path = bundle()
+    expect(sign(path)).toThrow(/detritus/)
+    signWithoutFinderInfo(path, realRun, sign(path))
+    expect(() => realRun('/usr/bin/codesign', ['--verify', path])).not.toThrow()
+    expect(finderInfoOf(path)).toBe(FINDER_INFO)
   })
 })
