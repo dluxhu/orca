@@ -251,7 +251,24 @@ describe('Profile Manager IPC', () => {
       '6832',
       '--command',
       launcher,
+      '--no-start',
       '--json'
+    ])
+  })
+
+  it('Start background service starts it now and leaves Start at login off', async () => {
+    writeRegistry()
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    await h.handlers.get('appProfiles:change')?.(manager, {
+      kind: 'service',
+      id: 'work',
+      run: true
+    })
+    expect(h.execFileCalls.map((call) => call.args.slice(5))).toEqual([
+      ['install', '--port', '6832', '--command', launcher, '--json'],
+      ['uninstall', '--keep-running', '--json']
     ])
   })
 
@@ -323,6 +340,7 @@ describe('Profile Manager IPC', () => {
       '6864',
       '--command',
       launcher,
+      '--no-start',
       '--json'
     ])
   })

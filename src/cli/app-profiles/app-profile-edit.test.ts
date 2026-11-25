@@ -311,6 +311,26 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
     expect(portAtBootstrap).toContain('<string>7000</string>')
   })
 
+  it('keeps a service that shows a desktop window running; its unit gets the new port', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    writeRuntimePid(work.userDataPath, 778, { role: 'serve', ppid: 777 })
+    const result = await setAppProfilePort({
+      id: 'work',
+      port: 7000,
+      ...deps(),
+      serviceRun: async (program, args) =>
+        program === '/usr/bin/lsappinfo'
+          ? { code: 0, out: 'type="Foreground"' }
+          : serviceRun(program, args)
+    })
+    expect(result.serveService).toBe('updated')
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+    expect(readFileSync(unit.unitPath, 'utf8')).toContain('<string>7000</string>')
+  })
+
   it('changes the saved port while the profile app is open; the app does not use it', async () => {
     const work = makeProfile()
     writeRuntimePid(work.userDataPath, 4242)
@@ -468,6 +488,7 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
             : { code: 113, out: '' }
     })
     expect(rows.map((row) => row.startAtLogin)).toEqual([false, false, true, false])
+    expect(rows.map((row) => row.serviceRuns)).toEqual([false, false, true, false])
     expect(rows.map((row) => [row.id, row.name, row.state])).toEqual([
       ['default', 'Default', 'stopped'],
       ['work', 'Orca - Work', 'running'],
@@ -533,6 +554,42 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ['orcad', 'background', undefined],
       ['days', 'stopped', undefined],
       ['older', 'running', undefined]
+    ])
+  })
+
+  it('shows a server that hosts a desktop window as running', async () => {
+    const work = makeProfile('Work')
+    const home = makeProfile('Home')
+    // A Dock click on the profile app brings its running server to the front with a window.
+    writeRuntimePid(work.userDataPath, 10, { role: 'serve', ppid: 11 })
+    processes.set(11, '9 00:02')
+    writeRuntimePid(home.userDataPath, 20, { role: 'serve', ppid: 21 })
+    processes.set(21, '19 00:02')
+    const label = (userDataPath: string) => serveServiceUnitOf(userDataPath, false, dir).label
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps(),
+      serviceRun: async (program, args) => {
+        if (program === '/usr/bin/lsappinfo') {
+          const type = args.at(-1) === '10' ? 'Foreground' : 'UIElement'
+          return { code: 0, out: `ASN:0x0-0x1: \n type="${type}" \n` }
+        }
+        if (program === '/bin/ps') {
+          return serviceRun(program, args)
+        }
+        if (args[1].endsWith(label(work.userDataPath))) {
+          return { code: 0, out: 'pid = 9' }
+        }
+        return args[1].endsWith(label(home.userDataPath))
+          ? { code: 0, out: 'pid = 19' }
+          : { code: 113, out: '' }
+      }
+    })
+    expect(rows.map((row) => [row.id, row.state])).toEqual([
+      ['default', 'stopped'],
+      ['work', 'running'],
+      ['home', 'background']
     ])
   })
 

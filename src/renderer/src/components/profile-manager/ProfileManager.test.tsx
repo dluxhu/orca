@@ -676,6 +676,32 @@ describe('ProfileManager', () => {
     expect(screen.getByText('Default')).toBeTruthy()
   })
 
+  it('starts and stops the background service of a profile whose app does not run', async () => {
+    appState.rows[1] = { ...appState.rows[1], serviceRuns: true }
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    // The running app has no service buttons.
+    expect(within(rowOf('Orca')).queryByRole('button', { name: /background service/ })).toBeNull()
+    expect(
+      within(rowOf('Orca - Work')).queryByRole('button', { name: 'Start background service' })
+    ).toBeNull()
+    fireEvent.click(
+      within(rowOf('Orca - Work')).getByRole('button', { name: 'Stop background service' })
+    )
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith({ kind: 'service', id: 'work', run: false })
+    )
+    expect(
+      within(rowOf('Orca - Home')).queryByRole('button', { name: 'Stop background service' })
+    ).toBeNull()
+    fireEvent.click(
+      within(rowOf('Orca - Home')).getByRole('button', { name: 'Start background service' })
+    )
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith({ kind: 'service', id: 'home', run: true })
+    )
+  })
+
   it('reads one list at a time: a read that does not return blocks the poll and focus', async () => {
     vi.useFakeTimers()
     getState.mockReset().mockReturnValue(new Promise(() => {}))

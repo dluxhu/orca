@@ -87,6 +87,10 @@ export type RuntimeOwner =
 export type AppProfileRuntime = {
   state: AppProfileState
   owner: RuntimeOwner
+  /** A server owns the runtime and shows a desktop window: a Dock click on the app opened it. */
+  serverWindow: boolean
+  /** The profile's own serve service job runs. */
+  serviceRuns: boolean
   /** The port of the owner's WebSocket listener, as pairing advertises it. */
   livePort: number | null
 }
@@ -150,6 +154,12 @@ async function classifyOwner(
   return file.runtime.role === 'serve' || file.runtime.role === 'orcad' ? 'server' : 'app'
 }
 
+/** True when the process has a Dock tile: a server gets one while it shows a desktop window. */
+async function hasDockTile(pid: number, run: ServeServiceRun): Promise<boolean> {
+  const result = await run('/usr/bin/lsappinfo', ['info', '-only', 'ApplicationType', String(pid)])
+  return result.code === 0 && /type="Foreground"/.test(result.out)
+}
+
 function webSocketPort(runtime: RuntimeMetadata): number | null {
   const endpoint = findTransport(runtime, 'websocket')?.endpoint ?? ''
   const port = Number(/:(\d+)$/.exec(endpoint)?.[1])
@@ -158,8 +168,9 @@ function webSocketPort(runtime: RuntimeMetadata): number | null {
 
 /**
  * The owner of the profile's runtime, its state and its live port.
- * "running": the profile app. "background": only a server runs: the serve service, or a server
- * that another launch agent or a terminal started. "stopped": neither runs.
+ * "running": the profile app, or a server that shows a desktop window. "background": only a server
+ * runs: the serve service, or a server that another launch agent or a terminal started.
+ * "stopped": neither runs.
  */
 export async function readAppProfileRuntime(
   profile: { userDataPath: string },
@@ -177,9 +188,21 @@ export async function readAppProfileRuntime(
   const owner =
     file && isAlive(file.runtime.pid) ? await classifyOwner(file, servicePid, run) : 'none'
   const serviceRuns = servicePid !== null && isAlive(servicePid)
+  // A Dock click on a profile app whose server runs activates that server, which opens a window.
+  const serverWindow =
+    file !== null && (owner === 'server' || owner === 'service')
+      ? await hasDockTile(file.runtime.pid, run)
+      : false
   return {
-    state: owner === 'app' ? 'running' : owner !== 'none' || serviceRuns ? 'background' : 'stopped',
+    state:
+      owner === 'app' || serverWindow
+        ? 'running'
+        : owner !== 'none' || serviceRuns
+          ? 'background'
+          : 'stopped',
     owner,
+    serverWindow,
+    serviceRuns,
     livePort: file && owner !== 'none' ? webSocketPort(file.runtime) : null
   }
 }
@@ -217,11 +240,16 @@ export async function listAppProfiles(
   const home = options.home ?? homedir()
   return Promise.all(
     rows.map(async (row) => {
-      const { state, livePort } = await readAppProfileRuntime(row, row.id === 'default', options)
+      const { state, livePort, serviceRuns } = await readAppProfileRuntime(
+        row,
+        row.id === 'default',
+        options
+      )
       return {
         ...row,
         ...(livePort === null ? {} : { livePort }),
         state,
+        serviceRuns,
         startAtLogin: existsSync(
           serveServiceUnitOf(row.userDataPath, row.id === 'default', home).unitPath
         )

@@ -205,6 +205,7 @@ export function ProfileManager(): React.JSX.Element {
                 onStartAtLogin={(enabled) =>
                   void run([{ kind: 'start-at-login', id: row.id, enabled }])
                 }
+                onService={(on) => void run([{ kind: 'service', id: row.id, run: on }])}
                 onRemove={() => setForm({ mode: 'remove', row, keepData: true })}
               />
             ))}

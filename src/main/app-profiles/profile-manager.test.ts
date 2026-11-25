@@ -71,6 +71,7 @@ vi.mock('../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal
 
 import {
   profileCommandArgs,
+  serviceCommandArgs,
   profilesMenuItems,
   readAppProfilesState,
   registerProfileManagerIpc,
@@ -202,16 +203,48 @@ describe('profileCommandArgs for Start at login', () => {
       '6832',
       '--command',
       '/Apps/Orca.app/Contents/Resources/bin/orca',
+      '--no-start',
       '--json'
     ])
-    // Uninstall removes only the service; the data stays.
+    // Only the login item goes; a running server keeps running, and the data stays.
     expect(profileCommandArgs({ kind: 'start-at-login', id: 'work', enabled: false })).toEqual([
       '--profile',
       'work',
       'serve',
       'service',
       'uninstall',
+      '--keep-running',
       '--json'
+    ])
+  })
+})
+
+describe('serviceCommandArgs', () => {
+  const service = { port: 6832, command: '/Apps/Orca.app/Contents/Resources/bin/orca' }
+  const install = [
+    '--profile',
+    'work',
+    'serve',
+    'service',
+    'install',
+    '--port',
+    '6832',
+    '--command',
+    service.command,
+    '--json'
+  ]
+  const uninstall = ['--profile', 'work', 'serve', 'service', 'uninstall', '--json']
+
+  it('starts and stops the service and keeps the Start at login choice', () => {
+    expect(serviceCommandArgs('work', true, true, service)).toEqual([install])
+    expect(serviceCommandArgs('work', true, false, service)).toEqual([
+      install,
+      [...uninstall.slice(0, -1), '--keep-running', '--json']
+    ])
+    expect(serviceCommandArgs('work', false, false, service)).toEqual([uninstall])
+    expect(serviceCommandArgs('work', false, true, service)).toEqual([
+      uninstall,
+      [...install.slice(0, -1), '--no-start', '--json']
     ])
   })
 })
