@@ -88,7 +88,8 @@ describe('jumpToQuoteSource', () => {
       source('reply-1'),
       fileQuote,
       fake.notifyMissing,
-      expect.any(Function)
+      expect.any(Function),
+      undefined
     )
     expect(fake.openFile).not.toHaveBeenCalled()
   })
