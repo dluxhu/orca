@@ -1,11 +1,11 @@
 // The refresh of a profile app after an Orca update: docs/fork/profiles-design.md, section 7.
 import {
+  lstatSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -75,10 +75,10 @@ export function preRefreshLeftoversOf(appsDir: string, id: string): string[] {
     .filter((entry) => entry.endsWith(`.app${PRE_REFRESH}`))
     .map((entry) => join(appsDir, entry))
     .filter((path) => profileIdOf(path) === id)
-    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+    .sort((a, b) => lstatSync(b).mtimeMs - lstatSync(a).mtimeMs)
 }
 
-/** Removes the previous bundles of the profile: rename and remove call it. */
+/** Removes the previous bundles of the profile: rename and remove call it. A link goes, not its target. */
 export function removePreRefreshLeftovers(appsDir: string, id: string): void {
   for (const path of preRefreshLeftoversOf(appsDir, id)) {
     rmSync(path, { recursive: true, force: true })
@@ -95,12 +95,18 @@ export function settlePreRefresh(appsDir: string, id: string, removeOld = true):
   if (leftovers.length === 0) {
     return
   }
-  const live = readdirSync(appsDir).some(
+  const entries = readdirSync(appsDir)
+  // A refresh of the profile runs now: between its two renames no live bundle exists.
+  if (!removeOld && entries.some((entry) => entry.startsWith(`.${id}.refresh-`))) {
+    return
+  }
+  const live = entries.some(
     (entry) => entry.endsWith('.app') && profileIdOf(join(appsDir, entry)) === id
   )
   if (!live) {
     const restored = leftovers[0].slice(0, -PRE_REFRESH.length)
-    if (!exists(restored)) {
+    // A link is no bundle to bring back.
+    if (!exists(restored) && !lstatSync(leftovers[0]).isSymbolicLink()) {
       renameSync(leftovers[0], restored)
       leftovers.shift()
     }
@@ -200,7 +206,12 @@ function rebuild(
       icon ? (contents, plist) => writeBundleIcon(contents, plist, icon) : undefined
     )
     if (icon) {
-      setFinderIcon(next, icon, run)
+      // Best effort: the Dock reads the icon file in the seal; the Finder icon is the stopped app's.
+      try {
+        setFinderIcon(next, icon, run)
+      } catch (error) {
+        console.warn('[profiles] cannot set the Finder icon of the refreshed app:', error)
+      }
     }
     // The live bundle moves to a visible sibling first: staging never holds the only copy.
     const previous = preRefreshPathOf(appPath)
