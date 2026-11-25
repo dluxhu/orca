@@ -1,5 +1,5 @@
 import { reenterPackagedElectron } from '../runtime/app-launch/packaged-cli-interpreter'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname } from 'node:path'
 import type { CommandHandler } from '../dispatch/dispatch'
@@ -128,6 +128,13 @@ async function mustRun(deps: ServeServiceDeps, program: string, args: string[]):
   }
 }
 
+// Fork patch: the login-item-only flags of the app profiles exist on macOS only.
+function requireLaunchd(manager: ServeServiceSpec['manager'], flag: string): void {
+  if (manager !== 'launchd') {
+    throw new RuntimeClientError('invalid_argument', `${flag} is available on macOS only.`)
+  }
+}
+
 /** Render and optionally install the supervised serve service for the current platform. */
 export async function installServeService(
   options: {
@@ -138,6 +145,8 @@ export async function installServeService(
     allowPublic?: boolean
     refusePublic?: boolean
     dryRun: boolean
+    /** Fork patch: false writes the unit (the login item) and starts or stops nothing. */
+    start?: boolean
   },
   deps: ServeServiceDeps = defaultDeps()
 ): Promise<Record<string, unknown>> {
@@ -146,6 +155,9 @@ export async function installServeService(
     ...options,
     command: resolveServiceCommand(options.command, deps)
   })
+  if (options.start === false) {
+    requireLaunchd(spec.manager, '--no-start')
+  }
   if (options.dryRun) {
     return { installed: false, dryRun: true, ...spec }
   }
@@ -156,6 +168,15 @@ export async function installServeService(
   }
   // Reinstalling retries a supervisor stopped by the crash-loop brake.
   clearServeSupervisorBrake(resolveLaunchUserDataPath(deps.env))
+  if (options.start === false) {
+    return {
+      installed: true,
+      manager: spec.manager,
+      name: spec.name,
+      unitPath: spec.unitPath,
+      logPath: spec.logPath
+    }
+  }
   if (spec.manager === 'launchd') {
     await deps.run('launchctl', ['bootout', `gui/${deps.uid}/${spec.name}`])
     await mustRun(deps, 'launchctl', ['bootstrap', `gui/${deps.uid}`, spec.unitPath])
@@ -251,10 +272,18 @@ export async function readServeServiceStatus(
 }
 
 export async function uninstallServeService(
-  deps: ServeServiceDeps = defaultDeps()
+  deps: ServeServiceDeps = defaultDeps(),
+  /** Fork patch: keepRunning removes only the unit (the login item); a loaded job keeps running. */
+  options: { keepRunning?: boolean } = {}
 ): Promise<Record<string, unknown>> {
   requireManager(deps.platform)
   const spec = serviceSpec(deps, { command: 'orca' })
+  if (options.keepRunning) {
+    requireLaunchd(spec.manager, '--keep-running')
+    const existed = existsSync(spec.unitPath)
+    rmSync(spec.unitPath, { force: true })
+    return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
+  }
   const existed = await removeServeServiceUnit(spec, deps.run, deps.uid)
   return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
 }
@@ -283,7 +312,8 @@ export const SERVE_SERVICE_HANDLERS: Record<string, CommandHandler> = {
       pairingAddress: optionalString(flags.get('pairing-address')),
       allowPublic: flags.get('allow-public') === true,
       refusePublic: flags.get('refuse-public') === true,
-      dryRun: flags.has('dry-run')
+      dryRun: flags.has('dry-run'),
+      start: !flags.has('no-start')
     }
     reenterPackagedElectron()
     const result = await installServeService(options)
@@ -293,8 +323,10 @@ export const SERVE_SERVICE_HANDLERS: Record<string, CommandHandler> = {
     const result = await readServeServiceStatus()
     emit(result, json, formatServeServiceStatus)
   },
-  'serve service uninstall': async ({ json }) => {
-    const result = await uninstallServeService()
+  'serve service uninstall': async ({ flags, json }) => {
+    const result = await uninstallServeService(undefined, {
+      keepRunning: flags.has('keep-running')
+    })
     emit(result, json, (value) =>
       value.removed ? `Removed ${String(value.name)}.` : `${String(value.name)} was not installed.`
     )

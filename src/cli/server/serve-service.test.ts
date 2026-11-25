@@ -91,6 +91,18 @@ describe('orca serve service', () => {
     ])
   })
 
+  it('changes only the login item with --no-start and --keep-running (fork)', async () => {
+    const d = deps('darwin')
+    const result = await installServeService({ command: null, dryRun: false, start: false }, d)
+    expect(existsSync(String(result.unitPath))).toBe(true)
+    await expect(uninstallServeService(d, { keepRunning: true })).resolves.toMatchObject({
+      removed: true
+    })
+    expect(existsSync(String(result.unitPath))).toBe(false)
+    // No launchctl step: a running server keeps running, a stopped one stays stopped.
+    expect(calls).toEqual([])
+  })
+
   it('skips a profile launcher and refuses a bare Linux orca', async () => {
     const scoped = join(home, 'profile', 'cli', 'bin')
     await mkdir(scoped, { recursive: true })

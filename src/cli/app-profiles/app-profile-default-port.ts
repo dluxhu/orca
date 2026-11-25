@@ -50,14 +50,17 @@ export async function setDefaultAppPort(
     const uid = options.uid ?? process.getuid?.() ?? 0
     const serviceRun = options.serviceRun ?? runServeServiceManager
     const unit = serveServiceUnitOf(userDataPath, true, home)
-    const { owner } = await readAppProfileRuntime({ userDataPath }, true, {
+    const { owner, serverWindow } = await readAppProfileRuntime({ userDataPath }, true, {
       home,
       uid,
       serviceRun,
       isAlive: options.isAlive
     })
     refuseOtherServer(owner, 'Default', 'edit')
-    const loaded = (await serviceRun('launchctl', ['print', `gui/${uid}/${unit.label}`])).code === 0
+    // A server with a window keeps running; its unit gets the port for its next start.
+    const loaded =
+      !serverWindow &&
+      (await serviceRun('launchctl', ['print', `gui/${uid}/${unit.label}`])).code === 0
     const port = options.port
     const moved = movePort({ run: options.run ?? runTool, uid, unit, loaded, port }, () =>
       writeRegistry(root, { ...registry, defaultPort: port })
