@@ -201,6 +201,20 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(registry).toMatchObject({ version: 1, defaultAppPath: app, profiles: [entry] })
   })
 
+  it('refuses a name longer than 200 bytes: its helper apps carry it in their file names', () => {
+    expect(() =>
+      createAppProfile({ name: 'w'.repeat(201), defaultAppPath: app, env: env(), run })
+    ).toThrow('The profile name is too long: at most 200 bytes.')
+    // 'é' is 2 bytes, so the limit counts bytes, not characters.
+    expect(() =>
+      createAppProfile({ name: `w${'é'.repeat(100)}`, defaultAppPath: app, env: env(), run })
+    ).toThrow('too long')
+    const name = 'w'.repeat(200)
+    const entry = createAppProfile({ name, defaultAppPath: app, env: env(), run })
+    const helper = join(entry.appPath, 'Contents', 'Frameworks', `${name} Helper (Renderer).app`)
+    expect(existsSync(helper)).toBe(true)
+  })
+
   it('gives the next profile the next port and refuses a taken name, id or port', () => {
     createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
     expect(createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).port).toBe(6832)
