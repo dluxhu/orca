@@ -82,7 +82,7 @@ export const SERVE_COMMAND_SPECS: CommandSpec[] = [
     path: ['serve', 'service', 'install'],
     summary: 'Run orca serve as a per-user background service that restarts itself',
     usage:
-      'orca serve service install [--port <port>] [--bind <ip>] [--pairing-address <host>] [--allow-public | --refuse-public] [--command <path>] [--dry-run] [--json]',
+      'orca serve service install [--port <port>] [--bind <ip>] [--pairing-address <host>] [--allow-public | --refuse-public] [--command <path>] [--dry-run] [--no-start] [--json]',
     allowedFlags: [
       ...LOCAL_COMMAND_FLAGS,
       'port',
@@ -91,13 +91,14 @@ export const SERVE_COMMAND_SPECS: CommandSpec[] = [
       'allow-public',
       'refuse-public',
       'command',
-      'dry-run'
+      'dry-run',
+      'no-start'
     ],
     notes: [
       'macOS writes a LaunchAgent; Linux writes a systemd user unit. Both run `orca serve --supervise --no-pairing` for this profile, so the server restarts with growing delays and gives up after repeated failures instead of looping.',
       'The service never prints a pairing link to its log. Pair clients with `orca pair` while it runs, or from the desktop app.',
       'On Linux the service stops at logout unless lingering is on (`loginctl enable-linger`); install reports it.',
-      "Reinstalling replaces the unit and clears a previous give-up. --command defaults to the installed Orca app's `orca` command on PATH (`orca-ide` on Linux) and must not be a launcher tied to one Orca version. --dry-run prints the unit without installing it.",
+      "Reinstalling replaces the unit and clears a previous give-up. --command defaults to the installed Orca app's `orca` command on PATH (`orca-ide` on Linux) and must not be a launcher tied to one Orca version. --dry-run prints the unit without installing it. --no-start (macOS) writes the LaunchAgent for the next login and starts or stops nothing now.",
       "Needs the Orca app installed on this machine. The `orca` command in an Orca terminal on an SSH host belongs to that connection's server and cannot install a service.",
       'Not available on Windows yet.'
     ],
@@ -119,10 +120,11 @@ export const SERVE_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['serve', 'service', 'uninstall'],
     summary: "Stop and remove this profile's orca serve service",
-    usage: 'orca serve service uninstall [--json]',
-    allowedFlags: [...LOCAL_COMMAND_FLAGS],
+    usage: 'orca serve service uninstall [--keep-running] [--json]',
+    allowedFlags: [...LOCAL_COMMAND_FLAGS, 'keep-running'],
     notes: [
-      'Stops the service and removes its unit file. The terminal daemon and its sessions keep running.'
+      'Stops the service and removes its unit file. The terminal daemon and its sessions keep running.',
+      '--keep-running (macOS) removes only the LaunchAgent file: the service does not start at the next login, and a running service keeps running.'
     ],
     examples: ['orca serve service uninstall']
   }

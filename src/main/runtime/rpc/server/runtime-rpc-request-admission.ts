@@ -170,7 +170,9 @@ export class RuntimeRpcRequestAdmission extends RuntimeRpcBinaryRouting {
       pid: this.pid,
       transports: this.transports,
       authToken: this.authToken,
-      startedAt: this.runtime.getStartedAt()
+      startedAt: this.runtime.getStartedAt(),
+      role: this.role,
+      userDataPath: this.userDataPath
     }
     writeRuntimeMetadata(this.userDataPath, metadata)
   }

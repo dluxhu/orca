@@ -7,6 +7,7 @@ import { RuntimeClientError } from '../runtime/connection/types'
 import { getOptionalServePort } from '../runtime/commands/serve-port-flag'
 import { getOptionalServeBind, resolveServeBindValue } from '../runtime/commands/serve-bind-flag'
 import { formatServeServiceInstall, formatServeServiceStatus } from './serve-service-format'
+import { keepServeUnitCopy, removeServeUnitCopy } from './serve-service-unit-copy'
 import { resolveLaunchUserDataPath } from '../runtime/profile/launch-user-data-path'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { readAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
@@ -138,6 +139,8 @@ export async function installServeService(
     allowPublic?: boolean
     refusePublic?: boolean
     dryRun: boolean
+    /** Fork patch: false writes the unit (the login item) and starts or stops nothing. */
+    start?: boolean
   },
   deps: ServeServiceDeps = defaultDeps()
 ): Promise<Record<string, unknown>> {
@@ -146,19 +149,27 @@ export async function installServeService(
     ...options,
     command: resolveServiceCommand(options.command, deps)
   })
+  if (options.start === false && spec.manager !== 'launchd') {
+    throw new RuntimeClientError('invalid_argument', '--no-start is available on macOS only.')
+  }
   if (options.dryRun) {
     return { installed: false, dryRun: true, ...spec }
   }
   mkdirSync(dirname(spec.unitPath), { recursive: true })
   writeFileSync(spec.unitPath, spec.content, { mode: 0o644 })
+  // Fork patch: the LaunchAgent replaces a copy that `uninstall --keep-running` left.
+  removeServeUnitCopy(resolveLaunchUserDataPath(deps.env))
   if (spec.logPath) {
     mkdirSync(dirname(spec.logPath), { recursive: true, mode: 0o700 })
   }
   // Reinstalling retries a supervisor stopped by the crash-loop brake.
   clearServeSupervisorBrake(resolveLaunchUserDataPath(deps.env))
   if (spec.manager === 'launchd') {
-    await deps.run('launchctl', ['bootout', `gui/${deps.uid}/${spec.name}`])
-    await mustRun(deps, 'launchctl', ['bootstrap', `gui/${deps.uid}`, spec.unitPath])
+    // Fork patch: --no-start writes only the LaunchAgent, the login item of the app profiles.
+    if (options.start !== false) {
+      await deps.run('launchctl', ['bootout', `gui/${deps.uid}/${spec.name}`])
+      await mustRun(deps, 'launchctl', ['bootstrap', `gui/${deps.uid}`, spec.unitPath])
+    }
     return {
       installed: true,
       manager: spec.manager,
@@ -251,10 +262,20 @@ export async function readServeServiceStatus(
 }
 
 export async function uninstallServeService(
-  deps: ServeServiceDeps = defaultDeps()
+  deps: ServeServiceDeps = defaultDeps(),
+  /** Fork patch: keepRunning moves the login item to its userData copy; a loaded job keeps running. */
+  options: { keepRunning?: boolean } = {}
 ): Promise<Record<string, unknown>> {
   requireManager(deps.platform)
   const spec = serviceSpec(deps, { command: 'orca' })
+  if (options.keepRunning) {
+    if (spec.manager !== 'launchd') {
+      throw new RuntimeClientError('invalid_argument', '--keep-running is available on macOS only.')
+    }
+    const existed = keepServeUnitCopy(spec.unitPath, resolveLaunchUserDataPath(deps.env))
+    return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
+  }
+  removeServeUnitCopy(resolveLaunchUserDataPath(deps.env))
   const existed = await removeServeServiceUnit(spec, deps.run, deps.uid)
   return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
 }
@@ -283,7 +304,8 @@ export const SERVE_SERVICE_HANDLERS: Record<string, CommandHandler> = {
       pairingAddress: optionalString(flags.get('pairing-address')),
       allowPublic: flags.get('allow-public') === true,
       refusePublic: flags.get('refuse-public') === true,
-      dryRun: flags.has('dry-run')
+      dryRun: flags.has('dry-run'),
+      start: !flags.has('no-start')
     }
     reenterPackagedElectron()
     const result = await installServeService(options)
@@ -293,8 +315,10 @@ export const SERVE_SERVICE_HANDLERS: Record<string, CommandHandler> = {
     const result = await readServeServiceStatus()
     emit(result, json, formatServeServiceStatus)
   },
-  'serve service uninstall': async ({ json }) => {
-    const result = await uninstallServeService()
+  'serve service uninstall': async ({ flags, json }) => {
+    const result = await uninstallServeService(undefined, {
+      keepRunning: flags.has('keep-running')
+    })
     emit(result, json, (value) =>
       value.removed ? `Removed ${String(value.name)}.` : `${String(value.name)} was not installed.`
     )
