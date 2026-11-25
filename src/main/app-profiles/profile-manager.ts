@@ -106,26 +106,46 @@ export function profileCommandArgs(
         ...(change.keepData ? ['--keep-data'] : []),
         '--json'
       ]
-    case 'start-at-login': {
-      // The existing serve service of the profile: a LaunchAgent with RunAtLoad.
-      const service = ['--profile', change.id, 'serve', 'service']
-      if (!change.enabled) {
-        return [...service, 'uninstall', '--json']
-      }
-      if (!extra.service) {
-        throw new Error('Start at login needs the port and the orca command.')
-      }
-      return [
-        ...service,
-        'install',
-        '--port',
-        String(extra.service.port),
-        '--command',
-        extra.service.command,
-        '--json'
-      ]
-    }
+    case 'start-at-login':
+      // The serve service of the profile is a LaunchAgent with RunAtLoad: its file is the login item.
+      return serviceArgs(change.id, change.enabled ? 'install' : 'uninstall', false, extra.service)
+    case 'service':
+      throw new Error('A service change has more steps: use serviceCommandArgs.')
   }
+}
+
+/** One `orca serve service` command. `now`: false changes only the login item (the unit file). */
+function serviceArgs(
+  id: string,
+  action: 'install' | 'uninstall',
+  now: boolean,
+  service?: StartAtLoginTarget
+): string[] {
+  const base = ['--profile', id, 'serve', 'service', action]
+  const later = now ? [] : [action === 'install' ? '--no-start' : '--keep-running']
+  if (action === 'uninstall') {
+    return [...base, ...later, '--json']
+  }
+  if (!service) {
+    throw new Error('The serve service needs the port and the orca command.')
+  }
+  return [...base, '--port', String(service.port), '--command', service.command, ...later, '--json']
+}
+
+/**
+ * Starts (`run`) or stops the profile's own serve service now, and then puts the login item back
+ * as it was: install and uninstall change both.
+ */
+export function serviceCommandArgs(
+  id: string,
+  run: boolean,
+  startAtLogin: boolean,
+  service: StartAtLoginTarget
+): string[][] {
+  const now = serviceArgs(id, run ? 'install' : 'uninstall', true, service)
+  return run === startAtLogin
+    ? [now]
+    : [now, serviceArgs(id, run ? 'uninstall' : 'install', false, service)]
 }
 
 export async function changeAppProfile(change: AppProfileChange): Promise<AppProfileReply> {
@@ -143,7 +163,7 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
     // A test root must stick in the new bundle, so that a Dock launch finds it.
     const pinRoot = profilesRoot() !== appProfilesRoot({})
     let service: StartAtLoginTarget | undefined
-    if (change.kind === 'start-at-login') {
+    if (change.kind === 'start-at-login' || change.kind === 'service') {
       const rows = (await readAppProfilesState()).rows
       const row = rows.find((candidate) => candidate.id === change.id)
       if (!row) {
@@ -154,6 +174,16 @@ export async function changeAppProfile(change: AppProfileChange): Promise<AppPro
       service = {
         port: row.port,
         command: join(defaultApp, 'Contents', 'Resources', 'bin', 'orca')
+      }
+      if (change.kind === 'service') {
+        let reply: AppProfileReply = { ok: true, result: {} }
+        for (const args of serviceCommandArgs(change.id, change.run, row.startAtLogin, service)) {
+          reply = await runCli(args)
+          if (!reply.ok) {
+            break
+          }
+        }
+        return reply
       }
     }
     return await runCli(profileCommandArgs(change, { settingsFile, pinRoot, service }))

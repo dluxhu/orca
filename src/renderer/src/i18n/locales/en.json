@@ -31011,6 +31011,10 @@
       "portNear": "The server of another Orca app can use the 31 ports after its own. It can take this port first."
     },
     "startAtLogin": "Start at login",
+    "service": {
+      "start": "Start background service",
+      "stop": "Stop background service"
+    },
     "defaultName": "Default"
   },
   "activityBar": {

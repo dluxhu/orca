@@ -74,6 +74,8 @@ export function ProfileRow(props: {
   onEdit: () => void
   onShowInFinder: () => void
   onStartAtLogin: (enabled: boolean) => void
+  /** Starts (true) or stops (false) the profile's own background service. */
+  onService: (run: boolean) => void
   onRemove: () => void
 }): React.JSX.Element {
   const t = useTranslate()
@@ -106,6 +108,26 @@ export function ProfileRow(props: {
         <Button size="sm" variant="outline" onClick={props.onOpen}>
           {t('profileManager.open', 'Open')}
         </Button>
+        {/* Only while the app does not run: the app and its service exclude each other. */}
+        {row.state === 'stopped' ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={props.busy}
+            onClick={() => props.onService(true)}
+          >
+            {t('profileManager.service.start', 'Start background service')}
+          </Button>
+        ) : row.state === 'background' && row.serviceRuns ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={props.busy}
+            onClick={() => props.onService(false)}
+          >
+            {t('profileManager.service.stop', 'Stop background service')}
+          </Button>
+        ) : null}
         {isDefault ? null : (
           <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onEdit}>
             {t('profileManager.edit.button', 'Edit')}

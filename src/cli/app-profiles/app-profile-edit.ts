@@ -58,6 +58,8 @@ export type Context = {
   /** True when the serve service runs and the app does not. */
   inBackground: boolean
   owner: RuntimeOwner
+  /** The server shows a desktop window. A restart of its service would close that window. */
+  serverWindow: boolean
 }
 
 /** The root of the profiles. The default app is not a profile, so no edit takes it. */
@@ -108,7 +110,7 @@ export async function prepare(
   const entry = { ...found, appPath: located ?? found.appPath }
   const uid = options.uid ?? process.getuid?.() ?? 0
   const serviceRun = options.serviceRun ?? runServeServiceManager
-  const { state, owner } = await readAppProfileRuntime(entry, false, {
+  const { state, owner, serverWindow } = await readAppProfileRuntime(entry, false, {
     home,
     uid,
     serviceRun,
@@ -131,7 +133,8 @@ export async function prepare(
     located,
     registry,
     inBackground: state === 'background',
-    owner
+    owner,
+    serverWindow
   }
 }
 
@@ -257,7 +260,10 @@ export async function setAppProfilePort(
     const context = await prepare(options, 'edit', true)
     const { label } = serveServiceUnitOf(context.entry.userDataPath, false, context.home)
     const run = options.serviceRun ?? runServeServiceManager
-    const loaded = (await run('launchctl', ['print', `gui/${context.uid}/${label}`])).code === 0
+    // A server with a window keeps running; its unit gets the port for its next start.
+    const loaded =
+      !context.serverWindow &&
+      (await run('launchctl', ['print', `gui/${context.uid}/${label}`])).code === 0
     return setPortLocked(context, options.port, loaded)
   })
 }

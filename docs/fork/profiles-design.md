@@ -405,10 +405,13 @@ in place of the defaults.
   and the app refuses a profile that a serve (`orcad`) holds ("Orca could not start",
   `main-process-preflight-failure.ts:10-19`). One mechanism, in the profile app itself:
   - At start, before it takes the profile lock (before `acquireDesktopProfileLockOrExplain`), the
-    app checks for its own serve LaunchAgent. If the job is loaded, the app runs
-    `launchctl bootout gui/<uid>/<label>` and waits until the profile lock is free.
+    app checks for its own serve job: a server whose supervisor runs under launchd. The app runs
+    `launchctl bootout gui/<uid>/<label>`, also when the LaunchAgent file is absent (a job loaded
+    without its file). Exit status 0: the job stopped, and the app waits until the profile lock is
+    free. Else the app asks, as for a server started by hand.
   - When it quits normally, the app runs `launchctl bootstrap gui/<uid> <plist>` for the job that it
-    stopped. The row changes from "Running" to "Running in background".
+    stopped, when the LaunchAgent file exists. The row changes from "Running" to "Running in
+    background".
 
   So every path that starts the app works the same: the Dock, Finder, the Profiles menu, an
   `orca:` forward, `orca open` and "Open" in the Profile Manager. After a crash of the app, the
