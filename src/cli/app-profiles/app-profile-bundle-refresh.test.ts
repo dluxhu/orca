@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import type * as Fs from 'node:fs'
 import {
+  symlinkSync,
   utimesSync,
   existsSync,
   lstatSync,
@@ -16,7 +17,11 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const h = vi.hoisted(() => ({ failSwap: false }))
+const h = vi.hoisted(() => ({
+  failSwap: false,
+  /** Runs right after the first rename of the swap: the live bundle to <app>.pre-refresh. */
+  duringSwap: null as (() => void) | null
+}))
 vi.mock('node:fs', async (original) => {
   const fs = await original<typeof Fs>()
   return {
@@ -30,12 +35,16 @@ vi.mock('node:fs', async (original) => {
       ) {
         throw new Error('rename failed')
       }
-      return fs.renameSync(from, to)
+      fs.renameSync(from, to)
+      if (String(to).endsWith('.pre-refresh') && h.duringSwap) {
+        h.duringSwap()
+      }
     }
   }
 })
 
 import {
+  preRefreshLeftoversOf,
   preRefreshPathOf,
   refreshAppProfileBundle,
   removePreRefreshLeftovers,
@@ -136,6 +145,7 @@ beforeEach(() => {
   signed = []
   failSign = false
   h.failSwap = false
+  h.duringSwap = null
   vi.stubEnv('HOME', dir)
 })
 
@@ -350,6 +360,76 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(readdirSync(apps)).toEqual(['Work.app'])
     // Another profile's previous bundle is not this profile's.
     expect(settlePreRefresh(apps, 'home')).toBeUndefined()
+  })
+
+  it('is not undone by a Profile Manager list that runs during the swap', () => {
+    const { entry, contents } = make()
+    defaultApp('2.0')
+    const apps = join(dir, 'apps')
+    h.duringSwap = () => settlePreRefresh(apps, 'work', false)
+    expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(true)
+    expect(read(join(contents, 'MacOS', 'Orca'))).toBe('main 2.0')
+  })
+
+  it("leaves another profile's previous bundle alone at the start (st4)", () => {
+    const { entry } = make()
+    const apps = join(dir, 'apps')
+    const home = createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run })
+    const homeLeftover = preRefreshPathOf(home.appPath)
+    renameSync(home.appPath, homeLeftover)
+    defaultApp('2.0')
+    refreshAppProfileBundle(entry.appPath, app, run)
+    settlePreRefresh(apps, 'work')
+    removePreRefreshLeftovers(apps, 'work')
+    expect(existsSync(homeLeftover)).toBe(true)
+  })
+
+  it('keeps a previous bundle in the list while the live app exists (st2)', () => {
+    const { entry } = make()
+    const previous = preRefreshPathOf(entry.appPath)
+    execFileSync('/bin/cp', ['-cR', entry.appPath, previous])
+    settlePreRefresh(join(dir, 'apps'), 'work', false)
+    expect(existsSync(previous)).toBe(true)
+    expect(existsSync(entry.appPath)).toBe(true)
+  })
+
+  it('does not bring a bundle back over an existing <name>.app (st7)', () => {
+    const { entry } = make()
+    const previous = preRefreshPathOf(entry.appPath)
+    renameSync(entry.appPath, previous)
+    // Another folder has the name now, with no profile in it.
+    file(join(entry.appPath, 'notes.txt'), 'mine')
+    settlePreRefresh(join(dir, 'apps'), 'work', false)
+    expect(read(join(entry.appPath, 'notes.txt'))).toBe('mine')
+    expect(existsSync(previous)).toBe(true)
+  })
+
+  it('never takes a leftover with an unreadable or binary Info.plist for the profile', () => {
+    const { entry } = make()
+    const apps = join(dir, 'apps')
+    const binary = join(apps, 'Binary.app.pre-refresh')
+    execFileSync('/bin/cp', ['-cR', entry.appPath, binary])
+    execFileSync('/usr/bin/plutil', ['-convert', 'binary1', join(binary, 'Contents', 'Info.plist')])
+    const empty = join(apps, 'Empty.app.pre-refresh')
+    mkdirSync(empty)
+    expect(preRefreshLeftoversOf(apps, 'work')).toEqual([])
+    removePreRefreshLeftovers(apps, 'work')
+    expect(existsSync(binary) && existsSync(empty)).toBe(true)
+  })
+
+  it('removes only the link of a linked leftover, and never brings it back', () => {
+    const { entry } = make()
+    const apps = join(dir, 'apps')
+    const target = join(dir, 'elsewhere.app')
+    execFileSync('/bin/cp', ['-cR', entry.appPath, target])
+    const link = join(apps, 'Link.app.pre-refresh')
+    symlinkSync(target, link)
+    rmSync(entry.appPath, { recursive: true })
+    settlePreRefresh(apps, 'work', false)
+    expect(existsSync(join(apps, 'Link.app'))).toBe(false)
+    removePreRefreshLeftovers(apps, 'work')
+    expect(existsSync(link)).toBe(false)
+    expect(existsSync(join(target, 'Contents', 'Info.plist'))).toBe(true)
   })
 
   it('gives a clear error and leaves the bundle as it was when a step fails', () => {
