@@ -380,10 +380,13 @@ in place of the defaults.
   and the app refuses a profile that a serve (`orcad`) holds ("Orca could not start",
   `main-process-preflight-failure.ts:10-19`). One mechanism, in the profile app itself:
   - At start, before it takes the profile lock (before `acquireDesktopProfileLockOrExplain`), the
-    app checks for its own serve LaunchAgent. If the job is loaded, the app runs
-    `launchctl bootout gui/<uid>/<label>` and waits until the profile lock is free.
+    app checks for its own serve job: a server whose supervisor runs under launchd. The app runs
+    `launchctl bootout gui/<uid>/<label>`, also when the LaunchAgent file is absent (a job loaded
+    without its file). Exit status 0: the job stopped, and the app waits until the profile lock is
+    free. Else the app asks, as for a server started by hand.
   - When it quits normally, the app runs `launchctl bootstrap gui/<uid> <plist>` for the job that it
-    stopped. The row changes from "Running" to "Running in background".
+    stopped, when the LaunchAgent file exists. The row changes from "Running" to "Running in
+    background".
 
   So every path that starts the app works the same: the Dock, Finder, the Profiles menu, an
   `orca:` forward, `orca open` and "Open" in the Profile Manager. After a crash of the app, the
@@ -654,10 +657,25 @@ with the reference's box and bounding box at the normal limit.
   macOS grid).
 - **Uploaded badge:** PNG, JPEG, WebP or SVG, with any style.
 - **Uploaded full icon:** PNG or ICNS, used as it is.
-- **Default character:** the first of "2" to "9", then "A" to "Z", that no other profile uses.
-  Default style: `ref-match`.
-- **Character colour:** `#0f172a`. `--icon-color <#rrggbb>` sets another one; the registry keeps it
-  in the badge `icon` field as `color`.
+- **Default badge:** a badge source without a character (`orca profiles create` and `set-icon`
+  without icon flags) gets the badge of the profile name (`defaultBadge`). The character is the
+  first letter or digit of the name, in upper case. When another profile uses it, the character is
+  the first of "2" to "9", then "A" to "Z", that no other profile uses. The colour is one of the
+  swatches (not the dark one), from a hash of the name. Default style: `ref-match`.
+- **Character colour:** `#0f172a` for a character that a flag sets. `--icon-color <#rrggbb>` sets
+  another one; the registry keeps it in the badge `icon` field as `color`. The swatches are
+  `APP_PROFILE_BADGE_SWATCHES` (`app-profile-icon-files.ts`).
+
+### Menu-bar template
+
+Each icon change (create, `set-icon`, `icon-preview`) also makes a menu-bar template at 2x
+(`app-profile-menu-bar.ts`): black pixels with alpha, 28 px high. It is the Orca tray glyph of the
+default app (`app.asar.unpacked/resources/tray/orca-menu-barTemplate@2x.png`), then the badge
+mark at the same height. The mark of a character is its alpha. The mark of a badge image is its
+alpha times its darkness. An own icon file gives the icon alone (alpha times darkness), with no
+glyph. With no glyph file, the template is the mark alone. The profile's userData keeps it
+(`profile-menu-bar@2x.png`). On macOS, the tray of a profile app shows it as a template image,
+else the plain glyph.
 
 ## 9. Ids, rename and remove
 
