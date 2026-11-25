@@ -38,22 +38,14 @@ export function ownDockIcon(): NativeImage | null {
 }
 
 /**
- * In a profile app: the menu-bar template that its userData keeps, as a 2x template image. Null in
- * every other app, and in a profile with no kept template.
+ * The menu-bar template that the userData keeps, as a template image; the "@2x" name gives it scale
+ * factor 2. Only a profile's userData keeps one. Null without a readable file.
  */
 export function ownMenuBarImage(): NativeImage | null {
-  if (!getAppProfile()) {
+  const image = nativeImage.createFromPath(join(app.getPath('userData'), APP_PROFILE_MENU_BAR_FILE))
+  if (image.isEmpty()) {
     return null
   }
-  try {
-    const png = readFileSync(join(app.getPath('userData'), APP_PROFILE_MENU_BAR_FILE))
-    const image = nativeImage.createFromBuffer(png, { scaleFactor: 2 })
-    if (image.isEmpty()) {
-      return null
-    }
-    image.setTemplateImage(true)
-    return image
-  } catch {
-    return null
-  }
+  image.setTemplateImage(true)
+  return image
 }
