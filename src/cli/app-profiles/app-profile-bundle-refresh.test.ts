@@ -319,6 +319,8 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     const { entry } = make()
     const previous = preRefreshPathOf(entry.appPath)
     mkdirSync(previous)
+    settlePreRefresh(entry.appPath, false)
+    expect(existsSync(previous)).toBe(true)
     settlePreRefresh(entry.appPath)
     expect(existsSync(previous)).toBe(false)
     renameSync(entry.appPath, previous)
