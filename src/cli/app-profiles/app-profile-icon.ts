@@ -54,7 +54,7 @@ export function defaultBadge(
   icons: readonly (AppProfileIcon | undefined)[]
 ): { text: string; color: string } {
   const letter = /[\p{L}\p{N}]/u
-  const first = (name.replace(/\borca\b/gi, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
+  const first = (name.replace(/(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}])/giu, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
   // 'ß' becomes 'SS': a badge has one character.
   const upper = first.toUpperCase().length === 1 ? first.toUpperCase() : first
   const used = icons.some((icon) => icon?.kind === 'badge' && icon.text === upper)
