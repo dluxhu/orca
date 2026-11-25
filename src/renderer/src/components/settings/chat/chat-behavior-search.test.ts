@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { i18n, setRendererUiLanguage } from '@/i18n/i18n'
 import { scoreSettingsSearch } from '../search/settings-search'
-import { getChatBehaviorEntriesByKey } from './chat-behavior-search'
+import { getScreenSubmitAltShortcutLabel } from '@/lib/keyboard/screen-submit-shortcut'
+import { getChatBehaviorEntriesByKey, getQueueFollowUpsDescription } from './chat-behavior-search'
 
 const QUERIES = ['промпт', 'следующий промпт', 'следующий запрос', 'next prompt']
 
@@ -69,5 +70,14 @@ describe('Suggested prompts settings search with the «запрос» glossary w
     const entry = getChatBehaviorEntriesByKey().promptSuggestions
     expect(entry.title).toBe('Предлагаемые запросы')
     expect(scoreSettingsSearch(query, entry, { firstEntryIsPane: false })).toBeGreaterThan(0)
+  })
+})
+
+describe('getQueueFollowUpsDescription', () => {
+  it('names the chord that sends the other way', () => {
+    expect(getQueueFollowUpsDescription(false)).toContain('Cmd/Ctrl+Enter does the opposite')
+    const on = getQueueFollowUpsDescription(true)
+    expect(on).toContain(`${getScreenSubmitAltShortcutLabel()} does the opposite`)
+    expect(on).not.toContain('Cmd/Ctrl+Enter')
   })
 })

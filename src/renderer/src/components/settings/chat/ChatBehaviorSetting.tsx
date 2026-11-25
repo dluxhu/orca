@@ -16,13 +16,18 @@ import { nativeChatQueueFollowUps } from '../../../../../shared/native-chat/inpu
 import {
   nativeChatMarksNewMessages,
   nativeChatScrollsToLatestOnSend,
+  nativeChatSendsWithModEnter,
   nativeChatShowsPromptSuggestions
 } from '../../../../../shared/native-chat/settings/native-chat-appearance-settings'
 import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import type { SettingsHostScope } from '../host-scope/settings-host-scope'
 import { NativeChatUsageLimitContinueSetting } from './NativeChatUsageLimitContinueSetting'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
-import { getChatBehaviorEntriesByKey, getChatBehaviorTitle } from './chat-behavior-search'
+import {
+  getChatBehaviorEntriesByKey,
+  getChatBehaviorTitle,
+  getQueueFollowUpsDescription
+} from './chat-behavior-search'
 import { getChatPermissionSearchEntry } from './chat-permission-search'
 import { matchesSettingsSearch } from '../search/settings-search'
 
@@ -62,6 +67,7 @@ export function ChatBehaviorSetting({
     entries.idleStop,
     ...(hostContinuesUsageLimits ? [entries.autoContinueAfterUsageLimit] : []),
     ...(hostQueuesMessages ? [entries.queueFollowUps] : []),
+    entries.sendWithModEnter,
     entries.scrollToLatestOnSend,
     entries.markNewMessages,
     entries.linkPreviews,
@@ -74,6 +80,7 @@ export function ChatBehaviorSetting({
   }
   const resumeOnRestartEnabled = settings.nativeChatResumeWorkOnRestart === true
   const queueFollowUps = nativeChatQueueFollowUps(settings)
+  const sendWithModEnter = nativeChatSendsWithModEnter(settings)
   const scrollToLatestOnSend = nativeChatScrollsToLatestOnSend(settings)
   const markNewMessages = nativeChatMarksNewMessages(settings)
   const linkPreviewsEnabled = settings.nativeChatLinkPreviews !== false
@@ -143,13 +150,27 @@ export function ChatBehaviorSetting({
         >
           <SettingsSwitchRow
             label={entries.queueFollowUps.title}
-            description={entries.queueFollowUps.description}
+            description={getQueueFollowUpsDescription(sendWithModEnter)}
             checked={queueFollowUps}
             ariaLabel={entries.queueFollowUps.title}
             onChange={() => updateSettings({ nativeChatQueueFollowUps: !queueFollowUps })}
           />
         </SearchableSetting>
       ) : null}
+      <SearchableSetting
+        {...entries.sendWithModEnter}
+        id={entries.sendWithModEnter.targetSectionId}
+        forceVisible={forceVisible}
+        className="max-w-none"
+      >
+        <SettingsSwitchRow
+          label={entries.sendWithModEnter.title}
+          description={entries.sendWithModEnter.description}
+          checked={sendWithModEnter}
+          ariaLabel={entries.sendWithModEnter.title}
+          onChange={() => updateSettings({ nativeChatSendWithModEnter: !sendWithModEnter })}
+        />
+      </SearchableSetting>
       <SearchableSetting
         {...entries.scrollToLatestOnSend}
         id={entries.scrollToLatestOnSend.targetSectionId}
