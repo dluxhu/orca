@@ -44,6 +44,9 @@ export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): s
   return BADGE_CHARACTERS.find((text) => !used.has(text)) ?? '2'
 }
 
+/** The word "Orca" in any script; an apostrophe and a letter after it belong to the word. */
+const ORCA_WORD = /(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}]|['’]\p{L})/giu
+
 /**
  * The default badge of a profile name: its first letter or digit in upper case when no other
  * profile uses it, else nextBadgeText. The word "Orca" does not count; "Orca's" is another word.
@@ -54,7 +57,7 @@ export function defaultBadge(
   icons: readonly (AppProfileIcon | undefined)[]
 ): { text: string; color: string } {
   const letter = /[\p{L}\p{N}]/u
-  const first = (name.replace(/(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}]|['’]\p{L})/giu, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
+  const first = (name.replace(ORCA_WORD, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
   // 'ß' becomes 'SS': a badge has one character.
   const upper = first.toUpperCase().length === 1 ? first.toUpperCase() : first
   const used = icons.some((icon) => icon?.kind === 'badge' && icon.text === upper)
