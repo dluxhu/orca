@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { WorktreeHostContextBadge } from '@/components/sidebar/workspace-card/host/WorktreeHostContextBadge'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAgentMessageSender } from '@/lib/agent-session/open/open-agent-message-sender'
+import { openOnOrcaHost } from '@/lib/agent-session/open/open-on-orca-host'
 import { useNativeChatVisualOwner } from '../../media/visuals/native-chat-visual-owner'
 import {
   NATIVE_CHAT_INLINE_CHIP,
@@ -100,8 +101,8 @@ function SenderName({
 }): React.JSX.Element {
   const t = useTranslate()
   const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
-  if (!opens || !chatWorktreeId) {
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  if (!open) {
     return (
       <span
         className={`min-w-0 truncate ${compact ? 'max-w-fit flex-1 basis-0 px-1.5' : queued ? 'max-w-full px-2' : 'max-w-full px-2.5'}`}
@@ -122,9 +123,7 @@ function SenderName({
           ? label
           : t('components.native-chat.agentMessage.goToAgent', 'Go to agent')
       }
-      onClick={() =>
-        void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
-      }
+      onClick={open}
     >
       <span className="min-w-0 truncate">{label}</span>
       {!queued ? <ArrowUpRight className="size-3" aria-hidden /> : null}
@@ -206,8 +205,8 @@ function RowSenderName({
 }): React.JSX.Element {
   const t = useTranslate()
   const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
-  if (!opens || !chatWorktreeId) {
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  if (!open) {
     return (
       <span aria-hidden={!spoken || undefined} className={NATIVE_CHAT_READABLE_SHARE} title={label}>
         {label}
@@ -220,9 +219,7 @@ function RowSenderName({
       aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', { name: label })}
       title={label}
       className={`${NATIVE_CHAT_READABLE_SHARE} rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-      onClick={() =>
-        void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
-      }
+      onClick={open}
     >
       {label}
     </button>
@@ -245,8 +242,8 @@ export function SenderChip({
 }): React.JSX.Element {
   const t = useTranslate()
   const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
-  if (!opens || !chatWorktreeId) {
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  if (!open) {
     return (
       <SenderTooltip label={label}>
         <span className={NATIVE_CHAT_INLINE_NAME}>{label}</span>
@@ -259,9 +256,7 @@ export function SenderChip({
         type="button"
         aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', { name: label })}
         className={NATIVE_CHAT_INLINE_CHIP}
-        onClick={() =>
-          void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
-        }
+        onClick={open}
       >
         <span className="min-w-0 truncate">{label}</span>
       </button>
@@ -285,4 +280,24 @@ function SenderTooltip({
       </TooltipContent>
     </Tooltip>
   )
+}
+
+/** What a click on a sender does: open it on this chat's host, or on the other Orca that sent it;
+ *  null when nothing opens. */
+function useSenderOpen(
+  from: AgentMessageSource,
+  sender: AgentMessageSender,
+  chatWorktreeId: string | null,
+  target: RuntimeClientTarget | undefined,
+  dispatchId: string | undefined,
+  label: string
+): (() => void) | null {
+  const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
+  const { origin } = sender
+  if (origin) {
+    return () => void openOnOrcaHost(origin.hostId, origin.address, label)
+  }
+  return opens && chatWorktreeId
+    ? () => void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
+    : null
 }
