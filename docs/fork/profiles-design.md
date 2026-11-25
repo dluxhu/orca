@@ -659,7 +659,8 @@ with the reference's box and bounding box at the normal limit.
 - **Uploaded full icon:** PNG or ICNS, used as it is.
 - **Default badge:** a badge source without a character (`orca profiles create` and `set-icon`
   without icon flags) gets the badge of the profile name (`defaultBadge`). The character is the
-  first letter or digit of the name, in upper case. When another profile uses it, the character is
+  first letter or digit of the name, in upper case; the word "Orca" does not count ("Orca - Work"
+  gets "W"), unless the name has nothing else. When another profile uses it, the character is
   the first of "2" to "9", then "A" to "Z", that no other profile uses. The colour is one of the
   swatches (not the dark one), from a hash of the name. Default style: `ref-match`.
 - **Character colour:** `#0f172a` for a character that a flag sets. `--icon-color <#rrggbb>` sets

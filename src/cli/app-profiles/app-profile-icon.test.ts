@@ -55,6 +55,10 @@ describe('profile icon sources', () => {
     expect(defaultBadge('Work', [])).toEqual({ text: 'W', color: '#9333ea' })
     expect(defaultBadge('Home', [{ kind: 'file' }])).toEqual({ text: 'H', color: '#2563eb' })
     expect(defaultBadge('2nd', [])).toEqual({ text: '2', color: '#dc2626' })
+    // The word "Orca" does not count, unless the name has nothing else.
+    expect(defaultBadge('Orca - Work', []).text).toBe('W')
+    expect(defaultBadge('Orcas', []).text).toBe('O')
+    expect(defaultBadge('Orca', []).text).toBe('O')
     expect(defaultBadge('ünited', []).text).toBe('Ü')
     // One character: 'ß' stays as it is.
     expect(defaultBadge('ß', []).text).toBe('ß')
