@@ -99,7 +99,9 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
       defaultAppPath: app,
       env: env(),
       run,
-      pinRoot: true
+      pinRoot: true,
+      // The icon renderer needs AppKit; this test needs only an icon file.
+      makeIcon: () => ({ icns: Buffer.from('icns'), icon: { kind: 'badge', text: 'W' } })
     })
     const contents = join(entry.appPath, 'Contents')
     // A file of the profile's own in Resources, as an icon change writes one.
