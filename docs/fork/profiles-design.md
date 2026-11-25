@@ -583,12 +583,12 @@ So:
 
 | Layer | Tool | Why |
 | --- | --- | --- |
-| Raster core: masks, blur, resize, polygons, compositing, the styles | **plain TypeScript** on `Float32Array` / `Uint8ClampedArray` RGBA buffers (1024 x 1024) | Deterministic, so golden tests can compare it with the Python output. It runs in Node (vitest) and in the renderer. No new dependency. |
-| Character badge (text to image) | **`OffscreenCanvas` in the Profile Manager renderer**, `fillText` with a bold system font | Text needs a font rasterizer. Chromium has one. |
-| Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `createImageBitmap` / `<img>` in the renderer, then `getImageData` | Chromium decodes all four. SVG needs no cairo. |
-| Decode an uploaded ICNS icon | `sips -s format png` (part of macOS) | Chromium does not decode ICNS. |
-| Encode PNG | `nativeImage.createFromBitmap(buf, { width, height }).toPNG()` in main | Electron built-in. |
-| Live preview | the same core, called from the renderer | One code path for preview and output. |
+| Raster core: masks, blur, resize, polygons, compositing, the styles | **plain TypeScript** on `Uint8Array` RGBA or alpha buffers (1024 x 1024), with `Float64Array` for the curl geometry | Deterministic, so golden tests can compare it with the Python output. It runs in Node (vitest) and in the renderer. No new dependency. |
+| Character badge (text to image) | **AppKit through `osascript -l JavaScript`** (`NSString` drawing, heavy system font, 1024 px sRGB bitmap) | Text needs a font rasterizer. AppKit has one, with emoji, and the CLI has no Chromium. |
+| Decode an uploaded badge (PNG, JPEG, WebP, SVG) | `NSImage` in the same AppKit script | AppKit decodes all four. SVG needs no cairo. |
+| Decode an uploaded ICNS icon | used as it is; the default app's `.icns` is read by its largest PNG entry, else by `NSImage` | No conversion needed. |
+| Encode PNG | a small writer on `node:zlib` (`src/cli/app-profiles/app-profile-icns.ts`) | Runs in the CLI. |
+| Live preview | `orca profiles icon-preview` in a child process of main (`makeAppProfileIcon`, then the largest PNG of its `.icns`) | One code path for the CLI, the preview and the output. No window stops while the icon is made. |
 
 Do not use Canvas 2D drawing (`filter: blur()`, `drawImage` scaling, path fill) inside the core.
 Their anti-aliasing and blur differ from Pillow, and they can differ between GPU and CPU. The core
@@ -600,8 +600,12 @@ Make the 10 iconset sizes (16 to 1024, with `@2x`) with the core's Lanczos resiz
 with a TypeScript writer: the `icns` header and one PNG entry for each size, as in the fallback
 writer of `write_icns` in `dock_icon_badger.py` (about 25 lines). It needs no tool and no
 temporary folder. `iconutil -c icns` (part of macOS) is the fallback if macOS refuses the file.
-Then sign again, `touch` the bundle and register it again with Launch Services, so the Dock and
-Finder show the new icon.
+`orca profiles create` writes the first icon into the bundle and signs once. A later icon change
+does not sign again: a new ad hoc signature changes the app's code identity, and the Keychain then
+asks the user again for the app's stored keys (owner decision, 2026-11-23). The change sets a
+Finder custom icon (NSWorkspace `setIcon:forFile:options:`, as Get Info does): it writes the
+bundle's `Icon\r` file and the FinderInfo flag, not the signed contents. The profile's userData
+keeps the icon (`profile-icon.icns`); the profile app sets its Dock tile from that copy at start.
 
 ### What the port needs
 
@@ -617,7 +621,7 @@ counted).
 | Badge image | `Logo` (`sized`, `on_white`), `fill_holes`, `key_out_white` | about 45 | ref-match |
 | Curl | `grid`, `_paper`, `page_curl`, `st_ref_match` | 70 | ref-match |
 | Parameters and `.icns` | `style_params`, `write_icns` | about 35 | ref-match |
-| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | later, one style per change |
+| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | ported |
 | Not ported | CLI, preview sheet, SVG rendering through cairo, `.app` and `.iconset` loading, the web UI server | about 110 | — |
 
 So `ref-match` needs about 300 lines of Python. Pillow and numpy give some parts that TypeScript
@@ -635,27 +639,42 @@ must now supply:
 
 Estimate: about 700 lines of TypeScript for `ref-match` with the primitives, and about 1,200 for
 all 14 styles. Put the core in `src/shared/icon-badger/` (no Electron import), the PNG and `.icns`
-I/O in `src/main/app-profiles/`, and the text badge in the Profile Manager renderer. Keep the MIT
+I/O and the AppKit text badge in `src/cli/app-profiles/` (the CLI build keeps them; electron-vite
+replaces `out/main`). Keep the MIT
 notice of dock-icon-badger in the ported files.
+
+### Ported styles
+
+The port has 14 styles (`ICON_STYLES` in `src/shared/icon-badger/badger.ts`): `ref-match` (the
+default), `ref-match-bigger`, `white-tile`, `tint-tile`, `frosted`, `round`, `sticker`, `stamp`,
+`liquid-glass`, `page-curl`, `page-curl-small`, `gentle-curve`, `rolled-cylinder` and `round-peel`.
+Each one has a golden test against the tool's `web/thumbs/<style>.png`.
+
+**`sticker` has its own limit.** The reference used the SVG badge at 4096 px; the test uses the PNG
+badge. The edge of the PNG badge is a little fainter at its top and bottom, so the traced backing is
+1 px shorter at each end. The box search then picks a different box, and the badge sits 1 px lower.
+A raster of the SVG badge's outline at 4096 px gives the reference's box and bounding box. So the
+port is correct, and the difference comes from the badge source. A second test checks the die-cut
+with the reference's box and bounding box at the normal limit.
 
 ### Tests against dock-icon-badger's own output
 
-- **Fixtures,** made once on a development machine with the Python tool, and committed with the
-  tool's commit id and the command line:
-  - base: Orca's `resources/build/icon.png`;
-  - badges: a PNG of the character "2" (rendered once and committed, so both sides use the same
-    badge pixels), and one logo PNG with holes;
-  - output: one 1024 px PNG for each base x badge x style.
-- **Test:** vitest decodes the base and badge PNGs with `pngjs` (dev dependency), runs the
-  TypeScript core in Node, and compares with the Python PNG.
-- **Limit:** on premultiplied RGBA, at least 99.5 % of pixels differ by 8 or less (of 255) in each channel,
-  a mean absolute difference of 1.0 or less, and no pixel more than 48 off. On a failure, the test
-  writes a difference PNG for review.
-- **Primitive tests:** each primitive (blur, Lanczos, polygon fill) also has a small golden test
-  against Pillow output, so a failure points to one primitive and not to the whole style.
-- **Mutants:** change one curl constant (for example `ARC_MID`) or the blur sigma; the golden test
-  must turn red.
-- The character text itself is drawn by Chromium and is not compared with Python. Its test checks
+- **Fixtures:** from the public dock-icon-badger repository at a fixed commit (named in
+  `badger.test.ts`): the base `samples/apps/Swirl.png`, the badge `samples/badges/beta.png`, and
+  the tool's own `web/thumbs/<style>.png` for each style (192 px). Pillow is not needed.
+- **Test:** vitest decodes the PNGs with `pngjs` (dev dependency), runs the TypeScript core in
+  Node, resizes the result to 192 px with the same Lanczos, and compares it with the thumb. Where
+  the reference used the SVG badge, the test pins the reference badge height.
+- **Limit:** on premultiplied RGBA, at least 99.8 % of pixels differ by 8 or less (of 255) in each
+  channel, a mean absolute difference of 0.2 or less, and no pixel more than 24 off. The 13 styles
+  measure at least 99.82 %, at most 0.068 and at most 15. On a failure, the test writes a
+  difference PNG for review.
+- **Primitive tests:** the blur has its own test (the standard deviation of a blurred step edge
+  equals the radius). Lanczos and the polygon fill have no separate golden test; the style goldens
+  cover them.
+- **Mutants:** change one curl constant (for example `ARC_MID`), the shadow opacity or the blur
+  sigma; a golden or the blur test must turn red.
+- The character text itself is drawn by AppKit and is not compared with Python. Its test checks
   only the size and position of the glyph box.
 
 ### Inputs and defaults
@@ -666,6 +685,8 @@ notice of dock-icon-badger in the ported files.
 - **Uploaded full icon:** PNG or ICNS, used as it is.
 - **Default character:** the first of "2" to "9", then "A" to "Z", that no other profile uses.
   Default style: `ref-match`.
+- **Character colour:** `#0f172a`. `--icon-color <#rrggbb>` sets another one; the registry keeps it
+  in the badge `icon` field as `color`.
 
 ## 9. Ids, rename and remove
 

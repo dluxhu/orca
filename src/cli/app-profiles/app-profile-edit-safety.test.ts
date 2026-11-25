@@ -16,6 +16,7 @@ import { removeAppProfile } from './app-profile-remove'
 import { listAppProfiles, serveServiceUnitOf } from './app-profile-list'
 import { healAppProfileAppPath } from './app-profile-registry'
 import { selectAppProfile } from './app-profile-selection'
+import { setAppProfileIcon } from './app-profile-set-icon'
 import { locateAppProfileApp } from '../../shared/app-profiles/app-profile-paths'
 import {
   dir,
@@ -138,7 +139,39 @@ describe.skipIf(process.platform !== 'darwin')('a profile app renamed in Finder'
       defaultUserDataPath: join(dir, 'default-data'),
       ...deps()
     })
-    expect(rows[1]).toMatchObject({ id: 'work', name: 'Orca - Finder', appPath: finderPath() })
+    expect(rows[1]).toMatchObject({
+      id: 'work',
+      name: 'Orca - Finder',
+      appPath: finderPath(),
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    })
+  })
+
+  it('set-icon gives the renamed app its icon, also after a rename while the icon is made', async () => {
+    renameInFinder()
+    const later = join(dir, 'apps', 'Orca - Later.app')
+    // The bundle of the last custom icon call.
+    const iconTarget = (): string | undefined =>
+      calls
+        .findLast((call) => call[0] === '/usr/bin/env')
+        ?.find((arg) => arg.startsWith('ORCA_APP_BUNDLE_PATH='))
+        ?.slice('ORCA_APP_BUNDLE_PATH='.length)
+    const made = (text: string, move?: () => void) =>
+      (() => {
+        move?.()
+        return {
+          icns: Buffer.from(`icns ${text}`),
+          icon: { kind: 'badge', text, style: 'ref-match' }
+        }
+      }) as never
+    await setAppProfileIcon('work', { kind: 'badge' }, { ...deps(), makeIcon: made('Q') })
+    expect(iconTarget()).toBe(finderPath())
+    await setAppProfileIcon(
+      'work',
+      { kind: 'badge' },
+      { ...deps(), makeIcon: made('R', () => renameSync(finderPath(), later)) }
+    )
+    expect(iconTarget()).toBe(later)
   })
 
   it('serve, open and rename find the renamed app', async () => {

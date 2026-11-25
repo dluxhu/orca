@@ -6,6 +6,12 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import type { ServeServiceRun } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { createAppProfile, type RunTool } from './app-profile-create'
 
+// Icons have their own tests; a profile here gets a fixed one.
+export const makeIcon = (() => ({
+  icns: Buffer.from('icns 2'),
+  icon: { kind: 'badge', text: '2', style: 'ref-match' }
+})) as never
+
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -13,6 +19,7 @@ const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
   <key>CFBundleIdentifier</key><string>com.stablyai.orca.dlux</string>
   <key>CFBundleExecutable</key><string>Orca</string>
   <key>CFBundleName</key><string>Orca</string>
+  <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundleDisplayName</key><string>Orca @dLux</string>
 </dict>
 </plist>
@@ -42,7 +49,7 @@ export const run: RunTool = (program, args) => {
   if (program.endsWith('lsregister') && args[0] === '-f' && serviceState.failRegister()) {
     throw new Error('lsregister -f failed')
   }
-  if (/(lsregister|launchctl|tccutil|security)$/.test(program)) {
+  if (/(lsregister|launchctl|tccutil|security)$/.test(program) || program === '/usr/bin/env') {
     return ''
   }
   return execFileSync(program, args, { encoding: 'utf8' })
@@ -110,7 +117,7 @@ export const deps = () => ({
 export const read = (path: string): string => readFileSync(path, 'utf8')
 
 export function makeProfile(name = 'Orca - Work', id?: string) {
-  const entry = createAppProfile({ name, id, defaultAppPath: app, env: env(), run })
+  const entry = createAppProfile({ makeIcon, name, id, defaultAppPath: app, env: env(), run })
   calls = []
   return entry
 }

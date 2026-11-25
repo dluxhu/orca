@@ -10,12 +10,15 @@ const h = vi.hoisted(() => ({
   windows: [] as { webContents: object }[],
   execFileCalls: [] as { file: string; args: string[]; options: Record<string, unknown> }[],
   stdout: '{"ok":true,"result":{}}',
+  dialogArgs: [] as unknown[][],
   profile: null as null | { id: string; userDataPath: string },
   reveal: vi.fn()
 }))
 
 vi.mock('electron', () => {
   class BrowserWindow {
+    static fromWebContents = (webContents: unknown) =>
+      h.windows.find((window) => window.webContents === webContents) ?? null
     webContents = { id: Math.random() }
     constructor() {
       h.windows.push(this)
@@ -37,6 +40,12 @@ vi.mock('electron', () => {
     },
     BrowserWindow,
     shell: { showItemInFolder: h.reveal },
+    dialog: {
+      showOpenDialog: async (...args: unknown[]) => {
+        h.dialogArgs.push(args)
+        return { canceled: false, filePaths: ['/x/logo.svg'] }
+      }
+    },
     nativeTheme: { shouldUseDarkColors: false },
     ipcMain: {
       handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => Promise<unknown>) =>
@@ -104,6 +113,8 @@ describe('Profile Manager IPC', () => {
       ['appProfiles:state', undefined],
       ['appProfiles:change', change],
       ['appProfiles:open', 'work'],
+      ['appProfiles:iconPreview', { kind: 'badge' }],
+      ['appProfiles:chooseIconFile', 'image'],
       ['appProfiles:showInFinder', 'work']
     ] as const) {
       await expect(h.handlers.get(channel)?.(other, arg)).rejects.toThrow(
@@ -118,6 +129,42 @@ describe('Profile Manager IPC', () => {
     expect(h.execFileCalls).toEqual([])
     await h.handlers.get('appProfiles:change')?.(manager, change)
     expect(h.execFileCalls).toHaveLength(1)
+  })
+
+  it('shows the icon file dialog on the Profile Manager window', async () => {
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const window = h.windows.at(-1)
+    const path = await h.handlers.get('appProfiles:chooseIconFile')?.(
+      { sender: window?.webContents },
+      'image'
+    )
+    expect(path).toBe('/x/logo.svg')
+    expect(h.dialogArgs.at(-1)?.[0]).toBe(window)
+  })
+
+  it('makes the icon preview in the CLI, not in the window', async () => {
+    registerProfileManagerIpc()
+    openProfileManagerWindow()
+    const manager = { sender: h.windows.at(-1)?.webContents }
+    h.stdout = '{"ok":true,"result":{"png":"UE5H"}}'
+    const reply = await h.handlers.get('appProfiles:iconPreview')?.(
+      manager,
+      { kind: 'image', path: '/logo.svg', style: 'ref-match' },
+      'work'
+    )
+    expect(reply).toEqual({ ok: true, result: { png: 'UE5H' } })
+    expect(h.execFileCalls[0].args.slice(1)).toEqual([
+      'profiles',
+      'icon-preview',
+      '--id',
+      'work',
+      '--icon-image',
+      '/logo.svg',
+      '--icon-style',
+      'ref-match',
+      '--json'
+    ])
   })
 
   it('runs the CLI as Node with the name as one argument, without a shell', async () => {
