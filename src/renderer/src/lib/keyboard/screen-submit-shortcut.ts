@@ -61,3 +61,7 @@ export function getScreenSubmitModifierLabel(): string {
 export function getScreenSubmitShortcutLabel(): string {
   return getShortcutPlatform() === 'darwin' ? '⌘ Enter' : 'Ctrl+Enter'
 }
+
+export function getScreenSubmitAltShortcutLabel(): string {
+  return getShortcutPlatform() === 'darwin' ? '⌘ ⌥ Enter' : 'Ctrl+Alt+Enter'
+}
