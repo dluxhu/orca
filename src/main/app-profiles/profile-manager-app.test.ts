@@ -31,7 +31,10 @@ vi.mock('electron', () => ({
   Menu: { buildFromTemplate: (template: unknown) => template, setApplicationMenu: h.setMenu }
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
-vi.mock('./app-profile', () => ({ isProfileManagerApp: () => h.isManager }))
+vi.mock('./app-profile', () => ({
+  isProfileManagerApp: () => h.isManager,
+  ownBundleDisplayName: () => 'Orca @dLux Profile Manager'
+}))
 vi.mock('./profile-manager', () => ({
   profilesMenuItems: () => [{ label: 'Profile Manager…' }],
   registerProfileManagerIpc: h.registerIpc,
@@ -138,13 +141,25 @@ describe('runProfileManagerApp', () => {
     expect(h.openWindow).toHaveBeenCalledWith({ startNew: false })
     const rebuild = h.startMenu.mock.calls[0][0] as () => void
     rebuild()
-    const menus = h.setMenu.mock.calls[0][0] as { label?: string; role?: string }[]
+    const menus = h.setMenu.mock.calls[0][0] as {
+      label?: string
+      role?: string
+      submenu?: { label?: string; role?: string }[]
+    }[]
     expect(menus.map((menu) => menu.label ?? menu.role)).toEqual([
-      'appMenu',
+      'Orca @dLux Profile Manager',
       'editMenu',
       'Profiles',
       'windowMenu'
     ])
+    // The labels take the bundle's display name; the app name (the Keychain item) stays.
+    const labels = new Map(menus[0].submenu?.map((item) => [item.role, item.label]))
+    expect([labels.get('about'), labels.get('hide'), labels.get('quit')]).toEqual([
+      'About Orca @dLux Profile Manager',
+      'Hide Orca @dLux Profile Manager',
+      'Quit Orca @dLux Profile Manager'
+    ])
+    expect(h.app.setName).toHaveBeenCalledWith('Orca Profile Manager')
     const on = new Map(h.app.on.mock.calls as [string, (...args: unknown[]) => void][])
     // A second start focuses the window of the first one, and passes on "New profile…".
     on.get('second-instance')?.({}, ['/x/Orca Profile Manager', '--new-profile'])
