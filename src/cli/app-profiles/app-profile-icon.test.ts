@@ -59,9 +59,11 @@ describe('profile icon sources', () => {
     expect(defaultBadge('Orca - Work', []).text).toBe('W')
     expect(defaultBadge('Orcas', []).text).toBe('O')
     expect(defaultBadge('Orca', []).text).toBe('O')
-    // A word boundary for every script: "Orcaé" is one word, "Orca's" is the word and "'s".
+    // A word boundary for every script; an apostrophe and a letter belong to the word.
     expect(defaultBadge('Orcaé', []).text).toBe('O')
-    expect(defaultBadge("Orca's Lab", []).text).toBe('S')
+    expect(defaultBadge("Orca's Lab", []).text).toBe('O')
+    expect(defaultBadge('Orca’s Lab', []).text).toBe('O')
+    expect(defaultBadge("Orca' Lab", []).text).toBe('L')
     expect(defaultBadge('ünited', []).text).toBe('Ü')
     // One character: 'ß' stays as it is.
     expect(defaultBadge('ß', []).text).toBe('ß')

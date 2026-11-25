@@ -45,16 +45,16 @@ export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): s
 }
 
 /**
- * The default badge of a profile name: its first letter or digit (the word "Orca" does not count)
- * in upper case when no other profile uses it, else nextBadgeText. The colour is a swatch (not the
- * dark one) from a hash of the name, so each name keeps its colour.
+ * The default badge of a profile name: its first letter or digit in upper case when no other
+ * profile uses it, else nextBadgeText. The word "Orca" does not count; "Orca's" is another word.
+ * The colour is a swatch (not the dark one) from a hash of the name, so each name keeps its colour.
  */
 export function defaultBadge(
   name: string,
   icons: readonly (AppProfileIcon | undefined)[]
 ): { text: string; color: string } {
   const letter = /[\p{L}\p{N}]/u
-  const first = (name.replace(/(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}])/giu, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
+  const first = (name.replace(/(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}]|['’]\p{L})/giu, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
   // 'ß' becomes 'SS': a badge has one character.
   const upper = first.toUpperCase().length === 1 ? first.toUpperCase() : first
   const used = icons.some((icon) => icon?.kind === 'badge' && icon.text === upper)
