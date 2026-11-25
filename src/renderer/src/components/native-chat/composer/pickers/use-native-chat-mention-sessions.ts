@@ -1,21 +1,70 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/index'
 import { callRuntimeRpc } from '@/runtime/rpc/calls/runtime-rpc-call'
+import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
 import { getRuntimeTargetForWorktreeOwner } from '@/lib/files/access/file-owner-runtime-target'
 import { chatWorkspaceByTabId as findTerminalTabWorktreeId } from '../../../../lib/agent-session/tab-identity/structured-chat-tab-index'
+import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
 import type { RuntimeTerminalListResult } from '../../../../../../shared/terminal/runtime/runtime-terminal-contracts'
 import type { RuntimeWorktreePsResult } from '../../../../../../shared/worktree/catalog/runtime-worktree-contracts'
 import {
+  listNativeChatMentionSessionRows,
+  NATIVE_CHAT_MENTION_SESSIONS_METHOD,
+  type NativeChatMentionSessionRow,
+  type NativeChatMentionSessionsResult
+} from '../../../../../../shared/native-chat/native-chat-mention-sessions'
+import {
   filterNativeChatMentionSessions,
-  listNativeChatMentionSessions,
   type NativeChatMentionSession
 } from './native-chat-mentions'
 
+// The host gives up on a silent saved environment first, so this is a backstop.
 const LIST_TIMEOUT_MS = 5_000
 const NO_SESSIONS: readonly NativeChatMentionSession[] = []
 
-/** The chats and terminals on this composer's host, read once each time an `@` token opens.
- * `loading` is true until both lists settle. */
+type Self = { sessionId?: string; ptyId: string | null }
+
+/** The chats and terminals that the composer's host reaches: its own and those of its saved environments. */
+async function readMentionRows(
+  target: RuntimeClientTarget,
+  self: Self
+): Promise<NativeChatMentionSessionRow[]> {
+  try {
+    const result = await callRuntimeRpc<NativeChatMentionSessionsResult>(
+      target,
+      NATIVE_CHAT_MENTION_SESSIONS_METHOD,
+      self,
+      { timeoutMs: LIST_TIMEOUT_MS }
+    )
+    return result.sessions
+  } catch (error) {
+    if (!(error instanceof RuntimeRpcCallError && error.code === 'method_not_found')) {
+      throw error
+    }
+  }
+  // An older host lists only its own sessions. A failed list leaves its kind out.
+  const [ps, terminals] = await Promise.allSettled([
+    callRuntimeRpc<RuntimeWorktreePsResult>(
+      target,
+      'worktree.ps',
+      {},
+      { timeoutMs: LIST_TIMEOUT_MS }
+    ),
+    callRuntimeRpc<RuntimeTerminalListResult>(
+      target,
+      'terminal.list',
+      { includeVisualLayouts: false, includePreview: false },
+      { timeoutMs: LIST_TIMEOUT_MS }
+    )
+  ])
+  return listNativeChatMentionSessionRows(
+    ps.status === 'fulfilled' ? ps.value : null,
+    terminals.status === 'fulfilled' ? terminals.value : null,
+    self
+  )
+}
+
+/** The `@` menu sessions, read once each time an `@` token opens. `loading` is true until the list settles. */
 export function useNativeChatMentionSessions(args: {
   query: string | null
   terminalTabId: string
@@ -44,33 +93,19 @@ export function useNativeChatMentionSessions(args: {
     const hostKey = target.kind === 'local' ? 'local' : target.environmentId
     let live = true
     setLoading(true)
-    // A failed list leaves its kind out; files still show.
-    void Promise.allSettled([
-      callRuntimeRpc<RuntimeWorktreePsResult>(
-        target,
-        'worktree.ps',
-        {},
-        { timeoutMs: LIST_TIMEOUT_MS }
-      ),
-      callRuntimeRpc<RuntimeTerminalListResult>(
-        target,
-        'terminal.list',
-        { includeVisualLayouts: false, includePreview: false },
-        { timeoutMs: LIST_TIMEOUT_MS }
-      )
-    ]).then(([ps, terminals]) => {
-      if (live) {
-        setLoading(false)
-        setSessions(
-          listNativeChatMentionSessions(
-            ps.status === 'fulfilled' ? ps.value : null,
-            terminals.status === 'fulfilled' ? terminals.value : null,
-            hostKey,
-            { sessionId, ptyId }
+    void readMentionRows(target, { sessionId, ptyId })
+      .catch(() => [])
+      .then((rows) => {
+        if (live) {
+          setLoading(false)
+          setSessions(
+            rows.map((row) => ({
+              ...row,
+              hostKey: row.environment ? `${hostKey}:${row.environment}` : hostKey
+            }))
           )
-        )
-      }
-    })
+        }
+      })
     return () => {
       live = false
     }
