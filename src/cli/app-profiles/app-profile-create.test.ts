@@ -71,7 +71,8 @@ const run: RunTool = (program, args) => {
   if (program.endsWith('codesign')) {
     const target = args.at(-1) ?? ''
     // The seal must cover the new icon: a real file with the new bytes when the bundle is signed.
-    if (args[0] === '--force' && target.endsWith('.app')) {
+    // The seal of the profile bundle, not of a helper app inside it.
+    if (args[0] === '--force' && target.endsWith('.app') && !target.includes('/Frameworks/')) {
       const icon = bundleIcon(target)
       if (lstatSync(icon).isSymbolicLink() || !readFileSync(icon, 'utf8').startsWith('icns ')) {
         throw new Error(`codesign before the icon is written: ${icon}`)
