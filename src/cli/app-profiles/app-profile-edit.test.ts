@@ -128,6 +128,22 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
     expect(calls.some((call) => call.includes('install'))).toBe(false)
   })
 
+  it('updates and restarts a job without a login item from its userData copy', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.copyPath, `<string>${work.appPath}/Contents/MacOS/Orca</string>`)
+    servicePid = 777
+    writeRuntimePid(work.userDataPath, 777)
+    const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('restarted')
+    expect(read(unit.copyPath)).toBe(
+      `<string>${join(dir, 'apps', 'Job.app')}/Contents/MacOS/Orca</string>`
+    )
+    // The copy loads the job again; no login item appears.
+    expect(calls.findLast((call) => call[0].endsWith('launchctl'))?.at(-1)).toBe(unit.copyPath)
+    expect(existsSync(unit.unitPath)).toBe(false)
+  })
+
   it('updates a unit whose app path has a double quote, as the unit renderer escapes it', async () => {
     const bob = makeProfile('Bob "B"', 'bob')
     const unit = serveServiceUnitOf(bob.userDataPath, false, dir)
@@ -309,6 +325,18 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
       'bootstrap'
     ])
     expect(portAtBootstrap).toContain('<string>7000</string>')
+  })
+
+  it('restarts a job without a login item on the new port from its userData copy', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.copyPath, '<string>--port</string>\n    <string>6800</string>')
+    servicePid = 777
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps() })
+    expect(result).toMatchObject({ serveService: 'restarted', serveServiceInstalled: false })
+    expect(read(unit.copyPath)).toContain('<string>7000</string>')
+    expect(calls.findLast((call) => call[0].endsWith('launchctl'))?.at(-1)).toBe(unit.copyPath)
+    expect(existsSync(unit.unitPath)).toBe(false)
   })
 
   it('keeps a service that shows a desktop window running; its unit gets the new port', async () => {

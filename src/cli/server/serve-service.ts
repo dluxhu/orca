@@ -1,5 +1,5 @@
 import { reenterPackagedElectron } from '../runtime/app-launch/packaged-cli-interpreter'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname } from 'node:path'
 import type { CommandHandler } from '../dispatch/dispatch'
@@ -7,6 +7,7 @@ import { RuntimeClientError } from '../runtime/connection/types'
 import { getOptionalServePort } from '../runtime/commands/serve-port-flag'
 import { getOptionalServeBind, resolveServeBindValue } from '../runtime/commands/serve-bind-flag'
 import { formatServeServiceInstall, formatServeServiceStatus } from './serve-service-format'
+import { keepServeUnitCopy, removeServeUnitCopy } from './serve-service-unit-copy'
 import { resolveLaunchUserDataPath } from '../runtime/profile/launch-user-data-path'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { readAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
@@ -260,7 +261,7 @@ export async function readServeServiceStatus(
 
 export async function uninstallServeService(
   deps: ServeServiceDeps = defaultDeps(),
-  /** Fork patch: keepRunning removes only the unit (the login item); a loaded job keeps running. */
+  /** Fork patch: keepRunning moves the login item to its userData copy; a loaded job keeps running. */
   options: { keepRunning?: boolean } = {}
 ): Promise<Record<string, unknown>> {
   requireManager(deps.platform)
@@ -269,10 +270,10 @@ export async function uninstallServeService(
     if (spec.manager !== 'launchd') {
       throw new RuntimeClientError('invalid_argument', '--keep-running is available on macOS only.')
     }
-    const existed = existsSync(spec.unitPath)
-    rmSync(spec.unitPath, { force: true })
+    const existed = keepServeUnitCopy(spec.unitPath, resolveLaunchUserDataPath(deps.env))
     return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
   }
+  removeServeUnitCopy(resolveLaunchUserDataPath(deps.env))
   const existed = await removeServeServiceUnit(spec, deps.run, deps.uid)
   return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
 }
