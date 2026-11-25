@@ -11,6 +11,7 @@ import {
   AgentLaunchStructuredSessionRefusedError,
   type AgentLaunchSurfaceFactory
 } from '../../../../agent-launch/agent-launch-surface-factories'
+import { openReleasedHolder } from './agent-launch-resume-holder'
 import { getStructuredAgentSessionHost } from '../../../../native-chat/agent-session-wire/host/structured-agent-session-registry'
 import type { StructuredAgentSessionHost } from '../../../../native-chat/agent-session-wire/host/structured-agent-session-host'
 import type { RpcContext } from '../../core'
@@ -29,7 +30,12 @@ import {
   type TerminalSpawnDispatch
 } from '../../../../agent-launch/agent-launch-not-started'
 import { AgentLaunchTabClosedError } from '../../../../../shared/agent-launch/contracts/agent-launch-tab-closed'
-import { isAgentSessionCreateAdmissionRefusal } from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
+import { AgentLaunchSurfaceUnavailableError } from '../../../../agent-launch/agent-launch-surface-refusal'
+import { formatAgentTypeLabel } from '../../../../../shared/agent-status/presentation/agent-type-label'
+import {
+  isAgentSessionCreateAdmissionRefusal,
+  isDefinitiveAgentSessionCreateRefusal
+} from '../../../../../shared/agent-session/failures/agent-session-definitive-refusal'
 import type { AgentSessionWireRefusal } from '../../../../../shared/agent-session/failures/agent-session-wire-refusals'
 import {
   agentLaunchMovesHostWindow,
@@ -60,6 +66,8 @@ export function agentLaunchSurfaceFactory(
       tabId,
       withoutPrompt,
       firstMessage,
+      resumeFrom,
+      remoteControl,
       signal
     }) => {
       const sessionId = requested ?? createOrcaSessionId(randomUUID)
@@ -74,6 +82,20 @@ export function agentLaunchSurfaceFactory(
         (withoutPrompt === true &&
           context.clientCapabilities?.includes(AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY) ===
             true)
+      if (remoteControl) {
+        await context.runtime.ensureStructuredAgentSessionHost()
+        // Recorded before the chat opens, so its first start connects as a Turn On does.
+        if (
+          !requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({ sessionId, agent })
+        ) {
+          throw new AgentLaunchSurfaceUnavailableError(
+            `${formatAgentTypeLabel(agent)} has no Remote Control. Nothing was started.`
+          )
+        }
+      }
+      const activate =
+        !callerPresentsSurface &&
+        (presentation === undefined || (presentation === 'focused' && movesHostWindow))
       const created = await createStructuredAgentSessionForWorktree({
         runtime: context.runtime,
         ensureHost: async () => {
@@ -98,12 +120,36 @@ export function agentLaunchSurfaceFactory(
         ...(tabId ? { tabId } : {}),
         ...(atRest ? { atRest: true as const } : {}),
         ...(firstMessage ? { firstMessage } : {}),
+        ...(resumeFrom ? { resumeFrom } : {}),
         ...(signal ? { signal } : {}),
-        activate:
-          !callerPresentsSurface &&
-          (presentation === undefined || (presentation === 'focused' && movesHostWindow))
+        activate
       })
       if (!created.ok) {
+        // Forget the Remote Control choice only when the refusal proves that no chat exists; an
+        // unknown outcome may have created the chat, and it keeps the choice.
+        if (
+          remoteControl &&
+          (createRefusedBeforeCommit(created) ||
+            isDefinitiveAgentSessionCreateRefusal(created.refusal.code))
+        ) {
+          requireInstalledHost().deps.adapter.turnOnRemoteControlAtOpen?.({
+            sessionId,
+            agent,
+            forget: true
+          })
+        }
+        const holder = resumeFrom
+          ? await openReleasedHolder(context, created.refusal, {
+              beforeCommit: createRefusedBeforeCommit(created),
+              worktreeId,
+              agent,
+              remoteControl,
+              activate
+            })
+          : null
+        if (holder) {
+          return holder
+        }
         // A caller-named session conflict must surface to that caller, never downgrade to terminal.
         if (requested && created.refusal.code === 'agent_session_conflict') {
           throw new AgentLaunchSessionAlreadyExistsError()

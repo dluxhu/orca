@@ -8,6 +8,7 @@ import {
   providerDiagnostic,
   withProviderDiagnostic
 } from '../../../shared/agent-session/failures/agent-session-failure'
+import { claudeQueryRemoteControl } from './claude-agent-sdk-remote-control'
 
 export class ClaudeControlRequestError extends Error {
   constructor(
@@ -210,6 +211,11 @@ export type ClaudeControlSurface = {
   getContextUsage: (options?: ClaudeControlOptions) => Promise<unknown>
   /** Names `sessionId` as the user's rename; refused once the CLI has moved to another session. */
   renameSession: (title: string, sessionId: string, options?: ClaudeControlOptions) => Promise<void>
+  /** `remote_control`: links this chat to claude.ai and the Claude app; answers with its URL. */
+  setRemoteControl?: (
+    enabled: boolean,
+    options?: ClaudeControlOptions & { reattachSessionId?: string }
+  ) => Promise<unknown>
   /** The `/mcp` panel's requests; test connections leave it out. */
   mcp?: ClaudeMcpControls
   /** Stops or restarts the CLI generating prompt suggestions; a new process starts unpaused. */
@@ -223,8 +229,26 @@ type InterruptingQuery = {
 }
 
 export function createClaudeControlSurface(query: Query): ClaudeControlSurface {
+  const remoteControl = claudeQueryRemoteControl(query)
   return {
     mcp: createClaudeMcpControls(query),
+    ...(remoteControl
+      ? {
+          setRemoteControl: (enabled, options) =>
+            runClaudeControl(
+              'remote_control',
+              () =>
+                remoteControl(
+                  enabled,
+                  undefined,
+                  options?.reattachSessionId
+                    ? { reattachSessionId: options.reattachSessionId }
+                    : undefined
+                ),
+              options?.timeoutMs
+            )
+        }
+      : {}),
     interrupt: (options) =>
       runClaudeControl(
         'interrupt',
