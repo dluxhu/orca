@@ -57,7 +57,11 @@ export function menuBarTemplate(mark: Img, glyph: Img | null): Img | null {
 }
 
 /** The template of an icon as PNG: the mark next to the default app's glyph, or alone. */
-export function menuBarPng(defaultAppPath: string, mark: Img, withGlyph = true): Buffer | undefined {
+export function menuBarPng(
+  defaultAppPath: string,
+  mark: Img,
+  withGlyph = true
+): Buffer | undefined {
   const img = menuBarTemplate(mark, withGlyph ? readTrayGlyph(defaultAppPath) : null)
   return img ? encodePng(img) : undefined
 }

@@ -78,9 +78,12 @@ describe('profile icon sources', () => {
       text: 'W',
       color: '#9333ea'
     })
-    expect(
-      withNameBadge({ kind: 'badge', style: 'round', color: '#16a34a' }, 'Work', [])
-    ).toEqual({ kind: 'badge', text: 'W', style: 'round', color: '#16a34a' })
+    expect(withNameBadge({ kind: 'badge', style: 'round', color: '#16a34a' }, 'Work', [])).toEqual({
+      kind: 'badge',
+      text: 'W',
+      style: 'round',
+      color: '#16a34a'
+    })
     expect(withNameBadge({ kind: 'badge', text: 'Q' }, 'Work', [])).toEqual({
       kind: 'badge',
       text: 'Q'
