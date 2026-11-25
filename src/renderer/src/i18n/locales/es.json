@@ -8085,7 +8085,7 @@
           "38e3bbeb25": "Elegir archivo personalizado"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Las claves del runtime local se almacenan en ~/.orca mediante el almacenamiento cifrado de Electron cuando está disponible.",
+          "d246b2bdb3": "Las claves del runtime local se almacenan en <path>{{root}}</path> mediante el almacenamiento cifrado de Electron cuando está disponible.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "Clave API configurada",
           "07ed3e512e": "El audio se envía a OpenAI solo cuando se selecciona un modelo de voz de OpenAI.",
@@ -8681,7 +8681,7 @@
           "25b0004fbf": "Terminal activa",
           "781cb74d22": "Se ejecuta desde paneles de terminal.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "El atajo ya no está disponible.",
           "9a3a3ca03d": "Atajos de teclado"
         },
@@ -24691,7 +24691,7 @@
       "computerAccountHint": "Dónde se ejecuta el bot, con la sesión de Orca iniciada como {{account}}.",
       "useChatDefaults": "Usar los valores predeterminados del chat",
       "agent": "Agente",
-      "folder": "Carpeta: {{path}}",
+      "folder": "Carpeta: <path>{{path}}</path>",
       "name": "Nombre",
       "validation": {
         "addName": "Añade un nombre",
