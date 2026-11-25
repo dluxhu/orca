@@ -457,6 +457,9 @@ Simulator and Instruments inside its own bundle. It is not part of Settings.
   Profile Manager" in the fork): macOS shows `CFBundleName` in bold in the menu bar. Electron finds
   its helpers as `Frameworks/<CFBundleName> Helper*.app`, so the helper copies carry that name, in
   the folder, the executable and the `Info.plist`; the release identity signs them in afterPack.
+  The About, Hide and Quit items of its app menu use that display name too
+  (`profileManagerAppMenu`). `app.setName` keeps "Orca Profile Manager": it selects the Keychain
+  item, so a change would make a new item and a prompt.
   The other `Frameworks/*.framework` entries and all `Resources/*` entries are relative links to the
   outer bundle. The framework copy costs 289 MB on disk and about 119 MB in the zip and the dmg
   (about +40 %). Idea, not tried: link the framework and start the nested helpers with

@@ -10,15 +10,38 @@ import {
   PROFILE_MANAGER_USER_DATA
 } from '../../shared/app-profiles/app-profile-paths'
 import { translateMain } from '../i18n/main-i18n'
-import { isProfileManagerApp } from './app-profile'
+import { isProfileManagerApp, ownBundleDisplayName } from './app-profile'
 import { profilesMenuItems, registerProfileManagerIpc, startProfilesMenu } from './profile-manager'
 import { openProfileManagerWindow, PROFILE_MANAGER_NEW_ARG } from './profile-manager-window'
 import { PROFILE_MANAGER_SMOKE_ENV, runProfileManagerSmoke } from './profile-manager-smoke'
 
+/**
+ * The app menu with the bundle's display name ("Orca @dLux Profile Manager" in the fork). The
+ * app name stays PROFILE_MANAGER_APP_NAME: it selects the Keychain item.
+ */
+export function profileManagerAppMenu(name: string): Electron.MenuItemConstructorOptions {
+  const named = (key: string, fallback: string): string =>
+    translateMain(key, fallback).replace('Orca', name)
+  return {
+    label: name,
+    submenu: [
+      { role: 'about', label: named('menu.about', 'About Orca') },
+      { type: 'separator' },
+      { role: 'services', label: translateMain('menu.services', 'Services') },
+      { type: 'separator' },
+      { role: 'hide', label: named('menu.hide', 'Hide Orca') },
+      { role: 'hideOthers', label: translateMain('menu.hideOthers', 'Hide Others') },
+      { role: 'unhide', label: translateMain('menu.unhide', 'Show All') },
+      { type: 'separator' },
+      { role: 'quit', label: translateMain('menu.quitApp', `Quit ${name}`, { appName: name }) }
+    ]
+  }
+}
+
 function applyMenu(): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { role: 'appMenu' },
+      profileManagerAppMenu(ownBundleDisplayName() ?? PROFILE_MANAGER_APP_NAME),
       { role: 'editMenu' },
       { label: translateMain('menu.profiles', 'Profiles'), submenu: profilesMenuItems() },
       { role: 'windowMenu' }
@@ -32,7 +55,8 @@ export function runProfileManagerApp(): boolean {
     return false
   }
   app.setPath('userData', join(appProfilesRoot(), PROFILE_MANAGER_USER_DATA))
-  // The app menu says "Quit Orca Profile Manager". Electron reads the name from package.json.
+  // Electron takes the Keychain item name from this name; the menu labels use the bundle's
+  // display name (profileManagerAppMenu).
   app.setName(PROFILE_MANAGER_APP_NAME)
   // `open` starts the app once. This lock also covers a direct start of the executable.
   const smoke = Boolean(process.env[PROFILE_MANAGER_SMOKE_ENV])

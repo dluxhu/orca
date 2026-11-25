@@ -159,6 +159,12 @@ export function isProfileManagerApp(): boolean {
   return profileManagerApp
 }
 
+/** The CFBundleDisplayName of this app's bundle, or null (afterPack writes it for the Profile Manager). */
+export function ownBundleDisplayName(): string | null {
+  const plist = readOwnInfoPlist()
+  return plist ? readPlistString(plist, 'CFBundleDisplayName') : null
+}
+
 /** The default app: this app, or the app that the links of a profile or the Profile Manager point into. */
 export async function ownDefaultAppPath(): Promise<string> {
   if (getAppProfile() === null && !isProfileManagerApp()) {
