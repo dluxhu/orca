@@ -203,7 +203,9 @@ function renameLocked(
   const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
   const jobFile = serveJobFileOf(unit)
   const target = `gui/${context.uid}/${unit.label}`
-  if (context.inBackground) {
+  // A job without a file cannot load again: it keeps running on the old path.
+  const restart = context.inBackground && jobFile !== null
+  if (restart) {
     run('/bin/launchctl', ['bootout', target])
   }
   let serveService: ServeServiceChange = 'none'
@@ -215,7 +217,7 @@ function renameLocked(
       tryRun(run, LSREGISTER, ['-u', oldPath])
       run(LSREGISTER, ['-f', newPath])
       // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
-      if (rewriteServeUnitAppPath(jobFile, oldPath, newPath)) {
+      if (jobFile && rewriteServeUnitAppPath(jobFile, oldPath, newPath)) {
         serveService = 'updated'
       }
       updateEntry(context, (registry) => ({
@@ -226,7 +228,7 @@ function renameLocked(
       }))
     } catch (failure) {
       // Put everything back: the unit, Launch Services and the old name.
-      if (serveService === 'updated') {
+      if (serveService === 'updated' && jobFile) {
         try {
           rewriteServeUnitAppPath(jobFile, newPath, oldPath)
         } catch {
@@ -241,11 +243,11 @@ function renameLocked(
       throw failure
     }
   } finally {
-    if (context.inBackground) {
+    if (restart && jobFile) {
       tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, jobFile])
     }
   }
-  if (context.inBackground) {
+  if (restart) {
     serveService = 'restarted'
   }
   return { ...entry, name, appPath: newPath, serveService }
@@ -316,20 +318,22 @@ export function movePort(
   },
   save: () => void
 ): { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
-  const { run, uid, unit, loaded } = options
+  const { run, uid, unit } = options
   const jobFile = serveJobFileOf(unit)
-  if (loaded) {
+  // A job without a file cannot load again: it keeps running on the old port.
+  const restart = options.loaded && jobFile !== null
+  if (restart) {
     run('/bin/launchctl', ['bootout', `gui/${uid}/${unit.label}`])
   }
   try {
-    const updated = rewriteServeUnitPort(jobFile, options.port)
+    const updated = jobFile !== null && rewriteServeUnitPort(jobFile, options.port)
     save()
     return {
       serveServiceInstalled: existsSync(unit.unitPath),
-      serveService: loaded ? 'restarted' : updated ? 'updated' : 'none'
+      serveService: restart ? 'restarted' : updated ? 'updated' : 'none'
     }
   } finally {
-    if (loaded) {
+    if (restart && jobFile) {
       run('/bin/launchctl', ['bootstrap', `gui/${uid}`, jobFile])
     }
   }

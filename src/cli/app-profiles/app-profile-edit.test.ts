@@ -29,6 +29,7 @@ import {
   registry,
   read,
   deps,
+  lsappinfoOut,
   makeIcon,
   makeProfile,
   writeRuntimePid
@@ -72,6 +73,28 @@ describe.skipIf(process.platform !== 'darwin')('renameAppProfile', () => {
       ['-u', work.appPath],
       ['-f', newPath]
     ])
+    // No service runs: launchctl never runs.
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
+  it('updates the unit of a Start at login service that is not loaded, and starts nothing', async () => {
+    const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.unitPath, `<string>${work.appPath}/Contents/MacOS/Orca</string>`)
+    const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('updated')
+    expect(read(unit.unitPath)).toContain(join(dir, 'apps', 'Job.app'))
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
+  it('leaves a loaded job without any unit file running, and says so', async () => {
+    const work = makeProfile()
+    servicePid = 777
+    writeRuntimePid(work.userDataPath, 777)
+    const result = await renameAppProfile({ id: 'work', name: 'Job', ...deps() })
+    expect(result.serveService).toBe('none')
+    // No bootout: no file could load the job again.
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
   })
 
   it('refuses while the profile app runs, and changes nothing', async () => {
@@ -339,6 +362,14 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
     expect(existsSync(unit.unitPath)).toBe(false)
   })
 
+  it('leaves a loaded job without any unit file on its port, and says so', async () => {
+    makeProfile()
+    servicePid = 777
+    const result = await setAppProfilePort({ id: 'work', port: 7000, ...deps() })
+    expect(result).toMatchObject({ port: 7000, serveService: 'none', serveServiceInstalled: false })
+    expect(calls.filter((call) => call[0].endsWith('launchctl'))).toEqual([])
+  })
+
   it('keeps a service that shows a desktop window running; its unit gets the new port', async () => {
     const work = makeProfile()
     const unit = serveServiceUnitOf(work.userDataPath, false, dir)
@@ -351,7 +382,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfilePort', () => {
       ...deps(),
       serviceRun: async (program, args) =>
         program === '/usr/bin/lsappinfo'
-          ? { code: 0, out: 'type="Foreground"' }
+          ? { code: 0, out: lsappinfoOut('Foreground') }
           : serviceRun(program, args)
     })
     expect(result.serveService).toBe('updated')
@@ -421,11 +452,15 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     ])
   })
 
-  it('keeps the data folder and the Keychain item with keepData', async () => {
+  it('keeps the data folder and the Keychain item with keepData, not the service unit copy', async () => {
     const work = makeProfile()
+    const unit = serveServiceUnitOf(work.userDataPath, false, dir)
+    file(unit.copyPath, 'unit')
     await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
     expect(trashed).toEqual([work.appPath])
     expect(existsSync(join(work.userDataPath, 'orca-app-profile.json'))).toBe(true)
+    // A new profile with the same id must not start the old job.
+    expect(existsSync(unit.copyPath)).toBe(false)
     expect(calls.some((call) => call[0].endsWith('security'))).toBe(false)
   })
 
@@ -600,8 +635,7 @@ describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
       ...deps(),
       serviceRun: async (program, args) => {
         if (program === '/usr/bin/lsappinfo') {
-          const type = args.at(-1) === '10' ? 'Foreground' : 'UIElement'
-          return { code: 0, out: `ASN:0x0-0x1: \n type="${type}" \n` }
+          return { code: 0, out: lsappinfoOut(args.at(-1) === '10' ? 'Foreground' : 'UIElement') }
         }
         if (program === '/bin/ps') {
           return serviceRun(program, args)

@@ -59,9 +59,9 @@ export function serveServiceUnitOf(
   return { label, unitPath, copyPath: serveUnitCopyPath(userDataPath) }
 }
 
-/** The file that loads the job: the LaunchAgent, else its copy. */
-export function serveJobFileOf(unit: ServeServiceUnit): string {
-  return existsSync(unit.unitPath) ? unit.unitPath : unit.copyPath
+/** The file that loads the job: the LaunchAgent, else its copy, else null. */
+export function serveJobFileOf(unit: ServeServiceUnit): string | null {
+  return [unit.unitPath, unit.copyPath].find((path) => existsSync(path)) ?? null
 }
 
 /** The pid of the loaded serve service job, or null when it is not loaded or has no process. */
