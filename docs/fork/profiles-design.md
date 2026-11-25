@@ -538,6 +538,18 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   - An Orca update with the same Electron version and the same small executables: no rebuild.
   - An Electron upgrade: the helper copies and the main executable must match the framework, so a
     rebuild and one more set of prompts.
+- **Refresh (built, 2026-11-25).** A profile app copies the runtime once, at create, so after an
+  Orca update it runs the old Electron runtime with the new `app.asar`. At start, before the server
+  check, a profile app compares the version of its copies (`CFBundleShortVersionString` and
+  `CFBundleVersion` in its own `Info.plist`) with the default app's (`refreshAppProfileBundle`,
+  `app-profile-bundle.ts`; `refreshOutdatedProfileApp`, `app-profile-refresh.ts`). Same version: no
+  work. Another version: it clones its bundle next to it, copies the executables, the helper apps,
+  the Electron framework and the `Info.plist` of the default app into the clone again, sets the
+  profile keys, links new `Resources` entries, signs the clone ad hoc, and swaps it in. The data,
+  the icon files and the Finder custom icon stay. Then the app starts again. A failure leaves the
+  bundle as it was: the app shows the error and starts with the old runtime. A serve start does not
+  refresh. Known gap: the version, not the `templateKey` above, decides, so each Orca update signs
+  again and the Keychain asks once more for each profile.
 - If the default app moves or is renamed, the links break. There is no "Repair" in v1 (owner): the
   user makes the profile again with the same name. A new profile with the id of an existing data
   folder uses that folder again (section 9).
