@@ -240,7 +240,7 @@ export async function listAppProfiles(
       userDataPath: options.defaultUserDataPath,
       port: registry?.defaultPort ?? DEFAULT_APP_PORT
     },
-    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port }) => {
+    ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port, icon }) => {
       try {
         // A refresh that stopped between its two renames left only <app>.pre-refresh.
         settlePreRefresh(dirname(appPath), id, false)
@@ -254,7 +254,8 @@ export async function listAppProfiles(
         name: found ? basename(found, '.app') : name,
         appPath: found ?? appPath,
         userDataPath,
-        port
+        port,
+        icon
       }
     })
   ]
