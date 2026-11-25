@@ -229,7 +229,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   }
   startMainThreadChurnProbe({ extraStats: () => ({ diffCache: settledDiffCache.stats() }) })
   // Before the server check: a running server keeps its mapped runtime while the bundle changes.
-  if (appProfile && !state.isServeMode && refreshOutdatedProfileApp()) {
+  if (appProfile && !state.isServeMode && refreshOutdatedProfileApp(appProfile.userDataPath)) {
     return false
   }
   // Before the instance locks: an Electron serve holds the same locks.

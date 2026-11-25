@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import {
   existsSync,
   lstatSync,
+  renameSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -55,16 +56,20 @@ function file(path: string, content: string): void {
   writeFileSync(path, content, { mode: 0o755 })
 }
 
-/** The default app at a version: its runtime files carry the version in their content. */
-function defaultApp(version: string): void {
+/** The default app at a version. `code`: the content of its runtime files (a new build). */
+function defaultApp(version: string, code = version): void {
   const contents = join(app, 'Contents')
   rmSync(join(contents, 'MacOS'), { recursive: true, force: true })
   rmSync(join(contents, 'Frameworks'), { recursive: true, force: true })
   file(join(contents, 'Info.plist'), plist(version))
-  file(join(contents, 'MacOS', 'Orca'), `main ${version}`)
+  file(join(contents, 'MacOS', 'Orca'), `main ${code}`)
   file(join(contents, 'MacOS', 'orca-notification-status'), 'default variant')
-  file(join(contents, 'Frameworks', 'Electron Framework.framework', 'x'), `fw ${version}`)
-  file(join(contents, 'Frameworks', 'Orca Helper.app', 'Contents', 'MacOS', 'h'), `h ${version}`)
+  const framework = join(contents, 'Frameworks', 'Electron Framework.framework')
+  file(join(framework, 'x'), `fw ${code}`)
+  file(join(framework, 'Resources', 'Info.plist'), plist(`electron ${code}`))
+  const helper = join(contents, 'Frameworks', 'Orca Helper (Renderer).app', 'Contents')
+  file(join(helper, 'MacOS', 'Orca Helper (Renderer)'), `h ${code}`)
+  file(join(helper, 'Info.plist'), plist(code))
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), `asar ${version}`)
   file(join(contents, 'Resources', 'profile-template', 'orca-notification-status'), 'profile')
@@ -111,23 +116,36 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     return { entry, contents }
   }
 
-  it('does no work when the default app has the same version', () => {
+  const forced = () => calls.filter((call) => call.includes('--force'))
+
+  it('does no work when the default app has the same version, with the check file', () => {
     const { entry } = make()
-    expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(false)
+    const check = join(dir, 'check.txt')
+    expect(refreshAppProfileBundle(entry.appPath, app, run, check)).toBe(false)
+    calls = []
+    expect(refreshAppProfileBundle(entry.appPath, app, run, check)).toBe(false)
     expect(calls).toEqual([])
   })
 
-  it('copies the new runtime and version into the bundle, and keeps the profile parts', () => {
+  it('does not copy or sign again when an update keeps the runtime parts', () => {
     const { entry, contents } = make()
+    defaultApp('2.0', '1.0')
+    expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(false)
+    expect(forced()).toEqual([])
+    expect(key(join(contents, 'Info.plist'), 'CFBundleVersion')).toBe('1.0')
+  })
+
+  it('copies the new runtime and version into the bundle when they change; keeps the profile parts', () => {
+    const { entry, contents } = make()
+    const keyBefore = key(join(contents, 'Info.plist'), 'OrcaProfileTemplateKey')
     defaultApp('2.0')
     file(join(app, 'Contents', 'Resources', 'new.pak'), 'new')
     expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(true)
     expect(read(join(contents, 'MacOS', 'Orca'))).toBe('main 2.0')
     expect(read(join(contents, 'MacOS', 'orca-notification-status'))).toBe('profile')
     expect(read(join(contents, 'Frameworks', 'Electron Framework.framework', 'x'))).toBe('fw 2.0')
-    expect(read(join(contents, 'Frameworks', 'Orca Helper.app', 'Contents', 'MacOS', 'h'))).toBe(
-      'h 2.0'
-    )
+    const helper = join(contents, 'Frameworks', 'Work Helper (Renderer).app', 'Contents')
+    expect(read(join(helper, 'MacOS', 'Work Helper (Renderer)'))).toBe('h 2.0')
     const plistPath = join(contents, 'Info.plist')
     expect(key(plistPath, 'CFBundleVersion')).toBe('2.0')
     expect(key(plistPath, 'CFBundleIdentifier')).toBe(entry.bundleId)
@@ -135,6 +153,7 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(key(plistPath, 'OrcaAppProfileId')).toBe('work')
     expect(key(plistPath, 'OrcaAppProfilesRoot')).toBe(join(dir, 'data'))
     expect(read(plistPath)).not.toContain('CFBundleURLTypes')
+    expect(key(plistPath, 'OrcaProfileTemplateKey')).not.toBe(keyBefore)
     // The profile's own file stays; a new Resources entry gets its link.
     expect(read(join(contents, 'Resources', 'own.icns'))).toBe('own icon')
     expect(lstatSync(join(contents, 'Resources', 'new.pak')).isSymbolicLink()).toBe(true)
@@ -147,6 +166,36 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     // The version is recorded: the next start does no work.
     calls = []
     expect(refreshAppProfileBundle(entry.appPath, app, run)).toBe(false)
+  })
+
+  it('does not sign again after a rename alone', () => {
+    const { entry } = make()
+    const check = join(dir, 'check.txt')
+    refreshAppProfileBundle(entry.appPath, app, run, check)
+    const renamed = join(dir, 'apps', 'Job.app')
+    renameSync(entry.appPath, renamed)
+    calls = []
+    expect(refreshAppProfileBundle(renamed, app, run, check)).toBe(false)
+    expect(calls).toEqual([])
+    expect(key(join(renamed, 'Contents', 'Info.plist'), 'CFBundleName')).toBe('Work')
+  })
+
+  it('gives the menu bar and the helpers the new name at the next update', () => {
+    const { entry } = make()
+    const renamed = join(dir, 'apps', 'Job.app')
+    renameSync(entry.appPath, renamed)
+    // An update with the same runtime parts: only the name differs.
+    defaultApp('2.0', '1.0')
+    expect(refreshAppProfileBundle(renamed, app, run)).toBe(true)
+    const contents = join(renamed, 'Contents')
+    expect(key(join(contents, 'Info.plist'), 'CFBundleName')).toBe('Job')
+    expect(key(join(contents, 'Info.plist'), 'CFBundleDisplayName')).toBe('Job')
+    const helper = join(contents, 'Frameworks', 'Job Helper (Renderer).app')
+    expect(read(join(helper, 'Contents', 'MacOS', 'Job Helper (Renderer)'))).toBe('h 1.0')
+    expect(key(join(helper, 'Contents', 'Info.plist'), 'CFBundleExecutable')).toBe(
+      'Job Helper (Renderer)'
+    )
+    expect(existsSync(join(contents, 'Frameworks', 'Work Helper (Renderer).app'))).toBe(false)
   })
 
   it('gives a clear error and leaves the bundle as it was when a step fails', () => {
