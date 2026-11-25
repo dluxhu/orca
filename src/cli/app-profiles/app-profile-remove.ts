@@ -15,6 +15,7 @@ import {
 } from './app-profile-edit'
 import { serveServiceUnitOf } from './app-profile-list'
 import { isInside, withRegistryLockAsync } from './app-profile-registry'
+import { removePreRefreshLeftovers } from './app-profile-bundle-refresh'
 
 /** Moves a file or folder to the Trash. */
 function moveToTrash(run: RunTool, path: string, home: string): void {
@@ -104,6 +105,8 @@ function removeLocked(
     tryRun(run, LSREGISTER, ['-u', targets.app])
     trash(targets.app)
   }
+  // The previous bundles of refreshes go too: they would bring the app back.
+  removePreRefreshLeftovers(dirname(targets.app ?? entry.appPath), entry.id)
   if (targets.data) {
     trash(targets.data)
   }

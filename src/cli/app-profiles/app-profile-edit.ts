@@ -36,6 +36,7 @@ import {
   withRegistryLockAsync,
   writeRegistry
 } from './app-profile-registry'
+import { removePreRefreshLeftovers } from './app-profile-bundle-refresh'
 
 export type EditAppProfileOptions = {
   id: string
@@ -226,6 +227,8 @@ function renameLocked(
           profile.id === entry.id ? { ...profile, name, appPath: newPath } : profile
         )
       }))
+      // A previous bundle of a refresh must not come back under the old name.
+      removePreRefreshLeftovers(dirname(newPath), entry.id)
     } catch (failure) {
       // Put everything back: the unit, Launch Services and the old name.
       if (serveService === 'updated' && jobFile) {

@@ -229,3 +229,42 @@ export function templateKeyOf(defaultApp: string, run: RunTool): string {
   }
   return hash.digest('hex').slice(0, 32)
 }
+
+/**
+ * Builds a new profile bundle at `bundle` from the default app, as create and refresh do: the
+ * copied runtime with the helpers in the profile's name, links for every Resources entry, the
+ * profile's Info.plist keys with the template key, and an ad hoc signature. `beforeSign` can add
+ * files to the bundle before the seal (an icon file).
+ */
+export function buildProfileBundle(
+  defaultApp: string,
+  bundle: string,
+  profile: { id: string; name: string; root?: string },
+  run: RunTool,
+  scratch: string,
+  beforeSign?: (contents: string, defaultPlist: string) => void
+): { bundleId: string } {
+  const source = join(defaultApp, 'Contents')
+  const contents = join(bundle, 'Contents')
+  mkdirSync(join(contents, 'Resources'), { recursive: true })
+  const plistPath = join(contents, 'Info.plist')
+  const defaultPlist = copyDefaultPlist(source, plistPath, run)
+  if (existsSync(join(source, 'PkgInfo'))) {
+    run('/usr/bin/ditto', [join(source, 'PkgInfo'), join(contents, 'PkgInfo')])
+  }
+  const defaultAppId = readPlistString(defaultPlist, 'CFBundleIdentifier')
+  const executable = readPlistString(defaultPlist, 'CFBundleExecutable')
+  if (!defaultAppId || !executable) {
+    throw new RuntimeClientError('invalid_argument', `${defaultApp} has no bundle id.`)
+  }
+  const bundleId = `${defaultAppId}.profile.${profile.id}`
+  const helpers = copyAppRuntime(source, contents, executable, profile.name, run)
+  for (const entry of readdirSync(join(source, 'Resources'))) {
+    symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
+  }
+  beforeSign?.(contents, defaultPlist)
+  const templateKey = templateKeyOf(defaultApp, run)
+  applyProfilePlist(plistPath, { ...profile, bundleId, templateKey }, run)
+  signProfileBundle(bundle, defaultApp, bundleId, helpers, scratch, run)
+  return { bundleId }
+}

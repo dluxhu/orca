@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
@@ -523,6 +524,28 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
       removeAppProfile({ id: 'work', keepData: false, trash, ...deps() })
     ).rejects.toThrow('runs')
     expect(trashed).toEqual([])
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('previous bundles of a refresh', () => {
+  const leftover = (appPath: string): string => {
+    execFileSync('/bin/cp', ['-cR', appPath, `${appPath}.pre-refresh`])
+    return `${appPath}.pre-refresh`
+  }
+
+  it('go with a rename, so the old name does not come back', async () => {
+    const work = makeProfile()
+    const previous = leftover(work.appPath)
+    await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
+    expect(existsSync(previous)).toBe(false)
+    expect(existsSync(join(dir, 'apps', 'Orca - Job.app'))).toBe(true)
+  })
+
+  it('go with a remove, also with "Keep data"', async () => {
+    const work = makeProfile()
+    const previous = leftover(work.appPath)
+    await removeAppProfile({ id: 'work', keepData: true, trash: () => {}, ...deps() })
+    expect(existsSync(previous)).toBe(false)
   })
 })
 

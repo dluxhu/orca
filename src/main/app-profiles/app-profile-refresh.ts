@@ -34,7 +34,7 @@ export function refreshOutdatedProfileApp(
   const bundle = resolve(dirname(process.execPath), '..', '..')
   const checkFile = join(userDataPath, 'profile-runtime-check.txt')
   try {
-    if (!refresh(bundle, defaultAppOf(bundle), runTool, checkFile)) {
+    if (!refresh(bundle, defaultAppOf(bundle), runTool, { checkFile, userDataPath })) {
       return false
     }
   } catch (error) {

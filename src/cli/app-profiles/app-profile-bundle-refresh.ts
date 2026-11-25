@@ -5,7 +5,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  symlinkSync,
+  statSync,
   writeFileSync
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -17,14 +17,13 @@ import {
 import { RuntimeClientError } from '../runtime/connection/types'
 import {
   APP_PROFILE_TEMPLATE_KEY,
-  applyProfilePlist,
-  copyAppRuntime,
-  copyDefaultPlist,
+  buildProfileBundle,
   exists,
-  signProfileBundle,
   templateKeyOf
 } from './app-profile-bundle'
 import type { RunTool } from './app-profile-create'
+
+const PRE_REFRESH = '.pre-refresh'
 
 const versionOf = (plist: string): string | null => {
   const short = readPlistString(plist, 'CFBundleShortVersionString')
@@ -32,49 +31,73 @@ const versionOf = (plist: string): string | null => {
   return short === null && build === null ? null : `${short ?? ''} (${build ?? ''})`
 }
 
+function readText(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** The profile id in a bundle's Info.plist, or null. */
+function profileIdOf(bundle: string): string | null {
+  const plist = readText(join(bundle, 'Contents', 'Info.plist'))
+  return plist === null ? null : readPlistString(plist, APP_PROFILE_PLIST_ID_KEY)
+}
+
 /** The previous bundle that a refresh keeps until the new one has started. */
 export function preRefreshPathOf(appPath: string): string {
-  return `${appPath}.pre-refresh`
+  return `${appPath}${PRE_REFRESH}`
 }
 
 /**
- * After a refresh: the new app has started, so its previous bundle goes (`removeOld`: false keeps
- * it, for a caller that is not the started app). A refresh that stopped between its two renames
- * left only the previous bundle: it goes back in place.
+ * The previous bundles of the profile `id` that refreshes left in `appsDir`, newest first. The
+ * profile id in their Info.plist finds them: a Finder rename changes the app's file name.
  */
-export function settlePreRefresh(appPath: string, removeOld = true): void {
-  const previous = preRefreshPathOf(appPath)
-  if (!exists(previous)) {
+export function preRefreshLeftoversOf(appsDir: string, id: string): string[] {
+  let entries: string[]
+  try {
+    entries = readdirSync(appsDir)
+  } catch {
+    return []
+  }
+  return entries
+    .filter((entry) => entry.endsWith(`.app${PRE_REFRESH}`))
+    .map((entry) => join(appsDir, entry))
+    .filter((path) => profileIdOf(path) === id)
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+}
+
+/** Removes the previous bundles of the profile: rename and remove call it. */
+export function removePreRefreshLeftovers(appsDir: string, id: string): void {
+  for (const path of preRefreshLeftoversOf(appsDir, id)) {
+    rmSync(path, { recursive: true, force: true })
+  }
+}
+
+/**
+ * When `appsDir` holds no live bundle of the profile `id` (a refresh stopped between its two
+ * renames), its newest previous bundle goes back in place. With a live bundle, `removeOld`
+ * removes the previous bundles: the profile app does it after its start.
+ */
+export function settlePreRefresh(appsDir: string, id: string, removeOld = true): void {
+  const leftovers = preRefreshLeftoversOf(appsDir, id)
+  if (leftovers.length === 0) {
     return
   }
-  if (exists(appPath)) {
-    if (removeOld) {
-      rmSync(previous, { recursive: true, force: true })
+  const live = readdirSync(appsDir).some(
+    (entry) => entry.endsWith('.app') && profileIdOf(join(appsDir, entry)) === id
+  )
+  if (!live) {
+    const restored = leftovers[0].slice(0, -PRE_REFRESH.length)
+    if (!exists(restored)) {
+      renameSync(leftovers[0], restored)
+      leftovers.shift()
     }
-  } else {
-    renameSync(previous, appPath)
   }
-}
-
-/**
- * Runs `sign` without the Finder information of the bundle (a Finder custom icon sets it), and
- * then puts it back: codesign refuses a bundle with it ("detritus not allowed").
- */
-export function signWithoutFinderInfo(bundle: string, run: RunTool, sign: () => void): void {
-  const attribute = 'com.apple.FinderInfo'
-  const hex = run('/bin/sh', [
-    '-c',
-    `/usr/bin/xattr -px ${attribute} "$0" 2>/dev/null || true`,
-    bundle
-  ]).replace(/\s+/g, '')
-  if (hex) {
-    run('/usr/bin/xattr', ['-d', attribute, bundle])
-  }
-  try {
-    sign()
-  } finally {
-    if (hex) {
-      run('/usr/bin/xattr', ['-wx', attribute, hex, bundle])
+  if (removeOld) {
+    for (const path of leftovers) {
+      rmSync(path, { recursive: true, force: true })
     }
   }
 }
@@ -82,29 +105,39 @@ export function signWithoutFinderInfo(bundle: string, run: RunTool, sign: () => 
 /** The check of the last start: the default app version and the template key of the copies. */
 const checkTextOf = (version: string, key: string | null): string => `${version}\n${key ?? ''}\n`
 
+export type RefreshOptions = {
+  /** Keeps the default app version and the key of the last check (see refreshAppProfileBundle). */
+  checkFile?: string
+  /** The profile's userData. */
+  userDataPath?: string
+}
+
 /**
- * Copies the executables, the helper apps, the Electron framework and the Info.plist of the
- * default app into the profile app again when the template key (templateKeyOf) differs from the
- * one that its own Info.plist records, or when CFBundleName is not the app's file name. The
- * profile's data, Resources links and icon files stay. The new bundle is built next to the app
- * and then swapped in; the previous bundle stays as <app>.pre-refresh until the next start
- * (settlePreRefresh). `checkFile` keeps the default app version and the key of the last check:
- * a start with the same version and complete copies reads no executables. Returns true when the
- * bundle changed.
+ * Builds the profile app again from the default app when the template key (templateKeyOf) differs
+ * from the one that its own Info.plist records, or when CFBundleName is not the app's file name.
+ * The new bundle is a fresh build next to the app (buildProfileBundle, as create makes one), not a
+ * copy of the old bundle, so no Finder data of the old bundle can block the signature. Then it is
+ * swapped in; the previous bundle stays as <app>.pre-refresh until the next start
+ * (settlePreRefresh). The profile's data stays. `checkFile`: a start with the same default app
+ * version and key, and complete copies, reads no executables. Returns true when the bundle changed.
  */
 export function refreshAppProfileBundle(
   appPath: string,
   defaultApp: string,
   run: RunTool,
-  checkFile?: string
+  options: RefreshOptions = {}
 ): boolean {
-  settlePreRefresh(appPath)
+  const ownPlist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
+  const id = readPlistString(ownPlist, APP_PROFILE_PLIST_ID_KEY)
+  if (!id) {
+    throw new RuntimeClientError('invalid_argument', `${appPath} is not a profile app.`)
+  }
+  settlePreRefresh(dirname(appPath), id)
   const source = join(defaultApp, 'Contents')
   const target = versionOf(readFileSync(join(source, 'Info.plist'), 'utf8'))
   if (target === null) {
     return false
   }
-  const ownPlist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
   const ownKey = readPlistString(ownPlist, APP_PROFILE_TEMPLATE_KEY)
   const executable = readPlistString(ownPlist, 'CFBundleExecutable') ?? ''
   const menuName = readPlistString(ownPlist, 'CFBundleName') ?? ''
@@ -112,6 +145,7 @@ export function refreshAppProfileBundle(
   const complete =
     exists(join(appPath, 'Contents', 'MacOS', executable)) &&
     exists(join(appPath, 'Contents', 'Frameworks', `${menuName} Helper (Renderer).app`))
+  const { checkFile } = options
   if (checkFile && complete && readText(checkFile) === checkTextOf(target, ownKey)) {
     return false
   }
@@ -119,7 +153,7 @@ export function refreshAppProfileBundle(
   // A rename changes only the file name (no new signature); the menu-bar name follows here.
   const changed = !complete || templateKey !== ownKey || menuName !== basename(appPath, '.app')
   if (changed) {
-    rebuild(appPath, defaultApp, ownPlist, templateKey, run)
+    rebuild(appPath, defaultApp, id, ownPlist, run)
   }
   if (checkFile) {
     try {
@@ -130,57 +164,21 @@ export function refreshAppProfileBundle(
   }
   return changed
 }
-function readText(path: string): string | null {
-  try {
-    return readFileSync(path, 'utf8')
-  } catch {
-    return null
-  }
-}
 
 function rebuild(
   appPath: string,
   defaultApp: string,
+  id: string,
   ownPlist: string,
-  templateKey: string,
   run: RunTool
 ): void {
-  const source = join(defaultApp, 'Contents')
-  const id = readPlistString(ownPlist, APP_PROFILE_PLIST_ID_KEY)
-  const bundleId = readPlistString(ownPlist, 'CFBundleIdentifier')
   // The file name is the profile name: a rename moves only the bundle.
   const name = basename(appPath, '.app')
-  if (!id || !bundleId || !name) {
-    throw new RuntimeClientError('invalid_argument', `${appPath} is not a profile app.`)
-  }
   const root = readPlistString(ownPlist, APP_PROFILE_PLIST_ROOT_KEY) ?? undefined
   const staging = mkdtempSync(join(dirname(appPath), `.${id}.refresh-`))
   try {
     const next = join(staging, basename(appPath))
-    // A clone keeps the Resources links, the icon files and the Finder custom icon.
-    run('/bin/cp', ['-cR', appPath, next])
-    const contents = join(next, 'Contents')
-    rmSync(join(contents, 'MacOS'), { recursive: true, force: true })
-    rmSync(join(contents, 'Frameworks'), { recursive: true, force: true })
-    const plistPath = join(contents, 'Info.plist')
-    const executable = readPlistString(
-      copyDefaultPlist(source, plistPath, run),
-      'CFBundleExecutable'
-    )
-    if (!executable) {
-      throw new RuntimeClientError('invalid_argument', `${defaultApp} has no executable.`)
-    }
-    const helpers = copyAppRuntime(source, contents, executable, name, run)
-    // A Resources entry that the new version adds gets its link.
-    for (const entry of readdirSync(join(source, 'Resources'))) {
-      if (!exists(join(contents, 'Resources', entry))) {
-        symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
-      }
-    }
-    applyProfilePlist(plistPath, { bundleId, name, id, root, templateKey }, run)
-    signWithoutFinderInfo(next, run, () =>
-      signProfileBundle(next, defaultApp, bundleId, helpers, staging, run)
-    )
+    buildProfileBundle(defaultApp, next, { id, name, root }, run, staging)
     // The live bundle moves to a visible sibling first: staging never holds the only copy.
     const previous = preRefreshPathOf(appPath)
     renameSync(appPath, previous)
