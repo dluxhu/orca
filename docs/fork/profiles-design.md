@@ -550,17 +550,22 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   `Frameworks/<CFBundleName> Helper (Renderer).app` exist, reads no executables. The file changes
   only after a check or a refresh that worked.
   - Same key: no work and no new signature, so the Keychain does not ask again.
-  - Another key: the app clones its bundle next to it, copies the executables, the helper apps,
-    the Electron framework and the `Info.plist` of the default app into the clone again, sets the
-    profile keys, links new `Resources` entries, and signs the clone ad hoc. codesign refuses a
-    bundle with Finder information (the Finder custom icon of `set-icon`), so the signing removes
-    `com.apple.FinderInfo` and puts it back after. Then the live bundle moves to
-    `<Name>.app.pre-refresh` and the clone takes its place; a failed second rename moves the live
-    bundle back. The next start removes `<Name>.app.pre-refresh`, or moves it back when
-    `<Name>.app` is missing (`settlePreRefresh`). The data, the icon files and the Finder custom
-    icon stay. The app then starts the new bundle with `open -n` after its own process exits:
-    `app.relaunch()` uses the helper path of the old `CFBundleName`. The new signature makes the
-    Keychain ask once more.
+  - Another key: the app builds a fresh bundle next to it from the default app, with the steps of
+    create (`buildProfileBundle`: the copied runtime, the helpers in the profile's name, links for
+    every `Resources` entry, the profile keys and the template key, an ad hoc signature). Nothing
+    comes from the old bundle, so no Finder data of it (Finder information, the `Icon` file) can
+    block the signature. Then the live bundle moves to `<Name>.app.pre-refresh` and the new one
+    takes its place; a failed second rename moves the live bundle back. The data stays. The app
+    then starts the new bundle with `open -n` after its own process exits: `app.relaunch()` uses
+    the helper path of the old `CFBundleName`. The new signature makes the Keychain ask once more.
+  - The profile's icon: the refresh writes the kept icon (`profile-icon.icns` in userData) into
+    the new bundle before the seal, as create does, and sets the Finder custom icon after the
+    signature, as `set-icon` does (`app-profile-bundle-icon.ts`).
+  - Leftovers (`settlePreRefresh`): the profile id in the `Info.plist` of each
+    `*.app.pre-refresh` finds the profile's previous bundles, not their path, so a Finder rename
+    of the app does not bring an old bundle back. The started profile app removes them. When no
+    live bundle of the profile exists (a refresh stopped between its two renames), the Profile
+    Manager list moves the newest one back in place. Rename and remove delete them.
   - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
   - A serve start does not refresh.
 - **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and
