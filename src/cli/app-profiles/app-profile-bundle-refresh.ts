@@ -206,7 +206,12 @@ function rebuild(
       icon ? (contents, plist) => writeBundleIcon(contents, plist, icon) : undefined
     )
     if (icon) {
-      setFinderIcon(next, icon, run)
+      // Best effort: the Dock reads the icon file in the seal; the Finder icon is the stopped app's.
+      try {
+        setFinderIcon(next, icon, run)
+      } catch (error) {
+        console.warn('[profiles] cannot set the Finder icon of the refreshed app:', error)
+      }
     }
     // The live bundle moves to a visible sibling first: staging never holds the only copy.
     const previous = preRefreshPathOf(appPath)

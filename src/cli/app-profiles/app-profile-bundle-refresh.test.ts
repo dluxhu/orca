@@ -310,6 +310,26 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(calls[finderIcon]).toContain('/usr/bin/osascript')
   })
 
+  it('refreshes also when the Finder icon cannot be set', () => {
+    const { entry, contents } = make()
+    writeFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'kept icns')
+    defaultApp('2.0')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const failing: RunTool = (program, args) => {
+      if (program === '/usr/bin/env') {
+        throw new Error('setIcon failed')
+      }
+      return run(program, args)
+    }
+    expect(
+      refreshAppProfileBundle(entry.appPath, app, failing, { userDataPath: entry.userDataPath })
+    ).toBe(true)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+    expect(read(join(contents, 'Resources', 'icon.icns'))).toBe('kept icns')
+    expect(key(join(contents, 'Info.plist'), 'CFBundleVersion')).toBe('2.0')
+  })
+
   it('refreshes when the check file names an older version (p1)', () => {
     const { entry } = make()
     const check = join(dir, 'check.txt')
@@ -400,7 +420,16 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
   it("leaves another profile's previous bundle alone at the start (st4)", () => {
     const { entry } = make()
     const apps = join(dir, 'apps')
-    const home = createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run })
+    const home = createAppProfile({
+      name: 'Home',
+      defaultAppPath: app,
+      env: env(),
+      run,
+      makeIcon: () => ({
+        icns: Buffer.from('icns'),
+        icon: { kind: 'badge' as const, text: 'H', style: 'ref-match' as const }
+      })
+    })
     const homeLeftover = preRefreshPathOf(home.appPath)
     renameSync(home.appPath, homeLeftover)
     defaultApp('2.0')
