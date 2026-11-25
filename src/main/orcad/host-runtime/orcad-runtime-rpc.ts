@@ -17,6 +17,7 @@ export function createOrcadRuntimeRpcServer(
   return new OrcaRuntimeRpcServer({
     runtime,
     userDataPath,
+    role: 'orcad',
     enableWebSocket: true,
     // Pin operator exposure across restarts; pairing must not silently widen a loopback bind.
     pinnedBindHost: bindHost,

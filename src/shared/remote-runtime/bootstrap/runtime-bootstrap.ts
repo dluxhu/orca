@@ -14,12 +14,19 @@ export type RuntimeTransportMetadata =
       endpoint: string
     }
 
+/** The process that owns a runtime file: the desktop app, an Electron `orca serve`, or orcad. */
+export type RuntimeRole = 'app' | 'serve' | 'orcad'
+
 export type RuntimeMetadata = {
   runtimeId: string
   pid: number
   transports: RuntimeTransportMetadata[]
   authToken: string | null
   startedAt: number
+  /** Absent in files of older versions. */
+  role?: RuntimeRole
+  /** The userData folder of the owner. Absent in files of older versions. */
+  userDataPath?: string
 }
 
 // Read both legacy singular transport and the newer transports array for older CLI metadata files.

@@ -1,0 +1,213 @@
+// Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
+// The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
+
+/** The built-in port of the default app (DEFAULT_WS_PORT). profiles.json can save another. */
+export const DEFAULT_APP_PORT = 6768
+const PROFILE_PORT_BASE = 6800
+const PORT_SPACING = 32
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{0,31}$/
+const RESERVED_IDS = ['default', 'all', 'manager']
+
+export type AppProfileState = 'running' | 'background' | 'stopped'
+
+/** One row of `orca profiles list --json`. The default app is the row with id `default`. */
+export type AppProfileRow = {
+  id: string
+  name: string
+  appPath: string
+  userDataPath: string
+  /** The saved port (profiles.json). */
+  port: number
+  /** The port that the profile's live server listens on. Absent when no server runs. */
+  livePort?: number
+  state: AppProfileState
+  /** The profile's own serve service is installed (`orca serve service install`). */
+  startAtLogin: boolean
+}
+
+/** What the Profile Manager window gets from the main process. */
+export type AppProfilesState = {
+  rows: AppProfileRow[]
+  /** The id of the app that shows the Profile Manager. */
+  currentId: string
+  /** Ids of data folders that "Keep data" left. A new profile with such an id uses the folder. */
+  keptIds: string[]
+}
+
+/** This app's own profile, for Settings. */
+export type OwnAppProfile = {
+  id: string
+  /** Start at login. */
+  enabled: boolean
+  /** The saved port. */
+  port: number
+  /** The saved ports of the other profiles, without the default app. */
+  otherPorts: number[]
+  /** The default app's saved port. */
+  defaultPort: number
+  /** A server of the profile runs, so its port must not change now. */
+  serverRuns: boolean
+}
+
+/** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
+export type AppProfileChange =
+  | { kind: 'create'; name: string; id: string; port: number; copySettings: boolean }
+  | { kind: 'rename'; id: string; name: string }
+  | { kind: 'set-port'; id: string; port: number }
+  | { kind: 'remove'; id: string; keepData: boolean }
+  /** Installs or removes the profile's own serve service. Its data stays. */
+  | { kind: 'start-at-login'; id: string; enabled: boolean }
+
+/** The `--json` reply of `orca profiles`. */
+export type AppProfileReply =
+  | { ok: true; result: unknown }
+  | { ok: false; error: { message: string } }
+
+/**
+ * The automatic id: the name without the word "Orca", in lower case, with `-` between the
+ * words. A bundle id has no `_`, so the id has none.
+ */
+export function appProfileIdFromName(name: string): string {
+  const id = name
+    .replace(/\borca\b/gi, ' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return id || 'profile'
+}
+
+/** The renderer's translate. The CLI uses the English text. */
+export type RuleTranslate = (
+  key: string,
+  fallback: string,
+  values?: Record<string, string | number>
+) => string
+
+const english: RuleTranslate = (_key, fallback, values) =>
+  fallback.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(values?.[name] ?? ''))
+
+/** Null when the id is valid and free. The check ignores case, as APFS and bundle ids do. */
+export function appProfileIdError(
+  id: string,
+  takenIds: readonly string[],
+  t: RuleTranslate = english
+): string | null {
+  if (!ID_PATTERN.test(id)) {
+    return t(
+      'profileManager.rule.idPattern',
+      'Use 1 to 32 letters, digits and -, with a letter or digit first.'
+    )
+  }
+  const lower = id.toLowerCase()
+  if (RESERVED_IDS.includes(lower)) {
+    return t('profileManager.rule.idReserved', 'The id "{{id}}" is reserved.', { id })
+  }
+  if (takenIds.some((taken) => taken.toLowerCase() === lower)) {
+    return t('profileManager.rule.idTaken', 'A profile with the id "{{id}}" exists.', { id })
+  }
+  return null
+}
+
+/**
+ * Null when the name can be the app's file name and no other profile has it. A name that starts
+ * with "-" would be read as an option of `orca profiles`.
+ */
+export function appProfileNameError(
+  name: string,
+  takenNames: readonly string[],
+  t: RuleTranslate = english
+): string | null {
+  const trimmed = name.trim()
+  if (!trimmed || /^[.-]/.test(trimmed) || /[/:]/.test(trimmed)) {
+    return t(
+      'profileManager.rule.nameChars',
+      'Type a name without "/" or ":", and with no "." or "-" first.'
+    )
+  }
+  const lower = trimmed.toLowerCase()
+  if (takenNames.some((taken) => taken.toLowerCase() === lower)) {
+    return t('profileManager.rule.nameTaken', 'A profile with the name "{{name}}" exists.', {
+      name: trimmed
+    })
+  }
+  return null
+}
+
+function portRangeError(port: number, t: RuleTranslate): string | null {
+  return !Number.isInteger(port) || port < 1024 || port > 65535
+    ? t('profileManager.rule.portRange', 'The port must be 1024 to 65535: {{port}}', { port })
+    : null
+}
+
+/**
+ * Null when the port is valid, is not the default app's saved port, and is outside the port
+ * range of other profiles. A range is a port and its fallback ladder of the next 31 ports.
+ * Ports near the default app's give only a warning: appPortWarning.
+ */
+export function appProfilePortError(
+  port: number,
+  otherPorts: readonly number[],
+  t: RuleTranslate = english,
+  defaultPort = DEFAULT_APP_PORT
+): string | null {
+  const range = portRangeError(port, t)
+  if (range) {
+    return range
+  }
+  const clash =
+    port === defaultPort || otherPorts.some((other) => Math.abs(other - port) < PORT_SPACING)
+  return clash
+    ? t(
+        'profileManager.rule.portClash',
+        'The port {{port}} is inside the port range of the default app or of another profile.',
+        { port }
+      )
+    : null
+}
+
+/** Null when the default app can save the port: valid, and no profile saves it. */
+export function defaultAppPortError(
+  port: number,
+  profilePorts: readonly number[],
+  t: RuleTranslate = english
+): string | null {
+  return (
+    portRangeError(port, t) ??
+    (profilePorts.includes(port)
+      ? t('profileManager.rule.portTaken', 'Another profile saves the port {{port}}.', { port })
+      : null)
+  )
+}
+
+/**
+ * A warning for a saved port that another Orca can take first, or null. Desktop apps listen on
+ * 6768 and its ladder. `nearPorts`: the saved ports of the other apps (both ways: a profile
+ * gives the default app's port, the default app gives the profiles' ports).
+ */
+export function appPortWarning(
+  port: number,
+  nearPorts: readonly number[],
+  t: RuleTranslate = english
+): string | null {
+  if (port >= DEFAULT_APP_PORT && port < DEFAULT_APP_PORT + PORT_SPACING) {
+    return t(
+      'profileManager.rule.portDesktop',
+      'Orca desktop apps also use the ports 6768 to 6799. A running desktop app can take this port first.'
+    )
+  }
+  return nearPorts.some((other) => other !== port && Math.abs(other - port) < PORT_SPACING)
+    ? t(
+        'profileManager.rule.portNear',
+        'The server of another Orca app can use the 31 ports after its own. It can take this port first.'
+      )
+    : null
+}
+
+/** The first port of the 6800, 6832, … series that no profile uses. */
+export function nextAppProfilePort(ports: readonly number[]): number {
+  let port = PROFILE_PORT_BASE
+  while (ports.some((other) => Math.abs(other - port) < PORT_SPACING)) {
+    port += PORT_SPACING
+  }
+  return port
+}
