@@ -21,14 +21,12 @@ let icns: Buffer
 
 beforeEach(() => {
   vi.resetModules()
-  h.createFromBuffer
-    .mockReset()
-    .mockImplementation((png: Buffer, options?: unknown) => ({
-      png,
-      options,
-      isEmpty: () => false,
-      setTemplateImage: vi.fn()
-    }))
+  h.createFromBuffer.mockReset().mockImplementation((png: Buffer, options?: unknown) => ({
+    png,
+    options,
+    isEmpty: () => false,
+    setTemplateImage: vi.fn()
+  }))
   dir = mkdtempSync(join(tmpdir(), 'dock-icon-'))
   h.userData = join(dir, 'work')
   mkdirSync(h.userData)
