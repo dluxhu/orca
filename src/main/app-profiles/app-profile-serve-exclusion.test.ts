@@ -1,3 +1,5 @@
+import type * as ChildProcess from 'node:child_process'
+import type * as Fs from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
@@ -14,12 +16,12 @@ vi.mock('electron', () => ({
   dialog: { showMessageBoxSync: h.showMessageBoxSync, showErrorBox: vi.fn() }
 }))
 vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof import('node:child_process')>()),
+  ...(await original<typeof ChildProcess>()),
   spawn: h.spawn,
   spawnSync: h.spawnSync
 }))
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof Fs>()),
   existsSync: () => h.unitExists
 }))
 vi.mock('../orcad/instance-lock/orcad-instance-lock-record', () => ({
