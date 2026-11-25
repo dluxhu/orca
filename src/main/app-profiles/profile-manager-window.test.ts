@@ -8,25 +8,32 @@ const h = vi.hoisted(() => ({
   isManager: false,
   defaultApp: '',
   opened: [] as string[][],
-  // A new window, or a focus of the one window.
+  // show() of a ready window, or a focus of the one window.
   shown: 0,
   windows: [] as {
     loadFile: ReturnType<typeof vi.fn>
     webContents: { send: ReturnType<typeof vi.fn>; isLoadingMainFrame: ReturnType<typeof vi.fn> }
+    /** The ready-to-show callback that the window registered. */
+    ready?: () => void
   }[]
 }))
 
 vi.mock('electron', () => {
   class BrowserWindow {
     webContents = { send: vi.fn(), isLoadingMainFrame: vi.fn(() => false) }
+    ready?: () => void
     constructor(public options: unknown) {
-      h.shown++
       h.windows.push(this)
     }
     isDestroyed = () => false
     isMinimized = () => false
     focus = () => h.shown++
-    once = vi.fn()
+    show = () => h.shown++
+    once = vi.fn((event: string, callback: () => void) => {
+      if (event === 'ready-to-show') {
+        this.ready = callback
+      }
+    })
     on = vi.fn()
     loadFile = vi.fn(async () => {})
     loadURL = vi.fn(async () => {})
@@ -82,6 +89,12 @@ describe('New profile…', () => {
     openProfileManagerWindow({ startNew: true })
     expect(h.windows).toHaveLength(1)
     const [window] = h.windows
+    // Created hidden; it shows when it is ready.
+    expect((window as unknown as { options: { show: boolean } }).options.show).toBe(false)
+    expect(h.shown).toBe(0)
+    window.ready?.()
+    expect(h.shown).toBe(1)
+    h.shown = 0
     // From the app path, also when the bundler puts the module into a chunk.
     expect(
       (window as unknown as { options: { webPreferences: { preload: string } } }).options

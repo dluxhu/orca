@@ -34,6 +34,10 @@ export async function profileManagerSmoke(
     const rendered = await contents
       .executeJavaScript("Boolean(document.querySelector('h1'))", true)
       .catch(() => false)
+    // An error can arrive while the query runs.
+    if (problems.length > 0) {
+      return problems[0]
+    }
     // The page must be the packaged Profile Manager page, not some other document.
     if (rendered === true && PAGE.test(contents.getURL())) {
       return null

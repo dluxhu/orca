@@ -33,6 +33,19 @@ describe('profileManagerSmoke', () => {
     }
   })
 
+  it('fails on an error that arrives while the heading query runs', async () => {
+    const contents = Object.assign(new EventEmitter(), {
+      executeJavaScript: async () => {
+        contents.emit('console-message', { level: 'error', message: 'late boom' })
+        return true
+      },
+      getURL: () => 'file:///A.app/Contents/Resources/app.asar/out/renderer/profile-manager.html#'
+    })
+    await expect(profileManagerSmoke({ webContents: contents } as never, 1000, 1)).resolves.toBe(
+      'console error: late boom'
+    )
+  })
+
   it('fails on another page, even with a heading', async () => {
     const { window } = fakeWindow(() => true, 'about:blank')
     await expect(profileManagerSmoke(window, 20, 1)).resolves.toBe(

@@ -55,43 +55,43 @@ function plistValue(path, key) {
   }
 }
 
-beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'orca-profile-manager-app-'))
-  app = join(dir, 'Orca.app')
-  const contents = join(app, 'Contents')
-  file(join(contents, 'Info.plist'), PLIST)
-  file(join(contents, 'PkgInfo'), 'APPL????')
-  // A real Mach-O file, so that the UUID step runs as in a build.
-  mkdirSync(join(contents, 'MacOS'), { recursive: true })
-  copyFileSync('/usr/bin/true', join(contents, 'MacOS', 'Orca'))
-  file(join(contents, 'MacOS', 'orca-keyboard-layout'), 'layout')
-  file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
-  const gpu = join(contents, 'Frameworks', 'Orca Helper (GPU).app', 'Contents')
-  file(join(gpu, 'MacOS', 'Orca Helper (GPU)'), 'gpu')
-  file(
-    join(gpu, 'Info.plist'),
-    PLIST.replace('<string>Orca</string>', '<string>Orca Helper (GPU)</string>')
-  )
-  file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
-  file(join(contents, 'Resources', 'app.asar'), 'asar')
-  file(join(contents, 'Resources', 'bin', 'orca'), 'cli')
-  signed = []
-})
-
-afterEach(() => {
-  rmSync(dir, { recursive: true, force: true })
-})
-
-const build = () =>
-  buildMacProfileManagerApp({
-    appPath: app,
-    appId: 'com.stablyai.orca.dlux',
-    executable: 'Orca',
-    signCode: async (path) => signed.push(['code', path]),
-    signBundle: async (path) => signed.push(['bundle', path])
+describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () => {
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'orca-profile-manager-app-'))
+    app = join(dir, 'Orca.app')
+    const contents = join(app, 'Contents')
+    file(join(contents, 'Info.plist'), PLIST)
+    file(join(contents, 'PkgInfo'), 'APPL????')
+    // A real Mach-O file, so that the UUID step runs as in a build.
+    mkdirSync(join(contents, 'MacOS'), { recursive: true })
+    copyFileSync('/usr/bin/true', join(contents, 'MacOS', 'Orca'))
+    file(join(contents, 'MacOS', 'orca-keyboard-layout'), 'layout')
+    file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
+    const gpu = join(contents, 'Frameworks', 'Orca Helper (GPU).app', 'Contents')
+    file(join(gpu, 'MacOS', 'Orca Helper (GPU)'), 'gpu')
+    file(
+      join(gpu, 'Info.plist'),
+      PLIST.replace('<string>Orca</string>', '<string>Orca Helper (GPU)</string>')
+    )
+    file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
+    file(join(contents, 'Resources', 'app.asar'), 'asar')
+    file(join(contents, 'Resources', 'bin', 'orca'), 'cli')
+    signed = []
   })
 
-describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () => {
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  const build = () =>
+    buildMacProfileManagerApp({
+      appPath: app,
+      appId: 'com.stablyai.orca.dlux',
+      executable: 'Orca',
+      signCode: async (path) => signed.push(['code', path]),
+      signBundle: async (path) => signed.push(['bundle', path])
+    })
+
   it('nests the app with its own id and copies, and relative links into the outer app', async () => {
     const bundle = await build()
     expect(bundle).toBe(profileManagerAppPath(app))
@@ -178,7 +178,8 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
 describe('macProfileManagerSignIgnore', () => {
   const ignored = (path) => macProfileManagerSignIgnore.some((pattern) => path.match(pattern))
   it('keeps electron-builder out of the nested app only', () => {
-    const nested = profileManagerAppPath('/b/Orca.app')
+    // The macOS form of the path, also when the test runs on Windows.
+    const nested = profileManagerAppPath('/b/Orca.app').replaceAll('\\', '/')
     expect(ignored(nested)).toBe(true)
     expect(ignored(`${nested}/Contents/Resources/app.asar.unpacked/x.node`)).toBe(true)
     expect(ignored('/b/Orca.app/Contents/Resources/app.asar.unpacked/x.node')).toBe(false)
