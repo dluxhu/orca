@@ -605,7 +605,10 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
     `*.app.pre-refresh` finds the profile's previous bundles, not their path, so a Finder rename
     of the app does not bring an old bundle back. The started profile app removes them. When no
     live bundle of the profile exists (a refresh stopped between its two renames), the Profile
-    Manager list moves the newest one back in place. Rename and remove delete them.
+    Manager list moves the newest one back in place; it waits while a `.<id>.refresh-*` folder
+    shows a refresh that runs now. A link is removed, never brought back, and its target stays. A
+    leftover whose `Info.plist` cannot be read as XML is no profile's. Rename and remove delete the
+    profile's leftovers; this is cleanup only, so a failure there does not stop them.
   - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
   - A serve start does not refresh.
 - **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and

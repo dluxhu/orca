@@ -227,8 +227,13 @@ function renameLocked(
           profile.id === entry.id ? { ...profile, name, appPath: newPath } : profile
         )
       }))
-      // A previous bundle of a refresh must not come back under the old name.
-      removePreRefreshLeftovers(dirname(newPath), entry.id)
+      // A previous bundle of a refresh must not come back under the old name. Cleanup only: a
+      // failure does not undo the rename.
+      try {
+        removePreRefreshLeftovers(dirname(newPath), entry.id)
+      } catch (error) {
+        console.warn('[profiles] cannot remove a previous bundle:', error)
+      }
     } catch (failure) {
       // Put everything back: the unit, Launch Services and the old name.
       if (serveService === 'updated' && jobFile) {
