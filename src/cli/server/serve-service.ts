@@ -128,13 +128,6 @@ async function mustRun(deps: ServeServiceDeps, program: string, args: string[]):
   }
 }
 
-// Fork patch: the login-item-only flags of the app profiles exist on macOS only.
-function requireLaunchd(manager: ServeServiceSpec['manager'], flag: string): void {
-  if (manager !== 'launchd') {
-    throw new RuntimeClientError('invalid_argument', `${flag} is available on macOS only.`)
-  }
-}
-
 /** Render and optionally install the supervised serve service for the current platform. */
 export async function installServeService(
   options: {
@@ -155,8 +148,8 @@ export async function installServeService(
     ...options,
     command: resolveServiceCommand(options.command, deps)
   })
-  if (options.start === false) {
-    requireLaunchd(spec.manager, '--no-start')
+  if (options.start === false && spec.manager !== 'launchd') {
+    throw new RuntimeClientError('invalid_argument', '--no-start is available on macOS only.')
   }
   if (options.dryRun) {
     return { installed: false, dryRun: true, ...spec }
@@ -168,18 +161,12 @@ export async function installServeService(
   }
   // Reinstalling retries a supervisor stopped by the crash-loop brake.
   clearServeSupervisorBrake(resolveLaunchUserDataPath(deps.env))
-  if (options.start === false) {
-    return {
-      installed: true,
-      manager: spec.manager,
-      name: spec.name,
-      unitPath: spec.unitPath,
-      logPath: spec.logPath
-    }
-  }
   if (spec.manager === 'launchd') {
-    await deps.run('launchctl', ['bootout', `gui/${deps.uid}/${spec.name}`])
-    await mustRun(deps, 'launchctl', ['bootstrap', `gui/${deps.uid}`, spec.unitPath])
+    // Fork patch: --no-start writes only the LaunchAgent, the login item of the app profiles.
+    if (options.start !== false) {
+      await deps.run('launchctl', ['bootout', `gui/${deps.uid}/${spec.name}`])
+      await mustRun(deps, 'launchctl', ['bootstrap', `gui/${deps.uid}`, spec.unitPath])
+    }
     return {
       installed: true,
       manager: spec.manager,
@@ -279,7 +266,9 @@ export async function uninstallServeService(
   requireManager(deps.platform)
   const spec = serviceSpec(deps, { command: 'orca' })
   if (options.keepRunning) {
-    requireLaunchd(spec.manager, '--keep-running')
+    if (spec.manager !== 'launchd') {
+      throw new RuntimeClientError('invalid_argument', '--keep-running is available on macOS only.')
+    }
     const existed = existsSync(spec.unitPath)
     rmSync(spec.unitPath, { force: true })
     return { removed: existed, manager: spec.manager, name: spec.name, unitPath: spec.unitPath }
