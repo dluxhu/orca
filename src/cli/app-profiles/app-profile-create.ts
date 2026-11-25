@@ -8,12 +8,9 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   renameSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync
+  rmSync
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -39,21 +36,15 @@ import {
   nextAppProfilePort
 } from '../../shared/app-profiles/app-profile-rules'
 import { RuntimeClientError } from '../runtime/connection/types'
-import {
-  applyProfilePlist,
-  copyAppRuntime,
-  copyDefaultPlist,
-  signProfileBundle,
-  templateKeyOf
-} from './app-profile-bundle'
+import { buildProfileBundle } from './app-profile-bundle'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
 import {
-  appIconFileName,
   keepProfileIcon,
   makeAppProfileIcon,
   withNameBadge,
   type AppProfileIconSource
 } from './app-profile-icon'
+import { writeBundleIcon } from './app-profile-bundle-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
@@ -99,7 +90,6 @@ export function createAppProfile(
   const root = resolve(appProfilesRoot(env, home))
   const appsDir = resolve(appProfilesAppsDir(env, home))
   const defaultApp = defaultAppOf(resolve(options.defaultAppPath))
-  const source = join(defaultApp, 'Contents')
   mkdirSync(root, { recursive: true })
   mkdirSync(appsDir, { recursive: true })
 
@@ -136,39 +126,22 @@ export function createAppProfile(
     const staging = mkdtempSync(join(appsDir, `.${id}.staging-`))
     try {
       const bundle = join(staging, `${name}.app`)
-      const contents = join(bundle, 'Contents')
-      mkdirSync(join(contents, 'Resources'), { recursive: true })
-      const plistPath = join(contents, 'Info.plist')
-      const defaultPlist = copyDefaultPlist(source, plistPath, run)
-      if (existsSync(join(source, 'PkgInfo'))) {
-        run('/usr/bin/ditto', [join(source, 'PkgInfo'), join(contents, 'PkgInfo')])
-      }
-      const defaultAppId = readPlistString(defaultPlist, 'CFBundleIdentifier')
-      const executable = readPlistString(defaultPlist, 'CFBundleExecutable')
-      if (!defaultAppId || !executable) {
-        throw new RuntimeClientError('invalid_argument', `${defaultApp} has no bundle id.`)
-      }
-      const bundleId = `${defaultAppId}.profile.${id}`
-
-      const helpers = copyAppRuntime(source, contents, executable, name, run)
-      for (const entry of readdirSync(join(source, 'Resources'))) {
-        symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
-      }
-      // The icon is a real file, so the seal covers it and the Dock shows it.
+      const pinnedRoot = options.pinRoot ? root : undefined
       const used = registry.profiles.map((profile) => profile.icon)
       const made = (options.makeIcon ?? makeAppProfileIcon)(
         defaultApp,
         withNameBadge(options.icon ?? { kind: 'badge' }, name, used),
         used
       )
-      const iconPath = join(contents, 'Resources', appIconFileName(defaultPlist))
-      rmSync(iconPath, { force: true })
-      writeFileSync(iconPath, made.icns)
-
-      const pinnedRoot = options.pinRoot ? root : undefined
-      const templateKey = templateKeyOf(defaultApp, run)
-      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot, templateKey }, run)
-      signProfileBundle(bundle, defaultApp, bundleId, helpers, staging, run)
+      const { bundleId } = buildProfileBundle(
+        defaultApp,
+        bundle,
+        { id, name, root: pinnedRoot },
+        run,
+        staging,
+        // The icon is a real file, so the seal covers it and the Dock shows it.
+        (contents, defaultPlist) => writeBundleIcon(contents, defaultPlist, made.icns)
+      )
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
       ensureAppProfileMarker(userDataPath, id)

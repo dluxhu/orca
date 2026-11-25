@@ -35,7 +35,7 @@ describe('refreshOutdatedProfileApp', () => {
       expect.any(String),
       '/Applications/Orca.app',
       expect.any(Function),
-      '/data/work/profile-runtime-check.txt'
+      { checkFile: '/data/work/profile-runtime-check.txt', userDataPath: '/data/work' }
     )
     expect(h.relaunch).not.toHaveBeenCalled()
   })

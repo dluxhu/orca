@@ -2,7 +2,7 @@
 // The main process imports this module for the Profiles menu, so it has no CLI-only imports.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, dirname } from 'node:path'
 import {
   appProfilesRoot,
   locateAppProfileApp,
@@ -243,7 +243,7 @@ export async function listAppProfiles(
     ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port, icon }) => {
       try {
         // A refresh that stopped between its two renames left only <app>.pre-refresh.
-        settlePreRefresh(appPath, false)
+        settlePreRefresh(dirname(appPath), id, false)
       } catch {
         // The next list tries again.
       }
