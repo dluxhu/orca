@@ -98,6 +98,8 @@ function removeLocked(
     rmSync(unit.unitPath, { force: true })
     serveService = 'removed'
   }
+  // Kept data must not start an old job again.
+  rmSync(unit.copyPath, { force: true })
   if (targets.app) {
     tryRun(run, LSREGISTER, ['-u', targets.app])
     trash(targets.app)

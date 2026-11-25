@@ -56,7 +56,6 @@ export function parseAppProfileMarker(text: string): string | null {
   }
 }
 
-/** The profile id in a userData folder, or null when the folder is not a profile's. */
 /**
  * The copy of the serve LaunchAgent that `serve service uninstall --keep-running` keeps in
  * userData. launchd does not load it at login; the profile app starts the job from it after a quit.
@@ -65,6 +64,7 @@ export function serveUnitCopyPath(userDataPath: string): string {
   return join(userDataPath, 'serve-service-unit.plist')
 }
 
+/** The profile id in a userData folder, or null when the folder is not a profile's. */
 export function readAppProfileMarker(userDataPath: string): string | null {
   try {
     return parseAppProfileMarker(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8'))

@@ -103,7 +103,21 @@ describe('takeProfileFromServer', () => {
     expect(bootouts()).toHaveLength(1)
     expect(bootouts()[0][1][1]).toMatch(new RegExp(`^gui/${uid}/`))
     expect(h.showMessageBoxSync).not.toHaveBeenCalled()
-    expect(h.once).not.toHaveBeenCalled()
+    h.once.mock.calls[0][1]()
+    expect(h.spawn).not.toHaveBeenCalled()
+  })
+
+  it('chooses the file at quit: Start at login can change while the app runs', () => {
+    h.exists = (path) => path.includes('/LaunchAgents/')
+    expect(takeProfileFromServer('/data/work')).toBe(true)
+    // Start at login goes off: the LaunchAgent moves to the userData copy.
+    h.exists = (path) => path === '/data/work/serve-service-unit.plist'
+    h.once.mock.calls[0][1]()
+    expect((h.spawn.mock.calls[0] as unknown as [string, string[]])[1]).toEqual([
+      'bootstrap',
+      `gui/${uid}`,
+      '/data/work/serve-service-unit.plist'
+    ])
   })
 
   it('starts the job again from its LaunchAgent file after a normal quit', () => {

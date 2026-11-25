@@ -237,6 +237,10 @@ const SERVICE_STATE_TTL_MS = 60_000
 let serviceStates = new Map<string, ReturnType<ServeServiceRun>>()
 let serviceStatesAt = 0
 const cachedServiceRun: ServeServiceRun = (program, args) => {
+  // Only `launchctl print`: lsappinfo reads the live Dock state, which a Dock click changes.
+  if (args[0] !== 'print') {
+    return runServeServiceManager(program, args)
+  }
   const key = [program, ...args].join('\0')
   let result = serviceStates.get(key)
   if (!result) {

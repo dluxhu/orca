@@ -157,6 +157,8 @@ export async function installServeService(
   }
   mkdirSync(dirname(spec.unitPath), { recursive: true })
   writeFileSync(spec.unitPath, spec.content, { mode: 0o644 })
+  // Fork patch: the LaunchAgent replaces a copy that `uninstall --keep-running` left.
+  removeServeUnitCopy(resolveLaunchUserDataPath(deps.env))
   if (spec.logPath) {
     mkdirSync(dirname(spec.logPath), { recursive: true, mode: 0o700 })
   }
