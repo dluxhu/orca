@@ -1,5 +1,7 @@
+import { access } from 'node:fs/promises'
 import path from 'node:path'
 import { runProcess } from '@orca/process-host'
+import { profileManagerAppPath } from '../../../shared/app-profiles/app-profile-paths'
 
 const RUNNING_INSTANCES_SCRIPT = `function run(argv) {
   ObjC.import('AppKit');
@@ -27,6 +29,20 @@ export async function getMacUpdateRunningInstances(
     return []
   }
   const bundlePath = path.dirname(path.dirname(path.dirname(executable)))
+  // Fork patch: ShipIt replaces the nested Profile Manager app too, so its instances block as well.
+  const managerApp = profileManagerAppPath(bundlePath)
+  const bundles = await access(managerApp).then(
+    () => [bundlePath, managerApp],
+    () => [bundlePath]
+  )
+  const pids: number[] = []
+  for (const bundle of bundles) {
+    pids.push(...(await listBundleInstances(bundle, currentPid)))
+  }
+  return pids
+}
+
+async function listBundleInstances(bundlePath: string, currentPid: number): Promise<number[]> {
   // Match ShipIt's registry query; run-as-node workers share the executable but do not block it.
   const result = await runProcess({
     program: '/usr/bin/osascript',
