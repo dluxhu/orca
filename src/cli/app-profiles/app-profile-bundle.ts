@@ -5,11 +5,9 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   renameSync,
-  rmSync,
   symlinkSync,
   writeFileSync
 } from 'node:fs'
@@ -27,7 +25,7 @@ const ELECTRON_FRAMEWORK = 'Electron Framework.framework'
 /** The Info.plist key with the template key of the profile's copies (templateKeyOf). */
 export const APP_PROFILE_TEMPLATE_KEY = 'OrcaProfileTemplateKey'
 
-function exists(path: string): boolean {
+export function exists(path: string): boolean {
   try {
     lstatSync(path)
     return true
@@ -41,7 +39,7 @@ function exists(path: string): boolean {
  * Frameworks/<CFBundleName> Helper*.app, and macOS shows CFBundleName in bold in the menu bar.
  * The helper is signed again ad hoc with its own entitlements (the renderer needs JIT).
  */
-function nameHelperApp(from: string, app: string, scratch: string, run: RunTool): void {
+function nameHelperApp(from: string, app: string, entitlements: string, run: RunTool): void {
   const oldExecutable = basename(from, '.app')
   const executable = basename(app, '.app')
   const macos = join(app, 'Contents', 'MacOS')
@@ -50,11 +48,10 @@ function nameHelperApp(from: string, app: string, scratch: string, run: RunTool)
   }
   const plist = join(app, 'Contents', 'Info.plist')
   if (existsSync(plist)) {
-    for (const key of ['CFBundleExecutable', 'CFBundleDisplayName']) {
+    for (const key of ['CFBundleExecutable', 'CFBundleDisplayName', 'CFBundleName']) {
       run('/usr/bin/plutil', ['-replace', key, '-string', executable, plist])
     }
   }
-  const entitlements = join(scratch, `${executable}.entitlements.plist`)
   writeFileSync(
     entitlements,
     run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', from])
@@ -102,6 +99,7 @@ export function copyAppRuntime(
   const helperPrefix = `${defaultName} Helper`
   // The bundle folder: the helpers' entitlement files stay out of the signed bundle.
   const scratch = dirname(dirname(contents))
+  let helperIndex = 0
   for (const entry of readdirSync(join(source, 'Frameworks'))) {
     const from = join(source, 'Frameworks', entry)
     const to = join(contents, 'Frameworks', entry)
@@ -112,7 +110,9 @@ export function copyAppRuntime(
         `${name} Helper${entry.slice(helperPrefix.length)}`
       )
       run('/usr/bin/ditto', [from, named])
-      nameHelperApp(from, named, scratch, run)
+      // A fixed file name: a long profile name must not make it too long.
+      const entitlements = join(scratch, `helper-${helperIndex++}.entitlements.plist`)
+      nameHelperApp(from, named, entitlements, run)
     } else if (entry.endsWith('.app')) {
       run('/usr/bin/ditto', [from, to])
     } else if (entry === ELECTRON_FRAMEWORK) {
@@ -193,12 +193,6 @@ export function signProfileBundle(
   ])
 }
 
-const versionOf = (plist: string): string | null => {
-  const short = readPlistString(plist, 'CFBundleShortVersionString')
-  const build = readPlistString(plist, 'CFBundleVersion')
-  return short === null && build === null ? null : `${short ?? ''} (${build ?? ''})`
-}
-
 /** The cdhash of a signed executable: it does not change with a new signature of the same code. */
 function codeHashOf(path: string, run: RunTool): string {
   const out = run('/bin/sh', ['-c', '/usr/bin/codesign -dvvv "$0" 2>&1 || true', path])
@@ -234,109 +228,4 @@ export function templateKeyOf(defaultApp: string, run: RunTool): string {
     hash.update(`${folder} ${readdirSync(join(source, folder)).sort().join('/')}\n`)
   }
   return hash.digest('hex').slice(0, 32)
-}
-
-/**
- * Copies the executables, the helper apps, the Electron framework and the Info.plist of the
- * default app into the profile app again when the template key (templateKeyOf) differs from the
- * one that its own Info.plist records. The profile's data, Resources links and icon files stay.
- * The new bundle is built next to the app and then swapped in, so a failure leaves the app as it
- * was. `checkFile` keeps the default app version of the last check, so a start with the same
- * version reads no executables. Returns true when the bundle changed.
- */
-export function refreshAppProfileBundle(
-  appPath: string,
-  defaultApp: string,
-  run: RunTool,
-  checkFile?: string
-): boolean {
-  const source = join(defaultApp, 'Contents')
-  const target = versionOf(readFileSync(join(source, 'Info.plist'), 'utf8'))
-  if (target === null || (checkFile && readText(checkFile) === target)) {
-    return false
-  }
-  const ownPlist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
-  const templateKey = templateKeyOf(defaultApp, run)
-  // A rename changes only the file name (no new signature); the menu-bar name follows here.
-  const changed =
-    templateKey !== readPlistString(ownPlist, APP_PROFILE_TEMPLATE_KEY) ||
-    readPlistString(ownPlist, 'CFBundleName') !== basename(appPath, '.app')
-  if (changed) {
-    rebuild(appPath, defaultApp, ownPlist, templateKey, run)
-  }
-  if (checkFile) {
-    try {
-      writeFileSync(checkFile, target)
-    } catch {
-      // The next start checks again.
-    }
-  }
-  return changed
-}
-
-function readText(path: string): string | null {
-  try {
-    return readFileSync(path, 'utf8')
-  } catch {
-    return null
-  }
-}
-
-function rebuild(
-  appPath: string,
-  defaultApp: string,
-  ownPlist: string,
-  templateKey: string,
-  run: RunTool
-): void {
-  const source = join(defaultApp, 'Contents')
-  const id = readPlistString(ownPlist, APP_PROFILE_PLIST_ID_KEY)
-  const bundleId = readPlistString(ownPlist, 'CFBundleIdentifier')
-  // The file name is the profile name: a rename moves only the bundle.
-  const name = basename(appPath, '.app')
-  if (!id || !bundleId || !name) {
-    throw new RuntimeClientError('invalid_argument', `${appPath} is not a profile app.`)
-  }
-  const root = readPlistString(ownPlist, APP_PROFILE_PLIST_ROOT_KEY) ?? undefined
-  const staging = mkdtempSync(join(dirname(appPath), `.${id}.refresh-`))
-  try {
-    const next = join(staging, basename(appPath))
-    // A clone keeps the Resources links, the icon files and the Finder custom icon.
-    run('/bin/cp', ['-cR', appPath, next])
-    const contents = join(next, 'Contents')
-    rmSync(join(contents, 'MacOS'), { recursive: true, force: true })
-    rmSync(join(contents, 'Frameworks'), { recursive: true, force: true })
-    const plistPath = join(contents, 'Info.plist')
-    const executable = readPlistString(
-      copyDefaultPlist(source, plistPath, run),
-      'CFBundleExecutable'
-    )
-    if (!executable) {
-      throw new RuntimeClientError('invalid_argument', `${defaultApp} has no executable.`)
-    }
-    const helpers = copyAppRuntime(source, contents, executable, name, run)
-    // A Resources entry that the new version adds gets its link.
-    for (const entry of readdirSync(join(source, 'Resources'))) {
-      if (!exists(join(contents, 'Resources', entry))) {
-        symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
-      }
-    }
-    applyProfilePlist(plistPath, { bundleId, name, id, root, templateKey }, run)
-    signProfileBundle(next, defaultApp, bundleId, helpers, staging, run)
-    const old = join(staging, 'old.app')
-    renameSync(appPath, old)
-    try {
-      renameSync(next, appPath)
-    } catch (error) {
-      renameSync(old, appPath)
-      throw error
-    }
-  } catch (error) {
-    throw new RuntimeClientError(
-      'profile_refresh_failed',
-      `Orca could not update the profile app ${appPath}: ${error instanceof Error ? error.message : String(error)}`
-    )
-  } finally {
-    rmSync(staging, { recursive: true, force: true })
-  }
 }

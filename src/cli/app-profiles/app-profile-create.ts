@@ -46,6 +46,9 @@ const DEFAULT_APP_PORTS = { first: 6768, last: 6799 }
 const PROFILE_PORT_BASE = 6800
 const PORT_SPACING = 32
 
+/** The longest profile name in UTF-8 bytes: its helper apps carry it in their file names. */
+export const APP_PROFILE_NAME_MAX_BYTES = 200
+
 /** Runs a tool and returns its stdout; throws when it fails. */
 export type RunTool = (program: string, args: string[]) => string
 
@@ -108,6 +111,13 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
   const id = appProfileIdFromName(name)
   if (!name || !id || name.includes('/')) {
     throw new RuntimeClientError('invalid_argument', `Not a profile name: "${options.name}"`)
+  }
+  // "<name> Helper (Renderer).app" must fit in a file name (255 bytes).
+  if (Buffer.byteLength(name) > APP_PROFILE_NAME_MAX_BYTES) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      `The profile name is too long: at most ${APP_PROFILE_NAME_MAX_BYTES} bytes.`
+    )
   }
   const root = resolve(appProfilesRoot(env, home))
   const appsDir = resolve(appProfilesAppsDir(env, home))
