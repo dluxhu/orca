@@ -598,6 +598,9 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
     takes its place; a failed second rename moves the live bundle back. The data stays. The app
     then starts the new bundle with `open -n` after its own process exits: `app.relaunch()` uses
     the helper path of the old `CFBundleName`. The new signature makes the Keychain ask once more.
+  - The profile's icon: the refresh writes the kept icon (`profile-icon.icns` in userData) into
+    the new bundle before the seal, as create does, and sets the Finder custom icon after the
+    signature, as `set-icon` does (`app-profile-bundle-icon.ts`).
   - Leftovers (`settlePreRefresh`): the profile id in the `Info.plist` of each
     `*.app.pre-refresh` finds the profile's previous bundles, not their path, so a Finder rename
     of the app does not bring an old bundle back. The started profile app removes them. When no
