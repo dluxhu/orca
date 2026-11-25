@@ -27,6 +27,11 @@ export type SetAppProfileIconOptions = {
   /** Tests only: the icon renderer. */
   makeIcon?: typeof makeAppProfileIcon
   isAlive?: (pid: number) => boolean
+  /**
+   * Only for a profile without an icon in profiles.json (made before profile icons): the profile
+   * app asks for its icon at start, so it may run. A profile with an icon does not change.
+   */
+  ifMissing?: boolean
 }
 
 // shortcut: a live runtime pid also refuses when only the serve service runs; use the state of `orca profiles list` when it merges.
@@ -59,8 +64,11 @@ export function setAppProfileIcon(
     if (!registry || !entry) {
       throw new RuntimeClientError('invalid_argument', `No profile "${id}".`)
     }
+    if (options.ifMissing && entry.icon) {
+      return entry
+    }
     const refuseWhileRunning = (): void => {
-      if (runs(entry.userDataPath, options.isAlive ?? isProcessAlive)) {
+      if (!options.ifMissing && runs(entry.userDataPath, options.isAlive ?? isProcessAlive)) {
         throw new RuntimeClientError(
           'profile_running',
           `"${entry.name}" runs. Quit it, and stop its server, before you change its icon.`

@@ -232,7 +232,8 @@ describe('menu-bar template', () => {
   it('makes the template of an own icon file from the icon alone, and keeps it in userData', () => {
     const app = join(dir, 'Orca.app')
     const path = join(dir, 'own.icns')
-    writeFileSync(path, writeIcns(block(16, 16, [4, 0, 12, 16], [0, 0, 0, 255])))
+    // 1024 px, the largest entry: no upscale, so no resampling ringing widens the box.
+    writeFileSync(path, writeIcns(block(1024, 1024, [256, 0, 768, 1024], [0, 0, 0, 255])))
     const made = makeAppProfileIcon(app, { kind: 'file', path })
     const template = decodePng(made.menuBarPng!)!
     expect([template.width, template.height]).toEqual([14, 28])

@@ -435,6 +435,27 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns W')
   })
 
+  it('with ifMissing, gives a profile without an icon its name badge once, also while it runs', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    // A profile from a build before profile icons: no icon in profiles.json.
+    const registryPath = join(dir, 'data', 'profiles.json')
+    const registry = JSON.parse(read(registryPath))
+    delete registry.profiles[0].icon
+    writeFileSync(registryPath, JSON.stringify(registry))
+    writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
+    const options = { env: env(), run, makeIcon, ifMissing: true }
+    expect(setAppProfileIcon('work', { kind: 'badge' }, options).icon).toEqual({
+      kind: 'badge',
+      text: 'W',
+      style: 'ref-match'
+    })
+    // It has an icon now: nothing changes.
+    expect(setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, options).icon).toMatchObject({
+      text: 'W'
+    })
+    expect(customIcons).toEqual([[work.appPath, 'icns W']])
+  })
+
   it('changes nothing when macOS refuses the custom icon', () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     const failing: RunTool = (program, args) => {
