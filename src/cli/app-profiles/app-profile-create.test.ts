@@ -164,14 +164,14 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       appPath: join(dir, 'apps', 'Orca - Work.app'),
       userDataPath: join(dir, 'data', 'work'),
       port: 6800,
-      icon: { kind: 'badge', text: 'O', style: 'ref-match' },
+      icon: { kind: 'badge', text: 'W', style: 'ref-match' },
       createdAt: 1
     })
     const isLink = (path: string): boolean => lstatSync(path).isSymbolicLink()
     // The icon is the profile's own file; userData keeps a copy under the profile id.
     expect(isLink(join(contents, 'Resources', 'icon.icns'))).toBe(false)
-    expect(readFileSync(join(contents, 'Resources', 'icon.icns'), 'utf8')).toBe('icns O')
-    expect(readFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns O')
+    expect(readFileSync(join(contents, 'Resources', 'icon.icns'), 'utf8')).toBe('icns W')
+    expect(readFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns W')
     expect(isLink(join(contents, 'MacOS', 'Orca'))).toBe(false)
     expect(lstatSync(join(contents, 'MacOS', 'Orca')).mode & 0o111).not.toBe(0)
     expect(readFileSync(join(contents, 'MacOS', 'orca-notification-status'), 'utf8')).toBe(
