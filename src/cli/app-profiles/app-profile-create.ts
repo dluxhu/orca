@@ -42,7 +42,8 @@ import {
   applyProfilePlist,
   copyAppRuntime,
   copyDefaultPlist,
-  signProfileBundle
+  signProfileBundle,
+  templateKeyOf
 } from './app-profile-bundle'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
 
@@ -137,13 +138,14 @@ export function createAppProfile(
       }
       const bundleId = `${defaultAppId}.profile.${id}`
 
-      const helpers = copyAppRuntime(source, contents, executable, run)
+      const helpers = copyAppRuntime(source, contents, executable, name, run)
       for (const entry of readdirSync(join(source, 'Resources'))) {
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }
 
       const pinnedRoot = options.pinRoot ? root : undefined
-      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot }, run)
+      const templateKey = templateKeyOf(defaultApp, run)
+      applyProfilePlist(plistPath, { bundleId, name, id, root: pinnedRoot, templateKey }, run)
       signProfileBundle(bundle, defaultApp, bundleId, helpers, staging, run)
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
