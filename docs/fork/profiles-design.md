@@ -410,13 +410,22 @@ in place of the defaults.
     without its file). Exit status 0: the job stopped, and the app waits until the profile lock is
     free. Else the app asks, as for a server started by hand.
   - When it quits normally, the app runs `launchctl bootstrap gui/<uid> <plist>` for the job that it
-    stopped, when the LaunchAgent file exists. The row changes from "Running" to "Running in
-    background".
+    stopped: from the LaunchAgent file, else from its userData copy (see Start at login). The row
+    changes from "Running" to "Running in background".
 
   So every path that starts the app works the same: the Dock, Finder, the Profiles menu, an
   `orca:` forward, `orca open` and "Open" in the Profile Manager. After a crash of the app, the
   service stays stopped until the next normal quit; the row shows "Stopped" and offers "Start
   service".
+- **Start at login** (owner, 2026-11-25) changes only the login item, the LaunchAgent file:
+  `serve service install --no-start` writes it, `serve service uninstall --keep-running` moves it
+  to `<userData>/serve-service-unit.plist` (`serveUnitCopyPath`). launchd does not read that copy at
+  login. A running app or service keeps running. A full `uninstall` removes both files.
+- **Service buttons.** A row whose app does not run has "Start background service" or "Stop
+  background service". They run the install or uninstall now, then put the Start at login choice
+  back. With Start at login off, the running job has only the userData copy. The app's quit step,
+  `rename` and `set-port` use the LaunchAgent file, else the copy (`serveJobFileOf`), so the job
+  comes back after the app quits and keeps the new path or port.
 - **Open.** Each row has "Open", the default profile's row too: `open -b <bundleId>`. It brings the
   profile to the front with a window, or starts it.
 - **Messages.** Use the profile's unix socket and token from `orca-runtime.json`, as the CLI does

@@ -23,7 +23,13 @@ import {
 } from '../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { LSREGISTER, runTool, type RunTool } from './app-profile-create'
-import { readAppProfileRuntime, serveServiceUnitOf, type RuntimeOwner } from './app-profile-list'
+import {
+  readAppProfileRuntime,
+  serveJobFileOf,
+  serveServiceUnitOf,
+  type RuntimeOwner,
+  type ServeServiceUnit
+} from './app-profile-list'
 import {
   rewriteServeUnitAppPath,
   rewriteServeUnitPort,
@@ -195,6 +201,7 @@ function renameLocked(
   }
 
   const unit = serveServiceUnitOf(entry.userDataPath, false, context.home)
+  const jobFile = serveJobFileOf(unit)
   const target = `gui/${context.uid}/${unit.label}`
   if (context.inBackground) {
     run('/bin/launchctl', ['bootout', target])
@@ -208,7 +215,7 @@ function renameLocked(
       tryRun(run, LSREGISTER, ['-u', oldPath])
       run(LSREGISTER, ['-f', newPath])
       // The unit starts the profile's executable by its path. Only Orca's own unit changes here.
-      if (rewriteServeUnitAppPath(unit.unitPath, oldPath, newPath)) {
+      if (rewriteServeUnitAppPath(jobFile, oldPath, newPath)) {
         serveService = 'updated'
       }
       updateEntry(context, (registry) => ({
@@ -221,7 +228,7 @@ function renameLocked(
       // Put everything back: the unit, Launch Services and the old name.
       if (serveService === 'updated') {
         try {
-          rewriteServeUnitAppPath(unit.unitPath, newPath, oldPath)
+          rewriteServeUnitAppPath(jobFile, newPath, oldPath)
         } catch {
           // The error below names the failed step; the unit keeps the new path.
         }
@@ -235,7 +242,7 @@ function renameLocked(
     }
   } finally {
     if (context.inBackground) {
-      tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, unit.unitPath])
+      tryRun(run, '/bin/launchctl', ['bootstrap', `gui/${context.uid}`, jobFile])
     }
   }
   if (context.inBackground) {
@@ -295,26 +302,27 @@ function setPortLocked(context: Context, port: number, loaded: boolean): AppProf
 }
 
 /**
- * Writes the new port to the Start at login unit, then `save`s it to profiles.json. A loaded job
- * restarts on it; others read it at load. A failed bootout stops here. The unit comes before the
- * registry, so a failed unit write leaves both on the old port.
+ * Writes the new port to the unit of the job (serveJobFileOf), then `save`s it to profiles.json. A
+ * loaded job restarts on it; others read it at load. A failed bootout stops here. The unit comes
+ * before the registry, so a failed unit write leaves both on the old port.
  */
 export function movePort(
   options: {
     run: RunTool
     uid: number
-    unit: { label: string; unitPath: string }
+    unit: ServeServiceUnit
     loaded: boolean
     port: number
   },
   save: () => void
 ): { serveServiceInstalled: boolean; serveService: ServeServiceChange } {
   const { run, uid, unit, loaded } = options
+  const jobFile = serveJobFileOf(unit)
   if (loaded) {
     run('/bin/launchctl', ['bootout', `gui/${uid}/${unit.label}`])
   }
   try {
-    const updated = rewriteServeUnitPort(unit.unitPath, options.port)
+    const updated = rewriteServeUnitPort(jobFile, options.port)
     save()
     return {
       serveServiceInstalled: existsSync(unit.unitPath),
@@ -322,7 +330,7 @@ export function movePort(
     }
   } finally {
     if (loaded) {
-      run('/bin/launchctl', ['bootstrap', `gui/${uid}`, unit.unitPath])
+      run('/bin/launchctl', ['bootstrap', `gui/${uid}`, jobFile])
     }
   }
 }

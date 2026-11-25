@@ -7,6 +7,7 @@ import {
   appProfilesRoot,
   locateAppProfileApp,
   readAppProfileRegistry,
+  serveUnitCopyPath,
   type AppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import {
@@ -37,16 +38,30 @@ export type AppProfileListDeps = {
   isAlive?: (pid: number) => boolean
 }
 
+export type ServeServiceUnit = {
+  label: string
+  /** The LaunchAgent: its file is the login item. */
+  unitPath: string
+  /** The unit that `serve service uninstall --keep-running` keeps for a job without a login item. */
+  copyPath: string
+}
+
 /** The LaunchAgent of `orca serve service install` for this userData. */
 export function serveServiceUnitOf(
   userDataPath: string,
   isDefault: boolean,
   home: string
-): { label: string; unitPath: string } {
+): ServeServiceUnit {
   const label = isDefault
     ? SERVE_LAUNCHD_LABEL_PREFIX
     : `${SERVE_LAUNCHD_LABEL_PREFIX}.${serveProfileSuffix(userDataPath)}`
-  return { label, unitPath: join(home, 'Library', 'LaunchAgents', `${label}.plist`) }
+  const unitPath = join(home, 'Library', 'LaunchAgents', `${label}.plist`)
+  return { label, unitPath, copyPath: serveUnitCopyPath(userDataPath) }
+}
+
+/** The file that loads the job: the LaunchAgent, else its copy. */
+export function serveJobFileOf(unit: ServeServiceUnit): string {
+  return existsSync(unit.unitPath) ? unit.unitPath : unit.copyPath
 }
 
 /** The pid of the loaded serve service job, or null when it is not loaded or has no process. */
