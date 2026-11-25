@@ -545,21 +545,30 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
   profile's notification helper, and the names in `Frameworks` and `Resources`. A new signature of
   the same code keeps the cdhash. At start, before the server check, the profile app compares the
   key of the default app with its own (`refreshOutdatedProfileApp`, `app-profile-refresh.ts`).
-  `<userData>/profile-runtime-check.txt` keeps the default app version of the last check, so a
-  start with the same version reads no executables.
+  `<userData>/profile-runtime-check.txt` keeps the default app version and the key of the last
+  check. A start with the same version and key, whose `MacOS/<executable>` and
+  `Frameworks/<CFBundleName> Helper (Renderer).app` exist, reads no executables. The file changes
+  only after a check or a refresh that worked.
   - Same key: no work and no new signature, so the Keychain does not ask again.
   - Another key: the app clones its bundle next to it, copies the executables, the helper apps,
     the Electron framework and the `Info.plist` of the default app into the clone again, sets the
-    profile keys, links new `Resources` entries, signs the clone ad hoc, and swaps it in. The data,
-    the icon files and the Finder custom icon stay. Then the app starts again. The new signature
-    makes the Keychain ask once more.
+    profile keys, links new `Resources` entries, and signs the clone ad hoc. codesign refuses a
+    bundle with Finder information (the Finder custom icon of `set-icon`), so the signing removes
+    `com.apple.FinderInfo` and puts it back after. Then the live bundle moves to
+    `<Name>.app.pre-refresh` and the clone takes its place; a failed second rename moves the live
+    bundle back. The next start removes `<Name>.app.pre-refresh`, or moves it back when
+    `<Name>.app` is missing (`settlePreRefresh`). The data, the icon files and the Finder custom
+    icon stay. The app then starts the new bundle with `open -n` after its own process exits:
+    `app.relaunch()` uses the helper path of the old `CFBundleName`. The new signature makes the
+    Keychain ask once more.
   - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
   - A serve start does not refresh.
 - **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and
   Electron finds its helpers as `Frameworks/<CFBundleName> Helper*.app`. So create and refresh
   (`copyAppRuntime`) set `CFBundleName` to the profile name, and copy each helper app as
   `<profile name> Helper (…).app`, with its executable and `Info.plist` renamed, signed again ad hoc
-  with its own entitlements.
+  with its own entitlements. A profile name has at most 200 bytes, so that
+  `<name> Helper (Renderer).app` fits in a file name.
   - A rename in the Profile Manager or in Finder does not sign again (no Keychain prompt): the Dock
     and the window show the new name at once. The bold menu-bar name follows at the next refresh:
     a refresh also runs when `CFBundleName` differs from the app's file name.
