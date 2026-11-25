@@ -150,7 +150,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
       }
       const bundleId = `${defaultAppId}.profile.${id}`
 
-      const helpers = copyAppRuntime(source, contents, executable, run)
+      const helpers = copyAppRuntime(source, contents, executable, name, run)
       for (const entry of readdirSync(join(source, 'Resources'))) {
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }

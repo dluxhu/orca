@@ -37,13 +37,41 @@ function exists(path: string): boolean {
 }
 
 /**
+ * Gives a copied Electron helper app the profile's name. Electron finds its helpers as
+ * Frameworks/<CFBundleName> Helper*.app, and macOS shows CFBundleName in bold in the menu bar.
+ * The helper is signed again ad hoc with its own entitlements (the renderer needs JIT).
+ */
+function nameHelperApp(from: string, app: string, scratch: string, run: RunTool): void {
+  const oldExecutable = basename(from, '.app')
+  const executable = basename(app, '.app')
+  const macos = join(app, 'Contents', 'MacOS')
+  if (existsSync(join(macos, oldExecutable))) {
+    renameSync(join(macos, oldExecutable), join(macos, executable))
+  }
+  const plist = join(app, 'Contents', 'Info.plist')
+  if (existsSync(plist)) {
+    for (const key of ['CFBundleExecutable', 'CFBundleDisplayName']) {
+      run('/usr/bin/plutil', ['-replace', key, '-string', executable, plist])
+    }
+  }
+  const entitlements = join(scratch, `${executable}.entitlements.plist`)
+  writeFileSync(
+    entitlements,
+    run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', from])
+  )
+  run('/usr/bin/codesign', ['--force', '-s', '-', '--entitlements', entitlements, app])
+}
+
+/**
  * Copies the executables and the Frameworks of the default app into the profile's `contents`.
- * Returns the executables in MacOS other than the main one.
+ * The helper apps get the profile's `name` (nameHelperApp). Returns the executables in MacOS other
+ * than the main one.
  */
 export function copyAppRuntime(
   source: string,
   contents: string,
   executable: string,
+  name: string,
   run: RunTool
 ): string[] {
   const template = join(source, 'Resources', 'profile-template', NOTIFICATION_HELPER)
@@ -67,10 +95,25 @@ export function copyAppRuntime(
   }
   // Electron helper apps are copies, so they find the profile as their main bundle. Helpers
   // crash at start when the Electron framework is a link (slice 1, U4), so it is an APFS clone.
+  const defaultName = readPlistString(
+    readFileSync(join(source, 'Info.plist'), 'utf8'),
+    'CFBundleName'
+  )
+  const helperPrefix = `${defaultName} Helper`
+  // The bundle folder: the helpers' entitlement files stay out of the signed bundle.
+  const scratch = dirname(dirname(contents))
   for (const entry of readdirSync(join(source, 'Frameworks'))) {
     const from = join(source, 'Frameworks', entry)
     const to = join(contents, 'Frameworks', entry)
-    if (entry.endsWith('.app')) {
+    if (entry.endsWith('.app') && defaultName && entry.startsWith(helperPrefix)) {
+      const named = join(
+        contents,
+        'Frameworks',
+        `${name} Helper${entry.slice(helperPrefix.length)}`
+      )
+      run('/usr/bin/ditto', [from, named])
+      nameHelperApp(from, named, scratch, run)
+    } else if (entry.endsWith('.app')) {
       run('/usr/bin/ditto', [from, to])
     } else if (entry === ELECTRON_FRAMEWORK) {
       run('/bin/cp', ['-cR', from, to])
@@ -103,6 +146,8 @@ export function applyProfilePlist(plistPath: string, keys: ProfilePlistKeys, run
   }
   plutil('-replace', 'CFBundleIdentifier', '-string', keys.bundleId)
   plutil('-replace', 'CFBundleDisplayName', '-string', keys.name)
+  // The bold name in the menu bar. The helper apps carry it too (copyAppRuntime).
+  plutil('-replace', 'CFBundleName', '-string', keys.name)
   plutil('-replace', APP_PROFILE_PLIST_ID_KEY, '-string', keys.id)
   plutil('-replace', APP_PROFILE_TEMPLATE_KEY, '-string', keys.templateKey)
   if (keys.root) {
@@ -212,7 +257,10 @@ export function refreshAppProfileBundle(
   }
   const ownPlist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
   const templateKey = templateKeyOf(defaultApp, run)
-  const changed = templateKey !== readPlistString(ownPlist, APP_PROFILE_TEMPLATE_KEY)
+  // A rename changes only the file name (no new signature); the menu-bar name follows here.
+  const changed =
+    templateKey !== readPlistString(ownPlist, APP_PROFILE_TEMPLATE_KEY) ||
+    readPlistString(ownPlist, 'CFBundleName') !== basename(appPath, '.app')
   if (changed) {
     rebuild(appPath, defaultApp, ownPlist, templateKey, run)
   }
@@ -244,7 +292,8 @@ function rebuild(
   const source = join(defaultApp, 'Contents')
   const id = readPlistString(ownPlist, APP_PROFILE_PLIST_ID_KEY)
   const bundleId = readPlistString(ownPlist, 'CFBundleIdentifier')
-  const name = readPlistString(ownPlist, 'CFBundleDisplayName')
+  // The file name is the profile name: a rename moves only the bundle.
+  const name = basename(appPath, '.app')
   if (!id || !bundleId || !name) {
     throw new RuntimeClientError('invalid_argument', `${appPath} is not a profile app.`)
   }
@@ -265,7 +314,7 @@ function rebuild(
     if (!executable) {
       throw new RuntimeClientError('invalid_argument', `${defaultApp} has no executable.`)
     }
-    const helpers = copyAppRuntime(source, contents, executable, run)
+    const helpers = copyAppRuntime(source, contents, executable, name, run)
     // A Resources entry that the new version adds gets its link.
     for (const entry of readdirSync(join(source, 'Resources'))) {
       if (!exists(join(contents, 'Resources', entry))) {

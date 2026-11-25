@@ -555,6 +555,16 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
     makes the Keychain ask once more.
   - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
   - A serve start does not refresh.
+- **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and
+  Electron finds its helpers as `Frameworks/<CFBundleName> Helper*.app`. So create and refresh
+  (`copyAppRuntime`) set `CFBundleName` to the profile name, and copy each helper app as
+  `<profile name> Helper (…).app`, with its executable and `Info.plist` renamed, signed again ad hoc
+  with its own entitlements.
+  - A rename in the Profile Manager or in Finder does not sign again (no Keychain prompt): the Dock
+    and the window show the new name at once. The bold menu-bar name follows at the next refresh:
+    a refresh also runs when `CFBundleName` differs from the app's file name.
+  - Accepted (owner, 2026-11-25): the helpers lose the default app's signature, so macOS can ask
+    once again for privacy permissions (for example the microphone) in each profile.
 - If the default app moves or is renamed, the links break. There is no "Repair" in v1 (owner): the
   user makes the profile again with the same name. A new profile with the id of an existing data
   folder uses that folder again (section 9).
