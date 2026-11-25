@@ -13,7 +13,11 @@ vi.mock('electron', () => ({
   app: { once: h.once },
   dialog: { showMessageBoxSync: h.showMessageBoxSync, showErrorBox: vi.fn() }
 }))
-vi.mock('node:child_process', () => ({ spawn: h.spawn, spawnSync: h.spawnSync }))
+vi.mock('node:child_process', async (original) => ({
+  ...(await original<typeof import('node:child_process')>()),
+  spawn: h.spawn,
+  spawnSync: h.spawnSync
+}))
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof import('node:fs')>()),
   existsSync: () => h.unitExists
