@@ -3,6 +3,7 @@ import { NativeChatTranscriptSignInNotice } from '../../host-access/NativeChatSi
 import { NativeChatUserBubble } from './NativeChatUserBubble'
 import { NativeChatTextAttachments } from '../../media/text/NativeChatTextAttachments'
 import { Goal } from 'lucide-react'
+import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/class-names'
 import { AUTOMATION_RESULT_NOTE_COPY } from '../../../../../../shared/bots/bot-automation-result-note'
@@ -13,6 +14,7 @@ import type { NativeChatDeliveryNotice } from './NativeChatMessageRow'
 import { NativeChatRewindAction } from '../actions/NativeChatRewindAction'
 import type { NativeChatRewindSurface } from '../actions/use-native-chat-rewind-host'
 import { NativeChatMarkdown } from '../../markdown/NativeChatMarkdown'
+import { plainNativeChatAgentMentions } from '../../markdown/native-chat-agent-mentions'
 import { NativeChatUserMessageFold } from './NativeChatUserMessageFold'
 import { NativeChatCodeBlock } from '../../markdown/code/NativeChatCodeBlock'
 import { NativeChatCopyButton } from '../actions/NativeChatCopyButton'
@@ -30,6 +32,7 @@ import { NativeChatConnectorNoAccessNote } from '../../NativeChatConnectorNoAcce
 import { NativeChatDetailsDisclosure } from '../diagnostics/NativeChatProviderDetails'
 import { NativeChatImageAttachments } from '../../media/images/NativeChatImageAttachments'
 import type { deriveNativeChatRowContent } from '../../../../../../shared/native-chat/transcript/row-content/native-chat-row-content'
+import { splitAgentReferenceNotes } from '../../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 
 const USER_META_REVEAL =
   'transition-opacity can-hover:pointer-events-none can-hover:opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 [.group:has(:focus-visible)_&]:pointer-events-auto [.group:has(:focus-visible)_&]:opacity-100'
@@ -103,6 +106,13 @@ export function NativeChatUserMessageRow({
   const folded = useFoldedIntoBotRequest(from)
   // A Slack message draws its markup; copy keeps `markdown`, its readable form.
   const drawn = message.drawnMarkdown
+  // The bubble shows what the user typed; the agent also got the routing notes.
+  const layout = message.sentAs === 'goal' ? 'goal' : 'message'
+  const sent = useMemo(
+    () => (from ? null : splitAgentReferenceNotes(markdown, layout)),
+    [from, layout, markdown]
+  )
+  const typed = sent ? plainNativeChatAgentMentions(sent.body, sent.mentions) : markdown
   if (folded) {
     return <div ref={rowRef} hidden />
   }
@@ -146,13 +156,13 @@ export function NativeChatUserMessageRow({
               />
               <NativeChatUserMessageFold
                 messageId={message.id}
-                markdown={markdown}
+                markdown={typed}
                 onRefolded={onRefolded}
                 // List numbers hang into the bubble's padding; clipping at the text edge cut them off.
                 className="-mx-3.5 px-3.5"
               >
                 <NativeChatTextAttachments
-                  content={drawn ?? markdown}
+                  content={drawn ?? typed}
                   structured={structuredAttachments}
                   runtimeContext={runtimeContext}
                   renderText={(text) => (
@@ -161,6 +171,7 @@ export function NativeChatUserMessageRow({
                       content={text}
                       variant="document"
                       slackMentions={drawn !== undefined}
+                      agentMentions={sent?.mentions}
                       className="text-sm"
                       renderCodeBlock={NativeChatCodeBlock}
                     />
