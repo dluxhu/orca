@@ -8839,7 +8839,7 @@
           "05f5c5ab50": "智能体需要输入"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "本地运行时密钥使用 Electron 加密存储(如果可用)存储在 ~/.orca 中",
+          "d246b2bdb3": "本地运行时密钥使用 Electron 加密存储(如果可用)存储在 <path>{{root}}</path> 中",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API 密钥已配置",
           "07ed3e512e": "仅当选择 OpenAI 语音模型时，音频才会发送到 OpenAI",
@@ -9446,7 +9446,7 @@
           "25b0004fbf": "终端活跃",
           "781cb74d22": "从终端窗口运行",
           "cb02e00202": "终端",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "此快捷键已不再可用",
           "9a3a3ca03d": "键盘快捷键"
         },
@@ -27372,7 +27372,7 @@
       "useChatDefaults": "使用聊天默认设置",
       "usingChatDefault": "正在使用你的聊天默认设置。后台运行使用你的“智能体”设置",
       "agent": "智能体",
-      "folder": "文件夹：{{path}}",
+      "folder": "文件夹：<path>{{path}}</path>",
       "cancel": "取消",
       "creating": "创建中…",
       "create": "创建",
