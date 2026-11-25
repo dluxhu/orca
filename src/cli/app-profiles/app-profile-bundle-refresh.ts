@@ -38,16 +38,19 @@ export function preRefreshPathOf(appPath: string): string {
 }
 
 /**
- * After a refresh: the new app has started, so its previous bundle goes. A refresh that stopped
- * between its two renames left only the previous bundle: it goes back in place.
+ * After a refresh: the new app has started, so its previous bundle goes (`removeOld`: false keeps
+ * it, for a caller that is not the started app). A refresh that stopped between its two renames
+ * left only the previous bundle: it goes back in place.
  */
-export function settlePreRefresh(appPath: string): void {
+export function settlePreRefresh(appPath: string, removeOld = true): void {
   const previous = preRefreshPathOf(appPath)
   if (!exists(previous)) {
     return
   }
   if (exists(appPath)) {
-    rmSync(previous, { recursive: true, force: true })
+    if (removeOld) {
+      rmSync(previous, { recursive: true, force: true })
+    }
   } else {
     renameSync(previous, appPath)
   }
