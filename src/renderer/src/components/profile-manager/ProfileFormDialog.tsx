@@ -44,7 +44,10 @@ export function freeBadge(state: AppProfilesState | null, row: AppProfileRow | n
 
 /** The icon of a new profile: the badge of its name, until the user changes the icon. */
 export function nameBadge(state: AppProfilesState | null, name: string): IconSource {
-  const badge = defaultBadge(name, (state?.rows ?? []).map((row) => row.icon))
+  const badge = defaultBadge(
+    name,
+    (state?.rows ?? []).map((row) => row.icon)
+  )
   return { kind: 'badge', ...badge, style: 'ref-match' }
 }
 
@@ -266,11 +269,7 @@ export function ProfileFormDialog(props: {
               }
             />
           </div>
-          <ProfileIconPreview
-            value={form.icon}
-            profileId={row?.id}
-            busy={props.busy}
-          />
+          <ProfileIconPreview value={form.icon} profileId={row?.id} busy={props.busy} />
         </div>
         {props.alert ? <div className="px-6 pb-4">{props.alert}</div> : null}
         <DialogFooter className="flex-row flex-wrap items-center justify-between gap-3 border-t px-6 py-4 sm:justify-between">
