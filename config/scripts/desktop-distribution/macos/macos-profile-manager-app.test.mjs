@@ -66,7 +66,12 @@ beforeEach(() => {
   copyFileSync('/usr/bin/true', join(contents, 'MacOS', 'Orca'))
   file(join(contents, 'MacOS', 'orca-keyboard-layout'), 'layout')
   file(join(contents, 'Frameworks', 'Electron Framework.framework', 'Versions', 'A', 'x'), 'fw')
-  file(join(contents, 'Frameworks', 'Orca Helper (GPU).app', 'Contents', 'MacOS', 'h'), 'gpu')
+  const gpu = join(contents, 'Frameworks', 'Orca Helper (GPU).app', 'Contents')
+  file(join(gpu, 'MacOS', 'Orca Helper (GPU)'), 'gpu')
+  file(
+    join(gpu, 'Info.plist'),
+    PLIST.replace('<string>Orca</string>', '<string>Orca Helper (GPU)</string>')
+  )
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
   file(join(contents, 'Resources', 'bin', 'orca'), 'cli')
@@ -95,15 +100,29 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
     expect(plistValue(plist, 'CFBundleIdentifier')).toBe('com.stablyai.orca.dlux.profile-manager')
     expect(plistValue(plist, 'CFBundleDisplayName')).toBe('Orca Profile Manager')
     expect(plistValue(plist, APP_ROLE_PLIST_KEY)).toBe(PROFILE_MANAGER_ROLE)
-    // Helpers are found by CFBundleName, so it stays.
-    expect(plistValue(plist, 'CFBundleName')).toBe('Orca')
+    // The bold menu-bar name. Electron finds the helpers as Frameworks/<CFBundleName> Helper*.app.
+    expect(plistValue(plist, 'CFBundleName')).toBe('Orca Profile Manager')
+    const helper = join(
+      contents,
+      'Frameworks',
+      `${plistValue(plist, 'CFBundleName')} Helper (GPU).app`
+    )
+    expect(
+      lstatSync(join(helper, 'Contents', 'MacOS', 'Orca Profile Manager Helper (GPU)')).isFile()
+    ).toBe(true)
+    for (const key of ['CFBundleExecutable', 'CFBundleName', 'CFBundleDisplayName']) {
+      expect(plistValue(join(helper, 'Contents', 'Info.plist'), key)).toBe(
+        'Orca Profile Manager Helper (GPU)'
+      )
+    }
+    expect(() => lstatSync(join(contents, 'Frameworks', 'Orca Helper (GPU).app'))).toThrow()
     expect(plistValue(plist, 'CFBundleURLTypes')).toBeNull()
     expect(plistValue(plist, 'CFBundleDocumentTypes')).toBeNull()
 
     const executable = join(contents, 'MacOS', 'Orca')
     expect(lstatSync(executable).isFile()).toBe(true)
     assertMacExecutableUuid(executable, 'com.stablyai.orca.dlux.profile-manager')
-    for (const copy of ['Electron Framework.framework', 'Orca Helper (GPU).app']) {
+    for (const copy of ['Electron Framework.framework', 'Orca Profile Manager Helper (GPU).app']) {
       expect(lstatSync(join(contents, 'Frameworks', copy)).isDirectory()).toBe(true)
     }
     for (const [link, target] of [
@@ -117,11 +136,35 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
     }
   })
 
+  it('takes the fork name of the outer app: "Orca @dLux Profile Manager"', async () => {
+    const contents = join(app, 'Contents')
+    const fork = (text) => text.replaceAll('<string>Orca</string>', '<string>Orca @dLux</string>')
+    file(join(contents, 'Info.plist'), fork(PLIST))
+    rmSync(join(contents, 'Frameworks', 'Orca Helper (GPU).app'), { recursive: true })
+    const gpu = join(contents, 'Frameworks', 'Orca @dLux Helper (GPU).app', 'Contents')
+    file(join(gpu, 'MacOS', 'Orca @dLux Helper (GPU)'), 'gpu')
+    const plist = join(await build(), 'Contents', 'Info.plist')
+    expect(plistValue(plist, 'CFBundleName')).toBe('Orca @dLux Profile Manager')
+    expect(plistValue(plist, 'CFBundleDisplayName')).toBe('Orca @dLux Profile Manager')
+    const nested = join(profileManagerAppPath(app), 'Contents', 'Frameworks')
+    expect(
+      lstatSync(
+        join(
+          nested,
+          'Orca @dLux Profile Manager Helper (GPU).app',
+          'Contents',
+          'MacOS',
+          'Orca @dLux Profile Manager Helper (GPU)'
+        )
+      ).isFile()
+    ).toBe(true)
+  })
+
   it('signs the copied code before the nested bundle', async () => {
     const bundle = await build()
     expect(signed).toEqual([
       ['code', join(bundle, 'Contents', 'Frameworks', 'Electron Framework.framework')],
-      ['code', join(bundle, 'Contents', 'Frameworks', 'Orca Helper (GPU).app')],
+      ['code', join(bundle, 'Contents', 'Frameworks', 'Orca Profile Manager Helper (GPU).app')],
       ['bundle', bundle]
     ])
   })
