@@ -130,6 +130,14 @@ function appendLegacyGuidance(
   }
 }
 
+/** The name the message saved for its sender, such as the chat name another Orca sent with its mail. */
+function savedSenderName(msg: MessageRow): string | null {
+  const saved = readAnswerSenderSnapshot(msg.answer_sender_snapshot)
+  return saved?.party.address === msg.from_handle && saved.name !== msg.from_handle
+    ? saved.name
+    : null
+}
+
 export function formatMessageBanner(msg: MessageRow, options: MessageFormattingOptions): string
 export function formatMessageBanner(msg: MessageRow): string
 export function formatMessageBanner(
@@ -155,7 +163,8 @@ export function formatMessageBannerWithContent(
           ? ' [LEGACY READ-ONLY]'
           : ''
   const paired = pairedSenderOf(msg, options.peerMail)
-  const from = paired ?? `${msg.from_handle.toUpperCase()} (${msg.from_handle})`
+  const from =
+    paired ?? `${savedSenderName(msg) ?? msg.from_handle.toUpperCase()} (${msg.from_handle})`
 
   const header = `──── From: ${from}${priorityTag}${authorityTag} (${msg.type}) ────`
 

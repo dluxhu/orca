@@ -4,8 +4,8 @@ import type { OrchestrationEntryCaller } from '../../../../orchestration/address
 import type { OrchestrationCompatibilityCallerAuthority } from '../../../../orchestration/terminal-authority/orchestration-compatibility-authority'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import {
+  locatedPeerMailSender,
   peerMailMessageId,
-  peerMailSender,
   peerMailSenderLabel
 } from '../../../../orchestration/federation/peer-mail/peer-mail-delivery'
 import { notifyPeerMailQueued } from '../../../../orchestration/federation/peer-mail/peer-mail-waiters'
@@ -34,14 +34,14 @@ const NOTHING_SENT = { effectsApplied: false } as const
 
 /** `send --on-client`: an agent here messages an agent on a paired computer, which pulls the mail
  *  while it is connected and decides there whether its agent takes it. Its replies come back here. */
-export function sendClientAsk(args: {
+export async function sendClientAsk(args: {
   params: z.infer<typeof SendParams> & { onClient: string }
   runtime: OrcaRuntimeService
   orchestrationCaller: OrchestrationEntryCaller | undefined
   attestedCaller: OrchestrationCompatibilityCallerAuthority | undefined
   orchestrationMutation: { callerFingerprint: string; requestId: string } | undefined
   recordMutationReceipt: ((receipt: unknown) => void) | undefined
-}): unknown {
+}): Promise<unknown> {
   const { params, runtime } = args
   const to = params.to
   if (params.on !== undefined) {
@@ -111,7 +111,7 @@ export function sendClientAsk(args: {
     type: type.data,
     ...(params.priority ? { priority: params.priority } : {}),
     ...(params.threadId ? { threadId: params.threadId } : {}),
-    sender: peerMailSender(runtime, caller.address),
+    sender: await locatedPeerMailSender(runtime, caller.address),
     rootSession: clientAskRootSession(db, caller.address)
   }
   if (type.data === 'question') {
