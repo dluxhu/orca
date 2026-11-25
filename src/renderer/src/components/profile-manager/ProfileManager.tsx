@@ -10,7 +10,7 @@ import {
   type AppProfileRow,
   type AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
-import { freeBadge, ProfileFormDialog, type ProfileForm } from './ProfileFormDialog'
+import { freeBadge, nameBadge, ProfileFormDialog, type ProfileForm } from './ProfileFormDialog'
 import { editIcon } from './ProfileIconPicker'
 import { ProfileRemoveForm } from './ProfileRemoveForm'
 import { ProfileRow } from './ProfileRow'
@@ -41,10 +41,11 @@ function newForm(t: Translate, state: AppProfilesState | null): ProfileForm {
     name,
     id: appProfileIdFromName(name),
     idEdited: false,
+    iconEdited: false,
     // The default app's row is in the list too: its port range is taken.
     port: String(nextAppProfilePort(state?.rows.map((row) => row.port) ?? [])),
     copySettings: false,
-    icon: editIcon(undefined, freeBadge(state, null))
+    icon: nameBadge(state, name)
   }
 }
 

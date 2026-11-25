@@ -695,6 +695,15 @@ with the reference's box and bounding box at the normal limit.
 - **Character colour:** `#0f172a` for a character that a flag sets. `--icon-color <#rrggbb>` sets
   another one; the registry keeps it in the badge `icon` field as `color`. The swatches are
   `APP_PROFILE_BADGE_SWATCHES` (`app-profile-icon-files.ts`).
+- **Older profiles:** a profile without `icon` in profiles.json (made before profile icons) gets
+  the default badge once. At start, a profile app with no kept icon runs
+  `orca profiles set-icon <id> --if-missing` in the background (`app-profile-missing-icon.ts`).
+  `--if-missing` may run while the app runs, and does nothing for a profile with an icon. When it
+  is done, the app sets its Dock tile and its menu-bar image from the new kept files.
+- **Profile Manager:** the New dialog starts with the default badge of its name, and the badge
+  follows the typed name until the user changes the icon. The preview shows the icon on a light
+  and a dark Dock, and the menu-bar template (`menuBarPng` of `icon-preview`) on a light and a
+  dark menu bar (the dark one inverts it, as macOS does).
 
 ### Menu-bar template
 

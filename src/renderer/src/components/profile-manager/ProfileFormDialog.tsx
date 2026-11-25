@@ -18,6 +18,7 @@ import {
   appPortWarning,
   appProfilePortError,
   appProfileIdFromName,
+  defaultBadge,
   nextBadgeText,
   type AppProfileChange,
   type AppProfileIconSource as IconSource,
@@ -41,12 +42,19 @@ export function freeBadge(state: AppProfilesState | null, row: AppProfileRow | n
   )
 }
 
+/** The icon of a new profile: the badge of its name, until the user changes the icon. */
+export function nameBadge(state: AppProfilesState | null, name: string): IconSource {
+  const badge = defaultBadge(name, (state?.rows ?? []).map((row) => row.icon))
+  return { kind: 'badge', ...badge, style: 'ref-match' }
+}
+
 export type ProfileForm =
   | {
       mode: 'new'
       name: string
       id: string
       idEdited: boolean
+      iconEdited: boolean
       port: string
       copySettings: boolean
       icon: IconSource
@@ -187,7 +195,12 @@ export function ProfileFormDialog(props: {
               onChange={(name) =>
                 onChange(
                   form.mode === 'new'
-                    ? { ...form, name, id: form.idEdited ? form.id : appProfileIdFromName(name) }
+                    ? {
+                        ...form,
+                        name,
+                        id: form.idEdited ? form.id : appProfileIdFromName(name),
+                        icon: form.iconEdited ? form.icon : nameBadge(props.state, name)
+                      }
                     : { ...form, name }
                 )
               }
@@ -246,13 +259,16 @@ export function ProfileFormDialog(props: {
             <ProfileIconPicker
               value={form.icon}
               defaultText={badge}
-              onChange={(icon) => onChange({ ...form, icon })}
+              onChange={(icon) =>
+                onChange(
+                  form.mode === 'new' ? { ...form, icon, iconEdited: true } : { ...form, icon }
+                )
+              }
             />
           </div>
           <ProfileIconPreview
             value={form.icon}
             profileId={row?.id}
-            appIcon={props.state?.icons?.default}
             busy={props.busy}
           />
         </div>

@@ -182,7 +182,7 @@ export function ProfileIconPicker(props: {
               inputClassName="w-16 text-center text-lg font-bold md:text-lg"
               note={t(
                 'profileManager.icon.badgeNote',
-                'Default: the next number that no profile uses (2, 3, 4, …). A letter or an emoji also works.'
+                'Default: the first letter of the app name, or a number when another profile uses it. A letter or an emoji also works.'
               )}
               onChange={(text) => onChange({ ...value, text })}
             />
@@ -228,32 +228,40 @@ export function ProfileIconPicker(props: {
 // The CLI takes seconds for a preview: a quick series of changes (typing, a colour drag) makes one.
 const PREVIEW_DELAY_MS = 300
 
+// The menu-bar template is black: macOS shows it as it is on a light menu bar, white on a dark one.
 const dockSamples = [
   {
     key: 'light',
     sample: 'bg-gradient-to-b from-[#e8ecf2] to-[#cfd6e0]',
-    dock: 'border-white/80 bg-white/55'
+    dock: 'border-white/80 bg-white/55',
+    menuBar: 'bg-white/70',
+    template: ''
   },
   {
     key: 'dark',
     sample: 'bg-gradient-to-b from-[#1f2937] to-[#0b1220]',
-    dock: 'border-white/15 bg-white/10'
+    dock: 'border-white/15 bg-white/10',
+    menuBar: 'bg-black/45',
+    template: 'invert'
   }
 ]
 
-/** The preview of the icon on a light and on a dark Dock, as the main process makes it. */
+/**
+ * The preview of the icon on a light and on a dark Dock, and of its menu-bar template on a light
+ * and on a dark menu bar, as the main process makes them.
+ */
 export function ProfileIconPreview(props: {
   value: AppProfileIconSource
   /** The profile that the Edit dialog changes; its own badge character is free. */
   profileId?: string | null
-  /** The default app's icon, shown next to the preview as in the Dock. */
-  appIcon?: string
   /** Save runs: no new preview starts, and the last one stays. */
   busy?: boolean
 }): React.JSX.Element {
   const t = useTranslate()
   const api = window.api.appProfiles
-  const [preview, setPreview] = useState<{ png: string } | { error: string } | null>(null)
+  const [preview, setPreview] = useState<
+    { png: string; menuBarPng?: string } | { error: string } | null
+  >(null)
   const key = JSON.stringify(props.value)
   const ready = iconChoiceReady(props.value)
 
@@ -274,7 +282,7 @@ export function ProfileIconPreview(props: {
           if (current) {
             setPreview(
               reply.ok
-                ? { png: (reply.result as { png: string }).png }
+                ? (reply.result as { png: string; menuBarPng?: string })
                 : { error: reply.error.message }
             )
           }
@@ -293,11 +301,11 @@ export function ProfileIconPreview(props: {
     >
       <span className="font-semibold">{t('profileManager.icon.preview', 'Preview')}</span>
       {dockSamples.map((sample, index) => (
-        <div key={sample.key} className={`flex justify-center rounded-[14px] p-5 ${sample.sample}`}>
+        <div
+          key={sample.key}
+          className={`flex items-center justify-center gap-4 rounded-[14px] p-5 ${sample.sample}`}
+        >
           <div className={`flex items-end gap-3 rounded-[18px] border px-4 py-2.5 ${sample.dock}`}>
-            {props.appIcon ? (
-              <img src={props.appIcon} alt="" className="size-14 opacity-85" />
-            ) : null}
             {preview && 'png' in preview ? (
               <img
                 className="size-24"
@@ -313,6 +321,20 @@ export function ProfileIconPreview(props: {
               </div>
             )}
           </div>
+          {preview && 'png' in preview && preview.menuBarPng ? (
+            <div className={`flex h-7 items-center rounded-md px-2.5 ${sample.menuBar}`}>
+              <img
+                className={`h-[18px] w-auto ${sample.template}`}
+                // The dark sample shows the same image again.
+                alt={
+                  index === 0
+                    ? t('profileManager.icon.menuBarAlt', 'Preview of the menu-bar icon')
+                    : ''
+                }
+                src={`data:image/png;base64,${preview.menuBarPng}`}
+              />
+            </div>
+          ) : null}
         </div>
       ))}
       {preview && 'error' in preview ? (
