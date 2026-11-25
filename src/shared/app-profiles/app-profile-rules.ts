@@ -192,6 +192,9 @@ export function appProfileIdError(
  * Null when the name can be the app's file name and no other profile has it. A name that starts
  * with "-" would be read as an option of `orca profiles`.
  */
+/** The longest profile name in UTF-8 bytes: its helper apps carry it in their file names. */
+export const APP_PROFILE_NAME_MAX_BYTES = 200
+
 export function appProfileNameError(
   name: string,
   takenNames: readonly string[],
@@ -202,6 +205,16 @@ export function appProfileNameError(
     return t(
       'profileManager.rule.nameChars',
       'Type a name without "/" or ":", and with no "." or "-" first.'
+    )
+  }
+  // "<name> Helper (Renderer).app" must fit in a file name (255 bytes).
+  if (new TextEncoder().encode(trimmed).length > APP_PROFILE_NAME_MAX_BYTES) {
+    return t(
+      'profileManager.rule.nameLong',
+      'The profile name is too long: at most {{max}} bytes.',
+      {
+        max: APP_PROFILE_NAME_MAX_BYTES
+      }
     )
   }
   const lower = trimmed.toLowerCase()

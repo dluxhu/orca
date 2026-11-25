@@ -529,6 +529,18 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
 })
 
 describe.skipIf(process.platform !== 'darwin')('listAppProfiles', () => {
+  it('moves back a bundle that a stopped refresh left only as <app>.pre-refresh', async () => {
+    const work = makeProfile()
+    renameSync(work.appPath, `${work.appPath}.pre-refresh`)
+    const rows = await listAppProfiles({
+      defaultAppPath: app,
+      defaultUserDataPath: join(dir, 'default-data'),
+      ...deps()
+    })
+    expect(existsSync(join(work.appPath, 'Contents', 'Info.plist'))).toBe(true)
+    expect(rows.find((row) => row.id === 'work')?.appPath).toBe(work.appPath)
+  })
+
   it('lists the default app first with the state of each profile', async () => {
     const work = makeProfile()
     const home = makeProfile('Home')
