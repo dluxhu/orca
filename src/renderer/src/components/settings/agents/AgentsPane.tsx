@@ -16,6 +16,10 @@ import {
   getAgentGeneratedTabTitlesTitle
 } from './behavior/agent-generated-tab-title-copy'
 import {
+  getClaudeRemoteControlDescription,
+  getClaudeRemoteControlTitle
+} from './behavior/claude-remote-control-copy'
+import {
   getAgentStatusHooksDescription,
   getAgentStatusHooksTitle
 } from './behavior/agent-status-hooks-copy'
@@ -101,6 +105,17 @@ export function AgentsPane({
             })
           }
           ariaLabel={getClaudeSubagentNavigationTitle(t)}
+        />
+        <SettingsSwitchRow
+          label={getClaudeRemoteControlTitle(t)}
+          description={getClaudeRemoteControlDescription(t)}
+          checked={settings.claudeRemoteControlForNewChats === true}
+          onChange={() =>
+            updateSettings({
+              claudeRemoteControlForNewChats: settings.claudeRemoteControlForNewChats !== true
+            })
+          }
+          ariaLabel={getClaudeRemoteControlTitle(t)}
         />
         {!isPairedWebClientWindow() ? (
           <>
