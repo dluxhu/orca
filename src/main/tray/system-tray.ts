@@ -7,6 +7,7 @@ import { translateMain } from '../i18n/main-i18n'
 import { quitAndStopAllSessionsMenuText } from '../menu/app-menu-quit-item'
 import { composeTrayAttentionIcon, tintTrayTemplateForAttention } from './tray-attention-icon'
 import { stampTrayDevBadge } from './tray-dev-badge'
+import { ownMenuBarImage } from '../app-profiles/app-profile-dock-icon'
 
 export type SystemTrayOptions = {
   /** App icon id from settings; the tray reuses the app icon image. */
@@ -115,6 +116,11 @@ function scheduleTrayImage(): void {
 }
 
 function createMacMenuBarImage(): NativeImage | null {
+  // A profile app shows its own template (fork patch).
+  const own = ownMenuBarImage()
+  if (own) {
+    return own
+  }
   const image = nativeImage.createFromPath(menuBarIconPath)
   const { width, height } = image.getSize()
   if (width <= 0 || height <= 0) {

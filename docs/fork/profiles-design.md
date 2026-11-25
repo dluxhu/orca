@@ -653,10 +653,25 @@ added.
   macOS grid).
 - **Uploaded badge:** PNG, JPEG, WebP or SVG, with any style.
 - **Uploaded full icon:** PNG or ICNS, used as it is.
-- **Default character:** the first of "2" to "9", then "A" to "Z", that no other profile uses.
-  Default style: `ref-match`.
-- **Character colour:** `#0f172a`. `--icon-color <#rrggbb>` sets another one; the registry keeps it
-  in the badge `icon` field as `color`.
+- **Default badge:** a badge source without a character (`orca profiles create` and `set-icon`
+  without icon flags) gets the badge of the profile name (`defaultBadge`). The character is the
+  first letter or digit of the name, in upper case. When another profile uses it, the character is
+  the first of "2" to "9", then "A" to "Z", that no other profile uses. The colour is one of the
+  swatches (not the dark one), from a hash of the name. Default style: `ref-match`.
+- **Character colour:** `#0f172a` for a character that a flag sets. `--icon-color <#rrggbb>` sets
+  another one; the registry keeps it in the badge `icon` field as `color`. The swatches are
+  `APP_PROFILE_BADGE_SWATCHES` (`app-profile-icon-files.ts`).
+
+### Menu-bar template
+
+Each icon change (create, `set-icon`, `icon-preview`) also makes a menu-bar template at 2x
+(`app-profile-menu-bar.ts`): black pixels with alpha, 28 px high. It is the Orca tray glyph of the
+default app (`app.asar.unpacked/resources/tray/orca-menu-barTemplate@2x.png`), then the badge
+mark at the same height. The mark of a character is its alpha. The mark of a badge image is its
+alpha times its darkness. An own icon file gives the icon alone (alpha times darkness), with no
+glyph. With no glyph file, the template is the mark alone. The profile's userData keeps it
+(`profile-menu-bar@2x.png`). On macOS, the tray of a profile app shows it as a template image,
+else the plain glyph.
 
 ## 9. Ids, rename and remove
 

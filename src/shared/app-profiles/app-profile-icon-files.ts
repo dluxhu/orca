@@ -7,3 +7,14 @@ export const APP_PROFILE_ICON_FILE = 'profile-icon.icns'
 export const APP_PROFILE_BADGE_FILE = 'profile-icon-badge.png'
 /** The colour of a badge character without its own colour. */
 export const APP_PROFILE_BADGE_COLOR = '#0f172a'
+/** The swatches of the badge character colour. The first is the default. */
+export const APP_PROFILE_BADGE_SWATCHES = [
+  APP_PROFILE_BADGE_COLOR,
+  '#dc2626',
+  '#ea580c',
+  '#16a34a',
+  '#2563eb',
+  '#9333ea'
+] as const
+/** The menu-bar (tray) template of the profile icon: a 2x PNG, black with alpha. */
+export const APP_PROFILE_MENU_BAR_FILE = 'profile-menu-bar@2x.png'

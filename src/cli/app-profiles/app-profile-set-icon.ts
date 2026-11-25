@@ -9,7 +9,12 @@ import {
   type AppProfileEntry
 } from '../../shared/app-profiles/app-profile-paths'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
-import { keepProfileIcon, makeAppProfileIcon, type AppProfileIconSource } from './app-profile-icon'
+import {
+  keepProfileIcon,
+  makeAppProfileIcon,
+  withNameBadge,
+  type AppProfileIconSource
+} from './app-profile-icon'
 import { MAC_DOCK_ICON_SCRIPT } from '../../shared/app-lifecycle/identity/mac-custom-icon-script'
 import { RuntimeClientError } from '../runtime/connection/types'
 import { runTool, type RunTool } from './app-profile-create'
@@ -63,10 +68,11 @@ export function setAppProfileIcon(
       }
     }
     refuseWhileRunning()
+    const used = registry.profiles.filter((profile) => profile.id !== id).map((p) => p.icon)
     const made = (options.makeIcon ?? makeAppProfileIcon)(
       registry.defaultAppPath,
-      icon,
-      registry.profiles.filter((profile) => profile.id !== id).map((profile) => profile.icon)
+      withNameBadge(icon, entry.name, used),
+      used
     )
     // The icon takes seconds to make. The app can start in that time.
     refuseWhileRunning()

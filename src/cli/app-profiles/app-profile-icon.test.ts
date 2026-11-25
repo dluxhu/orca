@@ -1,16 +1,29 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { bbox, newImg } from '../../shared/icon-badger/raster'
 import {
   appProfileIconSourceFromFlags,
+  defaultBadge,
+  keepProfileIcon,
   makeAppProfileIcon,
   nextBadgeText,
-  rasterizeWithAppKit
+  rasterizeWithAppKit,
+  withNameBadge
 } from './app-profile-icon'
 import { decodePng, encodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
+import { markAlpha, menuBarPng, menuBarTemplate } from './app-profile-menu-bar'
 
 let dir: string
 beforeEach(() => {
@@ -35,6 +48,41 @@ describe('profile icon sources', () => {
       style: 'ref-match' as const
     }))
     expect(nextBadgeText(digits)).toBe('A')
+  })
+
+  it('takes the default badge from the name: its first letter or digit, a colour from its hash', () => {
+    const q = { kind: 'badge' as const, text: 'W', style: 'ref-match' as const }
+    expect(defaultBadge('Work', [])).toEqual({ text: 'W', color: '#9333ea' })
+    expect(defaultBadge('Home', [{ kind: 'file' }])).toEqual({ text: 'H', color: '#2563eb' })
+    expect(defaultBadge('2nd', [])).toEqual({ text: '2', color: '#dc2626' })
+    expect(defaultBadge('ünited', []).text).toBe('Ü')
+    // One character: 'ß' stays as it is.
+    expect(defaultBadge('ß', []).text).toBe('ß')
+    // A taken letter, and a name without a letter, get the first free character.
+    expect(defaultBadge('Wild', [q])).toEqual({ text: '2', color: '#dc2626' })
+    expect(defaultBadge('--', []).text).toBe('2')
+    // The colour is never the dark default, and it does not change between calls.
+    for (const name of ['a', 'b', 'c', 'd', 'e', 'f', 'Orca - Work']) {
+      expect(defaultBadge(name, []).color).not.toBe('#0f172a')
+      expect(defaultBadge(name, [q])).toEqual(defaultBadge(name, [q]))
+    }
+  })
+
+  it('gives a badge source without text the badge of the name; keeps explicit values', () => {
+    expect(withNameBadge({ kind: 'badge' }, 'Work', [])).toEqual({
+      kind: 'badge',
+      text: 'W',
+      color: '#9333ea'
+    })
+    expect(
+      withNameBadge({ kind: 'badge', style: 'round', color: '#16a34a' }, 'Work', [])
+    ).toEqual({ kind: 'badge', text: 'W', style: 'round', color: '#16a34a' })
+    expect(withNameBadge({ kind: 'badge', text: 'Q' }, 'Work', [])).toEqual({
+      kind: 'badge',
+      text: 'Q'
+    })
+    const file = { kind: 'file' as const, path: '/x.icns' }
+    expect(withNameBadge(file, 'Work', [])).toBe(file)
   })
 
   it('reads the --icon flags', () => {
@@ -125,6 +173,75 @@ describe('PNG and .icns', () => {
     const largest = decodePng(largestIcnsPng(icns)!)!
     expect([largest.width, largest.height]).toEqual([1024, 1024])
     expect([...largest.data.subarray(0, 4)]).toEqual([10, 20, 30, 255])
+  })
+})
+
+describe('menu-bar template', () => {
+  // An RGBA image with one opaque block of one colour.
+  const block = (w: number, h: number, box: number[], rgba: number[]) => {
+    const img = newImg(w, h, 4)
+    for (let y = box[1]; y < box[3]; y++) {
+      for (let x = box[0]; x < box[2]; x++) {
+        img.data.set(rgba, (y * w + x) * 4)
+      }
+    }
+    return img
+  }
+  const alphaAt = (img: { width: number; data: Uint8Array }, x: number, y: number) =>
+    img.data[(y * img.width + x) * 4 + 3]
+
+  it('takes the alpha of a mark, times its darkness for an image', () => {
+    const img = newImg(3, 1, 4)
+    img.data.set([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 128])
+    expect([...markAlpha(img, false).data]).toEqual([255, 255, 128])
+    expect([...markAlpha(img, true).data]).toEqual([255, 0, 128])
+  })
+
+  it('puts the mark, cut to its box and at the glyph height, right of the glyph; all black', () => {
+    const glyph = block(44, 28, [0, 0, 44, 28], [0, 0, 0, 200])
+    const mark = markAlpha(block(100, 100, [10, 20, 30, 60], [9, 9, 9, 255]), false)
+    const out = menuBarTemplate(mark, glyph)!
+    // 20 x 40 scales to 14 x 28; 4 px gap.
+    expect([out.width, out.height]).toEqual([44 + 4 + 14, 28])
+    expect(alphaAt(out, 0, 0)).toBe(200)
+    expect(alphaAt(out, 45, 14)).toBe(0)
+    expect(alphaAt(out, 54, 14)).toBe(255)
+    for (let i = 0; i < out.data.length; i += 4) {
+      expect([...out.data.subarray(i, i + 3)]).toEqual([0, 0, 0])
+    }
+    // No glyph: the mark alone, 28 px high. An empty mark has no template.
+    const alone = menuBarTemplate(mark, null)!
+    expect([alone.width, alone.height]).toEqual([14, 28])
+    expect(menuBarTemplate(newImg(4, 4, 1), glyph)).toBeNull()
+  })
+
+  it("reads the default app's tray glyph; without the file, the mark is alone", () => {
+    const app = join(dir, 'Orca.app')
+    const tray = join(app, 'Contents', 'Resources', 'app.asar.unpacked', 'resources', 'tray')
+    const mark = markAlpha(block(10, 10, [0, 0, 10, 10], [0, 0, 0, 255]), false)
+    expect(decodePng(menuBarPng(app, mark)!)!.width).toBe(28)
+    mkdirSync(tray, { recursive: true })
+    copyFileSync(
+      join(__dirname, '..', '..', '..', 'resources', 'tray', 'orca-menu-barTemplate@2x.png'),
+      join(tray, 'orca-menu-barTemplate@2x.png')
+    )
+    expect(decodePng(menuBarPng(app, mark)!)!.width).toBe(44 + 4 + 28)
+    expect(decodePng(menuBarPng(app, mark, false)!)!.width).toBe(28)
+  })
+
+  it('makes the template of an own icon file from the icon alone, and keeps it in userData', () => {
+    const app = join(dir, 'Orca.app')
+    const path = join(dir, 'own.icns')
+    writeFileSync(path, writeIcns(block(16, 16, [4, 0, 12, 16], [0, 0, 0, 255])))
+    const made = makeAppProfileIcon(app, { kind: 'file', path })
+    const template = decodePng(made.menuBarPng!)!
+    expect([template.width, template.height]).toEqual([14, 28])
+    const userData = join(dir, 'work')
+    mkdirSync(userData)
+    keepProfileIcon(userData, made)
+    expect(readFileSync(join(userData, 'profile-menu-bar@2x.png'))).toEqual(made.menuBarPng)
+    keepProfileIcon(userData, { icns: made.icns })
+    expect(existsSync(join(userData, 'profile-menu-bar@2x.png'))).toBe(false)
   })
 })
 

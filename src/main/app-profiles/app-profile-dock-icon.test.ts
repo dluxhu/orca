@@ -23,7 +23,12 @@ beforeEach(() => {
   vi.resetModules()
   h.createFromBuffer
     .mockReset()
-    .mockImplementation((png: Buffer) => ({ png, isEmpty: () => false }))
+    .mockImplementation((png: Buffer, options?: unknown) => ({
+      png,
+      options,
+      isEmpty: () => false,
+      setTemplateImage: vi.fn()
+    }))
   dir = mkdtempSync(join(tmpdir(), 'dock-icon-'))
   h.userData = join(dir, 'work')
   mkdirSync(h.userData)
@@ -49,5 +54,29 @@ describe('ownDockIcon', () => {
     const { ownDockIcon } = await import('./app-profile-dock-icon')
     expect(ownDockIcon()).toBeNull()
     expect(h.createFromBuffer).not.toHaveBeenCalled()
+  })
+})
+
+describe('ownMenuBarImage', () => {
+  it('reads the template that the profile userData keeps, as a 2x template image', async () => {
+    h.profile = { id: 'work' }
+    const { ownMenuBarImage } = await import('./app-profile-dock-icon')
+    expect(ownMenuBarImage()).toBeNull()
+    writeFileSync(join(h.userData, 'profile-menu-bar@2x.png'), 'png')
+    const image = ownMenuBarImage() as unknown as {
+      png: Buffer
+      options: unknown
+      setTemplateImage: ReturnType<typeof vi.fn>
+    }
+    expect(image.png.toString()).toBe('png')
+    expect(image.options).toEqual({ scaleFactor: 2 })
+    expect(image.setTemplateImage).toHaveBeenCalledWith(true)
+  })
+
+  it('is null in the default app', async () => {
+    h.profile = null
+    writeFileSync(join(h.userData, 'profile-menu-bar@2x.png'), 'png')
+    const { ownMenuBarImage } = await import('./app-profile-dock-icon')
+    expect(ownMenuBarImage()).toBeNull()
   })
 })
