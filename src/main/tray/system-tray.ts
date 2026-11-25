@@ -310,6 +310,18 @@ export function setMacMenuBarIconVisible(visible: boolean, opts: SystemTrayOptio
   return createSystemTray(opts)
 }
 
+/** Reads the macOS menu-bar image again: a profile app can get its own template after start (fork patch). */
+export function refreshMacMenuBarImage(): void {
+  if (process.platform !== 'darwin' || !tray || tray.isDestroyed()) {
+    return
+  }
+  const image = createMacMenuBarImage()
+  if (image) {
+    baseTrayImage = devIndicator ? stampMacDevBadge(image) : image
+    scheduleTrayImage()
+  }
+}
+
 /** Bell/completion attention survives pre-creation calls; notification/visibility flow clears it on reveal. Safe without a tray. */
 export function setTrayAttention(active: boolean): void {
   if (attentionActive === active) {

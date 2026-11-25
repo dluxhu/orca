@@ -37,6 +37,11 @@ export function ownDockIcon(): NativeImage | null {
   return own
 }
 
+/** The next ownDockIcon reads the kept copy again. */
+export function forgetOwnDockIcon(): void {
+  own = undefined
+}
+
 /**
  * In a profile app: the menu-bar template that its userData keeps, as a 2x template image. Null in
  * every other app, and in a profile with no kept template.

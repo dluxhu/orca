@@ -49,6 +49,17 @@ describe('ownDockIcon', () => {
     expect(h.createFromBuffer.mock.calls[0][0]).toEqual(largestIcnsPng(icns))
   })
 
+  it('reads the kept copy again after forgetOwnDockIcon: a new icon replaces none', async () => {
+    h.profile = { id: 'work' }
+    rmSync(join(h.userData, 'profile-icon.icns'))
+    const { forgetOwnDockIcon, ownDockIcon } = await import('./app-profile-dock-icon')
+    expect(ownDockIcon()).toBeNull()
+    writeFileSync(join(h.userData, 'profile-icon.icns'), icns)
+    expect(ownDockIcon()).toBeNull()
+    forgetOwnDockIcon()
+    expect(ownDockIcon()).not.toBeNull()
+  })
+
   it('is null in the default app', async () => {
     h.profile = null
     const { ownDockIcon } = await import('./app-profile-dock-icon')

@@ -3,12 +3,26 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-const created = vi.hoisted(() => ({ options: [] as unknown[], used: [] as unknown[] }))
+const created = vi.hoisted(() => ({
+  options: [] as unknown[],
+  used: [] as unknown[],
+  setIcon: [] as unknown[]
+}))
 vi.mock('./app-profile-icon', async (original) => ({
   ...(await original<object>()),
   makeAppProfileIcon: (_app: string, _source: unknown, used: unknown) => {
     created.used.push(used)
-    return { icns: Buffer.alloc(0), icon: { kind: 'badge', text: '2', style: 'ref-match' } }
+    return {
+      icns: Buffer.alloc(0),
+      icon: { kind: 'badge', text: '2', style: 'ref-match' },
+      menuBarPng: Buffer.from('template')
+    }
+  }
+}))
+vi.mock('./app-profile-set-icon', () => ({
+  setAppProfileIcon: async (...args: unknown[]) => {
+    created.setIcon.push(args)
+    return { id: 'work' }
   }
 }))
 vi.mock('./app-profile-create', async (original) => ({
@@ -93,9 +107,25 @@ describe.skipIf(process.platform !== 'darwin')('orca profiles icon-preview', () 
     vi.stubEnv('ORCA_PROFILES_ROOT', root)
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     await runProfilesCommand(['icon-preview', '--id', 'work', '--json'])
+    const reply = JSON.parse(String(write.mock.calls.at(-1)?.[0]))
     write.mockRestore()
     vi.unstubAllEnvs()
     rmSync(root, { recursive: true, force: true })
     expect(created.used.at(-1)).toEqual([badge('3')])
+    // The menu-bar template comes with the icon, for the Edit form's preview.
+    expect(Buffer.from(reply.result.menuBarPng, 'base64').toString()).toBe('template')
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')('orca profiles set-icon', () => {
+  it('passes --if-missing to setAppProfileIcon as ifMissing', async () => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    await runProfilesCommand(['set-icon', 'work', '--if-missing', '--json'])
+    await runProfilesCommand(['set-icon', 'work', '--icon-badge', 'Q', '--json'])
+    write.mockRestore()
+    expect(created.setIcon).toEqual([
+      ['work', { kind: 'badge' }, { ifMissing: true }],
+      ['work', { kind: 'badge', text: 'Q', style: undefined }, { ifMissing: false }]
+    ])
   })
 })

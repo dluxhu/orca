@@ -26,7 +26,7 @@ const USAGE = `Usage:
       [--icon-color <#rrggbb>] [--icon-image <file>] [--icon-file <file>]
   orca profiles rename <id> --name <name>
   orca profiles set-icon <id> [--icon-badge <char>] [--icon-style <style>] [--icon-color <#rrggbb>]
-      [--icon-image <file>] [--icon-file <file>]
+      [--icon-image <file>] [--icon-file <file>] [--if-missing]
   orca profiles icon-preview [--id <id>] [--icon-…] --json
   orca profiles set-port <id|default> --port <port>
   orca profiles remove <id> [--keep-data]
@@ -154,7 +154,10 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
       return
     }
     case 'set-icon': {
-      const entry = await setAppProfileIcon(oneId(parsed), iconOf(parsed) ?? { kind: 'badge' })
+      // --if-missing: the profile app asks for the icon of a profile made before profile icons.
+      const entry = await setAppProfileIcon(oneId(parsed), iconOf(parsed) ?? { kind: 'badge' }, {
+        ifMissing: parsed.flags.has('--if-missing')
+      })
       print(entry, json, `The icon of "${entry.id}" is new.`)
       return
     }
@@ -168,7 +171,8 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
         (registry?.profiles ?? []).filter((p) => p.id !== id).map((p) => p.icon)
       )
       const png = largestIcnsPng(made.icns)?.toString('base64') ?? ''
-      print({ png, icon: made.icon }, json, JSON.stringify(made.icon))
+      const menuBarPng = made.menuBarPng?.toString('base64') ?? ''
+      print({ png, menuBarPng, icon: made.icon }, json, JSON.stringify(made.icon))
       return
     }
     case 'set-port': {
