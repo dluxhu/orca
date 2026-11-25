@@ -9,7 +9,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppProfile, type RunTool } from './app-profile-create'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
@@ -546,6 +546,34 @@ describe.skipIf(process.platform !== 'darwin')('previous bundles of a refresh', 
     const previous = leftover(work.appPath)
     await removeAppProfile({ id: 'work', keepData: true, trash: () => {}, ...deps() })
     expect(existsSync(previous)).toBe(false)
+  })
+
+  it("leave another profile's previous bundle alone (st4)", async () => {
+    makeProfile()
+    const home = makeProfile('Orca - Home', 'home')
+    const homeLeftover = leftover(home.appPath)
+    await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
+    await removeAppProfile({ id: 'work', keepData: true, trash: () => {}, ...deps() })
+    expect(existsSync(homeLeftover)).toBe(true)
+  })
+
+  it('do not undo a rename or stop a remove when they cannot go', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const work = makeProfile()
+    const previous = leftover(work.appPath)
+    // A folder that cannot be emptied: rmSync throws.
+    chmodSync(join(previous, 'Contents'), 0o555)
+    try {
+      const renamed = await renameAppProfile({ id: 'work', name: 'Orca - Job', ...deps() })
+      expect(renamed.name).toBe('Orca - Job')
+      await expect(
+        removeAppProfile({ id: 'work', keepData: true, trash: () => {}, ...deps() })
+      ).resolves.toMatchObject({ id: 'work' })
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      chmodSync(join(previous, 'Contents'), 0o755)
+      warn.mockRestore()
+    }
   })
 })
 

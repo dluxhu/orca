@@ -105,8 +105,13 @@ function removeLocked(
     tryRun(run, LSREGISTER, ['-u', targets.app])
     trash(targets.app)
   }
-  // The previous bundles of refreshes go too: they would bring the app back.
-  removePreRefreshLeftovers(dirname(targets.app ?? entry.appPath), entry.id)
+  // The previous bundles of refreshes go too: they would bring the app back. Cleanup only: a
+  // failure does not stop the remove.
+  try {
+    removePreRefreshLeftovers(dirname(targets.app ?? entry.appPath), entry.id)
+  } catch (error) {
+    console.warn('[profiles] cannot remove a previous bundle:', error)
+  }
   if (targets.data) {
     trash(targets.data)
   }
