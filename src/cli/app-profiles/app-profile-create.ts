@@ -210,7 +210,7 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
 }
 
 /** A profile's `orca` runs in the profile app; its app.asar link points into the default app. */
-function defaultAppOf(appPath: string): string {
+export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
   if (readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null) {
     return appPath
