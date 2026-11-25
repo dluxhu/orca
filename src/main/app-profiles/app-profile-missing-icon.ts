@@ -1,13 +1,16 @@
 // The icon of a profile made before profile icons: docs/fork/profiles-design.md, section 8.
+import { refreshMacMenuBarImage } from '../tray/system-tray'
+import { applyAppIcon } from '../window/desktop-integration/app-icon'
 import { getAppProfile } from './app-profile'
 import { forgetOwnDockIcon, ownDockIcon } from './app-profile-dock-icon'
 import { runCli } from './profile-manager-cli'
 
 /**
  * In a profile app without a kept icon: the CLI makes the name badge of the profile in the
- * background (`set-icon --if-missing`). `apply` runs when the CLI is done, to show the new icon.
+ * background (`set-icon --if-missing`). Then the Dock tile (for the `appIcon` setting) and the
+ * menu-bar image show the new icon.
  */
-export function makeMissingProfileIcon(apply: () => void): void {
+export function makeMissingProfileIcon(appIcon: () => unknown): void {
   const profile = getAppProfile()
   if (!profile || ownDockIcon()) {
     return
@@ -18,6 +21,7 @@ export function makeMissingProfileIcon(apply: () => void): void {
       return
     }
     forgetOwnDockIcon()
-    apply()
+    applyAppIcon(appIcon())
+    refreshMacMenuBarImage()
   })
 }

@@ -36,7 +36,6 @@ import { setDefaultWslDistroOverride } from '../git/command-runner/host-routing/
 import { wslHookRelayManager } from '../agent-hooks/wsl-relay/wsl-hook-relay-manager'
 import { applyAppIcon } from '../window/desktop-integration/app-icon'
 import { makeMissingProfileIcon } from '../app-profiles/app-profile-missing-icon'
-import { refreshMacMenuBarImage } from '../tray/system-tray'
 import {
   shouldSuppressDevEducation,
   suppressDevEducationForStore
@@ -291,10 +290,7 @@ export async function initializeReadyFoundation(): Promise<void> {
   })
   applyAppIcon(nativeSettings.getSettings().appIcon)
   // Fork patch: a profile made before profile icons gets its own icon.
-  makeMissingProfileIcon(() => {
-    applyAppIcon(nativeSettings.getSettings().appIcon)
-    refreshMacMenuBarImage()
-  })
+  makeMissingProfileIcon(() => nativeSettings.getSettings().appIcon)
   if (shouldSuppressDevEducation({ isDev: !app.isPackaged })) {
     suppressDevEducationForStore(store)
   }

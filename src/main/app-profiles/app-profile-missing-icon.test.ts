@@ -4,8 +4,12 @@ const h = vi.hoisted(() => ({
   profile: null as { id: string } | null,
   own: null as object | null,
   runCli: vi.fn(),
-  forget: vi.fn()
+  forget: vi.fn(),
+  applyAppIcon: vi.fn(),
+  refresh: vi.fn()
 }))
+vi.mock('../window/desktop-integration/app-icon', () => ({ applyAppIcon: h.applyAppIcon }))
+vi.mock('../tray/system-tray', () => ({ refreshMacMenuBarImage: h.refresh }))
 vi.mock('./app-profile', () => ({ getAppProfile: () => h.profile }))
 vi.mock('./app-profile-dock-icon', () => ({
   ownDockIcon: () => h.own,
@@ -19,13 +23,14 @@ beforeEach(() => {
   h.profile = { id: 'work' }
   h.own = null
   h.runCli.mockReset().mockResolvedValue({ ok: true, result: {} })
-  h.forget.mockReset()
+  for (const mock of [h.forget, h.applyAppIcon, h.refresh]) {
+    mock.mockReset()
+  }
 })
 
 describe('makeMissingProfileIcon', () => {
   it('asks the CLI for the icon of a profile without a kept icon, then shows it', async () => {
-    const apply = vi.fn()
-    makeMissingProfileIcon(apply)
+    makeMissingProfileIcon(() => 'classic')
     expect(h.runCli).toHaveBeenCalledWith([
       'profiles',
       'set-icon',
@@ -34,28 +39,28 @@ describe('makeMissingProfileIcon', () => {
       '--json'
     ])
     // The start does not wait for the CLI.
-    expect(apply).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1))
+    expect(h.applyAppIcon).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(h.applyAppIcon).toHaveBeenCalledWith('classic'))
     expect(h.forget).toHaveBeenCalledTimes(1)
+    expect(h.refresh).toHaveBeenCalledTimes(1)
   })
 
   it('does nothing in the default app and in a profile with a kept icon', () => {
     h.profile = null
-    makeMissingProfileIcon(vi.fn())
+    makeMissingProfileIcon(() => 'classic')
     h.profile = { id: 'work' }
     h.own = {}
-    makeMissingProfileIcon(vi.fn())
+    makeMissingProfileIcon(() => 'classic')
     expect(h.runCli).not.toHaveBeenCalled()
   })
 
   it('keeps the icon as it is when the CLI fails', async () => {
     h.runCli.mockResolvedValue({ ok: false, error: { message: 'no' } })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const apply = vi.fn()
-    makeMissingProfileIcon(apply)
+    makeMissingProfileIcon(() => 'classic')
     await vi.waitFor(() => expect(warn).toHaveBeenCalled())
     warn.mockRestore()
-    expect(apply).not.toHaveBeenCalled()
+    expect(h.applyAppIcon).not.toHaveBeenCalled()
     expect(h.forget).not.toHaveBeenCalled()
   })
 })
