@@ -45,6 +45,7 @@ import {
   appIconFileName,
   keepProfileIcon,
   makeAppProfileIcon,
+  withNameBadge,
   type AppProfileIconSource
 } from './app-profile-icon'
 
@@ -183,10 +184,11 @@ export function createAppProfile(
         symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
       }
       // The icon is a real file, so the seal covers it and the Dock shows it.
+      const used = registry.profiles.map((profile) => profile.icon)
       const made = (options.makeIcon ?? makeAppProfileIcon)(
         defaultApp,
-        options.icon ?? { kind: 'badge' },
-        registry.profiles.map((profile) => profile.icon)
+        withNameBadge(options.icon ?? { kind: 'badge' }, name, used),
+        used
       )
       const iconPath = join(contents, 'Resources', appIconFileName(defaultPlist))
       rmSync(iconPath, { force: true })

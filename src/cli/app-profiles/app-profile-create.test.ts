@@ -164,14 +164,14 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       appPath: join(dir, 'apps', 'Orca - Work.app'),
       userDataPath: join(dir, 'data', 'work'),
       port: 6800,
-      icon: { kind: 'badge', text: '2', style: 'ref-match' },
+      icon: { kind: 'badge', text: 'O', style: 'ref-match' },
       createdAt: 1
     })
     const isLink = (path: string): boolean => lstatSync(path).isSymbolicLink()
     // The icon is the profile's own file; userData keeps a copy under the profile id.
     expect(isLink(join(contents, 'Resources', 'icon.icns'))).toBe(false)
-    expect(readFileSync(join(contents, 'Resources', 'icon.icns'), 'utf8')).toBe('icns 2')
-    expect(readFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns 2')
+    expect(readFileSync(join(contents, 'Resources', 'icon.icns'), 'utf8')).toBe('icns O')
+    expect(readFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns O')
     expect(isLink(join(contents, 'MacOS', 'Orca'))).toBe(false)
     expect(lstatSync(join(contents, 'MacOS', 'Orca')).mode & 0o111).not.toBe(0)
     expect(readFileSync(join(contents, 'MacOS', 'orca-notification-status'), 'utf8')).toBe(
@@ -227,14 +227,26 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(registry).toMatchObject({ version: 1, defaultAppPath: app, profiles: [entry] })
   })
 
-  it('gives the next profile the next port and badge, and refuses a taken name, id or port', () => {
+  it('gives the next profile the next port and the badge of its name, and refuses a taken name, id or port', () => {
     createAppProfile({ makeIcon, name: 'Work', defaultAppPath: app, env: env(), run })
     expect(
       createAppProfile({ makeIcon, name: 'Home', defaultAppPath: app, env: env(), run }).port
     ).toBe(6832)
+    // "W" is taken: the first free character. Explicit flags stay as they are.
+    createAppProfile({ name: 'Wild', defaultAppPath: app, env: env(), run, makeIcon })
+    createAppProfile({
+      name: 'Blue',
+      icon: { kind: 'badge', text: 'Q' },
+      defaultAppPath: app,
+      env: env(),
+      run,
+      makeIcon
+    })
     expect(iconSources).toEqual([
-      { kind: 'badge', text: '2' },
-      { kind: 'badge', text: '3' }
+      { kind: 'badge', text: 'W', color: '#9333ea' },
+      { kind: 'badge', text: 'H', color: '#2563eb' },
+      { kind: 'badge', text: '2', color: '#dc2626' },
+      { kind: 'badge', text: 'Q' }
     ])
     expect(() =>
       createAppProfile({ makeIcon, name: 'work', defaultAppPath: app, env: env(), run })
@@ -514,7 +526,7 @@ describe.skipIf(process.platform !== 'darwin')(
       create('work')
       expect(readFileSync(outside, 'utf8')).toBe('outside')
       expect(lstatSync(join(userDataPath, 'profile-icon.icns')).isSymbolicLink()).toBe(false)
-      expect(readFileSync(join(userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns 2')
+      expect(readFileSync(join(userDataPath, 'profile-icon.icns'), 'utf8')).toBe('icns J')
     })
   }
 )
@@ -545,10 +557,10 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     calls = []
     // The automatic character skips the badges of the other profiles, not the own one.
     const changed = await setAppProfileIcon('work', { kind: 'badge' }, opts())
-    expect(changed.icon).toEqual({ kind: 'badge', text: '2', style: 'ref-match' })
+    expect(changed.icon).toEqual({ kind: 'badge', text: 'W', style: 'ref-match' })
     await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts())
     expect(customIcons).toEqual([
-      [work.appPath, 'icns 2'],
+      [work.appPath, 'icns W'],
       [work.appPath, 'icns Q']
     ])
     expect(calls.filter(([program]) => /codesign|lsregister/.test(program))).toEqual([])
@@ -558,7 +570,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
     expect(registry.profiles.map((p: { icon: { text: string } }) => p.icon.text)).toEqual([
       'Q',
-      '3'
+      'H'
     ])
   })
 
@@ -594,7 +606,7 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     )
     // set-icon writes the kept copy and the Finder custom icon; the signed bundle never changes.
     expect(customIcons).toEqual([])
-    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns W')
   })
 
   it('replaces a link at the icon copy in the data folder, and leaves its target alone', async () => {
@@ -621,7 +633,28 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     ).rejects.toThrow('"Work" runs.')
     // set-icon writes the kept copy and the Finder custom icon; the signed bundle never changes.
     expect(customIcons).toEqual([])
-    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns W')
+  })
+
+  it('with ifMissing, gives a profile without an icon its name badge once, also while it runs', async () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    customIcons = []
+    // A profile from a build before profile icons: no icon in profiles.json.
+    const registryPath = join(dir, 'data', 'profiles.json')
+    const registry = JSON.parse(read(registryPath))
+    delete registry.profiles[0].icon
+    writeFileSync(registryPath, JSON.stringify(registry))
+    writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
+    const options = opts({ ifMissing: true })
+    expect((await setAppProfileIcon('work', { kind: 'badge' }, options)).icon).toEqual({
+      kind: 'badge',
+      text: 'W',
+      style: 'ref-match'
+    })
+    // It has an icon now: nothing changes.
+    const again = await setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, options)
+    expect(again.icon).toMatchObject({ text: 'W' })
+    expect(customIcons).toEqual([[work.appPath, 'icns W']])
   })
 
   it('changes nothing when macOS refuses the custom icon', async () => {
@@ -635,8 +668,8 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     await expect(
       setAppProfileIcon('work', { kind: 'badge', text: 'Q' }, opts({ run: failing }))
     ).rejects.toThrow('setIcon failed')
-    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns 2')
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns W')
     const registry = JSON.parse(read(join(dir, 'data', 'profiles.json')))
-    expect(registry.profiles[0].icon.text).toBe('2')
+    expect(registry.profiles[0].icon.text).toBe('W')
   })
 })

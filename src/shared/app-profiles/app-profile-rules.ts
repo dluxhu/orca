@@ -2,6 +2,7 @@
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
 import type { IconStyle } from '../icon-badger/badger'
 import type { AppProfileIcon } from './app-profile-paths'
+import { APP_PROFILE_BADGE_SWATCHES } from './app-profile-icon-files'
 
 /** The built-in port of the default app (DEFAULT_WS_PORT). profiles.json can save another. */
 export const DEFAULT_APP_PORT = 6768
@@ -33,7 +34,7 @@ export type AppProfileRow = {
 
 /** What makes a profile icon: a badge character, a badge image file or a full icon file. */
 export type AppProfileIconSource =
-  // No text: the first free character (nextBadgeText).
+  // No text: the name's badge (withNameBadge), else the first free character (nextBadgeText).
   | { kind: 'badge'; text?: string; style?: IconStyle; color?: string }
   | { kind: 'image'; path: string; style?: IconStyle }
   | { kind: 'file'; path: string }
@@ -44,6 +45,28 @@ const BADGE_CHARACTERS = [...'23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
 export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): string {
   const used = new Set(icons.map((icon) => (icon?.kind === 'badge' ? icon.text : null)))
   return BADGE_CHARACTERS.find((text) => !used.has(text)) ?? '2'
+}
+
+/**
+ * The default badge of a profile name: its first letter or digit in upper case when no other
+ * profile uses it, else nextBadgeText. The colour is a swatch (not the dark one) from a hash of
+ * the name, so each name keeps its colour.
+ */
+export function defaultBadge(
+  name: string,
+  icons: readonly (AppProfileIcon | undefined)[]
+): { text: string; color: string } {
+  const first = name.match(/[\p{L}\p{N}]/u)?.[0] ?? ''
+  // 'ß' becomes 'SS': a badge has one character.
+  const upper = first.toUpperCase().length === 1 ? first.toUpperCase() : first
+  const used = icons.some((icon) => icon?.kind === 'badge' && icon.text === upper)
+  const text = upper && !used ? upper : nextBadgeText(icons)
+  const colors = APP_PROFILE_BADGE_SWATCHES.slice(1)
+  let hash = 0
+  for (const char of name) {
+    hash = (hash * 31 + char.codePointAt(0)!) >>> 0
+  }
+  return { text, color: colors[hash % colors.length] }
 }
 
 /** What the Profile Manager window gets from the main process. */

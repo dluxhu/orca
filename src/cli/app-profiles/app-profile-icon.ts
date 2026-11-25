@@ -7,6 +7,7 @@ import { extname, join, resolve } from 'node:path'
 import { ICON_STYLES, renderBadgedIcon, type IconStyle } from '../../shared/icon-badger/badger'
 import type { Img } from '../../shared/icon-badger/raster'
 import { decodePng, encodePng, largestIcnsPng, writeIcns } from './app-profile-icns'
+import { markAlpha, menuBarPng } from './app-profile-menu-bar'
 import {
   APP_PROFILE_BADGE_COLOR,
   APP_PROFILE_BADGE_FILE,
@@ -14,12 +15,14 @@ import {
   readPlistString,
   type AppProfileIcon
 } from '../../shared/app-profiles/app-profile-paths'
+import { APP_PROFILE_MENU_BAR_FILE } from '../../shared/app-profiles/app-profile-icon-files'
 import {
+  defaultBadge,
   nextBadgeText,
   type AppProfileIconSource
 } from '../../shared/app-profiles/app-profile-rules'
 
-export { nextBadgeText, type AppProfileIconSource }
+export { defaultBadge, nextBadgeText, type AppProfileIconSource }
 
 type RunTool = (program: string, args: string[]) => string
 
@@ -29,6 +32,19 @@ const runTool: RunTool = (program, args) =>
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 64 * 1024 * 1024
   })
+
+/** A badge source without text gets the default badge of the profile name. */
+export function withNameBadge(
+  source: AppProfileIconSource,
+  name: string,
+  icons: readonly (AppProfileIcon | undefined)[]
+): AppProfileIconSource {
+  if (source.kind !== 'badge' || source.text !== undefined) {
+    return source
+  }
+  const badge = defaultBadge(name, icons)
+  return { ...source, text: badge.text, color: source.color ?? badge.color }
+}
 
 export function isIconStyle(value: string): value is IconStyle {
   return (ICON_STYLES as readonly string[]).includes(value)
@@ -199,7 +215,7 @@ export function makeAppProfileIcon(
   source: AppProfileIconSource,
   used: readonly (AppProfileIcon | undefined)[] = [],
   run: RunTool = runTool
-): { icns: Buffer; icon: AppProfileIcon; badgePng?: Buffer } {
+): { icns: Buffer; icon: AppProfileIcon; badgePng?: Buffer; menuBarPng?: Buffer } {
   if (source.kind === 'file') {
     if (!existsSync(source.path)) {
       throw new Error(`No file ${source.path}`)
@@ -209,29 +225,48 @@ export function makeAppProfileIcon(
         ? readFileSync(source.path)
         : writeIcns(rasterizeWithAppKit('file', source.path, run))
     // The preview and the Dock need a PNG entry.
-    if (icns.toString('latin1', 0, 4) !== 'icns' || !largestIcnsPng(icns)) {
+    const png = icns.toString('latin1', 0, 4) === 'icns' ? largestIcnsPng(icns) : null
+    if (!png) {
       throw new Error(`Not an .icns file with a PNG image: ${source.path}`)
     }
-    return { icns, icon: { kind: 'file' } }
+    const img = decodePng(png)
+    // An own icon: the icon alone, no glyph.
+    const menuBar = img ? menuBarPng(defaultAppPath, markAlpha(img, true), false) : undefined
+    return { icns, icon: { kind: 'file' }, menuBarPng: menuBar }
   }
   const style = source.style ?? 'ref-match'
   const { base, badge, text } = appProfileIconParts(defaultAppPath, source, used, run)
   const img = renderBadgedIcon(base, badge, style)
+  // A character: its shape only. An image: its dark parts.
+  const menuBar = menuBarPng(defaultAppPath, markAlpha(badge, source.kind === 'image'))
   if (source.kind === 'badge') {
     const color = source.color ? { color: source.color } : {}
-    return { icns: writeIcns(img), icon: { kind: 'badge', text, style, ...color } }
+    return {
+      icns: writeIcns(img),
+      icon: { kind: 'badge', text, style, ...color },
+      menuBarPng: menuBar
+    }
   }
-  return { icns: writeIcns(img), icon: { kind: 'image', style }, badgePng: encodePng(badge) }
+  return {
+    icns: writeIcns(img),
+    icon: { kind: 'image', style },
+    badgePng: encodePng(badge),
+    menuBarPng: menuBar
+  }
 }
 
-/** Keeps the icon, and an uploaded badge, in the profile's userData. The Edit form reads them. */
+/**
+ * Keeps the icon, an uploaded badge and the menu-bar template in the profile's userData. The Edit
+ * form reads the first two; the profile app reads the icon and the template.
+ */
 export function keepProfileIcon(
   userDataPath: string,
-  made: { icns: Buffer; badgePng?: Buffer }
+  made: { icns: Buffer; badgePng?: Buffer; menuBarPng?: Buffer }
 ): void {
   for (const [name, bytes] of [
     [APP_PROFILE_ICON_FILE, made.icns],
-    [APP_PROFILE_BADGE_FILE, made.badgePng]
+    [APP_PROFILE_BADGE_FILE, made.badgePng],
+    [APP_PROFILE_MENU_BAR_FILE, made.menuBarPng]
   ] as const) {
     // Kept data can hold a link here; the write must not follow it.
     rmSync(join(userDataPath, name), { force: true })

@@ -13,6 +13,7 @@ import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile
 import {
   APP_PROFILE_BADGE_COLOR,
   APP_PROFILE_BADGE_FILE,
+  APP_PROFILE_BADGE_SWATCHES,
   APP_PROFILE_ICON_FILE
 } from '../../../../shared/app-profiles/app-profile-icon-files'
 import { Field } from './ProfileField'
@@ -49,16 +50,6 @@ function fileName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-/** The swatches of the badge character colour. The first is the default. */
-const BADGE_COLORS = [
-  APP_PROFILE_BADGE_COLOR,
-  '#dc2626',
-  '#ea580c',
-  '#16a34a',
-  '#2563eb',
-  '#9333ea'
-] as const
-
 /** The badge character colour: the swatches, then any colour. The default colour is no colour. */
 function BadgeColors(props: {
   color?: string
@@ -66,8 +57,8 @@ function BadgeColors(props: {
 }): React.JSX.Element {
   const t = useTranslate()
   const current = props.color ?? APP_PROFILE_BADGE_COLOR
-  const isCustom = !BADGE_COLORS.some((swatch) => swatch === current)
-  const names: Record<(typeof BADGE_COLORS)[number], string> = {
+  const isCustom = !APP_PROFILE_BADGE_SWATCHES.some((swatch) => swatch === current)
+  const names: Record<(typeof APP_PROFILE_BADGE_SWATCHES)[number], string> = {
     [APP_PROFILE_BADGE_COLOR]: t('profileManager.icon.colorDark', 'Dark'),
     '#dc2626': t('profileManager.icon.colorRed', 'Red'),
     '#ea580c': t('profileManager.icon.colorOrange', 'Orange'),
@@ -89,7 +80,7 @@ function BadgeColors(props: {
         aria-labelledby="profile-badge-color"
         className="flex h-9 items-center gap-2"
       >
-        {BADGE_COLORS.map((swatch) => (
+        {APP_PROFILE_BADGE_SWATCHES.map((swatch) => (
           <button
             key={swatch}
             type="button"
