@@ -53,6 +53,7 @@ Fixes:
 - A chat adopts a Claude conversation that moved into its workspace after it started elsewhere ([#17](https://github.com/dluxhu/orca/pull/17)).
 - The macOS `orca` command starts the app even when its executable is not named "Orca" ([#18](https://github.com/dluxhu/orca/pull/18)).
 - Register says when it replaces the `orca` command link of another Orca app ([#19](https://github.com/dluxhu/orca/pull/19)).
+- In a paired server's chat, a bot on this computer picked with `@` shows as a chip, not as raw text ([#54](https://github.com/dluxhu/orca/pull/54)).
 - `orca computer` works: the macOS Computer Use helper trusts the Orca @dLux apps (stable, Nightly and profile apps).
 
 [docs/fork/PATCHES.md](../docs/fork/PATCHES.md) has the release order and the upstream state of each patch.
