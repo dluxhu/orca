@@ -43,7 +43,7 @@ The release build adds these branches onto the upstream stable tag, in this orde
 17. `dlux/chat-compaction-marker` - upstream candidate: a chat shows a "Context compacted automatically" divider when Claude Code compacts its context on its own, also in a chat read from the Claude transcript (fork PR #40).
 18. `dlux/peer-mail-sender-name` - upstream candidate: mail from a chat on another Orca names that chat in the From line, and its "Message from" card opens it on its Orca (fork PR #41).
 19. `dlux/client-bot-mention-pill` - upstream candidate: in a paired server's chat, a pick of a bot on this computer gives a bot pill, not the raw token (fork PR #54, #53).
-20. `dlux/usage-panel-format` - upstream candidate: the status bar usage format has `{5h.passed}` (share of the window passed) and `{5h.total}` (window length) for each window (fork PR #55).
+20. `dlux/usage-panel-format` - upstream candidate: the status bar usage format has `{5h.time%}` (share of the window passed, or left in Remaining mode) and `{5h.total}` (window length) for each window (fork PR #55).
 21. `dlux/fork-release-channel` - fork-only: the release channels Stable and Nightly; the Nightly app has its own update feed (fork PR #38).
 22. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, headless orcad fallback, this file. Stacked on `dlux/cli-wrapper-exec` and `dlux/cli-link-notice`. Last, except the branches stacked on it.
 23. `dlux/profiles` - fork-only: app profiles, each a separate app with its own data, `~/.orca` and agent folders (fork PR #43). Stacked on `dlux/fork-setup`.
