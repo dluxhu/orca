@@ -14946,6 +14946,8 @@
             "windows": "window percentage",
             "reset": "time until reset, e.g. 3h 15m",
             "resetAt": "reset clock time, e.g. 20:50",
+            "passed": "share of the window already passed, e.g. 35%",
+            "total": "window length, e.g. 5h",
             "buckets": "Gemini model buckets",
             "optional": "dropped when a placeholder inside is empty"
           }

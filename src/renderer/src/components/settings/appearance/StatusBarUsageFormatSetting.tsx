@@ -92,6 +92,20 @@ export function StatusBarUsageFormatSetting({
       )
     ],
     [
+      '{5h.passed}',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.passed',
+        'share of the window already passed, e.g. 35%'
+      )
+    ],
+    [
+      '{5h.total}',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.total',
+        'window length, e.g. 5h'
+      )
+    ],
+    [
       '{buckets}',
       t(
         'auto.components.settings.StatusBarUsageFormatSetting.placeholder.buckets',

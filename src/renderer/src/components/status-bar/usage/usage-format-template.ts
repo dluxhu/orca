@@ -4,6 +4,7 @@ import type {
 } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { formatResetDuration } from '../../../../../shared/agent-usage/rate-limits/rate-limit-reset-format'
 import {
+  clampUsedPercent,
   getDisplayedUsagePercentage,
   type UsagePercentageDisplay
 } from '../../../../../shared/agent-usage/display/usage-percentage-display'
@@ -90,6 +91,13 @@ export function buildUsageFormatValues(
     values[`${key}.reset`] =
       window?.resetsAt != null ? formatResetDuration(window.resetsAt - options.now) : ''
     values[`${key}.resetAt`] = window?.resetsAt != null ? resetClock(window.resetsAt, options) : ''
+    const windowMs = window && window.windowMinutes > 0 ? window.windowMinutes * 60_000 : null
+    values[`${key}.total`] = windowMs !== null ? formatResetDuration(windowMs) : ''
+    // Why: elapsed time is not usage, so it ignores the Used/Remaining preference.
+    values[`${key}.passed`] =
+      windowMs !== null && window?.resetsAt != null
+        ? `${clampUsedPercent(100 - ((window.resetsAt - options.now) / windowMs) * 100)}%`
+        : ''
   }
   const buckets = (p.buckets ?? [])
     .filter((bucket) => BUCKET_ORDER.includes(bucket.name))
