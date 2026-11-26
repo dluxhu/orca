@@ -36,44 +36,51 @@ function render(
 }
 
 describe('window time placeholders', () => {
-  it('fills {5h.passed} and {5h.total}', () => {
-    expect(render('{5h.passed}')).toBe('60%')
+  it('fills {5h.time%} and {5h.total}', () => {
+    expect(render('{5h.time%}')).toBe('60%')
     expect(render('{5h.total}')).toBe('5h')
   })
 
   it('renders a usage-of-time-passed template', () => {
-    expect(render('{5h} of {5h.passed} {5h.reset}')).toBe('45% of 60% 2h')
+    expect(render('{5h} of {5h.time%} {5h.reset}')).toBe('45% of 60% 2h')
+  })
+
+  it('follows the Used/Remaining preference like the usage percentage', () => {
+    expect(render('{5h} of {5h.time%} {5h.reset}', {}, 'remaining')).toBe('55% of 40% 2h')
   })
 
   it('works for the weekly and Fable windows', () => {
     const weekly = { ...session, windowMinutes: 10080, resetsAt: now + 42 * hour }
-    expect(render('{7d.passed} {7d.total}', { weekly })).toBe('75% 7d')
-    expect(render('{fable.passed} {fable.total}', { fableWeekly: weekly })).toBe('75% 7d')
+    expect(render('{7d.time%} {7d.total}', { weekly })).toBe('75% 7d')
+    expect(render('{fable.time%} {fable.total}', { fableWeekly: weekly })).toBe('75% 7d')
   })
 
   it('rounds like the usage percentage and clamps to 0..100', () => {
-    // 3h 1.5m of 5h = 60.5% rounds up, as usage does.
-    expect(
-      render('{5h.passed}', { session: { ...session, resetsAt: now + 2 * hour - 90_000 } })
-    ).toBe('61%')
-    expect(render('{5h.passed}', { session: { ...session, resetsAt: now + 9 * hour } })).toBe('0%')
-    expect(render('{5h.passed}', { session: { ...session, resetsAt: now - hour } })).toBe('100%')
-  })
-
-  it('ignores the Used/Remaining preference', () => {
-    expect(render('{5h} {5h.passed}', {}, 'remaining')).toBe('55% 60%')
+    // 3h 1.5m of 5h = 60.5% rounds up, as usage does; Remaining complements the rounded value.
+    const late = { session: { ...session, resetsAt: now + 2 * hour - 90_000 } }
+    expect(render('{5h.time%}', late)).toBe('61%')
+    expect(render('{5h.time%}', late, 'remaining')).toBe('39%')
+    expect(render('{5h.time%}', { session: { ...session, resetsAt: now + 9 * hour } })).toBe('0%')
+    expect(render('{5h.time%}', { session: { ...session, resetsAt: now - hour } })).toBe('100%')
   })
 
   it('is empty without a reset time, so optional groups drop', () => {
     const noReset = { ...session, resetsAt: null }
-    expect(render('{5h}[ of {5h.passed}]', { session: noReset })).toBe('45%')
+    expect(render('{5h}[ of {5h.time%}]', { session: noReset })).toBe('45%')
     expect(render('{5h.total}', { session: noReset })).toBe('5h')
-    expect(render('[{7d.passed}][{7d.total}]')).toBe('')
+    expect(render('[{7d.time%}][{7d.total}]')).toBe('')
   })
 
-  it('leaves unknown placeholders as literal text', () => {
-    expect(render('{5h.passed} {5h.nope} {time_passed_percent}')).toBe(
-      '60% {5h.nope} {time_passed_percent}'
+  it('leaves unknown placeholders as literal text, also with a %', () => {
+    expect(render('{5h.time%} {5h.nope} {5h.passed} {50%} {%}')).toBe(
+      '60% {5h.nope} {5h.passed} {50%} {%}'
     )
+  })
+
+  it('renders an existing template as before', () => {
+    expect(render('{provider}[ | 5h: {5h} ({5h.reset})][ | 7d: {7d}] {5h.resetAt}')).toBe(
+      'Claude | 5h: 45% (2h) 14:00'
+    )
+    expect(render('{5h} is 100% [{7d} 7d]')).toBe('45% is 100% ')
   })
 })

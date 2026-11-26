@@ -92,10 +92,10 @@ export function StatusBarUsageFormatSetting({
       )
     ],
     [
-      '{5h.passed}',
+      '{5h.time%}',
       t(
-        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.passed',
-        'share of the window already passed, e.g. 35%'
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.timePercent',
+        'share of the window passed (Used) or left (Remaining), e.g. 35%'
       )
     ],
     [

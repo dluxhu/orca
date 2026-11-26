@@ -4,7 +4,6 @@ import type {
 } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
 import { formatResetDuration } from '../../../../../shared/agent-usage/rate-limits/rate-limit-reset-format'
 import {
-  clampUsedPercent,
   getDisplayedUsagePercentage,
   type UsagePercentageDisplay
 } from '../../../../../shared/agent-usage/display/usage-percentage-display'
@@ -13,7 +12,8 @@ import { formatPlanLabel } from './usage-roster-formatting'
 
 export type UsageFormatValues = Record<string, string>
 
-const PLACEHOLDER_RE = /\{([a-zA-Z0-9_.]+)\}/g
+// Why: `%` lets `{5h.time%}` match; a `{...%}` that is no key still stays verbatim.
+const PLACEHOLDER_RE = /\{([a-zA-Z0-9_.%]+)\}/g
 // Why: one level of brackets only — nested optional groups aren't worth the parsing cost for a footer string.
 const OPTIONAL_GROUP_RE = /\[([^[\]]*)\]/g
 
@@ -93,10 +93,10 @@ export function buildUsageFormatValues(
     values[`${key}.resetAt`] = window?.resetsAt != null ? resetClock(window.resetsAt, options) : ''
     const windowMs = window && window.windowMinutes > 0 ? window.windowMinutes * 60_000 : null
     values[`${key}.total`] = windowMs !== null ? formatResetDuration(windowMs) : ''
-    // Why: elapsed time is not usage, so it ignores the Used/Remaining preference.
-    values[`${key}.passed`] =
+    // Time passed in Used mode, time left in Remaining mode, rounded like the usage percentage.
+    values[`${key}.time%`] =
       windowMs !== null && window?.resetsAt != null
-        ? `${clampUsedPercent(100 - ((window.resetsAt - options.now) / windowMs) * 100)}%`
+        ? `${getDisplayedUsagePercentage(100 - ((window.resetsAt - options.now) / windowMs) * 100, options.display)}%`
         : ''
   }
   const buckets = (p.buckets ?? [])
