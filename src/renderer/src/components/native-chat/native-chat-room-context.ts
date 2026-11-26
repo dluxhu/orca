@@ -36,11 +36,11 @@ export type NativeChatBotChatRoom = NativeChatComposerRoom & {
  *  pill, and whether it is paused. */
 export type NativeChatBotMentionTarget = { name: string; avatar: ReactNode; paused: boolean }
 
-/** Looks a picked bot up by id, on the paired server `server` names if any: null once its computer
- *  has listed its bots without it (deleted), undefined while that isn't known (not listed yet, or no
- *  bots here). */
+/** Looks a picked bot up by id, on the paired server `server` names, or on the paired computer
+ *  `client` names, if any: null once its computer has listed its bots without it (deleted),
+ *  undefined while that isn't known (not listed yet, or no bots here). */
 export const NativeChatBotMentionTargetContext = createContext<
-  (id: string, server?: string) => NativeChatBotMentionTarget | null | undefined
+  (id: string, server?: string, client?: string) => NativeChatBotMentionTarget | null | undefined
 >(() => undefined)
 
 export const NativeChatBotChatRoomContext = createContext<NativeChatBotChatRoom | undefined>(
