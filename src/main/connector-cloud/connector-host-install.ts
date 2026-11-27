@@ -14,7 +14,6 @@ import {
   installLocalWebhooks
 } from '../webhooks/local/local-webhooks-install'
 import { installComposioUpkeep } from '../runtime/rpc/methods/bots-composio-upkeep'
-import { refreshDueLinearLogins } from '../linear/accounts/linear-login-refresh'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { Store } from '../persistence/loading-store/store'
 import { splitBotsByOlderBuildSupport, withGitHubMembersTagged } from '../../shared/bot-types'
@@ -200,9 +199,9 @@ export function installConnectorHost({
   stops.push(accessWatch.start())
   // Connect Linear's login lasts a day: refresh it after startup's rush, and on wake where the host says.
   const refreshLinearLogins = () => {
-    refreshDueLinearLogins().catch((error: unknown) =>
-      console.warn('[linear] login refresh failed', error)
-    )
+    void import('../linear/accounts/linear-login-refresh')
+      .then(({ refreshDueLinearLogins }) => refreshDueLinearLogins())
+      .catch((error: unknown) => console.warn('[linear] login refresh failed', error))
   }
   setTimeout(refreshLinearLogins, LINEAR_LOGIN_REFRESH_DELAY_MS).unref?.()
   return {
