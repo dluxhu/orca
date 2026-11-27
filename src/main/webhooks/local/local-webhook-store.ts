@@ -186,7 +186,13 @@ export class LocalWebhookStore {
     hook.key = newWebhookKey()
     hook.keyGeneration++
     const data = await this.data()
-    hook.rotateCancelled = stopNow ? await this.cancelPending(data, hook.hookId) : 0
+    try {
+      hook.rotateCancelled = stopNow ? await this.cancelPending(data, hook.hookId) : 0
+    } catch (error) {
+      // Unfinished: memory goes, so a retry rotates again from the file.
+      this.loaded = null
+      throw error
+    }
     await this.save(data)
     return hook.rotateCancelled
   }
