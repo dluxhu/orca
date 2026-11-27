@@ -85,6 +85,7 @@ export class RuntimeClientSettingsController {
       agentDefaultEnv: launchProfile.agentDefaultEnv,
       agentStatusHooksEnabled: settings.agentStatusHooksEnabled !== false,
       claudeSubagentNavigationEnabled: settings.claudeSubagentNavigationEnabled !== false,
+      claudeRemoteControlForNewChats: settings.claudeRemoteControlForNewChats === true,
       // Mobile honors this Copy option; absence from older hosts means on (#19770).
       terminalCopyTrimsGutter: settings.terminalCopyTrimsGutter !== false,
       // Phones size their terminal scrollback and word selection the way this desktop's terminals do.
