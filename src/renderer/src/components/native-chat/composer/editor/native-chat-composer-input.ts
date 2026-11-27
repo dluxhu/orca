@@ -21,7 +21,11 @@ export type NativeChatComposerInput = Pick<
 > & {
   /** Follows a surviving character through edits; null means it was replaced or deleted. */
   trackTextPosition?: (offset: number, onChange: (offset: number | null) => void) => () => void
-  insertAgentReferences?: (references: OrchestrationAgentReference[]) => void
+  /** True when a chip went in; `replace` is a text range the chips take the place of. */
+  insertAgentReferences?: (
+    references: OrchestrationAgentReference[],
+    replace?: { from: number; to: number }
+  ) => boolean
   contains?: (node: Node | null) => boolean
   insertText?: (text: string) => void
   insertSkill?: (from: number, to: number, token: string, path?: string) => void
