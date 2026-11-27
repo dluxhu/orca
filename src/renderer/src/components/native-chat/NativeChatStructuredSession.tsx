@@ -3,6 +3,7 @@ import {
   NativeChatCrewContext,
   useNativeChatCrewSource
 } from '../orchestration-crew/use-native-chat-crew'
+import { NativeChatRawDockTranscript } from './messages/diagnostics/NativeChatRawPanel'
 import { NativeChatUsageLimitActionsProvider } from './usage/NativeChatUsageLimitActions'
 import { useNativeChatHandOff } from './pane/actions/use-native-chat-hand-off'
 import { useNativeChatStructuredPaneNotices } from '@/components/native-chat/messages/notices/use-native-chat-structured-pane-notices'
@@ -57,7 +58,7 @@ import { cancelStructuredPrompt } from './session/structured/writes/native-chat-
 import { useNativeChatBotHome } from './NativeChatBotHomeScope'
 import { useStructuredAgentSessionHostExecution } from '@/components/native-chat/session/status/structured-agent-session-status-hooks'
 import { useNativeChatPaneFork } from '@/components/native-chat/messages/actions/use-native-chat-fork'
-import { NativeChatDock, NativeChatDockTranscript } from './pane/dock/NativeChatDock'
+import { NativeChatDock } from './pane/dock/NativeChatDock'
 import { useAppStore } from '@/store/index'
 import { structuredAgentLabel } from '@/lib/agent-session/launch/structured-agent-session-launch-label'
 import { useNativeChatStructuredComposerTransport } from '@/components/native-chat/composer/submit/use-native-chat-structured-composer-transport'
@@ -190,7 +191,6 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
     composerRef,
     canMention
   })
-  const cancelPrompt = () => cancelStructuredPrompt(controller, prompt)
   const surface = useNativeChatSurface({
     tabId: props.tabId,
     sessionId: props.sessionId,
@@ -266,7 +266,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
             <NativeChatSubagentSheetLayer {...subagents.layer}>
               {paneHeader}
               <NativeChatWorkerAutoCloseBanner pane={props} />
-              <NativeChatDockTranscript>
+              <NativeChatRawDockTranscript tabId={props.tabId} items={controller.journalItems}>
                 <NativeChatContextClearFade
                   // A read failure stays in view: no divider may come to end the fade.
                   clearing={controller.contextClear.clearing && viewState.kind !== 'error'}
@@ -335,7 +335,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
                     </NativeChatRowActionsProvider>
                   )}
                 </NativeChatContextClearFade>
-              </NativeChatDockTranscript>
+              </NativeChatRawDockTranscript>
               <NativeChatDock
                 shown={!readFailure?.final}
                 keepFloatingTerminalTriggerClear={props.isVisible}
@@ -361,7 +361,7 @@ export function NativeChatStructuredSession(props: Omit<NativeChatStructuredView
                     key={prompt ? `${prompt.itemId}:${prompt.revision}` : undefined}
                     prompt={prompt}
                     promptResponse={promptResponse}
-                    onCancel={cancelPrompt}
+                    onCancel={() => cancelStructuredPrompt(controller, prompt)}
                     shouldFocus={!promptsUnanswerable && props.isVisible && props.isFocusedGroup}
                     answerInputRef={questionAnswerInputRef}
                   />
