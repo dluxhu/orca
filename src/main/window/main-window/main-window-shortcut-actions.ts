@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type { WindowShortcutAction } from '../../../shared/keybindings/window-shortcut-policy'
 import { reloadWithRendererCheckpoint } from '../renderer-relays/native-unload-coordinator'
-import { openProfileManagerWindow } from '../../app-profiles/profile-manager-window'
+import { showProfileManager } from '../../app-profiles/profile-manager-window'
 
 export function sendResolvedWindowShortcutAction(
   mainWindow: BrowserWindow,
@@ -20,7 +20,8 @@ export function sendResolvedWindowShortcutAction(
       mainWindow.webContents.send('ui:openSettings')
       return
     case 'openProfileManager':
-      openProfileManagerWindow()
+      // The Profile Manager app, or this app's own window when the build has no Manager app.
+      void showProfileManager()
       return
     case 'forceReload':
       void reloadWithRendererCheckpoint(mainWindow.webContents, true, onBeforeReload).catch(

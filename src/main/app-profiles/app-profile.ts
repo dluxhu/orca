@@ -1,5 +1,6 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { realpath } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
@@ -7,6 +8,7 @@ import {
   APP_PROFILE_PLIST_ID_KEY,
   APP_PROFILE_PLIST_ROOT_KEY,
   appProfilesRoot,
+  isProfileManagerBundle,
   readAppProfileMarker,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
@@ -141,6 +143,34 @@ export function getAppProfile(): AppProfile | null {
         : null
   }
   return resolved
+}
+
+let profileManagerApp: boolean | undefined
+
+/** True in the Profile Manager app, the nested bundle that the release build makes. */
+export function isProfileManagerApp(): boolean {
+  if (profileManagerApp === undefined) {
+    profileManagerApp =
+      process.platform === 'darwin' &&
+      Boolean(process.versions.electron) &&
+      !process.defaultApp &&
+      isProfileManagerBundle(readOwnInfoPlist(), resolve(dirname(process.execPath), '..', '..'))
+  }
+  return profileManagerApp
+}
+
+/** The CFBundleDisplayName of this app's bundle, or null (afterPack writes it for the Profile Manager). */
+export function ownBundleDisplayName(): string | null {
+  const plist = readOwnInfoPlist()
+  return plist ? readPlistString(plist, 'CFBundleDisplayName') : null
+}
+
+/** The default app: this app, or the app that the links of a profile or the Profile Manager point into. */
+export async function ownDefaultAppPath(): Promise<string> {
+  if (getAppProfile() === null && !isProfileManagerApp()) {
+    return resolve(dirname(process.execPath), '..', '..')
+  }
+  return resolve(await realpath(join(process.resourcesPath, 'app.asar')), '..', '..', '..')
 }
 
 /** The name and bundle id of the running app. Use it in place of the build-time FORK_IDENTITY. */

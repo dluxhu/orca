@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createAppProfile, type RunTool } from './app-profile-create'
+import { createAppProfile, defaultAppOf, type RunTool } from './app-profile-create'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -296,6 +296,50 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
       const plist = join(entry.appPath, 'Contents', 'Info.plist')
       expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBeNull()
     }
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')(
+  'createAppProfile from the Profile Manager app',
+  () => {
+    it("takes the default app through the Manager app's relative links", () => {
+      // The release layout: <default app>/Contents/Applications/<Manager>.app, links to ../../../../.
+      const manager = join(app, 'Contents', 'Applications', 'Orca Profile Manager.app')
+      const contents = join(manager, 'Contents')
+      file(
+        join(contents, 'Info.plist'),
+        DEFAULT_PLIST.replace(
+          'com.stablyai.orca.dlux</string>',
+          'com.stablyai.orca.dlux.profile-manager</string>\n  <key>OrcaAppRole</key><string>profile-manager</string>'
+        )
+      )
+      mkdirSync(join(contents, 'Resources'), { recursive: true })
+      symlinkSync(
+        join('..', '..', '..', '..', 'Resources', 'app.asar'),
+        join(contents, 'Resources', 'app.asar')
+      )
+      const work = createAppProfile({ name: 'Work', defaultAppPath: manager, env: env(), run })
+      expect(work.bundleId).toBe('com.stablyai.orca.dlux.profile.work')
+      expect(readlinkSync(join(work.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(
+        join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
+      )
+    })
+  }
+)
+
+describe.skipIf(process.platform !== 'darwin')('defaultAppOf', () => {
+  it('takes the outer app for a Manager app at the nested place without its role', () => {
+    const manager = join(app, 'Contents', 'Applications', 'Orca Profile Manager.app')
+    const contents = join(manager, 'Contents')
+    // The default plist: no OrcaAppRole, as after a plist miss.
+    file(join(contents, 'Info.plist'), DEFAULT_PLIST)
+    mkdirSync(join(contents, 'Resources'), { recursive: true })
+    symlinkSync(
+      join('..', '..', '..', '..', 'Resources', 'app.asar'),
+      join(contents, 'Resources', 'app.asar')
+    )
+    expect(defaultAppOf(manager)).toBe(realpathSync(app))
+    expect(defaultAppOf(app)).toBe(app)
   })
 })
 

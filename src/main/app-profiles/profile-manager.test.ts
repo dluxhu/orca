@@ -6,18 +6,18 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileRow } from '../../shared/app-profiles/app-profile-rules'
 
-const { handlers, rows, isManager, profile, appOn, launchctl, reveal, openWindow } = vi.hoisted(
-  () => ({
-    openWindow: vi.fn(),
+const { handlers, rows, isManager, profile, appOn, launchctl, managerApp, showManager, reveal } =
+  vi.hoisted(() => ({
     reveal: vi.fn(),
+    managerApp: { current: false },
+    showManager: vi.fn(async () => {}),
     appOn: vi.fn(),
     launchctl: vi.fn(async (_program: string, _args: string[]) => ({ code: 113, out: '' })),
     handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<unknown>>(),
     rows: { current: [] as AppProfileRow[] },
     isManager: { current: true },
     profile: { current: null as { id: string; userDataPath: string } | null }
-  })
-)
+  }))
 
 vi.mock('node:fs', async (original) => {
   const actual = await original<typeof Fs>()
@@ -33,12 +33,16 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../i18n/main-i18n', () => ({ translateMain: (_key: string, text: string) => text }))
 vi.mock('../startup/main-process-state', () => ({ mainProcessState: {} }))
-vi.mock('./app-profile', () => ({ getAppProfile: () => profile.current }))
+vi.mock('./app-profile', () => ({
+  getAppProfile: () => profile.current,
+  isProfileManagerApp: () => managerApp.current,
+  ownDefaultAppPath: async () => '/apps/Orca.app'
+}))
 vi.mock('../ipc/ui', () => ({ isTrustedUIRenderer: () => false }))
 vi.mock('./profile-manager-window', () => ({
   isProfileManagerRenderer: () => isManager.current,
   openApp: vi.fn(),
-  openProfileManagerWindow: openWindow
+  showProfileManager: showManager
 }))
 vi.mock('../../cli/app-profiles/app-profile-list', () => ({
   // One service read and one Dock state read per list, as the real list does for a server.
@@ -82,6 +86,8 @@ beforeEach(() => {
   rows.current = [row('default', 'Orca', 'running')]
   isManager.current = true
   profile.current = null
+  managerApp.current = false
+  showManager.mockClear()
 })
 
 afterEach(() => {
@@ -308,11 +314,11 @@ describe('profilesMenuItems', () => {
       }
       return found
     }
-    openWindow.mockClear()
+    showManager.mockClear()
     ;(item('New profile…').click as () => void)()
-    expect(openWindow).toHaveBeenCalledWith({ startNew: true })
+    expect(showManager).toHaveBeenCalledWith({ startNew: true })
     ;(item('Profile Manager…').click as () => void)()
-    expect(openWindow).toHaveBeenLastCalledWith()
+    expect(showManager).toHaveBeenLastCalledWith()
     expect(item('Profile Manager…').accelerator).toBe('CommandOrControl+Shift+P')
   })
 
@@ -351,6 +357,34 @@ describe('Profiles menu refresh on activation', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('Profiles > Profile Manager…', () => {
+  it('shows the Profile Manager', () => {
+    const item = profilesMenuItems().at(-1)
+    expect(item?.label).toBe('Profile Manager…')
+    const click = item?.click as () => void
+    click()
+    expect(showManager).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks no row in the Profile Manager app, which is no row', async () => {
+    managerApp.current = true
+    rows.current = [row('default', 'Orca', 'running'), row('work', 'Orca - Work', 'stopped')]
+    const rebuild = vi.fn()
+    startProfilesMenu(rebuild)
+    await vi.waitFor(() => expect(rebuild).toHaveBeenCalled())
+    // No "This app" section: every app is under "Switch to", with no check.
+    expect(profilesMenuItems().map((item) => [item.type, item.label, item.checked])).toEqual([
+      ['header', 'Switch to', undefined],
+      [undefined, 'Default — Running', undefined],
+      [undefined, 'Orca - Work', undefined],
+      ['separator', undefined, undefined],
+      [undefined, 'New profile…', undefined],
+      [undefined, 'Profile Manager…', undefined]
+    ])
+    expect((await readAppProfilesState()).currentId).toBeNull()
   })
 })
 
