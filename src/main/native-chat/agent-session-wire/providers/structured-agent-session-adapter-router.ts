@@ -130,13 +130,9 @@ export class StructuredAgentSessionAdapterRouter implements Adapter {
 
   cancelTurn: Adapter['cancelTurn'] = (input) => this.owner(input.sessionId).cancelTurn(input)
 
-  changeThreadGoal: NonNullable<Adapter['changeThreadGoal']> = (input) => {
-    const change = this.owner(input.sessionId).changeThreadGoal
-    if (!change) {
-      return Promise.resolve({ ok: false, rejected: 'Goals are unavailable for this provider.' })
-    }
-    return change(input)
-  }
+  changeThreadGoal: NonNullable<Adapter['changeThreadGoal']> = (input) =>
+    this.owner(input.sessionId).changeThreadGoal?.(input) ??
+    Promise.resolve({ ok: false, rejected: 'Goals are unavailable for this provider.' })
 
   stopBackgroundTasks: NonNullable<Adapter['stopBackgroundTasks']> = (input) => {
     const stop = this.owner(input.sessionId).stopBackgroundTasks
@@ -158,8 +154,12 @@ export class StructuredAgentSessionAdapterRouter implements Adapter {
   remoteControl: NonNullable<Adapter['remoteControl']> = (input) =>
     this.liveOwnerOrNull(input.sessionId)?.remoteControl?.(input) ?? Promise.resolve(null)
 
-  liveTurnId = (sessionId: string): string | null | undefined =>
-    this.liveOwnerOrNull(sessionId)?.liveTurnId?.(sessionId)
+  relayOpenWork = (id: string, rootTurnRunning: boolean) =>
+    this.liveOwnerOrNull(id)?.relayOpenWork?.(id, rootTurnRunning) ?? null
+
+  liveTurnId = (id: string) => this.liveOwnerOrNull(id)?.liveTurnId?.(id)
+
+  steeringMode = (id: string) => this.liveOwnerOrNull(id)?.steeringMode?.(id)
 
   requiresModelTransitionRestart: NonNullable<Adapter['requiresModelTransitionRestart']> = (
     input
@@ -181,6 +181,9 @@ export class StructuredAgentSessionAdapterRouter implements Adapter {
     this.adapters()
       .map((adapter) => adapter.startupEnding?.(sessionId, acquisitionGeneration))
       .find((ending) => ending !== undefined)
+
+  endedBeforeAcquire = (sessionId: string, generation: string): boolean =>
+    this.adapters().some((each) => each.endedBeforeAcquire?.(sessionId, generation))
 
   retireStartup = (sessionId: string, acquisitionGeneration: string): void =>
     this.adapters().forEach((adapter) => adapter.retireStartup?.(sessionId, acquisitionGeneration))
