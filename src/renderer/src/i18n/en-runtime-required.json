@@ -2465,6 +2465,10 @@
       "keywordProfile": "browser profile",
       "keywordSignIn": "sign in"
     },
+    "RepositoryChatReferenceLinksSection": {
+      "keywordIssue": "issue link",
+      "keywordPullRequest": "pull request"
+    },
     "native-chat": {
       "approval": {
         "allow": "Allow",
