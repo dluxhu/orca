@@ -67,8 +67,11 @@ async function handOver(
   call: LocalCall
 ): Promise<void> {
   const automations = deps.automations()
-  // A hook paused since its call was taken hands nothing over, as the pause would have cancelled it.
-  const found = hook.state === 'paused' ? null : hookAutomation(automations, hook)
+  // A hook paused since its call came in (paused now, or paused and resumed: a newer epoch) hands
+  // nothing over, as the pause would have cancelled the call.
+  const epoch = call.epoch ?? hook.epoch
+  const found =
+    hook.state === 'paused' || epoch !== hook.epoch ? null : hookAutomation(automations, hook)
   const delivery: TriggerDelivery | null = found && {
     kind: 'trigger',
     deliveryId: call.callId,
@@ -84,7 +87,7 @@ async function handOver(
       occurredAt: call.receivedAt,
       webhook: {
         callId: call.callId,
-        epoch: hook.epoch,
+        epoch,
         ...(call.sample ? { sample: true as const } : {})
       }
     }

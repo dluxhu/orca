@@ -36,6 +36,8 @@ export const LocalCall = z.object({
   hookId: z.string().min(1),
   receivedAt: z.number(),
   state: z.enum(WEBHOOK_CALL_STATES),
+  // The hook's epoch when the call came in; a pause since then refuses it.
+  epoch: z.number().int().nonnegative().optional(),
   subject: z.string().optional(),
   sample: z.literal(true).optional(),
   sampleOperationId: z.string().optional(),

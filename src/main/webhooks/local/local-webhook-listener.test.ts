@@ -311,6 +311,27 @@ describe('local webhook listener, keys and replays', () => {
     expect(await store.call(call.callId)).toMatchObject({ state: 'refused' })
   })
 
+  it('hands nothing over for a call that came in before a pause and resume', async () => {
+    const call = await store.admit(hook, { receivedAt: 1, state: 'queued' }, null)
+    if (!call) {
+      throw new Error('not taken')
+    }
+    // As if a pause and a resume both ran while the call was being stored.
+    hook.epoch++
+    const deps = {
+      store,
+      automations: () => automations,
+      bots: () => [{ id: hook.botId }],
+      receive: () => {
+        received.push({ callId: 'handed' })
+        return true
+      }
+    }
+    expect(await deliverLocalCall(deps, hook, call)).toBe(true)
+    expect(received).toEqual([])
+    expect(await store.call(call.callId)).toMatchObject({ state: 'refused' })
+  })
+
   it('refuses a call whose key a stop-now rotation ended before it was listed', async () => {
     const oldKey = hook.key
     await store.rotate(hook, 'r-2', true)

@@ -243,7 +243,7 @@ export class LocalWebhookStore {
   /** A new call with its envelope (none for an ignored or paused one), newest kept within the caps. */
   async admit(
     hook: LocalHook,
-    call: Omit<LocalCall, 'callId' | 'hookId' | 'hasEnvelope'>,
+    call: Omit<LocalCall, 'callId' | 'hookId' | 'hasEnvelope' | 'epoch'>,
     envelope: WebhookEnvelope | null,
     sender: { key?: string; deliveryId?: string } = {}
   ): Promise<LocalCall | null> {
@@ -251,6 +251,7 @@ export class LocalWebhookStore {
       ...call,
       callId: newCallId(),
       hookId: hook.hookId,
+      epoch: hook.epoch,
       hasEnvelope: envelope !== null
     }
     if (envelope) {
