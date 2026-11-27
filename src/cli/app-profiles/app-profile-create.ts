@@ -202,7 +202,8 @@ function keptDataFolderId(
 
 /**
  * A profile's `orca` runs in the profile app, and the Profile Manager's in the Manager app. Their
- * app.asar link points into the default app.
+ * app.asar.unpacked link points into the default app. Not the app.asar: Electron 45 reads no asar
+ * archive through a link (EINVAL), so that one is a copy in the Manager.
  */
 export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
@@ -212,5 +213,10 @@ export function defaultAppOf(appPath: string): string {
   ) {
     return appPath
   }
-  return resolve(realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar')), '..', '..', '..')
+  return resolve(
+    realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar.unpacked')),
+    '..',
+    '..',
+    '..'
+  )
 }
