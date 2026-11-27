@@ -27,7 +27,6 @@ export function storePeerReply(
     ...payload,
     ownInstallationId
   })
-  settlePeerQuestionsOut(db, conversation.conversation_id, payload)
   const stored = db.insertPeerMailMessage({
     conversationId: conversation.conversation_id,
     remoteParty: payload.fromAddress,
@@ -38,9 +37,12 @@ export function storePeerReply(
       subject: payload.subject,
       body,
       threadId: payload.threadId ?? undefined,
+      replyTo: payload.replyTo,
       runId: recipient.ok ? recipient.runId : undefined,
       ...carried
-    }
+    },
+    // The reply and the question it settles commit together, so a replay finds both done.
+    onFirstStore: () => settlePeerQuestionsOut(db, conversation.conversation_id, payload)
   })
   return stored.duplicate ? undefined : stored.message
 }

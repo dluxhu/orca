@@ -28,6 +28,7 @@ import { recordReceiptBeforeNudge } from './mutation-replay-nudge'
 import type { SendParams } from './send-params'
 import type { SendRecipientWarning } from './recipient-routing'
 import { peerMailLocalCaller } from './peer-mail-local-caller'
+import { peerMailSendingAskers } from './peer-mail-sending-askers'
 import { clientAskCard } from './client-ask-card'
 
 const NOTHING_SENT = { effectsApplied: false } as const
@@ -74,6 +75,7 @@ export async function sendClientAsk(args: {
     )
   }
   const caller = peerMailLocalCaller({ ...args, from: params.from })
+  const askers = await peerMailSendingAskers(runtime, args.orchestrationCaller, caller, { to })
   const cardFor = (computer: { installationId: string; computer: string }) =>
     clientAskCard({
       asker: caller.address,
@@ -112,6 +114,7 @@ export async function sendClientAsk(args: {
     ...(params.priority ? { priority: params.priority } : {}),
     ...(params.threadId ? { threadId: params.threadId } : {}),
     sender: await locatedPeerMailSender(runtime, caller.address),
+    ...(askers ? { askers } : {}),
     rootSession: clientAskRootSession(db, caller.address)
   }
   if (type.data === 'question') {

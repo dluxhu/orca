@@ -19,7 +19,7 @@ import type {
 } from '../../../../../../shared/agent-session/journal/agent-session-message-source'
 import {
   unnamedSenderLabel,
-  useAgentMessageSenderLabel
+  useAgentMessageSenderName
 } from './native-chat-agent-message-sender-label'
 import { useAgentMessageSenderOpens } from './native-chat-agent-message-sender-view'
 import type { RuntimeClientTarget } from '../../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
@@ -100,8 +100,9 @@ function SenderName({
   compact: boolean
 }): React.JSX.Element {
   const t = useTranslate()
-  const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  const name = useAgentMessageSenderName(sender, chatWorktreeId, target, dispatchId)
+  const label = name ?? unnamedSenderLabel(t)
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, name, label)
   if (!open) {
     return (
       <span
@@ -141,7 +142,10 @@ export function NativeChatAgentMessageSenderNames({
   chatWorktreeId,
   target,
   dispatchId,
-  spoken
+  spoken,
+  name,
+  label,
+  title
 }: {
   from: AgentMessageSource
   shown: readonly AgentMessageSender[]
@@ -150,8 +154,11 @@ export function NativeChatAgentMessageSenderNames({
   target?: RuntimeClientTarget
   dispatchId?: string
   spoken: boolean
+  name: string | null
+  label: string
+  /** The name where it stands alone on hover; a recipient's reads "an Eule" in German. */
+  title: string
 }): React.JSX.Element {
-  const t = useTranslate()
   // The message's Dispatch is its one sender's; mail from several opens its first by its own address.
   const senderDispatchId = shown.length > 1 ? undefined : dispatchId
   // One line has room for one name: the rest count as +N.
@@ -161,7 +168,7 @@ export function NativeChatAgentMessageSenderNames({
     <>
       {shown.length === 0 ? (
         <span aria-hidden={!spoken || undefined} className={NATIVE_CHAT_READABLE_SHARE}>
-          {unnamedSenderLabel(t)}
+          {label}
         </span>
       ) : null}
       {first ? (
@@ -173,6 +180,9 @@ export function NativeChatAgentMessageSenderNames({
             target={target}
             dispatchId={senderDispatchId}
             spoken={spoken}
+            name={name}
+            label={label}
+            title={title}
           />
           {first.host ? (
             <WorktreeHostContextBadge label={first.host} className="inline-flex shrink-0" />
@@ -194,7 +204,10 @@ function RowSenderName({
   chatWorktreeId,
   target,
   dispatchId,
-  spoken
+  spoken,
+  name,
+  label,
+  title
 }: {
   from: AgentMessageSource
   sender: AgentMessageSender
@@ -202,13 +215,16 @@ function RowSenderName({
   target?: RuntimeClientTarget
   dispatchId?: string
   spoken: boolean
+  name: string | null
+  label: string
+  /** The name where it stands alone on hover; a recipient's reads "an Eule" in German. */
+  title: string
 }): React.JSX.Element {
   const t = useTranslate()
-  const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, name, label)
   if (!open) {
     return (
-      <span aria-hidden={!spoken || undefined} className={NATIVE_CHAT_READABLE_SHARE} title={label}>
+      <span aria-hidden={!spoken || undefined} className={NATIVE_CHAT_READABLE_SHARE} title={title}>
         {label}
       </span>
     )
@@ -216,8 +232,10 @@ function RowSenderName({
   return (
     <button
       type="button"
-      aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', { name: label })}
-      title={label}
+      aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', {
+        name: name ?? unnamedSenderLabel(t)
+      })}
+      title={title}
       className={`${NATIVE_CHAT_READABLE_SHARE} rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
       onClick={open}
     >
@@ -241,8 +259,9 @@ export function SenderChip({
   dispatchId?: string
 }): React.JSX.Element {
   const t = useTranslate()
-  const label = useAgentMessageSenderLabel(sender, chatWorktreeId, target, dispatchId)
-  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, label)
+  const name = useAgentMessageSenderName(sender, chatWorktreeId, target, dispatchId)
+  const label = name ?? unnamedSenderLabel(t)
+  const open = useSenderOpen(from, sender, chatWorktreeId, target, dispatchId, name, label)
   if (!open) {
     return (
       <SenderTooltip label={label}>
@@ -290,6 +309,7 @@ function useSenderOpen(
   chatWorktreeId: string | null,
   target: RuntimeClientTarget | undefined,
   dispatchId: string | undefined,
+  name: string | null,
   label: string
 ): (() => void) | null {
   const opens = useAgentMessageSenderOpens(sender, chatWorktreeId, target, dispatchId)
@@ -298,6 +318,6 @@ function useSenderOpen(
     return () => void openOnOrcaHost(origin.hostId, origin.address, label)
   }
   return opens && chatWorktreeId
-    ? () => void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, label)
+    ? () => void openAgentMessageSender(from, sender, chatWorktreeId, target, dispatchId, name)
     : null
 }
