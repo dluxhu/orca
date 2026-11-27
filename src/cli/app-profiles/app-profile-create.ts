@@ -192,13 +192,21 @@ export function createAppProfile(options: CreateAppProfileOptions): AppProfileEn
   })
 }
 
-/** A profile's `orca` runs in the profile app; its app.asar link points into the default app. */
+/**
+ * A profile's `orca` runs in the profile app; its app.asar.unpacked link points into the default
+ * app. Not the app.asar link: Electron 45 reads no asar archive through a link (EINVAL).
+ */
 export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
   if (readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null) {
     return appPath
   }
-  return resolve(realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar')), '..', '..', '..')
+  return resolve(
+    realpathSync(join(appPath, 'Contents', 'Resources', 'app.asar.unpacked')),
+    '..',
+    '..',
+    '..'
+  )
 }
 
 const CREATE_USAGE =

@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createAppProfile,
+  defaultAppOf,
   nextAppProfilePort,
   runProfilesCreate,
   type RunTool
@@ -127,6 +128,7 @@ beforeEach(() => {
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
   file(join(contents, 'Resources', 'icon.icns'), 'default icon')
+  file(join(contents, 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js'), 'cli')
   file(
     join(contents, 'Resources', 'profile-template', 'orca-notification-status'),
     'profile variant'
@@ -390,6 +392,15 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
       const plist = join(entry.appPath, 'Contents', 'Info.plist')
       expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBeNull()
     }
+  })
+
+  it('finds the default app through app.asar.unpacked when app.asar is no link', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    // Electron 45 reads no asar archive through a link, so a profile's app.asar can be its own.
+    const asar = join(work.appPath, 'Contents', 'Resources', 'app.asar')
+    rmSync(asar)
+    writeFileSync(asar, 'own asar')
+    expect(defaultAppOf(work.appPath)).toBe(realpathSync(app))
   })
 })
 
