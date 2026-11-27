@@ -21183,6 +21183,7 @@
       "notices": {
         "contextCleared": "Kontext geleert",
         "compaction": "Kontext komprimiert",
+        "compactionAutomatic": "Kontext automatisch komprimiert",
         "details": "Details",
         "plan": "Plan",
         "historyRepaired": "Ein Teil des Chatverlaufs konnte nicht geladen werden.",

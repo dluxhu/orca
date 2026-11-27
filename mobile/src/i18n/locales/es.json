@@ -481,6 +481,7 @@
     },
     "notice": {
       "compaction": "Contexto compactado",
+      "compactionAutomatic": "Contexto compactado automáticamente",
       "contextCleared": "Contexto borrado",
       "plan": "Plan",
       "stoppedManually": "Detenido manualmente",
