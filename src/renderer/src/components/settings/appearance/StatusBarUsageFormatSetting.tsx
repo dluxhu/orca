@@ -92,6 +92,20 @@ export function StatusBarUsageFormatSetting({
       )
     ],
     [
+      '{5h.time%}',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.timePercent',
+        'share of the window passed (Used) or left (Remaining), e.g. 35%'
+      )
+    ],
+    [
+      '{5h.total}',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.total',
+        'window length, e.g. 5h'
+      )
+    ],
+    [
       '{buckets}',
       t(
         'auto.components.settings.StatusBarUsageFormatSetting.placeholder.usagePools',
