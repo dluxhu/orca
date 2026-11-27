@@ -1,7 +1,8 @@
-import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import type * as FsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   WEBHOOK_CALL_ID_PATTERN,
   WEBHOOK_HOOK_ID_PATTERN
@@ -10,6 +11,21 @@ import type { WebhookCloudCalls } from '../webhook-cloud-routes'
 import { localWebhookCalls, switchedWebhookCalls } from './local-webhook-routes'
 import { keyMatches } from './local-webhook-records'
 import { LocalWebhookStore, type LocalCall } from './local-webhook-store'
+
+// Lets a test make the store's file removal fail.
+const removal = vi.hoisted(() => ({ fail: false }))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof FsPromises>()
+  return {
+    ...actual,
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      if (removal.fail) {
+        throw new Error('removal failed')
+      }
+      await actual.rm(...args)
+    }
+  }
+})
 
 const WEBHOOK_KEY_PATTERN = /^orcawh_[A-Za-z0-9_-]{43}$/
 
@@ -125,9 +141,8 @@ describe('local webhook routes', () => {
   it('fails an overlapping repeat with the rotation it repeats, and rotates on a later retry', async () => {
     const hook = await mint()
     await value(routes.sample(hook.hookId, 'sample-1'))
-    const envelopes = join(dir, 'local-webhooks', 'envelopes')
     // The pending call's envelope can't be removed, so the stop-now cancellation fails.
-    chmodSync(envelopes, 0o500)
+    removal.fail = true
     try {
       const tries = await Promise.allSettled([
         routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }),
@@ -135,7 +150,7 @@ describe('local webhook routes', () => {
       ])
       expect(tries.map((entry) => entry.status)).toEqual(['rejected', 'rejected'])
     } finally {
-      chmodSync(envelopes, 0o700)
+      removal.fail = false
     }
     expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(1)
     expect(await value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }))).toEqual({
