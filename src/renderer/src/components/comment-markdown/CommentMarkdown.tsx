@@ -61,7 +61,7 @@ function remarkNativeChatFileLinks(
 }
 
 export function remarkGitHubReferences(
-  defaultRepo: GitHubRepoReference
+  defaultRepo: GitHubRepoReference | null
 ): () => (tree: Parameters<typeof linkGitHubReferences>[0]) => void {
   return () => (tree) => linkGitHubReferences(tree, defaultRepo)
 }
@@ -102,6 +102,8 @@ type CommentMarkdownProps = React.ComponentPropsWithoutRef<'div'> & {
   math?: boolean
   variant?: 'compact' | 'document'
   githubRepo?: GitHubRepoReference | null
+  /** False: only `owner/repo#123` links, and a bare `#123` stays text. */
+  linkBareGitHubReferences?: boolean
   onLinkClick?: CommentMarkdownLinkClickHandler
   allowFileUriLinks?: boolean
   /** Turns detected file paths into links, keeping only those this confirms exist. */
@@ -138,6 +140,7 @@ const CommentMarkdown = React.memo(
       className,
       variant = 'compact',
       githubRepo,
+      linkBareGitHubReferences = true,
       onLinkClick,
       allowFileUriLinks = false,
       fileLinkExists,
@@ -188,8 +191,18 @@ const CommentMarkdown = React.memo(
         : basePlugins
       const withMath: RemarkPlugins = math ? [...plugins, remarkChatMath] : plugins
       const withExtension = extension ? [...withMath, ...extension.remarkPlugins] : withMath
-      return githubRepo ? [...withExtension, remarkGitHubReferences(githubRepo)] : withExtension
-    }, [extension, fileLinkExists, githubRepo, math, singleTildeStrikethrough, unknownHtmlAsText])
+      return githubRepo
+        ? [...withExtension, remarkGitHubReferences(linkBareGitHubReferences ? githubRepo : null)]
+        : withExtension
+    }, [
+      extension,
+      fileLinkExists,
+      githubRepo,
+      linkBareGitHubReferences,
+      math,
+      singleTildeStrikethrough,
+      unknownHtmlAsText
+    ])
     const blocks = useMarkdownBlocks(
       content,
       growing,

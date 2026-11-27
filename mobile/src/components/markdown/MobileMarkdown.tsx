@@ -91,6 +91,7 @@ function MobileMarkdownContent({
     {
       fileLinkExists,
       githubRepo: links?.githubRepo,
+      linkBareGitHubReferences: links?.linkBareGitHubReferences,
       slackMentions,
       slackPeople
     }

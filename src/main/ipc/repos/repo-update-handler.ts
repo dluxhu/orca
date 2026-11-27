@@ -54,6 +54,7 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
             | 'symlinkPaths'
             | 'dictationTerms'
             | 'issueSourcePreference'
+            | 'linkBareReferencesInChat'
             | 'forkSyncMode'
             | 'agentWorkspaceTrust'
             | 'externalWorktreeVisibilityPromptDismissedAt'
@@ -91,6 +92,12 @@ export function registerRepoUpdateHandler(mainWindow: BrowserWindow, store: Stor
         updates.issueSourcePreference !== 'auto'
       ) {
         delete updates.issueSourcePreference
+      }
+      if (
+        'linkBareReferencesInChat' in updates &&
+        typeof updates.linkBareReferencesInChat !== 'boolean'
+      ) {
+        delete updates.linkBareReferencesInChat
       }
       if (
         'forkSyncMode' in updates &&
