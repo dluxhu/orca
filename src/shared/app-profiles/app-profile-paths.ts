@@ -1,17 +1,21 @@
 // App profiles: one Orca app per profile on macOS. See docs/fork/profiles-design.md.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 /** The marker in a profile's userData. serve and orcad find the profile through it. */
 export const APP_PROFILE_MARKER = 'orca-app-profile.json'
 export const APP_PROFILES_REGISTRY = 'profiles.json'
+/** Settings that a new profile applies once at its first start ("Copy settings from:"). */
+export const APP_PROFILE_SETTINGS_SEED = 'orca-settings-seed.json'
 /** The Info.plist key that makes a bundle a profile app. */
 export const APP_PROFILE_PLIST_ID_KEY = 'OrcaAppProfileId'
 /** Info.plist key for a test root. `orca profiles create --pin-root` writes it. */
 export const APP_PROFILE_PLIST_ROOT_KEY = 'OrcaAppProfilesRoot'
 /** Overrides the folder that holds profiles.json and the profile userData folders. */
 export const APP_PROFILES_ROOT_ENV = 'ORCA_PROFILES_ROOT'
+/** The argument that makes an Orca app open its Profile Manager window. */
+export const PROFILE_MANAGER_ARG = '--orca-profile-manager'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
@@ -28,6 +32,8 @@ export type AppProfileEntry = {
 export type AppProfileRegistry = {
   version: 1
   defaultAppPath: string
+  /** The default app's saved port. Without it, the default app uses DEFAULT_WS_PORT. */
+  defaultPort?: number
   urlHandler: { mode: 'ask' } | { mode: 'profile'; profileId: string }
   profiles: AppProfileEntry[]
 }
@@ -40,18 +46,50 @@ export function appProfilesAppsDir(env: NodeJS.ProcessEnv = process.env, home = 
   return env[APP_PROFILES_APPS_DIR_ENV] || join(home, 'Applications', 'Orca Profiles')
 }
 
-/** The profile id in a userData folder, or null when the folder is not a profile's. */
-export function readAppProfileMarker(userDataPath: string): string | null {
+/** The profile id in the text of a marker, or null. */
+export function parseAppProfileMarker(text: string): string | null {
   try {
-    const id = (
-      JSON.parse(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8')) as {
-        id?: unknown
-      }
-    ).id
+    const id = (JSON.parse(text) as { id?: unknown }).id
     return typeof id === 'string' && id.length > 0 ? id : null
   } catch {
     return null
   }
+}
+
+/**
+ * The copy of the serve LaunchAgent that `serve service uninstall --keep-running` keeps in
+ * userData. launchd does not load it at login; the profile app starts the job from it after a quit.
+ */
+export function serveUnitCopyPath(userDataPath: string): string {
+  return join(userDataPath, 'serve-service-unit.plist')
+}
+
+/** The profile id in a userData folder, or null when the folder is not a profile's. */
+export function readAppProfileMarker(userDataPath: string): string | null {
+  try {
+    return parseAppProfileMarker(readFileSync(join(userDataPath, APP_PROFILE_MARKER), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The saved port of the app of a userData folder: the profile's port, or the default app's
+ * defaultPort. `orca serve` uses it when no --port is given. Null when none is saved.
+ */
+export function savedAppPort(
+  userDataPath: string,
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir()
+): number | null {
+  const registry = readAppProfileRegistry(appProfilesRoot(env, home))
+  const id = readAppProfileMarker(userDataPath)
+  const port =
+    id === null ? registry?.defaultPort : registry?.profiles.find((p) => p.id === id)?.port
+  // profiles.json is a user file.
+  return typeof port === 'number' && Number.isInteger(port) && port >= 1024 && port <= 65535
+    ? port
+    : null
 }
 
 /** Writes the marker when it is missing. serve and orcad find the profile only through it. */
@@ -66,6 +104,39 @@ export function ensureAppProfileMarker(userDataPath: string, id: string): void {
 export function readAppProfileRegistry(root: string): AppProfileRegistry | null {
   try {
     return JSON.parse(readFileSync(join(root, APP_PROFILES_REGISTRY), 'utf8')) as AppProfileRegistry
+  } catch {
+    return null
+  }
+}
+
+/** The profile id in an app's Info.plist, or null. */
+export function appProfileIdOfApp(appPath: string): string | null {
+  try {
+    return readPlistString(
+      readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8'),
+      APP_PROFILE_PLIST_ID_KEY
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The profile's app: the registry path, or the one app in the same folder whose Info.plist has
+ * this profile id (a rename in Finder changes only the file name). Null when there is none, or
+ * more than one (a copy in Finder): Orca does not guess.
+ */
+export function locateAppProfileApp(entry: Pick<AppProfileEntry, 'id' | 'appPath'>): string | null {
+  if (appProfileIdOfApp(entry.appPath) === entry.id) {
+    return entry.appPath
+  }
+  try {
+    const folder = dirname(entry.appPath)
+    const names = readdirSync(folder).filter(
+      (candidate) =>
+        candidate.endsWith('.app') && appProfileIdOfApp(join(folder, candidate)) === entry.id
+    )
+    return names.length === 1 ? join(folder, names[0]) : null
   } catch {
     return null
   }

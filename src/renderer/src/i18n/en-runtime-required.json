@@ -3504,6 +3504,21 @@
       "unsupportedFile": "Unsupported file. Pick a PNG, APNG, JPG, GIF, WebP, or SVG."
     }
   },
+  "profileManager": {
+    "rule": {
+      "idPattern": "Use 1 to 32 letters, digits and -, with a letter or digit first.",
+      "idReserved": "The id \"{{id}}\" is reserved.",
+      "idTaken": "A profile with the id \"{{id}}\" exists.",
+      "nameChars": "Type a name without \"/\" or \":\", and with no \".\" or \"-\" first.",
+      "nameLong": "The profile name is too long: at most {{max}} bytes.",
+      "nameTaken": "A profile with the name \"{{name}}\" exists.",
+      "portClash": "The port {{port}} is inside the port range of the default app or of another profile.",
+      "portRange": "The port must be 1024 to 65535: {{port}}",
+      "portTaken": "Another profile saves the port {{port}}.",
+      "portDesktop": "Orca desktop apps also use the ports 6768 to 6799. A running desktop app can take this port first.",
+      "portNear": "The server of another Orca app can use the 31 ports after its own. It can take this port first."
+    }
+  },
   "plugins": {
     "displayText": {
       "t0b4f7e19": "Unofficial ports of VS Code's default color themes: Dark Modern, Light Modern, Dark+ and Light+.",

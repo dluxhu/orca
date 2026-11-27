@@ -1,3 +1,4 @@
+import type { RuntimeRole } from '../../../../shared/remote-runtime/bootstrap/runtime-bootstrap'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcAnyMethodDeclaration } from '../core'
 import type { DeviceRegistry } from './pairing/device-registry'
@@ -32,6 +33,8 @@ export function formatWsEndpoint(host: string, port: number): string {
 export type OrcaRuntimeRpcServerOptions = {
   runtime: OrcaRuntimeService
   userDataPath: string
+  /** Written to the runtime file, so that other processes know its owner. Default: 'serve' with --serve, else 'app'. */
+  role?: RuntimeRole
   pid?: number
   platform?: NodeJS.Platform
   enableWebSocket?: boolean

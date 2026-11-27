@@ -23,7 +23,9 @@
 2 src/main/amp/managed-plugin-install-status.ts
 3 src/main/antigravity/native-file-credentials.ts
 1 src/main/app-profiles/app-profile-serve-exclusion.ts # app profiles (fork): one serve unit check before the instance locks, pre-ready where nothing can await
-1 src/main/app-profiles/app-profile.ts # app profiles (fork): one Info.plist read, memoized, before userData is set
+2 src/main/app-profiles/app-profile-startup.ts # app profiles (fork): one seed read and removal at the first ready
+4 src/main/app-profiles/app-profile.ts # app profiles (fork): one Info.plist read and the data-folder checks, memoized, before userData is set
+1 src/main/app-profiles/profile-manager.ts # app profiles (fork): one mkdir of the profiles folder when the Profiles menu starts
 3 src/main/artifacts/artifact-create-intent-store.ts
 2 src/main/artifacts/artifact-share-record-store.ts
 1 src/main/automations/external-managers/external-manager-discovery.ts
