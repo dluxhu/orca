@@ -3,10 +3,14 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import * as z from 'zod'
-import type { WebhookCallRow as WebhookCallRowSchema } from '../../../shared/connector-webhook-routes'
+import type {
+  WebhookCallRow as WebhookCallRowSchema,
+  WebhookView
+} from '../../../shared/connector-webhook-routes'
 import {
   WEBHOOK_CALL_STATES,
-  WEBHOOK_HOOK_ID_PATTERN
+  WEBHOOK_HOOK_ID_PATTERN,
+  type WebhookCallState
 } from '../../../shared/connector-webhook-contract'
 
 export const LocalHook = z.object({
@@ -113,4 +117,32 @@ export function historyRows(calls: LocalCall[], counters: LocalCounter[]): Webho
   ]
   const at = (row: WebhookCallRow) => (row.kind === 'call' ? row.receivedAt : row.minute)
   return rows.sort((a, b) => at(b) - at(a))
+}
+
+/** States of a call admitted but not yet started on the host: what a stop-now rotation cancels. */
+export const PENDING: readonly WebhookCallState[] = ['queued', 'delivered']
+export const isPending = (call: LocalCall): boolean => PENDING.includes(call.state) && !call.runId
+
+/** A hook as every route answering one returns it; never its key. */
+export function hookView(
+  hook: LocalHook,
+  pendingCalls: number,
+  baseUrl: string,
+  now: number
+): WebhookView {
+  const previousLive = hook.previousKey && (hook.previousKeyExpiresAt ?? 0) > now
+  return {
+    hookId: hook.hookId,
+    automationId: hook.automationId,
+    botId: hook.botId,
+    state: hook.state,
+    epoch: hook.epoch,
+    hostGen: 1,
+    keyGeneration: hook.keyGeneration,
+    url: `${baseUrl}/hooks/${hook.hookId}`,
+    adapter: null,
+    previousKeyExpiresAt: previousLive ? hook.previousKeyExpiresAt : null,
+    lastCall: hook.lastCall ? { ...hook.lastCall, signatureValid: false } : null,
+    pendingCalls
+  }
 }

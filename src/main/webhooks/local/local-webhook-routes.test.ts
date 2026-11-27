@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -119,6 +119,28 @@ describe('local webhook routes', () => {
       routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }),
       routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true })
     ])
+    expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(2)
+  })
+
+  it('fails an overlapping repeat with the rotation it repeats, and rotates on a later retry', async () => {
+    const hook = await mint()
+    await value(routes.sample(hook.hookId, 'sample-1'))
+    const envelopes = join(dir, 'local-webhooks', 'envelopes')
+    // The pending call's envelope can't be removed, so the stop-now cancellation fails.
+    chmodSync(envelopes, 0o500)
+    try {
+      const tries = await Promise.allSettled([
+        routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }),
+        routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true })
+      ])
+      expect(tries.map((entry) => entry.status)).toEqual(['rejected', 'rejected'])
+    } finally {
+      chmodSync(envelopes, 0o700)
+    }
+    expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(1)
+    expect(await value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }))).toEqual({
+      cancelledCalls: 1
+    })
     expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(2)
   })
 

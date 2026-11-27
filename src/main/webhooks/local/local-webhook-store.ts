@@ -2,17 +2,15 @@
 // userData, each call's envelope in its own file. It answers what Orca Cloud keeps for a hook.
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import type * as z from 'zod'
 import type { WebhookCallState } from '../../../shared/connector-webhook-contract'
-import {
-  WebhookEnvelope,
-  type WebhookCallRow as WebhookCallRowSchema,
-  type WebhookView
-} from '../../../shared/connector-webhook-routes'
+import { WebhookEnvelope, type WebhookView } from '../../../shared/connector-webhook-routes'
 import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
 import {
   StoredLocalWebhooks,
+  PENDING,
   historyRows,
+  hookView,
+  isPending,
   keyMatches,
   newCallId,
   newHookId,
@@ -24,8 +22,6 @@ import {
 } from './local-webhook-records'
 
 export type { LocalCall, LocalHook } from './local-webhook-records'
-
-type WebhookCallRow = z.infer<typeof WebhookCallRowSchema>
 
 const DIR = 'local-webhooks'
 const FILE = 'hooks.json'
@@ -40,14 +36,13 @@ const CALLS_PER_HOOK = 200
 const ENVELOPES_PER_HOOK = 50
 const COUNTER_MS = 7 * DAY_MS
 
-const PENDING: readonly WebhookCallState[] = ['queued', 'delivered']
-const isPending = (call: LocalCall) => PENDING.includes(call.state) && !call.runId
 const unreadable = () =>
   console.warn('[webhooks] the local webhook file was unreadable; starting a new one')
 
 export class LocalWebhookStore {
   private loaded: Promise<StoredLocalWebhooks> | null = null
   private writes: Promise<void> = Promise.resolve()
+  private readonly rotations = new Map<string, Promise<number>>()
 
   constructor(
     private readonly userDataPath: string,
@@ -171,7 +166,23 @@ export class LocalWebhookStore {
   }
 
   /** A new key; the old one keeps working a day, or stops now with the calls it let in. */
-  async rotate(hook: LocalHook, operationId: string, stopNow: boolean): Promise<number> {
+  rotate(hook: LocalHook, operationId: string, stopNow: boolean): Promise<number> {
+    // A repeat while the first try runs shares its outcome, a failure included.
+    let running = this.rotations.get(operationId)
+    if (!running) {
+      running = this.rotateOnce(hook, operationId, stopNow).finally(() =>
+        this.rotations.delete(operationId)
+      )
+      this.rotations.set(operationId, running)
+    }
+    return running
+  }
+
+  private async rotateOnce(
+    hook: LocalHook,
+    operationId: string,
+    stopNow: boolean
+  ): Promise<number> {
     if (hook.rotateOperationId === operationId) {
       return hook.rotateCancelled ?? 0
     }
@@ -321,7 +332,7 @@ export class LocalWebhookStore {
   }
 
   /** The hook's calls and counted requests, newest first. */
-  async history(hookId: string): Promise<WebhookCallRow[]> {
+  async history(hookId: string): Promise<ReturnType<typeof historyRows>> {
     const data = await this.data()
     const own = <T extends { hookId: string }>(rows: T[]) =>
       rows.filter((row) => row.hookId === hookId)
@@ -329,23 +340,10 @@ export class LocalWebhookStore {
   }
 
   async view(hook: LocalHook, baseUrl: string): Promise<WebhookView> {
-    const data = await this.data()
-    const previousLive = hook.previousKey && (hook.previousKeyExpiresAt ?? 0) > this.now()
-    return {
-      hookId: hook.hookId,
-      automationId: hook.automationId,
-      botId: hook.botId,
-      state: hook.state,
-      epoch: hook.epoch,
-      hostGen: 1,
-      keyGeneration: hook.keyGeneration,
-      url: `${baseUrl}/hooks/${hook.hookId}`,
-      adapter: null,
-      previousKeyExpiresAt: previousLive ? hook.previousKeyExpiresAt : null,
-      lastCall: hook.lastCall ? { ...hook.lastCall, signatureValid: false } : null,
-      pendingCalls: data.calls.filter((call) => call.hookId === hook.hookId && isPending(call))
-        .length
-    }
+    const pending = (await this.data()).calls.filter(
+      (c) => c.hookId === hook.hookId && isPending(c)
+    )
+    return hookView(hook, pending.length, baseUrl, this.now())
   }
 
   /** The sample call a Send sample made; a repeat with the same operationId gets the same call. */
