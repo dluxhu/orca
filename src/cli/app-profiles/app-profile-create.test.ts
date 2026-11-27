@@ -123,6 +123,7 @@ beforeEach(() => {
   file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
   file(join(contents, 'Resources', 'app.asar'), 'asar')
   file(join(contents, 'Resources', 'icon.icns'), 'default icon')
+  file(join(contents, 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js'), 'cli')
   file(
     join(contents, 'Resources', 'profile-template', 'orca-notification-status'),
     'profile variant'
@@ -413,6 +414,15 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
       expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBeNull()
     }
   })
+
+  it('finds the default app through app.asar.unpacked when app.asar is no link', () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
+    // Electron 45 reads no asar archive through a link, so a profile's app.asar can be its own.
+    const asar = join(work.appPath, 'Contents', 'Resources', 'app.asar')
+    rmSync(asar)
+    writeFileSync(asar, 'own asar')
+    expect(defaultAppOf(work.appPath)).toBe(realpathSync(app))
+  })
 })
 
 describe.skipIf(process.platform !== 'darwin')(
@@ -430,9 +440,11 @@ describe.skipIf(process.platform !== 'darwin')(
         )
       )
       mkdirSync(join(contents, 'Resources'), { recursive: true })
+      // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+      writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
       symlinkSync(
-        join('..', '..', '..', '..', 'Resources', 'app.asar'),
-        join(contents, 'Resources', 'app.asar')
+        join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+        join(contents, 'Resources', 'app.asar.unpacked')
       )
       const work = createAppProfile({
         makeIcon,
@@ -456,9 +468,11 @@ describe.skipIf(process.platform !== 'darwin')('defaultAppOf', () => {
     // The default plist: no OrcaAppRole, as after a plist miss.
     file(join(contents, 'Info.plist'), DEFAULT_PLIST)
     mkdirSync(join(contents, 'Resources'), { recursive: true })
+    // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+    writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
     symlinkSync(
-      join('..', '..', '..', '..', 'Resources', 'app.asar'),
-      join(contents, 'Resources', 'app.asar')
+      join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+      join(contents, 'Resources', 'app.asar.unpacked')
     )
     expect(defaultAppOf(manager)).toBe(realpathSync(app))
     expect(defaultAppOf(app)).toBe(app)

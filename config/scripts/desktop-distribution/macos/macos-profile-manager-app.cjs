@@ -37,8 +37,9 @@ function nameHelperApp(helper, oldName, name, run) {
 /**
  * Makes <app>/Contents/Applications/Orca Profile Manager.app from the packed app, before the
  * outer app is signed. Copies: the main executable, the helper apps and the Electron framework
- * (a linked framework stops every child process, section 12, U4). Links: all other frameworks and
- * all resources, relative, so they stay inside the outer bundle. Returns the nested app's path.
+ * (a linked framework stops every child process, section 12, U4) and app.asar (Electron 45 reads
+ * no asar archive through a link). Links: all other frameworks and all other resources, relative,
+ * so they stay inside the outer bundle. Returns the nested app's path.
  */
 async function buildMacProfileManagerApp({
   appPath,
@@ -106,7 +107,12 @@ async function buildMacProfileManagerApp({
     }
   }
   for (const entry of readdirSync(join(outer, 'Resources'))) {
-    symlinkSync(join(TO_OUTER_CONTENTS, 'Resources', entry), join(contents, 'Resources', entry))
+    const to = join(contents, 'Resources', entry)
+    if (entry === 'app.asar') {
+      copyFileSync(join(outer, 'Resources', entry), to)
+    } else {
+      symlinkSync(join(TO_OUTER_CONTENTS, 'Resources', entry), to)
+    }
   }
 
   // Inner code first: a bundle seal needs signed nested code.
