@@ -19,7 +19,7 @@ import {
 /** Global roots Orca once installed into for agents that also read ~/.agents/skills, in a home.
  *  In an app profile, the root is in the profile's agent folder. */
 const FORMER_GLOBAL_SKILL_ROOTS: readonly ((home: string) => string)[] = [
-  // Gemini CLI warns on every start when this repeats a ~/.agents/skills name.
+  // Orca once linked skills here for Gemini CLI; its copies still need retiring.
   (home) => join(agentHomeDirIn(home, 'GEMINI_CLI_HOME', '.gemini'), 'skills')
 ]
 
