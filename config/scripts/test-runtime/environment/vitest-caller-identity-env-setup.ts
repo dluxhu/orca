@@ -8,6 +8,8 @@ for (const name of [
   'ORCA_RUNTIME_SOURCE_ID',
   'ORCA_RUNTIME_SOURCE_INCARNATION',
   'ORCA_RUNTIME_SOURCE_PROFILE_PATH',
+  // Fork: the CLI picks this app profile first, so a test CLI would reach the live profile app.
+  'ORCA_PROFILE',
   'TERM_PROGRAM',
   'TERM_PROGRAM_VERSION',
   'TERM_SESSION_ID'
