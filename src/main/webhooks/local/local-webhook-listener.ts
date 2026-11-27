@@ -12,8 +12,10 @@ import {
   deliverLocalCall,
   hookAutomation,
   parseWebhookBody,
+  withoutKeys,
   type LocalWebhookDeliverDeps
 } from './local-webhook-delivery'
+import type { LocalHook } from './local-webhook-store'
 
 // As Orca Cloud's WEBHOOK_ENVELOPE_LIMITS (connector-contract/src/webhook-envelope.ts).
 const MAX_HEADER_VALUE_LENGTH = 1024
@@ -36,6 +38,8 @@ const KEPT_HEADERS = [
 ]
 // A sender's own delivery id: a repeat of one is dropped for a day.
 const DELIVERY_ID_HEADERS = ['x-github-delivery', 'idempotency-key']
+
+const TOO_LARGE_CLOSE_MS = 2000
 
 const PATH = /^\/hooks\/([^/]+)(?:\/([^/]+))?\/?$/
 
@@ -175,9 +179,13 @@ export function createLocalWebhookHandler(
       return
     }
     const tooLarge = () => {
+      req.resume()
       res.writeHead(413, { 'content-type': 'application/json', connection: 'close' })
-      // Stops reading the rest of an over-cap body once the answer is out.
-      res.end(JSON.stringify({ error: 'body_too_large' }), () => req.destroy())
+      // The rest of the body is read and dropped briefly, so a sender still uploading gets the
+      // answer, then the connection closes.
+      res.end(JSON.stringify({ error: 'body_too_large' }), () => {
+        setTimeout(() => req.destroy(), TOO_LARGE_CLOSE_MS).unref()
+      })
     }
     if (Number(req.headers['content-length'] ?? 0) > limits.maxBodyBytes) {
       tooLarge()
@@ -188,19 +196,19 @@ export function createLocalWebhookHandler(
       tooLarge()
       return
     }
-    // The hook's own keys never reach the stored call, the run's file or its quote.
-    let text = raw.toString('utf8')
-    for (const own of [hook.key, hook.previousKey, key]) {
-      text = own ? text.split(own).join('[orca webhook key]') : text
-    }
     const contentType = headerValue(req, 'content-type') ?? null
-    const body = parseWebhookBody(contentType, text)
-    if (!body) {
+    const parsed = parseWebhookBody(contentType, raw.toString('utf8'))
+    if (!parsed) {
       send(res, 400, { error: 'invalid_json' })
       return
     }
-    if (!webhookBodyFits(body.value)) {
+    if (!webhookBodyFits(parsed.value)) {
       send(res, 413, { error: 'body_too_complex' })
+      return
+    }
+    // A stop-now rotation while the body was read ends this key too.
+    if (!(await deps.store.authenticate(hook.hookId, key))) {
+      notFound(res)
       return
     }
     const found = hookAutomation(deps.automations(), hook)
@@ -214,23 +222,57 @@ export function createLocalWebhookHandler(
       send(res, 200, { status: 'duplicate' })
       return
     }
-    const headers = Object.fromEntries(
-      KEPT_HEADERS.flatMap((name) => {
-        const value = headerValue(req, name)
-        return value === undefined ? [] : [[name, value]]
+    try {
+      await admit(res, hook, found, key, {
+        contentType,
+        body: parsed,
+        headers: Object.fromEntries(
+          KEPT_HEADERS.flatMap((name) => {
+            const value = headerValue(req, name)
+            return value === undefined ? [] : [[name, value]]
+          })
+        )
       })
-    )
+    } catch (error) {
+      // Not taken: the sender's retry of this delivery id is a new call, not a duplicate.
+      if (deliveryId) {
+        await deps.store.forgetDelivery(hook.hookId, deliveryId)
+      }
+      throw error
+    }
+  }
+
+  const admit = async (
+    res: ServerResponse,
+    hook: LocalHook,
+    found: NonNullable<ReturnType<typeof hookAutomation>>,
+    key: string,
+    request: Pick<WebhookEnvelope, 'contentType' | 'headers' | 'body'>
+  ): Promise<void> => {
     const receivedAt = now()
-    const envelope: WebhookEnvelope = { receivedAt, contentType, headers, body, truncated: false }
+    // The hook's own keys never reach the stored call, the run's file or its quote: replaced after
+    // decoding, so an escaped or percent-encoded echo is caught too.
+    const { headers, body } = withoutKeys({ headers: request.headers, body: request.body }, [
+      hook.key,
+      hook.previousKey,
+      key
+    ])
+    const envelope: WebhookEnvelope = {
+      receivedAt,
+      contentType: request.contentType,
+      headers,
+      body,
+      truncated: false
+    }
     const view = webhookCallView(envelope)
     if (hook.state === 'paused' || !found.automation.enabled) {
-      const call = await deps.store.admit(hook, { receivedAt, state: 'paused' }, null)
-      send(res, 200, { callId: call.callId, status: 'paused' })
+      const paused = await deps.store.admit(hook, { receivedAt, state: 'paused' }, null)
+      send(res, 200, { callId: paused.callId, status: 'paused' })
       return
     }
     if (!matchesWebhookCall(found.rule, view)) {
-      const call = await deps.store.admit(hook, { receivedAt, state: 'ignored' }, null)
-      send(res, 200, { callId: call.callId, status: 'ignored' })
+      const ignored = await deps.store.admit(hook, { receivedAt, state: 'ignored' }, null)
+      send(res, 200, { callId: ignored.callId, status: 'ignored' })
       return
     }
     const subject = webhookCallSubject(found.rule, view)

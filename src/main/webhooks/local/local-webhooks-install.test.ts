@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 import {
   isLocalWebhookBindAddress,
@@ -45,6 +45,8 @@ describe('local webhook settings', () => {
     expect(localWebhookPublicUrlProblem('')).toBeNull()
     expect(localWebhookPublicUrlProblem('https://a.example/x')).toBeNull()
     expect(localWebhookPublicUrlProblem('https://a.example/?q=1')).not.toBeNull()
+    expect(localWebhookPublicUrlProblem('https://a.example/?')).not.toBeNull()
+    expect(localWebhookPublicUrlProblem('https://a.example/#')).not.toBeNull()
     expect(localWebhookPublicUrlProblem('hooks.example.net')).not.toBeNull()
     expect(isLocalWebhookBindAddress('100.64.0.1')).toBe(true)
     expect(isLocalWebhookBindAddress('::1')).toBe(true)
@@ -57,6 +59,7 @@ describe('installLocalWebhooks', () => {
   let dir: string | undefined
   let installed: LocalWebhooks | undefined
   afterEach(() => {
+    vi.restoreAllMocks()
     installed?.stop()
     if (dir) {
       rmSync(dir, { recursive: true, force: true })
@@ -102,5 +105,33 @@ describe('installLocalWebhooks', () => {
     expect(installed.routes()).toBeNull()
     expect(modeChanges).toBe(2)
     await expect.poll(reach).toBe('closed')
+  })
+
+  it('listens once a busy port frees up', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'local-webhooks-install-'))
+    const busy = createServer()
+    const port = await listenOnLoopback(busy)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    installed = installLocalWebhooks({
+      userDataPath: dir,
+      settings: () => ({ localWebhooksEnabled: true, localWebhooksPort: port }),
+      onSettingsChanged: () => () => {},
+      automations: () => [],
+      bots: () => [],
+      modeChanged: () => {},
+      bindRetryMs: 50
+    })
+    const reach = () =>
+      fetch(`http://127.0.0.1:${port}/hooks/wh_AAAAAAAAAAAAAAAA`, { method: 'POST' }).then(
+        (answer) => answer.status,
+        () => 'closed'
+      )
+    // The first bind fails on the busy port before the port frees up.
+    await expect.poll(() => warn.mock.calls.length).toBeGreaterThan(0)
+    await new Promise((resolve) => {
+      busy.close(resolve)
+      busy.closeAllConnections()
+    })
+    await expect.poll(reach).toBe(401)
   })
 })

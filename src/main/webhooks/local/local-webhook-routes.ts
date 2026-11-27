@@ -37,6 +37,31 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
     return hook ? await act(hook) : refuse(404, 'not_found')
   }
   const view = (hook: LocalHook) => store.view(hook, deps.baseUrl())
+  const sampling = new Map<string, Promise<LocalCall>>()
+  const sampleCall = async (hook: LocalHook, operationId: string): Promise<LocalCall> => {
+    const made = await store.sampleCall(operationId)
+    if (made) {
+      // A repeat delivers a sample whose first delivery failed; the host takes a known call once.
+      if (made.state === 'queued') {
+        await deps.deliver(hook, made)
+      }
+      return made
+    }
+    const receivedAt = now()
+    const call = await store.admit(
+      hook,
+      { receivedAt, state: 'queued', sample: true, sampleOperationId: operationId },
+      {
+        receivedAt,
+        contentType: 'application/json',
+        headers: { 'content-type': 'application/json' },
+        body: { kind: 'json', value: SAMPLE_BODY },
+        truncated: false
+      }
+    )
+    await deps.deliver(hook, call)
+    return call
+  }
   return {
     mint: async ({ operationId, automationId, botId }) =>
       answer(await view(await store.mint(operationId, automationId, botId))),
@@ -61,24 +86,13 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
     setSecret: (hookId) => withHook(hookId, async () => refuse(400, LOCAL_SIGNATURES_UNSUPPORTED)),
     sample: (hookId, operationId) =>
       withHook(hookId, async (hook) => {
-        const made = await store.sampleCall(operationId)
-        if (made) {
-          return answer({ callId: made.callId })
+        // One sample per operation, also for a repeat that overlaps the first.
+        let made = sampling.get(operationId)
+        if (!made) {
+          made = sampleCall(hook, operationId).finally(() => sampling.delete(operationId))
+          sampling.set(operationId, made)
         }
-        const receivedAt = now()
-        const call = await store.admit(
-          hook,
-          { receivedAt, state: 'queued', sample: true, sampleOperationId: operationId },
-          {
-            receivedAt,
-            contentType: 'application/json',
-            headers: { 'content-type': 'application/json' },
-            body: { kind: 'json', value: SAMPLE_BODY },
-            truncated: false
-          }
-        )
-        await deps.deliver(hook, call)
-        return answer({ callId: call.callId })
+        return answer({ callId: (await made).callId })
       }),
     calls: (hookId) => withHook(hookId, async () => answer({ calls: await store.history(hookId) })),
     envelope: async (callId) => {

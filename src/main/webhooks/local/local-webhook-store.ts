@@ -12,6 +12,7 @@ import {
 import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
 import {
   StoredLocalWebhooks,
+  historyRows,
   keyMatches,
   newCallId,
   newHookId,
@@ -82,11 +83,16 @@ export class LocalWebhookStore {
     return (this.loaded ??= this.load())
   }
 
-  /** Writes in order, each with what memory held when it was asked for. */
+  /**
+   * Writes in order, each with what memory held when it was asked for. A failed write drops memory,
+   * so nothing a caller was refused is kept or later acknowledged; the next read loads the file.
+   */
   private async save(data: StoredLocalWebhooks): Promise<void> {
     const file = [join(this.dir, FILE), JSON.stringify(data)] as const
     const write = this.writes.then(() => writeOwnerOnlyFile(...file))
-    this.writes = write.catch(() => {})
+    this.writes = write.catch(() => {
+      this.loaded = null
+    })
     await write
   }
 
@@ -169,8 +175,8 @@ export class LocalWebhookStore {
     if (hook.rotateOperationId === operationId) {
       return hook.rotateCancelled ?? 0
     }
-    const data = await this.data()
-    const cancelled = stopNow ? await this.cancelPending(data, hook.hookId) : 0
+    // The key changes before any await, so a repeat of this operation can't rotate it again.
+    hook.rotateOperationId = operationId
     if (stopNow) {
       delete hook.previousKey
     } else {
@@ -179,10 +185,10 @@ export class LocalWebhookStore {
     hook.previousKeyExpiresAt = stopNow ? null : this.now() + PREVIOUS_KEY_MS
     hook.key = newWebhookKey()
     hook.keyGeneration++
-    hook.rotateOperationId = operationId
-    hook.rotateCancelled = cancelled
+    const data = await this.data()
+    hook.rotateCancelled = stopNow ? await this.cancelPending(data, hook.hookId) : 0
     await this.save(data)
-    return cancelled
+    return hook.rotateCancelled
   }
 
   private async cancelPending(data: StoredLocalWebhooks, hookId: string): Promise<number> {
@@ -212,6 +218,15 @@ export class LocalWebhookStore {
     data.deliveries.push({ hookId, id: deliveryId, at: this.now() })
     await this.save(data)
     return false
+  }
+
+  /** A delivery id whose call was not taken after all, so the sender's retry is a new call. */
+  async forgetDelivery(hookId: string, deliveryId: string): Promise<void> {
+    const data = await this.data()
+    data.deliveries = data.deliveries.filter(
+      (entry) => entry.hookId !== hookId || entry.id !== deliveryId
+    )
+    await this.save(data)
   }
 
   /** A refused, over-budget or duplicate request, counted per minute as the call history shows them. */
@@ -260,11 +275,12 @@ export class LocalWebhookStore {
 
   /** A call's state changed: delivered to the host, or refused by it. */
   async settle(call: LocalCall, state: WebhookCallState, reason?: string): Promise<void> {
-    const data = await this.data()
+    // Before any await, so a run start that follows can't be overwritten by this change.
     call.state = state
     if (reason) {
       call.reason = reason
     }
+    const data = await this.data()
     const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
     if (hook?.lastCall?.at === call.receivedAt) {
       hook.lastCall.state = state
@@ -301,22 +317,9 @@ export class LocalWebhookStore {
   /** The hook's calls and counted requests, newest first. */
   async history(hookId: string): Promise<WebhookCallRow[]> {
     const data = await this.data()
-    const calls = data.calls
-      .filter((call) => call.hookId === hookId)
-      .map((call): WebhookCallRow => ({
-        kind: 'call',
-        callId: call.callId,
-        receivedAt: call.receivedAt,
-        state: call.state,
-        ...(call.sample ? { sample: true as const } : {}),
-        ...(call.runId ? { runId: call.runId } : {}),
-        ...(call.reason ? { reason: call.reason } : {})
-      }))
-    const counters = data.counters
-      .filter((counter) => counter.hookId === hookId)
-      .map(({ kind, minute, count }): WebhookCallRow => ({ kind, minute, count }))
-    const at = (row: WebhookCallRow) => (row.kind === 'call' ? row.receivedAt : row.minute)
-    return [...calls, ...counters].sort((a, b) => at(b) - at(a))
+    const own = <T extends { hookId: string }>(rows: T[]) =>
+      rows.filter((row) => row.hookId === hookId)
+    return historyRows(own(data.calls), own(data.counters))
   }
 
   async view(hook: LocalHook, baseUrl: string): Promise<WebhookView> {

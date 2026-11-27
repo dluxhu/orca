@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import * as z from 'zod'
+import type { WebhookCallRow as WebhookCallRowSchema } from '../../../shared/connector-webhook-routes'
 import {
   WEBHOOK_CALL_STATES,
   WEBHOOK_HOOK_ID_PATTERN
@@ -46,6 +47,8 @@ const Counter = z.object({
   count: z.number().int().positive()
 })
 export type LocalCounterKind = z.infer<typeof Counter>['kind']
+type LocalCounter = z.infer<typeof Counter>
+type WebhookCallRow = z.infer<typeof WebhookCallRowSchema>
 
 export const StoredLocalWebhooks = z.object({
   hooks: z.array(LocalHook),
@@ -92,4 +95,22 @@ export async function writeOwnerOnlyFile(path: string, contents: string): Promis
   } finally {
     await rm(staged, { force: true })
   }
+}
+
+/** A hook's calls and counted requests as its call history lists them, newest first. */
+export function historyRows(calls: LocalCall[], counters: LocalCounter[]): WebhookCallRow[] {
+  const rows = [
+    ...calls.map((call): WebhookCallRow => ({
+      kind: 'call',
+      callId: call.callId,
+      receivedAt: call.receivedAt,
+      state: call.state,
+      ...(call.sample ? { sample: true as const } : {}),
+      ...(call.runId ? { runId: call.runId } : {}),
+      ...(call.reason ? { reason: call.reason } : {})
+    })),
+    ...counters.map(({ kind, minute, count }): WebhookCallRow => ({ kind, minute, count }))
+  ]
+  const at = (row: WebhookCallRow) => (row.kind === 'call' ? row.receivedAt : row.minute)
+  return rows.sort((a, b) => at(b) - at(a))
 }

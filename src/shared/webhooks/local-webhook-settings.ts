@@ -27,7 +27,8 @@ export function localWebhookPublicUrlProblem(value: string): string | null {
   }
   try {
     const url = new URL(trimmed)
-    return (url.protocol === 'http:' || url.protocol === 'https:') && !url.search && !url.hash
+    // A literal ? or #, even empty, would put /hooks/... in the query or the fragment.
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !/[?#]/.test(trimmed)
       ? null
       : 'Use an http:// or https:// URL without ? or #.'
   } catch {

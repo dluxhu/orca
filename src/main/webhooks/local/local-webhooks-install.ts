@@ -26,6 +26,9 @@ const SETTING_KEYS = [
   'localWebhooksPublicUrl'
 ] as const
 
+const BIND_RETRIES = 10
+const BIND_RETRY_MS = 30_000
+
 export type LocalWebhooks = {
   /** The local routes while local webhooks are on; null hands webhooks to Orca Cloud. */
   routes: () => WebhookCloudCalls | null
@@ -42,6 +45,8 @@ export function installLocalWebhooks(deps: {
   bots: () => readonly Bot[]
   /** Local webhooks went on or off, so the hooks and the hello change. */
   modeChanged: () => void
+  /** For tests: the wait before a busy port is tried again. */
+  bindRetryMs?: number
 }): LocalWebhooks {
   const store = new LocalWebhookStore(deps.userDataPath)
   let receive: (delivery: TriggerDelivery, event: AutomationRunEvent) => boolean = () => false
@@ -61,6 +66,8 @@ export function installLocalWebhooks(deps: {
 
   let server: Server | null = null
   let listening: string | null = null
+  let bindRetries = 0
+  let stopped = false
   // Off or moved: open keep-alive connections end too, so nothing is served on the old address.
   const close = (): void => {
     server?.close()
@@ -68,6 +75,9 @@ export function installLocalWebhooks(deps: {
     server = null
   }
   const apply = (): void => {
+    if (stopped) {
+      return
+    }
     const next = config()
     if (next && isIP(next.bindAddress) === 0) {
       console.warn(
@@ -85,12 +95,24 @@ export function installLocalWebhooks(deps: {
       // A slow sender can't hold a connection open for long.
       made.requestTimeout = 30_000
       made.headersTimeout = 10_000
-      made.on('error', (error) =>
+      made.on('error', (error) => {
         console.warn(
           `[webhooks] local webhooks could not listen on ${next.bindAddress}:${next.port}`,
           error
         )
-      )
+        // A busy port may free up: try the same address again a few times, then wait for Settings.
+        if (server === made && !made.listening) {
+          close()
+          listening = null
+          if (bindRetries < BIND_RETRIES) {
+            bindRetries++
+            setTimeout(apply, deps.bindRetryMs ?? BIND_RETRY_MS).unref()
+          }
+        }
+      })
+      made.on('listening', () => {
+        bindRetries = 0
+      })
       made.listen(next.port, next.bindAddress)
       server = made
     }
@@ -102,6 +124,7 @@ export function installLocalWebhooks(deps: {
     if (!SETTING_KEYS.some((key) => key in updates)) {
       return
     }
+    bindRetries = 0
     apply()
     if ((config() !== null) !== on) {
       on = !on
@@ -114,6 +137,7 @@ export function installLocalWebhooks(deps: {
       receive = next
     },
     stop: () => {
+      stopped = true
       unsubscribe()
       close()
       listening = null

@@ -109,6 +109,42 @@ describe('local webhook routes', () => {
     })
   })
 
+  it('rotates once for an operation, also for a repeat that overlaps it', async () => {
+    const hook = await mint()
+    const local = await store.hook(hook.hookId)
+    if (!local) {
+      throw new Error('no hook')
+    }
+    await Promise.all([
+      routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }),
+      routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true })
+    ])
+    expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(2)
+  })
+
+  it('makes one sample per operation, and delivers it again if its delivery failed', async () => {
+    const hook = await mint()
+    let failures = 1
+    const flaky = localWebhookCalls({
+      store,
+      baseUrl: () => baseUrl,
+      deliver: async (_hook, call) => {
+        if (failures-- > 0) {
+          throw new Error('delivery failed')
+        }
+        delivered.push(call)
+      },
+      now: () => now
+    })
+    await expect(value(flaky.sample(hook.hookId, 's-1'))).rejects.toThrow('delivery failed')
+    const [first, second] = await Promise.all([
+      value(flaky.sample(hook.hookId, 's-1')),
+      value(flaky.sample(hook.hookId, 's-1'))
+    ])
+    expect(second.callId).toBe(first.callId)
+    expect(delivered.map((call) => call.callId)).toEqual([first.callId])
+  })
+
   it('cancels calls not yet started when the hook pauses', async () => {
     const hook = await mint()
     const { callId } = await value(routes.sample(hook.hookId, 'sample-1'))

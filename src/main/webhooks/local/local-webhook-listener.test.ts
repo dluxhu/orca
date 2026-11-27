@@ -203,6 +203,48 @@ describe('local webhook listener', () => {
   })
 })
 
+describe('local webhook listener, keys and replays', () => {
+  it('scrubs a key echoed with JSON escapes or percent-encoding', async () => {
+    const escaped = `\\u006f${hook.key.slice(1)}`
+    await post(`/hooks/${hook.hookId}/${hook.key}`, `{"echo":"${escaped}"}`)
+    await post(`/hooks/${hook.hookId}/${hook.key}`, `echo=${encodeURIComponent(hook.key)}`, {
+      'content-type': 'application/x-www-form-urlencoded'
+    })
+    const stored = readdirSync(join(dir, 'local-webhooks', 'envelopes')).map((file) =>
+      readFileSync(join(dir, 'local-webhooks', 'envelopes', file), 'utf8')
+    )
+    expect(stored).toHaveLength(2)
+    for (const text of stored) {
+      expect(text).not.toContain(hook.key)
+      expect(text).toContain('[orca webhook key]')
+    }
+  })
+
+  it('refuses a call whose key a stop-now rotation ended while its body was read', async () => {
+    const status = new Promise<number>((resolve) => {
+      const req = request(
+        `${base}/hooks/${hook.hookId}/${hook.key}`,
+        { method: 'POST', headers: { 'content-type': 'application/json' } },
+        (res) => resolve(res.statusCode ?? 0)
+      )
+      req.write('{"a":')
+      // The listener has checked the key and waits for the rest of the body.
+      setTimeout(() => {
+        void store.rotate(hook, 'r-1', true).then(() => req.end('1}'))
+      }, 50)
+    })
+    expect(await status).toBe(404)
+    expect(received).toHaveLength(0)
+  })
+
+  it('forgets a delivery id whose call was not taken', async () => {
+    expect(await store.replayed(hook.hookId, 'd-1')).toBe(false)
+    await store.forgetDelivery(hook.hookId, 'd-1')
+    expect(await store.replayed(hook.hookId, 'd-1')).toBe(false)
+    expect(await store.replayed(hook.hookId, 'd-1')).toBe(true)
+  })
+})
+
 describe('parseWebhookBody', () => {
   it('reads JSON, forms with repeated keys, and text', () => {
     expect(parseWebhookBody('application/json; charset=utf-8', '{"a":1}')).toEqual({
@@ -214,6 +256,15 @@ describe('parseWebhookBody', () => {
       value: { a: ['1', '2'], b: '3' }
     })
     expect(parseWebhookBody('text/plain', 'hi')).toEqual({ kind: 'text', value: 'hi' })
+    const tricky = parseWebhookBody(
+      'application/x-www-form-urlencoded',
+      'constructor=x&__proto__=y&toString=z'
+    )
+    expect(tricky?.kind === 'form' && Object.entries(tricky.value)).toEqual([
+      ['constructor', 'x'],
+      ['__proto__', 'y'],
+      ['toString', 'z']
+    ])
     expect(parseWebhookBody('application/json', '{')).toBeNull()
   })
 })

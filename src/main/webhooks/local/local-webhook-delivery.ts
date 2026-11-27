@@ -15,6 +15,7 @@ import type { LocalCall, LocalHook, LocalWebhookStore } from './local-webhook-st
 export type TriggerDelivery = Extract<ConnectorDelivery, { kind: 'trigger' }>
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const REDACTED_WEBHOOK_KEY = '[orca webhook key]'
 
 export type LocalWebhookDeliverDeps = {
   store: LocalWebhookStore
@@ -89,12 +90,32 @@ export function parseWebhookBody(
     }
   }
   if (media === 'application/x-www-form-urlencoded') {
-    const value: Record<string, string | string[]> = {}
+    // A Map, so names like __proto__ or constructor are ordinary fields; repeats append in place.
+    const fields = new Map<string, string[]>()
     for (const [key, entry] of new URLSearchParams(text)) {
-      const seen = value[key]
-      value[key] = seen === undefined ? entry : [...(Array.isArray(seen) ? seen : [seen]), entry]
+      const seen = fields.get(key)
+      if (seen) {
+        seen.push(entry)
+      } else {
+        fields.set(key, [entry])
+      }
+    }
+    const value: Record<string, string | string[]> = Object.create(null)
+    for (const [key, entries] of fields) {
+      value[key] = entries.length === 1 ? (entries[0] ?? '') : entries
     }
     return { kind: 'form', value }
   }
   return { kind: 'text', value: text }
+}
+
+/** The value with every one of the keys replaced, in its decoded strings. */
+export function withoutKeys<T>(value: T, keys: readonly (string | undefined)[]): T {
+  let text = JSON.stringify(value)
+  for (const key of keys) {
+    // Keys are base64url, so JSON never escapes them: the decoded key appears as it is.
+    text = key ? text.split(key).join(REDACTED_WEBHOOK_KEY) : text
+  }
+  const redacted: T = JSON.parse(text)
+  return redacted
 }
