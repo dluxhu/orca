@@ -66,6 +66,10 @@ async function handOver(
   hook: LocalHook,
   call: LocalCall
 ): Promise<void> {
+  // Only a call still queued goes: one a stop-now rotation or a pause cancelled meanwhile never does.
+  if ((await deps.store.call(call.callId))?.state !== 'queued') {
+    return
+  }
   const automations = deps.automations()
   // The hook as stored now: one removed, paused since the call came in, or paused and resumed (a
   // newer epoch) hands nothing over, as the pause would have cancelled the call.
@@ -97,14 +101,11 @@ async function handOver(
   }
   const event = delivery && triggerRunEvent(automations, deps.bots(), delivery)
   const taken = delivery !== null && event !== null && deps.receive(delivery, event)
-  // The host may already have started it; only a call still queued here changes.
-  if (call.state === 'queued') {
-    await deps.store.settle(
-      call,
-      taken ? 'delivered' : 'refused',
-      taken ? undefined : 'automation_not_listening'
-    )
-  }
+  await deps.store.settleQueued(
+    call.callId,
+    taken ? 'delivered' : 'refused',
+    taken ? undefined : 'automation_not_listening'
+  )
 }
 
 /** The body as a call's envelope keeps it, or null when its JSON doesn't parse. */

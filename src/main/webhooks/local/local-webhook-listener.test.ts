@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { createServer, request, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Automation } from '../../../shared/automations/automation-definition'
 import { deliverLocalCall, parseWebhookBody, redeliverQueued } from './local-webhook-delivery'
 import { createLocalWebhookHandler } from './local-webhook-listener'
@@ -47,6 +47,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   server.close()
   rmSync(dir, { recursive: true, force: true })
 })
@@ -222,20 +223,48 @@ describe('local webhook listener, keys and replays', () => {
   })
 
   it('refuses a call whose key a stop-now rotation ended while its body was read', async () => {
-    const status = new Promise<number>((resolve) => {
-      const req = request(
-        `${base}/hooks/${hook.hookId}/${hook.key}`,
-        { method: 'POST', headers: { 'content-type': 'application/json' } },
-        (res) => resolve(res.statusCode ?? 0)
-      )
-      req.write('{"a":')
-      // The listener has checked the key and waits for the rest of the body.
-      setTimeout(() => {
-        void store.rotate(hook.hookId, 'r-1', true).then(() => req.end('1}'))
-      }, 50)
+    // The listener's first key check: once it has passed, the listener waits for the body.
+    const authenticate = store.authenticate.bind(store)
+    let keyChecked: () => void = () => {}
+    const checked = new Promise<void>((resolve) => (keyChecked = resolve))
+    vi.spyOn(store, 'authenticate').mockImplementationOnce(async (hookId, key) => {
+      const opened = await authenticate(hookId, key)
+      keyChecked()
+      return opened
     })
+    const req = request(`${base}/hooks/${hook.hookId}/${hook.key}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' }
+    })
+    const status = new Promise<number>((resolve) =>
+      req.on('response', (res) => resolve(res.statusCode ?? 0))
+    )
+    req.write('{"a":')
+    await checked
+    await store.rotate(hook.hookId, 'r-1', true)
+    req.end('1}')
     expect(await status).toBe(404)
     expect(received).toHaveLength(0)
+  })
+
+  it('never hands over a call a stop-now rotation cancelled', async () => {
+    const call = await store.admit(hook, { receivedAt: 1, state: 'queued' }, null)
+    if (!call) {
+      throw new Error('not taken')
+    }
+    await store.rotate(hook.hookId, 'r-3', true)
+    const deps = {
+      store,
+      automations: () => automations,
+      bots: () => [{ id: hook.botId }],
+      receive: () => {
+        received.push({ callId: 'handed' })
+        return true
+      }
+    }
+    await deliverLocalCall(deps, hook, call)
+    expect(received).toEqual([])
+    expect(await store.call(call.callId)).toMatchObject({ state: 'cancelled' })
   })
 
   it('keeps a delivery id only with its call: a resend after a failed admission is a new call', async () => {

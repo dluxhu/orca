@@ -105,8 +105,7 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
       return envelope ? answer(envelope) : refuse(404, 'not_found')
     },
     start: async (callId, runId) => {
-      const call = await store.call(callId)
-      const started = call ? await store.start(call, runId) : 'settled'
+      const started = await store.start(callId, runId)
       if (started === 'another_run') {
         return refuse(409, 'started_for_another_run')
       }

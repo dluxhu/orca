@@ -13,7 +13,12 @@ import { keyMatches } from './local-webhook-records'
 import { LocalWebhookStore, type LocalCall } from './local-webhook-store'
 
 // Lets a test make the store's file reads, writes or removals fail.
-const removal = vi.hoisted(() => ({ fail: false, failWrites: false, failReads: false }))
+const removal = vi.hoisted(() => ({
+  fail: false,
+  failWrites: false,
+  failReads: false,
+  failHookFileWrites: 0
+}))
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof FsPromises>()
   return {
@@ -25,7 +30,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       return await actual.readFile(...args)
     },
     writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
-      if (removal.failWrites) {
+      const hookFile = String(args[0]).includes('hooks.json')
+      if (removal.failWrites || (hookFile && removal.failHookFileWrites-- > 0)) {
         throw new Error('write failed')
       }
       await actual.writeFile(...args)
@@ -160,6 +166,46 @@ describe('local webhook routes', () => {
       await store.admit(local, { receivedAt: now, state: 'queued' }, null, { key: local.key })
     ).toBeNull()
     expect(await store.history(hook.hookId)).toEqual([])
+  })
+
+  it('keeps a call taken while a pause failed to save', async () => {
+    const hook = await mint()
+    const local = await store.hook(hook.hookId)
+    if (!local) {
+      throw new Error('no hook')
+    }
+    removal.failHookFileWrites = 1
+    const [paused, call] = await Promise.allSettled([
+      store.setState(hook.hookId, 'paused'),
+      store.admit(local, { receivedAt: now, state: 'queued' }, null)
+    ])
+    expect(paused.status).toBe('rejected')
+    const taken = call.status === 'fulfilled' ? call.value : null
+    expect(taken).not.toBeNull()
+    const reopened = new LocalWebhookStore(dir, () => now)
+    expect((await reopened.hook(hook.hookId))?.state).toBe('live')
+    expect(await reopened.call(taken?.callId ?? '')).toMatchObject({ state: 'queued' })
+  })
+
+  it('counts every call a stop-now rotation cancels, also one whose envelope was let go', async () => {
+    const hook = await mint()
+    const local = await store.hook(hook.hookId)
+    if (!local) {
+      throw new Error('no hook')
+    }
+    const envelope = {
+      receivedAt: now,
+      contentType: null,
+      headers: {},
+      body: { kind: 'text' as const, value: '' },
+      truncated: false
+    }
+    for (let index = 0; index < 51; index++) {
+      await store.admit(local, { receivedAt: now, state: 'queued' }, envelope)
+    }
+    expect(await value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }))).toEqual({
+      cancelledCalls: 51
+    })
   })
 
   it('shows the local URL, or the Public URL when one is set', async () => {

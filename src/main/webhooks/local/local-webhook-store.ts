@@ -2,7 +2,6 @@
 // userData, each call's envelope in its own file. It answers what Orca Cloud keeps for a hook.
 import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { WebhookCallState } from '../../../shared/connector-webhook-contract'
 import { WebhookEnvelope, type WebhookView } from '../../../shared/connector-webhook-routes'
 import {
   type StoredLocalWebhooks,
@@ -40,8 +39,7 @@ const ENVELOPES_PER_HOOK = 50
 
 export class LocalWebhookStore {
   private loaded: Promise<StoredLocalWebhooks> | null = null
-  private writes: Promise<void> = Promise.resolve()
-  private lifecycle: Promise<unknown> = Promise.resolve()
+  private turns: Promise<unknown> = Promise.resolve()
 
   constructor(
     private readonly userDataPath: string,
@@ -65,16 +63,24 @@ export class LocalWebhookStore {
   }
 
   /**
-   * Writes in order, each with what memory held when it was asked for. A failed write drops memory,
-   * so nothing a caller was refused is kept or later acknowledged; the next read loads the file.
+   * Every write runs here, one at a time: it finds what it changes by id in the current state, changes
+   * it with no await, and is saved before the next one starts. A failed save drops memory, so the
+   * next change starts from the file and nothing a caller was refused is kept or acknowledged.
    */
-  private async save(data: StoredLocalWebhooks): Promise<void> {
-    const file = [join(this.dir, FILE), JSON.stringify(data)] as const
-    const write = this.writes.then(() => writeOwnerOnlyFile(...file))
-    this.writes = write.catch(() => {
-      this.loaded = null
+  private inTurn<T>(change: (data: StoredLocalWebhooks) => T): Promise<T> {
+    const next = this.turns.then(async () => {
+      const data = await this.data()
+      const result = change(data)
+      try {
+        await writeOwnerOnlyFile(join(this.dir, FILE), JSON.stringify(data))
+      } catch (error) {
+        this.loaded = null
+        throw error
+      }
+      return result
     })
-    await write
+    this.turns = next.catch(() => {})
+    return next
   }
 
   async hooks(botId?: string): Promise<LocalHook[]> {
@@ -119,20 +125,9 @@ export class LocalWebhookStore {
     return queuedCalls(await this.data())
   }
 
-  /**
-   * Hook changes run one at a time, each on the state the one before left: a change has awaits in
-   * its middle, and an overlapping one must never see it half done. A failed save drops memory
-   * (save), so the next one starts from the file.
-   */
-  private inTurn<T>(change: (data: StoredLocalWebhooks) => Promise<T>): Promise<T> {
-    const next = this.lifecycle.then(async () => await change(await this.data()))
-    this.lifecycle = next.catch(() => {})
-    return next
-  }
-
   /** The hook a create made; a repeat with the same operationId gets the same hook. */
   mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
-    return this.inTurn(async (data) => {
+    return this.inTurn((data) => {
       const made = data.hooks.find((hook) => hook.mintOperationId === operationId)
       if (made) {
         return made
@@ -150,48 +145,47 @@ export class LocalWebhookStore {
         lastCall: null
       }
       data.hooks.push(hook)
-      await this.save(data)
       return hook
     })
   }
 
   /** A pause cancels the calls not yet started, as Orca Cloud does, and raises the hook's epoch. */
-  setState(hookId: string, state: LocalHook['state']): Promise<LocalHook | null> {
-    return this.inTurn(async (data) => {
-      const hook = data.hooks.find((entry) => entry.hookId === hookId)
-      if (!hook || hook.state === state) {
-        return hook ?? null
+  async setState(hookId: string, state: LocalHook['state']): Promise<LocalHook | null> {
+    const { hook, files } = await this.inTurn((data) => {
+      const found = data.hooks.find((entry) => entry.hookId === hookId)
+      if (!found || found.state === state) {
+        return { hook: found ?? null, files: [] }
       }
-      hook.state = state
-      const cancelled = state === 'paused' ? this.cancelPending(data, hookId) : []
+      found.state = state
       if (state === 'paused') {
-        hook.epoch++
+        found.epoch++
       }
-      await this.save(data)
-      await this.removeEnvelopes(cancelled)
-      return hook
+      const ended = state === 'paused' ? this.cancelPending(data, hookId) : null
+      return { hook: found, files: ended?.files ?? [] }
     })
+    await this.removeEnvelopes(files)
+    return hook
   }
 
-  remove(hookId: string): Promise<void> {
-    return this.inTurn(async (data) => {
+  async remove(hookId: string): Promise<void> {
+    const files = await this.inTurn((data) => {
       const gone = data.calls.filter((entry) => entry.hookId === hookId && entry.hasEnvelope)
       data.hooks = data.hooks.filter((hook) => hook.hookId !== hookId)
       data.calls = data.calls.filter((call) => call.hookId !== hookId)
       data.counters = data.counters.filter((counter) => counter.hookId !== hookId)
       data.deliveries = data.deliveries.filter((entry) => entry.hookId !== hookId)
-      await this.save(data)
-      await this.removeEnvelopes(gone)
+      return gone
     })
+    await this.removeEnvelopes(files)
   }
 
   /** A new key; the old one keeps working a day, or stops now with the calls it let in. Null for a
    *  hook that is gone. */
-  rotate(hookId: string, operationId: string, stopNow: boolean): Promise<number | null> {
-    return this.inTurn(async (data) => {
+  async rotate(hookId: string, operationId: string, stopNow: boolean): Promise<number | null> {
+    const { cancelled, files } = await this.inTurn((data) => {
       const hook = data.hooks.find((entry) => entry.hookId === hookId)
       if (!hook || hook.rotateOperationId === operationId) {
-        return hook ? (hook.rotateCancelled ?? 0) : null
+        return { cancelled: hook ? (hook.rotateCancelled ?? 0) : null, files: [] }
       }
       hook.rotateOperationId = operationId
       if (stopNow) {
@@ -202,25 +196,26 @@ export class LocalWebhookStore {
       hook.previousKeyExpiresAt = stopNow ? null : this.now() + PREVIOUS_KEY_MS
       hook.key = newWebhookKey()
       hook.keyGeneration++
-      const cancelled = stopNow ? this.cancelPending(data, hookId) : []
-      hook.rotateCancelled = cancelled.length
-      await this.save(data)
-      await this.removeEnvelopes(cancelled)
-      return cancelled.length
+      const ended = stopNow ? this.cancelPending(data, hookId) : { count: 0, files: [] }
+      hook.rotateCancelled = ended.count
+      return { cancelled: ended.count, files: ended.files }
     })
+    await this.removeEnvelopes(files)
+    return cancelled
   }
 
   /** Marks the calls not yet started cancelled, with no envelope; their files go after the save. */
-  private cancelPending(data: StoredLocalWebhooks, hookId: string): LocalCall[] {
+  private cancelPending(
+    data: StoredLocalWebhooks,
+    hookId: string
+  ): { count: number; files: LocalCall[] } {
     const pending = data.calls.filter((call) => call.hookId === hookId && isPending(call))
+    const files = pending.filter((call) => call.hasEnvelope)
     for (const call of pending) {
       call.state = 'cancelled'
-    }
-    return pending.filter((call) => {
-      const had = call.hasEnvelope
       call.hasEnvelope = false
-      return had
-    })
+    }
+    return { count: pending.length, files }
   }
 
   /** Best effort, after a save: a leftover file is never read once no call lists it. */
@@ -230,21 +225,17 @@ export class LocalWebhookStore {
     )
   }
 
-  private async dropEnvelope(call: LocalCall): Promise<void> {
-    if (call.hasEnvelope) {
-      call.hasEnvelope = false
-      await rm(this.envelopePath(call.callId), { force: true })
-    }
-  }
-
   /** A refused, over-budget or duplicate request, counted per minute as the call history shows them. */
   async count(hookId: string, kind: LocalCounterKind): Promise<void> {
-    const data = await this.data()
-    data.counters = counted(data.counters, hookId, kind, this.now())
-    await this.save(data)
+    await this.inTurn((data) => {
+      data.counters = counted(data.counters, hookId, kind, this.now())
+    })
   }
 
-  /** A new call with its envelope (none for an ignored or paused one), newest kept within the caps. */
+  /**
+   * A new call with its envelope (none for an ignored or paused one), newest kept within the caps.
+   * Null, storing nothing, when the hook is gone or the sender's key has ended since it was checked.
+   */
   async admit(
     hook: LocalHook,
     call: Omit<LocalCall, 'callId' | 'hookId' | 'hasEnvelope' | 'epoch'>,
@@ -255,76 +246,86 @@ export class LocalWebhookStore {
       ...call,
       callId: newCallId(),
       hookId: hook.hookId,
+      // As the call came in; a pause since then refuses it at handoff.
       epoch: hook.epoch,
       hasEnvelope: envelope !== null
     }
     if (envelope) {
       await writeOwnerOnlyFile(this.envelopePath(entry.callId), JSON.stringify(envelope))
     }
-    const data = await this.data()
-    // Checked with no await before the call is listed: a hook removed meanwhile, or a key a stop-now
-    // rotation ended, refuses it; a rotation after this finds it to cancel.
-    const current = data.hooks.find((entry) => entry.hookId === hook.hookId)
-    const key = sender.key
-    if (
-      !current ||
-      (key !== undefined && !keyMatches(key, current.key) && !this.previousKeyOpens(current, key))
-    ) {
-      await this.dropEnvelope(entry)
-      return null
-    }
-    data.calls.unshift(entry)
-    if (sender.deliveryId !== undefined) {
-      // Saved with the call itself, so a resend is a duplicate exactly when its call was taken.
-      data.deliveries = data.deliveries.filter((other) => other.at > call.receivedAt - REPLAY_MS)
-      data.deliveries.push({
-        hookId: hook.hookId,
-        id: deliveryHash(sender.deliveryId),
-        at: call.receivedAt
-      })
-    }
-    current.lastCall = { at: call.receivedAt, state: call.state }
-    const own = data.calls.filter((other) => other.hookId === hook.hookId)
-    const stale = own.slice(ENVELOPES_PER_HOOK).filter((old) => old.hasEnvelope)
-    for (const old of stale) {
-      old.hasEnvelope = false
-    }
-    const dropped = new Set(own.slice(CALLS_PER_HOOK))
-    data.calls = data.calls.filter((other) => !dropped.has(other))
-    // A failed save drops memory (save), so a refused call is never visible afterwards.
-    await this.save(data)
-    // Only after the save: a leftover file is harmless, a half-taken call is not.
-    await this.removeEnvelopes(stale)
-    return entry
+    const taken = await this.inTurn((data) => {
+      const current = data.hooks.find((other) => other.hookId === hook.hookId)
+      const { key, deliveryId } = sender
+      const keyEnded =
+        key !== undefined &&
+        current &&
+        !keyMatches(key, current.key) &&
+        !this.previousKeyOpens(current, key)
+      if (!current || keyEnded) {
+        return null
+      }
+      data.calls.unshift(entry)
+      if (deliveryId !== undefined) {
+        // Saved with the call itself, so a resend is a duplicate exactly when its call was taken.
+        const at = call.receivedAt
+        data.deliveries = data.deliveries.filter((other) => other.at > at - REPLAY_MS)
+        data.deliveries.push({ hookId: hook.hookId, id: deliveryHash(deliveryId), at })
+      }
+      current.lastCall = { at: call.receivedAt, state: call.state }
+      const own = data.calls.filter((other) => other.hookId === hook.hookId)
+      const stale = own.slice(ENVELOPES_PER_HOOK).filter((old) => old.hasEnvelope)
+      for (const old of stale) {
+        old.hasEnvelope = false
+      }
+      const dropped = new Set(own.slice(CALLS_PER_HOOK))
+      data.calls = data.calls.filter((other) => !dropped.has(other))
+      return stale
+    }).catch(async (error: unknown) => {
+      await this.removeEnvelopes([entry])
+      throw error
+    })
+    // A refused call's own envelope, or old ones pushed out: only after the save.
+    await this.removeEnvelopes(taken ?? [entry])
+    return taken ? entry : null
   }
 
-  /** A call's state changed: delivered to the host, or refused by it. */
-  async settle(call: LocalCall, state: WebhookCallState, reason?: string): Promise<void> {
-    // Before any await, so a run start that follows can't be overwritten by this change.
-    call.state = state
-    if (reason) {
-      call.reason = reason
-    }
-    const data = await this.data()
-    const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
-    if (hook?.lastCall?.at === call.receivedAt) {
-      hook.lastCall.state = state
-    }
-    await this.save(data)
+  /** A queued call was handed to the host (delivered) or not taken by it (refused). */
+  async settleQueued(
+    callId: string,
+    state: 'delivered' | 'refused',
+    reason?: string
+  ): Promise<void> {
+    await this.inTurn((data) => {
+      const call = data.calls.find((entry) => entry.callId === callId)
+      // The host may already have started it; only a call still queued here changes.
+      if (!call || call.state !== 'queued') {
+        return
+      }
+      call.state = state
+      if (reason) {
+        call.reason = reason
+      }
+      const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
+      if (hook?.lastCall?.at === call.receivedAt) {
+        hook.lastCall.state = state
+      }
+    })
   }
 
   /** The run start a call gets: once, for one run. */
-  async start(call: LocalCall, runId: string): Promise<'started' | 'another_run' | 'settled'> {
-    if (call.runId !== undefined) {
-      return call.runId === runId ? 'started' : 'another_run'
-    }
-    if (!PENDING.includes(call.state)) {
-      return 'settled'
-    }
-    call.runId = runId
-    call.state = 'started'
-    await this.save(await this.data())
-    return 'started'
+  start(callId: string, runId: string): Promise<'started' | 'another_run' | 'settled'> {
+    return this.inTurn((data) => {
+      const call = data.calls.find((entry) => entry.callId === callId)
+      if (call?.runId !== undefined) {
+        return call.runId === runId ? 'started' : 'another_run'
+      }
+      if (!call || !PENDING.includes(call.state)) {
+        return 'settled'
+      }
+      call.runId = runId
+      call.state = 'started'
+      return 'started'
+    })
   }
 
   async envelope(callId: string): Promise<WebhookEnvelope | null> {
