@@ -286,6 +286,26 @@ On a packaged macOS app, `orca serve` uses the desktop app's server, which needs
 ORCA_SERVE_RUNTIME=orcad orca serve --pairing-address 100.64.1.20
 ```
 
+## Let a server reach your laptop
+
+Pairing is one way. A server reaches only the hosts that it saved. To let the agents on a server read and message the chats and terminals on your laptop, do these steps once:
+
+1. On the laptop, start the runtime and copy the pairing URL that it prints:
+
+   ```bash
+   orca serve --pairing-address <laptop-tailscale-ip-or-hostname>
+   ```
+
+   If the Orca desktop app already shares the laptop, use its pairing URL instead. Do not start a second `orca serve`.
+
+2. On the server, save the laptop as an environment:
+
+   ```bash
+   orca environment add --name laptop --pairing-code <pairing-url>
+   ```
+
+Then `orca chat list --environment laptop` on the server lists the laptop's chats, and the `@` menu of a chat on the server shows them. The laptop must be on and reachable. A host that does not answer is left out of the `@` menu after a few seconds.
+
 ## Desktop app or `orca serve`?
 
 |               | Desktop app on the server           | `orca serve`                                       |
