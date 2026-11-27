@@ -135,6 +135,7 @@ Do these steps when upstream publishes a new stable tag. Do not wait for a newer
    pnpm run build:computer-macos
    pnpm run build:keyboard-layout-macos --single-arch
    pnpm run build:process-footprint-macos --single-arch
+   pnpm run build:socket-owner-macos --single-arch
    pnpm run build:notification-status-macos --single-arch
    pnpm run ensure:electron-runtime
    # orcad template: common files (daemon and server JS) and darwin-arm64 from this worktree.
