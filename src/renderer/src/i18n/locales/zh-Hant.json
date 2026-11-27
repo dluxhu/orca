@@ -9503,7 +9503,7 @@
           "05f5c5ab50": "代理程式需要輸入"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "本機執行階段金鑰使用 Electron 加密儲存（如果可用）儲存在 ~/.orca 中。",
+          "d246b2bdb3": "本機執行階段金鑰使用 Electron 加密儲存（如果可用）儲存在 <path>{{root}}</path> 中。",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API 金鑰已設定",
           "07ed3e512e": "僅當選擇 OpenAI 語音模型時，音訊才會傳送到 OpenAI。",
@@ -10118,7 +10118,7 @@
           "25b0004fbf": "終端機作用中",
           "781cb74d22": "從終端機窗格執行。",
           "cb02e00202": "終端機",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "此快速鍵已不再可用。",
           "9a3a3ca03d": "鍵盤快速鍵"
         },
@@ -26973,7 +26973,7 @@
       "computerAccountHint": "機器人執行的位置，以 {{account}} 身分登入 Orca。",
       "useChatDefaults": "使用聊天預設設定",
       "agent": "代理程式",
-      "folder": "資料夾：{{path}}",
+      "folder": "資料夾：<path>{{path}}</path>",
       "name": "名稱",
       "validation": {
         "addName": "新增名稱",

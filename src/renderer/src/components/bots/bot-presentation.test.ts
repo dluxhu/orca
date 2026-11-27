@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RuntimeRpcCallError } from '@/runtime/rpc/calls/runtime-rpc-result'
 import type { RuntimeRpcFailure } from '../../../../shared/remote-runtime/rpc/runtime-rpc-envelope'
-import { botCreateErrorMessage, botErrorMessage } from './bot-presentation'
+import { botFolderPreview } from './BotRunsOnPicker'
+import {
+  botCreateErrorMessage,
+  botErrorMessage,
+  botFolderDisplay,
+  localBotFolderPath
+} from './bot-presentation'
 
 // The host's reply when a bot's Hermes is older than chats support (#46746).
 const TOO_OLD_REPLY: RuntimeRpcFailure = {
@@ -44,6 +50,45 @@ describe('botErrorMessage', () => {
     })
 
     expect(botErrorMessage(error)).not.toContain('this computer')
+  })
+})
+
+const PROFILE = '/Users/me/Library/Application Support/Orca Profiles/work'
+
+function stubProfileDir(dir: string | null): void {
+  vi.stubGlobal('window', { api: { platform: { get: () => ({ appProfileDir: dir }) } } })
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('bot Folder text', () => {
+  it('shows a local bot in an app profile from $PROFILE', () => {
+    stubProfileDir(PROFILE)
+    expect(botFolderDisplay('reviewer', 'local', false)).toBe('$PROFILE/bots/reviewer')
+    expect(botFolderPreview('Reviewer', [], 'local', false)).toBe('$PROFILE/bots/reviewer')
+  })
+
+  it('keeps ~/.orca for the default app and for a paired server', () => {
+    stubProfileDir(null)
+    expect(botFolderDisplay('reviewer', 'local', false)).toBe('~/.orca/bots/reviewer')
+    expect(botFolderDisplay('reviewer', 'local', true)).toBe('%USERPROFILE%\\.orca\\bots\\reviewer')
+    stubProfileDir(PROFILE)
+    expect(botFolderDisplay('reviewer', 'runtime:env-1', false)).toBe('~/.orca/bots/reviewer')
+  })
+
+  it('opens the real bot folder on this computer, and none in the web client', () => {
+    expect(localBotFolderPath('reviewer', false, PROFILE, `${PROFILE}/orca-home`)).toBe(
+      `${PROFILE}/bots/reviewer`
+    )
+    expect(localBotFolderPath('reviewer', false, null, '/Users/me/.orca')).toBe(
+      '/Users/me/.orca/bots/reviewer'
+    )
+    expect(localBotFolderPath('reviewer', true, null, 'C:\\Users\\me\\.orca')).toBe(
+      'C:\\Users\\me\\.orca\\bots\\reviewer'
+    )
+    expect(localBotFolderPath('reviewer', false, null, null)).toBeNull()
   })
 })
 

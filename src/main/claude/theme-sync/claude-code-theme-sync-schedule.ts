@@ -1,3 +1,4 @@
+import { isAppProfileRuntime } from '../../app-profiles/app-profile'
 import { readFile } from 'node:fs/promises'
 import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 import { resolveTerminalPalette } from '../../../shared/terminal-themes/terminal-theme-selection'
@@ -70,6 +71,10 @@ export function startClaudeCodeThemeSync(host: {
   onAppFocused: (listener: () => void) => unknown
   userDataPath: string
 }): void {
+  // Fork patch: a profile does not sync the Claude Code theme (profiles-design.md, section 12).
+  if (isAppProfileRuntime()) {
+    return
+  }
   let lastSynced: string | null = null
   let lastForcedAt = Date.now()
   let restorePending = false
