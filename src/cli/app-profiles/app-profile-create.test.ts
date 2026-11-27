@@ -324,9 +324,11 @@ describe.skipIf(process.platform !== 'darwin')(
         )
       )
       mkdirSync(join(contents, 'Resources'), { recursive: true })
+      // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+      writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
       symlinkSync(
-        join('..', '..', '..', '..', 'Resources', 'app.asar'),
-        join(contents, 'Resources', 'app.asar')
+        join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+        join(contents, 'Resources', 'app.asar.unpacked')
       )
       const work = createAppProfile({ name: 'Work', defaultAppPath: manager, env: env(), run })
       expect(work.bundleId).toBe('com.stablyai.orca.dlux.profile.work')
@@ -344,9 +346,11 @@ describe.skipIf(process.platform !== 'darwin')('defaultAppOf', () => {
     // The default plist: no OrcaAppRole, as after a plist miss.
     file(join(contents, 'Info.plist'), DEFAULT_PLIST)
     mkdirSync(join(contents, 'Resources'), { recursive: true })
+    // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+    writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
     symlinkSync(
-      join('..', '..', '..', '..', 'Resources', 'app.asar'),
-      join(contents, 'Resources', 'app.asar')
+      join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+      join(contents, 'Resources', 'app.asar.unpacked')
     )
     expect(defaultAppOf(manager)).toBe(realpathSync(app))
     expect(defaultAppOf(app)).toBe(app)

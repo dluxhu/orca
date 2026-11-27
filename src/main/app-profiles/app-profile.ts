@@ -165,12 +165,15 @@ export function ownBundleDisplayName(): string | null {
   return plist ? readPlistString(plist, 'CFBundleDisplayName') : null
 }
 
-/** The default app: this app, or the app that the links of a profile or the Profile Manager point into. */
+/**
+ * The default app: this app, or the app that the links of a profile or the Profile Manager point
+ * into. Through app.asar.unpacked: Electron 45 reads no asar archive through a link.
+ */
 export async function ownDefaultAppPath(): Promise<string> {
   if (getAppProfile() === null && !isProfileManagerApp()) {
     return resolve(dirname(process.execPath), '..', '..')
   }
-  return resolve(await realpath(join(process.resourcesPath, 'app.asar')), '..', '..', '..')
+  return resolve(await realpath(join(process.resourcesPath, 'app.asar.unpacked')), '..', '..', '..')
 }
 
 /** The name and bundle id of the running app. Use it in place of the build-time FORK_IDENTITY. */

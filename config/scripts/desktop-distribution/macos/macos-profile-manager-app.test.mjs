@@ -4,6 +4,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readlinkSync,
   realpathSync,
   rmSync,
@@ -75,6 +76,7 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
     )
     file(join(contents, 'Frameworks', 'Squirrel.framework', 'Versions', 'A', 'y'), 'squirrel')
     file(join(contents, 'Resources', 'app.asar'), 'asar')
+    file(join(contents, 'Resources', 'app.asar.unpacked', 'out', 'cli', 'index.js'), 'cli')
     file(join(contents, 'Resources', 'bin', 'orca'), 'cli')
     signed = []
   })
@@ -127,13 +129,17 @@ describe.skipIf(process.platform !== 'darwin')('buildMacProfileManagerApp', () =
     }
     for (const [link, target] of [
       [join('Frameworks', 'Squirrel.framework'), join('Frameworks', 'Squirrel.framework')],
-      [join('Resources', 'app.asar'), join('Resources', 'app.asar')],
+      [join('Resources', 'app.asar.unpacked'), join('Resources', 'app.asar.unpacked')],
       [join('Resources', 'bin'), join('Resources', 'bin')]
     ]) {
       const path = join(contents, link)
       expect(readlinkSync(path).startsWith('..')).toBe(true)
       expect(realpathSync(path)).toBe(realpathSync(join(app, 'Contents', target)))
     }
+    // Electron 45 reads no asar archive through a link: the Manager has its own copy.
+    const asar = join(contents, 'Resources', 'app.asar')
+    expect(lstatSync(asar).isFile()).toBe(true)
+    expect(readFileSync(asar, 'utf8')).toBe('asar')
   })
 
   it('takes the fork name of the outer app: "Orca @dLux Profile Manager"', async () => {
