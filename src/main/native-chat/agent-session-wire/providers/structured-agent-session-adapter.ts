@@ -43,6 +43,7 @@ import type {
 /** `unknown` (no timely, correlated answer) skips this idle stop and asks again later. */
 export type AgentSessionIdleConfirmation = 'idle' | 'busy' | 'unknown'
 
+import type { StructuredAgentSessionAdapterRemoteControl } from './structured-agent-session-adapter-remote-control'
 import type { AgentJournalDispatchRejection } from '../../../../shared/agent-session/failures/agent-session-failure-words'
 import type { AgentSessionExecutionOptions } from '../../../../shared/agent-session/options/protocol/agent-session-execution-options'
 import type { AgentSessionPromptResponse } from '../../../../shared/agent-session/requests/prompts/agent-session-question-answer'
@@ -182,7 +183,9 @@ export type StructuredAgentSessionSetOptionInput = {
   signal?: AbortSignal
 }
 
-type AdapterControls = StructuredAgentSessionAdapterStop & StructuredAgentSessionAdapterPermission
+type AdapterControls = StructuredAgentSessionAdapterStop &
+  StructuredAgentSessionAdapterPermission &
+  StructuredAgentSessionAdapterRemoteControl
 
 export type StructuredAgentSessionAdapter = AdapterControls & {
   readAccountUsage?(record: AgentSessionRecord, signal: AbortSignal): Promise<CodexAccountUsageRead>
