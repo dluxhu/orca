@@ -30,10 +30,7 @@ import { useNativeChatTranscriptRowContext } from './conversation/slots/use-nati
 import type { StructuredAgentSessionHostWork } from './session/structured/use-structured-agent-session-transport-state'
 import type { NativeChatDeliveryNotice } from './messages/rows/NativeChatMessageRow'
 import { splitNativeChatSlotsWaitingBehindLiveTurn } from './conversation/slots/native-chat-transcript-slot-selection'
-import {
-  useNativeChatExpandedTurns,
-  useNativeChatUnfoldTurnOf
-} from './conversation/slots/use-native-chat-expanded-turns'
+import * as ExpandedTurns from './conversation/slots/use-native-chat-expanded-turns'
 import { useNativeChatTranscriptSlots } from './conversation/slots/use-native-chat-transcript-slots'
 import type { NativeChatTimedRow } from './conversation/slots/native-chat-timed-rows'
 import { useNativeChatTranscriptWindow } from './viewport/virtualization/use-native-chat-transcript-window'
@@ -142,8 +139,7 @@ export function NativeChatMessageList({
   const receipts = useNativeChatQuestionReceipts(journalItems)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const expandedTurns = useNativeChatExpandedTurns()
-  const { expandedTurnIds, toggleExpandedTurn } = expandedTurns
+  const expandedTurns = ExpandedTurns.useNativeChatExpandedTurns()
 
   const { hasMore, loadingEarlier, loadEarlier } = session
   const historyRetention = useNativeChatHistoryRetention({
@@ -223,7 +219,7 @@ export function NativeChatMessageList({
     turnStatuses,
     turnDiffs,
     openedPullRequests: openedPullRequests.byTurn,
-    expandedTurnKeys: expandedTurnIds,
+    expandedTurnKeys: expandedTurns.expandedTurnIds,
     isWorking: working,
     lifecycleWorking,
     subagentHeads: scope.heads,
@@ -250,7 +246,6 @@ export function NativeChatMessageList({
     [allSlots, journalItems, stopping, journalSubmissions, latestTurn, hostWork]
   )
   const navigationRequest = useNativeChatNavigationRequest(slots)
-  const unfoldTurnOf = useNativeChatUnfoldTurnOf(slots, rows, turnKeys, expandedTurns)
   const newRows = useNativeChatNewRowsMarker(
     slots,
     waitingSlots,
@@ -323,7 +318,7 @@ export function NativeChatMessageList({
     scrollMessageToTop,
     readerLeavesEnd,
     scrollToBottom,
-    unfoldTurnOf
+    unfoldTurnOf: ExpandedTurns.useNativeChatUnfoldTurnOf(slots, rows, turnKeys, expandedTurns)
   })
   const { beginNavigation, jumpToLatest, jumpToQuote } = navigation
   const { railRef, wake: wakeRail, onScroll: onTranscriptScroll } = useNativeChatRailWake(onScroll)
@@ -356,11 +351,11 @@ export function NativeChatMessageList({
     expandSignal,
     revealedDiff: navigationRequest.revealedDiff,
     taskListPredecessors,
-    expandedTurnIds,
+    expandedTurnIds: expandedTurns.expandedTurnIds,
     latestTurnKey,
     deliveryNotices,
     runtimeContext,
-    onToggleExpandedTurn: toggleExpandedTurn,
+    onToggleExpandedTurn: expandedTurns.toggleExpandedTurn,
     onOpenSubagent: scope.open,
     onScrollMessageToTop: scrollMessageToTop,
     readerAtEnd,
