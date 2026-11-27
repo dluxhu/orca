@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Why: every case shares the paired-server harness in this describe (two runtimes, the transport, the relay); the fork's sender-name cases need it too. */
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

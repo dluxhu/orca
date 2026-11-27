@@ -11,7 +11,7 @@ import {
   resetSenderStore
 } from './messages/agent-senders/native-chat-agent-sender.test-fixture'
 import { MessageRow } from './messages/rows/NativeChatMessageRow'
-import { useAgentMessageSenderLabel } from './messages/agent-senders/native-chat-agent-message-sender-label'
+import { useAgentMessageSenderName } from './messages/agent-senders/native-chat-agent-message-sender-label'
 import { readAgentMessageSource } from '../../../../shared/agent-session/journal/agent-session-message-source'
 import { toRuntimeExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import { makeUnifiedTab } from '@/store/slices/tabs/tab-group.test-fixture'
@@ -155,7 +155,7 @@ it('does not wake a sender without an origin on host status changes', () => {
   let renders = 0
   renderHook(() => {
     renders += 1
-    return useAgentMessageSenderLabel(sender!, 'workspace', { kind: 'local' })
+    return useAgentMessageSenderName(sender!, 'workspace', { kind: 'local' })
   })
   const before = renders
 
