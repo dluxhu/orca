@@ -2,10 +2,11 @@ import { useCallback, useRef } from 'react'
 import { useNativeChatPaneLifetimeEffect } from '../../pane/ownership/native-chat-pane-lifetime'
 const NATIVE_CHAT_RAIL_WAKE_MS = 300
 const NATIVE_CHAT_RAIL_SUSTAIN_MS = 1500
-export function useNativeChatRailWake(): {
+/** Scrolling the transcript keeps an awake rail lit; `onScroll` is the transcript's own handler. */
+export function useNativeChatRailWake(onScroll: (event: React.UIEvent<HTMLDivElement>) => void): {
   railRef: React.RefObject<HTMLDivElement | null>
   wake: () => void
-  sustain: () => void
+  onScroll: (event: React.UIEvent<HTMLDivElement>) => void
 } {
   const railRef = useRef<HTMLDivElement | null>(null)
   const awakeRail = useRef<HTMLDivElement | null>(null)
@@ -52,6 +53,14 @@ export function useNativeChatRailWake(): {
     }
   }, [])
 
+  const onTranscriptScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      onScroll(event)
+      sustain()
+    },
+    [onScroll, sustain]
+  )
+
   useNativeChatPaneLifetimeEffect(
     useCallback(
       () => () => {
@@ -64,22 +73,5 @@ export function useNativeChatRailWake(): {
     )
   )
 
-  return { railRef, wake, sustain }
-}
-
-/** The rail wake and the transcript's scroll handler, which also keeps a woken rail awake. */
-export function useNativeChatRailWakeScroll(
-  onScroll: (event: React.UIEvent<HTMLDivElement>) => void
-): Omit<ReturnType<typeof useNativeChatRailWake>, 'sustain'> & {
-  onScroll: (event: React.UIEvent<HTMLDivElement>) => void
-} {
-  const { railRef, wake, sustain } = useNativeChatRailWake()
-  const onWakeScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      onScroll(event)
-      sustain()
-    },
-    [onScroll, sustain]
-  )
-  return { railRef, wake, onScroll: onWakeScroll }
+  return { railRef, wake, onScroll: onTranscriptScroll }
 }
