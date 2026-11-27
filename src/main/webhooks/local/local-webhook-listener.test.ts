@@ -1,0 +1,219 @@
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { createServer, request, type Server } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import type { Automation } from '../../../shared/automations/automation-definition'
+import { parseWebhookBody } from './local-webhook-delivery'
+import { createLocalWebhookHandler } from './local-webhook-listener'
+import { LocalWebhookStore, type LocalHook } from './local-webhook-store'
+import { listenOnLoopback, webhookAutomation } from './local-webhook.test-fixture'
+
+let dir: string
+let store: LocalWebhookStore
+let server: Server
+let base: string
+let hook: LocalHook
+let automations: Automation[]
+let received: { callId: string; subject?: string }[]
+
+async function listen(limits?: { perHookPerMinute?: number; perMinute?: number }) {
+  server?.close()
+  server = createServer(
+    createLocalWebhookHandler({
+      store,
+      automations: () => automations,
+      bots: () => [{ id: hook.botId }],
+      receive: (delivery, event) => {
+        received.push({
+          callId: delivery.event.key,
+          ...(event.subject ? { subject: event.subject } : {})
+        })
+        return true
+      },
+      ...(limits ? { limits } : {})
+    })
+  )
+  base = `http://127.0.0.1:${await listenOnLoopback(server)}`
+}
+
+beforeEach(async () => {
+  dir = mkdtempSync(join(tmpdir(), 'local-webhooks-'))
+  store = new LocalWebhookStore(dir)
+  hook = await store.mint('op-1', 'auto-1', 'bot-1')
+  automations = [webhookAutomation(hook)]
+  received = []
+  await listen()
+})
+
+afterEach(() => {
+  server.close()
+  rmSync(dir, { recursive: true, force: true })
+})
+
+const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+  fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: typeof body === 'string' ? body : JSON.stringify(body)
+  })
+
+describe('local webhook listener', () => {
+  it('takes a call with the key in the URL or as a Bearer token', async () => {
+    const inPath = await post(`/hooks/${hook.hookId}/${hook.key}`, { ok: 1 })
+    expect(inPath.status).toBe(200)
+    expect(await inPath.json()).toMatchObject({ status: 'queued' })
+    const bearer = await post(
+      `/hooks/${hook.hookId}`,
+      { ok: 2 },
+      { authorization: `Bearer ${hook.key}` }
+    )
+    expect(bearer.status).toBe(200)
+    expect(received).toHaveLength(2)
+    expect(await store.history(hook.hookId)).toMatchObject([
+      { state: 'delivered' },
+      { state: 'delivered' }
+    ])
+  })
+
+  it('answers an unknown hook and a wrong key alike, and asks for a missing key', async () => {
+    const wrongKey = await post(`/hooks/${hook.hookId}/orcawh_${'x'.repeat(43)}`, {})
+    const unknown = await post(`/hooks/wh_AAAAAAAAAAAAAAAA/${hook.key}`, {})
+    expect(wrongKey.status).toBe(404)
+    expect(unknown.status).toBe(404)
+    expect(await wrongKey.text()).toBe(await unknown.text())
+    expect([...wrongKey.headers.keys()].sort()).toEqual([...unknown.headers.keys()].sort())
+    const missing = await post(`/hooks/${hook.hookId}`, {})
+    const missingUnknown = await post('/hooks/wh_AAAAAAAAAAAAAAAA', {})
+    expect(missing.status).toBe(401)
+    expect(await missing.text()).toBe(await missingUnknown.text())
+    expect(received).toHaveLength(0)
+  })
+
+  it('takes POST only', async () => {
+    const answer = await fetch(`${base}/hooks/${hook.hookId}/${hook.key}`)
+    expect(answer.status).toBe(405)
+    expect(answer.headers.get('allow')).toBe('POST')
+    expect((await fetch(`${base}/`)).status).toBe(404)
+  })
+
+  it('refuses a body over 1 MiB, by its length or as it streams', async () => {
+    const big = JSON.stringify({ text: 'x'.repeat(1024 * 1024) })
+    expect((await post(`/hooks/${hook.hookId}/${hook.key}`, big)).status).toBe(413)
+    // No content-length: chunks are counted as they come.
+    const streamed = await new Promise<number>((resolve) => {
+      const req = request(
+        `${base}/hooks/${hook.hookId}/${hook.key}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'text/plain', 'transfer-encoding': 'chunked' }
+        },
+        (res) => resolve(res.statusCode ?? 0)
+      )
+      // The listener closes the connection after its 413, so the rest of the upload fails.
+      req.on('error', () => {})
+      for (let i = 0; i < 9; i++) {
+        req.write('y'.repeat(128 * 1024))
+      }
+      req.end()
+    })
+    expect(streamed).toBe(413)
+    expect(received).toHaveLength(0)
+  })
+
+  it('refuses very deep JSON before storing it', async () => {
+    const deep = `${'['.repeat(200)}${']'.repeat(200)}`
+    const answer = await post(`/hooks/${hook.hookId}/${hook.key}`, deep)
+    expect(answer.status).toBe(413)
+    expect(await store.history(hook.hookId)).toEqual([])
+  })
+
+  it('answers 429 past the per-hook and the overall rate', async () => {
+    await listen({ perHookPerMinute: 2 })
+    const path = `/hooks/${hook.hookId}/${hook.key}`
+    const statuses = [await post(path, {}), await post(path, {}), await post(path, {})].map(
+      (answer) => answer.status
+    )
+    expect(statuses).toEqual([200, 200, 429])
+    expect(await store.history(hook.hookId)).toContainEqual(
+      expect.objectContaining({ kind: 'over_budget', count: 1 })
+    )
+    await listen({ perMinute: 1 })
+    expect((await post(path, {})).status).toBe(200)
+    expect((await post('/hooks/wh_AAAAAAAAAAAAAAAA/nokey', {})).status).toBe(429)
+  })
+
+  it("runs only calls that match the rule's filters, with their subject", async () => {
+    automations = [
+      webhookAutomation(hook, {
+        where: [{ path: 'body.action', op: '=', values: ['opened'] }],
+        subjectFrom: 'body.number'
+      })
+    ]
+    const path = `/hooks/${hook.hookId}/${hook.key}`
+    expect(await (await post(path, { action: 'closed', number: 1 })).json()).toMatchObject({
+      status: 'ignored'
+    })
+    expect(await (await post(path, { action: 'opened', number: 7 })).json()).toMatchObject({
+      status: 'queued'
+    })
+    expect(received).toEqual([{ callId: expect.any(String), subject: '7' }])
+    const [queued, ignored] = await store.history(hook.hookId)
+    expect(ignored).toMatchObject({ state: 'ignored' })
+    expect(await store.envelope(ignored?.kind === 'call' ? ignored.callId : '')).toBeNull()
+    expect(await store.envelope(queued?.kind === 'call' ? queued.callId : '')).not.toBeNull()
+  })
+
+  it('keeps a paused automation’s call out of its runs', async () => {
+    automations = [webhookAutomation(hook, {}, false)]
+    const answer = await post(`/hooks/${hook.hookId}/${hook.key}`, {})
+    expect(await answer.json()).toMatchObject({ status: 'paused' })
+    expect(received).toHaveLength(0)
+  })
+
+  it("drops a sender's repeated delivery id", async () => {
+    const path = `/hooks/${hook.hookId}/${hook.key}`
+    const headers = { 'x-github-delivery': 'd-1' }
+    expect(await (await post(path, {}, headers)).json()).toMatchObject({ status: 'queued' })
+    expect(await (await post(path, {}, headers)).json()).toEqual({ status: 'duplicate' })
+    expect(await (await post(path, {}, { 'idempotency-key': 'd-2' })).json()).toMatchObject({
+      status: 'queued'
+    })
+    expect(received).toHaveLength(2)
+    expect(await store.history(hook.hookId)).toContainEqual(
+      expect.objectContaining({ kind: 'duplicate', count: 1 })
+    )
+  })
+
+  it('never stores Authorization or the key', async () => {
+    await post(
+      `/hooks/${hook.hookId}`,
+      { echo: hook.key },
+      { authorization: `Bearer ${hook.key}`, cookie: 'a=b', 'x-github-event': 'push' }
+    )
+    const [file] = readdirSync(join(dir, 'local-webhooks', 'envelopes'))
+    const stored = readFileSync(join(dir, 'local-webhooks', 'envelopes', file ?? ''), 'utf8')
+    expect(stored).not.toContain(hook.key)
+    expect(stored).not.toContain('authorization')
+    expect(stored).not.toContain('cookie')
+    expect(JSON.parse(stored)).toMatchObject({
+      headers: { 'x-github-event': 'push' },
+      body: { kind: 'json', value: { echo: '[orca webhook key]' } }
+    })
+  })
+})
+
+describe('parseWebhookBody', () => {
+  it('reads JSON, forms with repeated keys, and text', () => {
+    expect(parseWebhookBody('application/json; charset=utf-8', '{"a":1}')).toEqual({
+      kind: 'json',
+      value: { a: 1 }
+    })
+    expect(parseWebhookBody('application/x-www-form-urlencoded', 'a=1&a=2&b=3')).toEqual({
+      kind: 'form',
+      value: { a: ['1', '2'], b: '3' }
+    })
+    expect(parseWebhookBody('text/plain', 'hi')).toEqual({ kind: 'text', value: 'hi' })
+    expect(parseWebhookBody('application/json', '{')).toBeNull()
+  })
+})
