@@ -108,6 +108,10 @@ const run: RunTool = (program, args) => {
   if (program.endsWith('lsregister')) {
     return ''
   }
+  // The Finder custom icon (AppKit through osascript) never runs in a test.
+  if (program === '/usr/bin/env') {
+    return ''
+  }
   return execFileSync(program, args, { encoding: 'utf8' })
 }
 
@@ -169,7 +173,12 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
       defaultAppPath: app,
       env: env(),
       run,
-      pinRoot: true
+      pinRoot: true,
+      // The icon renderer needs AppKit; this test needs only an icon file.
+      makeIcon: () => ({
+        icns: Buffer.from('icns'),
+        icon: { kind: 'badge' as const, text: 'W', style: 'ref-match' as const }
+      })
     })
     const contents = join(entry.appPath, 'Contents')
     calls = []
@@ -284,6 +293,43 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(existsSync(join(entry.appPath, 'Icon\r'))).toBe(false)
   })
 
+  it('puts the kept icon into the new bundle before the seal, and the Finder icon after it', () => {
+    const { entry, contents } = make()
+    writeFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'kept icns')
+    defaultApp('2.0')
+    expect(
+      refreshAppProfileBundle(entry.appPath, app, run, { userDataPath: entry.userDataPath })
+    ).toBe(true)
+    expect(lstatSync(join(contents, 'Resources', 'icon.icns')).isSymbolicLink()).toBe(false)
+    expect(read(join(contents, 'Resources', 'icon.icns'))).toBe('kept icns')
+    const bundleSign = calls.findLastIndex(
+      (call) => call[0].endsWith('codesign') && call[1] === '--force'
+    )
+    const finderIcon = calls.findIndex((call) => call[0] === '/usr/bin/env')
+    expect(finderIcon).toBeGreaterThan(bundleSign)
+    expect(calls[finderIcon]).toContain('/usr/bin/osascript')
+  })
+
+  it('refreshes also when the Finder icon cannot be set', () => {
+    const { entry, contents } = make()
+    writeFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'kept icns')
+    defaultApp('2.0')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const failing: RunTool = (program, args) => {
+      if (program === '/usr/bin/env') {
+        throw new Error('setIcon failed')
+      }
+      return run(program, args)
+    }
+    expect(
+      refreshAppProfileBundle(entry.appPath, app, failing, { userDataPath: entry.userDataPath })
+    ).toBe(true)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+    expect(read(join(contents, 'Resources', 'icon.icns'))).toBe('kept icns')
+    expect(key(join(contents, 'Info.plist'), 'CFBundleVersion')).toBe('2.0')
+  })
+
   it('refreshes when the check file names an older version (p1)', () => {
     const { entry } = make()
     const check = join(dir, 'check.txt')
@@ -374,7 +420,16 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
   it("leaves another profile's previous bundle alone at the start (st4)", () => {
     const { entry } = make()
     const apps = join(dir, 'apps')
-    const home = createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run })
+    const home = createAppProfile({
+      name: 'Home',
+      defaultAppPath: app,
+      env: env(),
+      run,
+      makeIcon: () => ({
+        icns: Buffer.from('icns'),
+        icon: { kind: 'badge' as const, text: 'H', style: 'ref-match' as const }
+      })
+    })
     const homeLeftover = preRefreshPathOf(home.appPath)
     renameSync(home.appPath, homeLeftover)
     defaultApp('2.0')
@@ -457,7 +512,25 @@ describe.skipIf(process.platform !== 'darwin')(
       if (program.endsWith('codesign') && args[0] === '-d') {
         return '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict/></plist>'
       }
+      if (program === '/usr/bin/env') {
+        // What NSWorkspace setIcon writes: the Icon file with a fork, and Finder information.
+        const bundle = (args.find((arg) => arg.startsWith('ORCA_APP_BUNDLE_PATH=')) ?? '').slice(21)
+        finderIcon(bundle)
+        return ''
+      }
       return execFileSync(program, args, { encoding: 'utf8' })
+    }
+    const finderIcon = (bundle: string): void => {
+      const icon = join(bundle, 'Icon\r')
+      writeFileSync(icon, '')
+      execFileSync('/usr/bin/xattr', ['-wx', 'com.apple.ResourceFork', '00010203', icon])
+      execFileSync('/usr/bin/xattr', [
+        '-wx',
+        'com.apple.FinderInfo',
+        `${'0'.repeat(16)}4000${'0'.repeat(44)}`,
+        icon
+      ])
+      execFileSync('/usr/bin/xattr', ['-wx', 'com.apple.FinderInfo', FINDER_INFO, bundle])
     }
     const machO = (path: string): void => {
       mkdirSync(join(path, '..'), { recursive: true })
@@ -501,7 +574,11 @@ describe.skipIf(process.platform !== 'darwin')(
         defaultAppPath: app,
         env: env(),
         run: realRun,
-        pinRoot: true
+        pinRoot: true,
+        makeIcon: () => ({
+          icns: Buffer.from('icns'),
+          icon: { kind: 'badge' as const, text: 'W', style: 'ref-match' as const }
+        })
       })
       // What a Finder custom icon leaves: Finder information on the bundle, and Icon\r with a fork.
       const icon = join(entry.appPath, 'Icon\r')
@@ -518,9 +595,15 @@ describe.skipIf(process.platform !== 'darwin')(
       // An update that changes the runtime parts: a new Resources entry.
       file(join(app, 'Contents', 'Resources', 'new.pak'), 'new')
       file(join(app, 'Contents', 'Info.plist'), plist('2.0'))
-      expect(refreshAppProfileBundle(entry.appPath, app, realRun)).toBe(true)
+      writeFileSync(join(entry.userDataPath, 'profile-icon.icns'), 'kept icns')
+      expect(
+        refreshAppProfileBundle(entry.appPath, app, realRun, { userDataPath: entry.userDataPath })
+      ).toBe(true)
       expect(() => execFileSync('/usr/bin/codesign', ['--verify', entry.appPath])).not.toThrow()
       expect(key(join(entry.appPath, 'Contents', 'Info.plist'), 'CFBundleVersion')).toBe('2.0')
+      // The custom icon is kept: the icon file in the seal, the Finder icon after it.
+      expect(read(join(entry.appPath, 'Contents', 'Resources', 'icon.icns'))).toBe('kept icns')
+      expect(finderInfoOf(entry.appPath)).toBe(FINDER_INFO)
     })
   }
 )

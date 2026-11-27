@@ -73,6 +73,7 @@
 1 src/main/antigravity/native-file-credentials.ts
 12 src/main/antigravity/native-windows-credentials.ts
 1 src/main/antigravity/native-wsl-credentials.ts
+4 src/main/app-profiles/app-profile-missing-icon.ts # app profiles (fork): once at ready; getAppProfile and ownDockIcon cache their first read, runCli is async
 6 src/main/artifacts/artifact-cloud-auth-context.ts
 7 src/main/artifacts/artifact-cloud-service.ts
 2 src/main/artifacts/artifact-create-intent-store.ts # sign-out clear (bestEffortFsyncDirectorySync) plus writeArtifactFileWhileCurrent, whose only sync step is the fenced renameSync; was 8
@@ -1370,7 +1371,7 @@
 2 src/main/startup/main-process-observers.ts
 1 src/main/startup/main-process-preflight-failure.ts
 25 src/main/startup/main-process-preflight.ts
-16 src/main/startup/main-process-ready-foundation.ts # +1 app profiles (fork): the settings seed, once at ready
+17 src/main/startup/main-process-ready-foundation.ts # +2 app profiles (fork): the settings seed and the missing-icon check, once at ready
 3 src/main/startup/main-process-ready-runtime.ts
 4 src/main/startup/main-process-ready.ts
 2 src/main/startup/main-window/main-process-i18n-menu.ts # +1 app profiles (fork): startProfilesMenu, one mkdir at menu start

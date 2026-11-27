@@ -7,6 +7,7 @@ import { translateMain } from '../i18n/main-i18n'
 import { quitAndStopAllSessionsMenuText } from '../menu/app-menu-quit-item'
 import { composeTrayAttentionIcon, tintTrayTemplateForAttention } from './tray-attention-icon'
 import { stampTrayDevBadge } from './tray-dev-badge'
+import { ownMenuBarImage } from '../app-profiles/app-profile-dock-icon'
 
 export type SystemTrayOptions = {
   /** App icon id from settings; the tray reuses the app icon image. */
@@ -115,6 +116,11 @@ function scheduleTrayImage(): void {
 }
 
 function createMacMenuBarImage(): NativeImage | null {
+  // A profile app shows its own template (fork patch).
+  const own = ownMenuBarImage()
+  if (own) {
+    return own
+  }
   const image = nativeImage.createFromPath(menuBarIconPath)
   const { width, height } = image.getSize()
   if (width <= 0 || height <= 0) {
@@ -302,6 +308,18 @@ export function setMacMenuBarIconVisible(visible: boolean, opts: SystemTrayOptio
     return null
   }
   return createSystemTray(opts)
+}
+
+/** Reads the macOS menu-bar image again: a profile app can get its own template after start (fork patch). */
+export function refreshMacMenuBarImage(): void {
+  if (process.platform !== 'darwin' || !tray || tray.isDestroyed()) {
+    return
+  }
+  const image = createMacMenuBarImage()
+  if (image) {
+    baseTrayImage = devIndicator ? stampMacDevBadge(image) : image
+    scheduleTrayImage()
+  }
 }
 
 /** Bell/completion attention survives pre-creation calls; notification/visibility flow clears it on reveal. Safe without a tray. */

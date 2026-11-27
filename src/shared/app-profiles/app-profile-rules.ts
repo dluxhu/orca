@@ -1,5 +1,8 @@
 // Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
+import type { IconStyle } from '../icon-badger/badger'
+import type { AppProfileIcon } from './app-profile-paths'
+import { APP_PROFILE_BADGE_SWATCHES } from './app-profile-icon-files'
 
 /** The built-in port of the default app (DEFAULT_WS_PORT). profiles.json can save another. */
 export const DEFAULT_APP_PORT = 6768
@@ -25,6 +28,49 @@ export type AppProfileRow = {
   startAtLogin: boolean
   /** The profile's own serve service job runs. */
   serviceRuns?: boolean
+  /** The registry `icon` field. The default app has none. */
+  icon?: AppProfileIcon
+}
+
+/** What makes a profile icon: a badge character, a badge image file or a full icon file. */
+export type AppProfileIconSource =
+  // No text: the name's badge (withNameBadge), else the first free character (nextBadgeText).
+  | { kind: 'badge'; text?: string; style?: IconStyle; color?: string }
+  | { kind: 'image'; path: string; style?: IconStyle }
+  | { kind: 'file'; path: string }
+
+const BADGE_CHARACTERS = [...'23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+
+/** The first of 2 to 9, then A to Z, that no profile uses as its badge. */
+export function nextBadgeText(icons: readonly (AppProfileIcon | undefined)[]): string {
+  const used = new Set(icons.map((icon) => (icon?.kind === 'badge' ? icon.text : null)))
+  return BADGE_CHARACTERS.find((text) => !used.has(text)) ?? '2'
+}
+
+/** The word "Orca" in any script; an apostrophe and a letter after it belong to the word. */
+const ORCA_WORD = /(?<![\p{L}\p{N}])orca(?![\p{L}\p{N}]|['’]\p{L})/giu
+
+/**
+ * The default badge of a profile name: its first letter or digit in upper case when no other
+ * profile uses it, else nextBadgeText. The word "Orca" does not count; "Orca's" is another word.
+ * The colour is a swatch (not the dark one) from a hash of the name, so each name keeps its colour.
+ */
+export function defaultBadge(
+  name: string,
+  icons: readonly (AppProfileIcon | undefined)[]
+): { text: string; color: string } {
+  const letter = /[\p{L}\p{N}]/u
+  const first = (name.replace(ORCA_WORD, ' ').match(letter) ?? name.match(letter))?.[0] ?? ''
+  // 'ß' becomes 'SS': a badge has one character.
+  const upper = first.toUpperCase().length === 1 ? first.toUpperCase() : first
+  const used = icons.some((icon) => icon?.kind === 'badge' && icon.text === upper)
+  const text = upper && !used ? upper : nextBadgeText(icons)
+  const colors = APP_PROFILE_BADGE_SWATCHES.slice(1)
+  let hash = 0
+  for (const char of name) {
+    hash = (hash * 31 + char.codePointAt(0)!) >>> 0
+  }
+  return { text, color: colors[hash % colors.length] }
 }
 
 /** What the Profile Manager window gets from the main process. */
@@ -34,6 +80,30 @@ export type AppProfilesState = {
   currentId: string | null
   /** Ids of data folders that "Keep data" left. A new profile with such an id uses the folder. */
   keptIds: string[]
+  /** Each app's own Dock icon as a PNG data URL, by row id. The main process sets it for the window. */
+  icons?: Record<string, string>
+}
+
+/**
+ * The `--icon-*` flags of an icon source. The CLI reads them with appProfileIconSourceFromFlags.
+ */
+export function appProfileIconFlags(source: AppProfileIconSource | undefined): string[] {
+  if (!source) {
+    return []
+  }
+  const style = source.kind !== 'file' && source.style ? ['--icon-style', source.style] : []
+  if (source.kind === 'file') {
+    return ['--icon-file', source.path]
+  }
+  if (source.kind === 'image') {
+    return ['--icon-image', source.path, ...style]
+  }
+  // No text and no style still means a badge: the CLI makes the default one.
+  return [
+    ...(source.text ? ['--icon-badge', source.text] : []),
+    ...style,
+    ...(source.color ? ['--icon-color', source.color] : [])
+  ]
 }
 
 /** This app's own profile, for Settings. */
@@ -53,7 +123,16 @@ export type OwnAppProfile = {
 
 /** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */
 export type AppProfileChange =
-  | { kind: 'create'; name: string; id: string; port: number; copySettings: boolean }
+  | {
+      kind: 'create'
+      name: string
+      id: string
+      port: number
+      copySettings: boolean
+      /** No icon: the next free badge character. */
+      icon?: AppProfileIconSource
+    }
+  | { kind: 'set-icon'; id: string; icon: AppProfileIconSource }
   | { kind: 'rename'; id: string; name: string }
   | { kind: 'set-port'; id: string; port: number }
   | { kind: 'remove'; id: string; keepData: boolean }

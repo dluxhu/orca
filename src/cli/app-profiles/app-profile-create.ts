@@ -38,6 +38,13 @@ import {
 import { RuntimeClientError } from '../runtime/connection/types'
 import { buildProfileBundle } from './app-profile-bundle'
 import { isInside, withRegistryLock, writeRegistry } from './app-profile-registry'
+import {
+  keepProfileIcon,
+  makeAppProfileIcon,
+  withNameBadge,
+  type AppProfileIconSource
+} from './app-profile-icon'
+import { writeBundleIcon } from './app-profile-bundle-icon'
 
 export const LSREGISTER =
   '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
@@ -55,12 +62,16 @@ export type CreateAppProfileOptions = {
   port?: number
   /** A JSON file of settings. The profile applies them at its first start. */
   settingsFile?: string
+  /** The default: a badge with the first free character, in the ref-match style. */
+  icon?: AppProfileIconSource
   defaultAppPath: string
   /** Test runs only: write the profiles root into Info.plist, so a Dock launch finds a test root. */
   pinRoot?: boolean
   env?: NodeJS.ProcessEnv
   home?: string
   run?: RunTool
+  /** Tests only: the icon renderer. */
+  makeIcon?: typeof makeAppProfileIcon
   now?: () => number
 }
 
@@ -116,12 +127,20 @@ export function createAppProfile(
     try {
       const bundle = join(staging, `${name}.app`)
       const pinnedRoot = options.pinRoot ? root : undefined
+      const used = registry.profiles.map((profile) => profile.icon)
+      const made = (options.makeIcon ?? makeAppProfileIcon)(
+        defaultApp,
+        withNameBadge(options.icon ?? { kind: 'badge' }, name, used),
+        used
+      )
       const { bundleId } = buildProfileBundle(
         defaultApp,
         bundle,
         { id, name, root: pinnedRoot },
         run,
-        staging
+        staging,
+        // The icon is a real file, so the seal covers it and the Dock shows it.
+        (contents, defaultPlist) => writeBundleIcon(contents, defaultPlist, made.icns)
       )
       // The marker comes first: a launchable app always finds its profile. A later failure
       // removes the app, so a retry with the same name works.
@@ -133,6 +152,7 @@ export function createAppProfile(
         // Kept data can hold a seed of an earlier create; this create copies no settings.
         rmSync(seed, { force: true })
       }
+      keepProfileIcon(userDataPath, made)
       const entry: AppProfileEntry = {
         id,
         name,
@@ -140,6 +160,7 @@ export function createAppProfile(
         appPath,
         userDataPath,
         port,
+        icon: made.icon,
         createdAt: (options.now ?? Date.now)()
       }
       renameSync(bundle, appPath)

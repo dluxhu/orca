@@ -17,11 +17,12 @@ import {
   appProfilesRoot,
   parseAppProfileMarker
 } from '../../shared/app-profiles/app-profile-paths'
-import type {
-  AppProfileChange,
-  AppProfileReply,
-  AppProfileRow,
-  AppProfilesState
+import {
+  appProfileIconFlags,
+  type AppProfileChange,
+  type AppProfileReply,
+  type AppProfileRow,
+  type AppProfilesState
 } from '../../shared/app-profiles/app-profile-rules'
 import { listAppProfiles } from '../../cli/app-profiles/app-profile-list'
 import {
@@ -32,6 +33,8 @@ import { translateMain } from '../i18n/main-i18n'
 import { mainProcessState as state } from '../startup/main-process-state'
 import { getAppProfile, isProfileManagerApp, ownDefaultAppPath } from './app-profile'
 import { profilesEnv, profilesRoot, runCli } from './profile-manager-cli'
+import { registerProfileIconIpc } from './profile-manager-icon'
+import { appIcons, withAppIcons, type AppIcon } from './profile-manager-app-icon'
 import { registerOwnProfileIpc } from './profile-manager-settings'
 import { isProfileManagerRenderer, openApp, showProfileManager } from './profile-manager-window'
 
@@ -92,8 +95,11 @@ export function profileCommandArgs(
         String(change.port),
         ...(extra.settingsFile ? ['--settings-file', extra.settingsFile] : []),
         ...(extra.pinRoot ? ['--pin-root'] : []),
+        ...appProfileIconFlags(change.icon),
         '--json'
       ]
+    case 'set-icon':
+      return ['profiles', 'set-icon', change.id, ...appProfileIconFlags(change.icon), '--json']
     case 'rename':
       return ['profiles', 'rename', change.id, '--name', change.name, '--json']
     case 'set-port':
@@ -221,16 +227,18 @@ function fromProfileManager<T extends unknown[], R>(
 export function registerProfileManagerIpc(): void {
   ipcMain.handle(
     'appProfiles:state',
-    fromProfileManager(() => readAppProfilesState())
+    fromProfileManager(async () => withAppIcons(await readAppProfilesState()))
   )
   ipcMain.handle('appProfiles:change', fromProfileManager(changeAppProfile))
   ipcMain.handle('appProfiles:open', fromProfileManager(onAppOf(openApp)))
+  registerProfileIconIpc(fromProfileManager)
   ipcMain.handle('appProfiles:showInFinder', fromProfileManager(onAppOf(shell.showItemInFolder)))
   registerOwnProfileIpc(readAppProfilesState, changeAppProfile)
 }
 
 // The Profiles menu. Electron menus are not live, so the rows are cached and the menu rebuilt.
 let menuRows: AppProfileRow[] = []
+let menuIcons = new Map<string, AppIcon>()
 let rebuildMenu: (() => void) | null = null
 
 // One launchctl print per profile is slow. A refresh on app activation reads only the runtime pids
@@ -262,6 +270,7 @@ async function refreshProfilesMenu(full = true): Promise<void> {
   }
   try {
     menuRows = (await readAppProfilesState({ serviceRun: cachedServiceRun })).rows
+    menuIcons = await appIcons(menuRows)
     rebuildMenu()
   } catch (error) {
     console.warn('[profiles] menu refresh failed:', error)
@@ -302,15 +311,14 @@ export function profilesMenuItems(managerShortcut?: string): MenuItemConstructor
   const currentId = currentAppId()
   const stateLabel = {
     running: translateMain('menu.profileRunning', 'Running'),
-    background: translateMain('menu.profileBackground', 'Running in background'),
-    stopped: ''
+    background: translateMain('menu.profileBackground', 'Running in background')
   }
   const item = (row: AppProfileRow): MenuItemConstructorOptions => {
     const name = row.id === 'default' ? translateMain('menu.profileDefault', 'Default') : row.name
-    const click = (): void => openApp(row.appPath)
+    const common = { icon: menuIcons.get(row.id)?.menu, click: () => openApp(row.appPath) }
     return row.id === currentId
-      ? { label: name, type: 'checkbox', checked: true, click }
-      : { label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}`, click }
+      ? { ...common, label: name, type: 'checkbox', checked: true }
+      : { ...common, label: row.state === 'stopped' ? name : `${name} — ${stateLabel[row.state]}` }
   }
   const section = (label: string, rows: AppProfileRow[]): MenuItemConstructorOptions[] =>
     rows.length > 0 ? [{ type: 'header', label }, ...rows.map(item), { type: 'separator' }] : []
