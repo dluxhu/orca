@@ -223,12 +223,14 @@ describe('local webhook listener, keys and replays', () => {
   })
 
   it('refuses a call whose key a stop-now rotation ended while its body was read', async () => {
-    // The listener's first key check: once it has passed, the listener waits for the body.
+    // Each key check's answer; once the first has passed, the listener waits for the body.
     const authenticate = store.authenticate.bind(store)
+    const answers: (string | null)[] = []
     let keyChecked: () => void = () => {}
     const checked = new Promise<void>((resolve) => (keyChecked = resolve))
-    vi.spyOn(store, 'authenticate').mockImplementationOnce(async (hookId, key) => {
+    vi.spyOn(store, 'authenticate').mockImplementation(async (hookId, key) => {
       const opened = await authenticate(hookId, key)
+      answers.push(opened?.hookId ?? null)
       keyChecked()
       return opened
     })
@@ -244,6 +246,9 @@ describe('local webhook listener, keys and replays', () => {
     await store.rotate(hook.hookId, 'r-1', true)
     req.end('1}')
     expect(await status).toBe(404)
+    // Opened before the body, refused by the check after it: the call never reached admission.
+    expect(answers).toEqual([hook.hookId, null])
+    expect(await store.history(hook.hookId)).toEqual([])
     expect(received).toHaveLength(0)
   })
 
