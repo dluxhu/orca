@@ -57,9 +57,6 @@ const WINDOW_KEYS: readonly [
   ['30d', 43200, (p) => p.monthly]
 ]
 
-// Same subset and order the built-in Gemini rendering shows.
-const BUCKET_ORDER = ['Flash', 'Pro', '1.5 Pro']
-
 /** Window percentage in the user's Used/Remaining preference. */
 function percent(window: RateLimitWindow, display: UsagePercentageDisplay): string {
   return `${getDisplayedUsagePercentage(window.usedPercent, display)}%`
@@ -99,10 +96,7 @@ export function buildUsageFormatValues(
         ? `${getDisplayedUsagePercentage(100 - ((window.resetsAt - options.now) / windowMs) * 100, options.display)}%`
         : ''
   }
-  const buckets = (p.buckets ?? [])
-    .filter((bucket) => BUCKET_ORDER.includes(bucket.name))
-    .sort((a, b) => BUCKET_ORDER.indexOf(a.name) - BUCKET_ORDER.indexOf(b.name))
-  values.buckets = buckets
+  values.buckets = (p.buckets ?? [])
     .map((bucket) => `${bucket.name} ${percent(bucket, options.display)}`)
     .join(' · ')
   return values
