@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { MessageSquarePlus, SquareSplitVertical } from 'lucide-react'
+import { Braces, MessageSquarePlus, SquareSplitVertical } from 'lucide-react'
 import { ShortcutKeyCombo } from '@/components/ui/ShortcutKeyCombo'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -18,6 +18,7 @@ import { useBotHomeRuleApplies } from '@/lib/bot-host-status'
 import { NativeChatSettingsButton } from '../../appearance/NativeChatSettingsButton'
 import type { NativeChatStructuredViewProps } from '../../native-chat-view-types'
 import type { NativeChatHandOff } from './use-native-chat-hand-off'
+import { useNativeChatRawPanel } from '../../messages/diagnostics/NativeChatRawPanel'
 
 const HEADER_STYLE: React.CSSProperties & Record<'--orca-pane-title-bg', string> = {
   '--orca-pane-title-bg': 'var(--chat-canvas)'
@@ -69,6 +70,8 @@ export function NativeChatPaneHeader({
     'components.agentSessionContinuation.handOffToAnotherAgent',
     'Hand off to agent'
   )
+  const rawPanel = useNativeChatRawPanel(tabId)
+  const showRaw = t('components.native-chat.rawPanel.toggle', 'Show raw')
   const homeBot = hostedChat && homeRule && bot?.chatSessionId === nativeChat.sessionId ? bot : null
   return (
     <div
@@ -102,6 +105,26 @@ export function NativeChatPaneHeader({
             </TooltipContent>
           </Tooltip>
         ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="pane-title"
+              size="icon-xs"
+              aria-label={showRaw}
+              aria-pressed={rawPanel.open}
+              onClick={(event) => {
+                event.stopPropagation()
+                rawPanel.toggle()
+              }}
+            >
+              <Braces className="size-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={4}>
+            {showRaw}
+          </TooltipContent>
+        </Tooltip>
         {!onBotPage && nativeChat.agent && agentForksConversations(nativeChat.agent) ? (
           <NativeChatResumeInCliButton
             tabId={tabId}
