@@ -11,7 +11,6 @@ import type { CodexAccountUsageRead } from '../../../rate-limits/providers/codex
 import type { ClaudeAccountRecipe } from '../../../../shared/agent-session/lifecycle/accounts/agent-session-acquired-account'
 import type { StructuredAgentSessionAdmitFreshInput } from '../delivery/structured-agent-session-input-admission'
 import type { AiVaultConversationCopy } from '../../../../shared/ai-vault/resume/ai-vault-resume-preparation'
-import type { StructuredAgentSessionAdapterPermission } from './structured-agent-session-adapter-permission'
 import type {
   AgentSessionRewindFork,
   AgentSessionRewindSupport
@@ -36,14 +35,11 @@ import type { StructuredAgentSessionAtRestCommands } from '../options/structured
 import type { AgentSessionSlashCommand } from '../../../../shared/agent-session/agent-session-wire'
 import type { AgentSessionThreadGoalChange } from '../../../../shared/agent-session/thread-goals/agent-session-thread-goal-wire'
 import type { SubmissionRejectionFact } from '../../../../shared/agent-session/failures/agent-session-failure'
-import type {
-  AgentSessionCloseObserver,
-  StructuredAgentSessionAdapterStop
-} from './structured-agent-session-adapter-stop'
+import type { AgentSessionCloseObserver } from './structured-agent-session-adapter-stop'
 /** `unknown` (no timely, correlated answer) skips this idle stop and asks again later. */
 export type AgentSessionIdleConfirmation = 'idle' | 'busy' | 'unknown'
 
-import type { StructuredAgentSessionAdapterRemoteControl } from './structured-agent-session-adapter-remote-control'
+import type { StructuredAgentSessionAdapterControls as AdapterControls } from './structured-agent-session-adapter-remote-control'
 import type { AgentJournalDispatchRejection } from '../../../../shared/agent-session/failures/agent-session-failure-words'
 import type { AgentSessionExecutionOptions } from '../../../../shared/agent-session/options/protocol/agent-session-execution-options'
 import type { AgentSessionPromptResponse } from '../../../../shared/agent-session/requests/prompts/agent-session-question-answer'
@@ -184,10 +180,6 @@ export type StructuredAgentSessionSetOptionInput = {
   /** Stop/close/quit aborts cannot wait for hung option writes; self-bounded adapters may ignore the signal. */
   signal?: AbortSignal
 }
-
-type AdapterControls = StructuredAgentSessionAdapterStop &
-  StructuredAgentSessionAdapterPermission &
-  StructuredAgentSessionAdapterRemoteControl
 
 export type StructuredAgentSessionAdapter = AdapterControls & {
   readAccountUsage?(record: AgentSessionRecord, signal: AbortSignal): Promise<CodexAccountUsageRead>
