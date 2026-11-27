@@ -135,20 +135,15 @@ describe('app profile homes', () => {
       codexHomeSessionsDir(),
       defaultCodexHomeDir(),
       getClaudePluginMetadataPaths(homedir(), '/repo').installedPlugins,
-      ...(['gemini', 'copilot', 'kiro', 'cline', 'codebuddy', 'openclaw'] as const).map(
+      ...(['copilot', 'kiro', 'cline', 'codebuddy', 'openclaw'] as const).map(
         (agent) => AI_VAULT_AGENT_SOURCES[agent]!.rootDirs({}, [])[0]
       ),
-      ...['home-codex', 'codex-plugin-cache', 'home-qoder', 'home-copilot', 'home-gemini'].map(
-        skillRoot
-      ),
+      ...['home-codex', 'codex-plugin-cache', 'home-qoder', 'home-copilot'].map(skillRoot),
       ...(['claude', 'grok', 'codebuddy', 'kiro'] as const).map(
         (id) => installRoots[id] ?? `missing ${id}`
       )
     ]
     expect(paths.filter((path) => !underProfile(path))).toEqual([])
-    expect(skillRoot('home-gemini')).toBe(
-      join(work, 'orca-home', 'agents', 'gemini', '.gemini', 'skills')
-    )
     const { formerSkillRootPaths } =
       await import('../../main/skills/bundled-skill-install/former-skill-roots')
     expect(formerSkillRootPaths({ scope: 'global', homeDirectory: homedir() })).toEqual([
