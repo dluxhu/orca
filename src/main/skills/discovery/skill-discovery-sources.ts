@@ -1,8 +1,5 @@
 import { homedir } from 'node:os'
-import {
-  agentHomeDirIn,
-  type AppProfileAgentHomeVariable
-} from '../../../shared/app-profiles/app-profile-homes'
+import { agentHomeDirIn } from '../../../shared/app-profiles/app-profile-homes'
 import { basename, join, type posix } from 'node:path'
 import type {
   SkillDiscoverySource,
@@ -134,7 +131,7 @@ export function buildSkillDiscoverySources(
   const pathApi = args.pathApi ?? { basename, join }
   const home = args.homeDir ?? homedir()
   // On this host, an app profile's agent folders replace the ones in the user's home.
-  const agentHome = (variable: AppProfileAgentHomeVariable, folder: string): string =>
+  const agentHome = (variable: Parameters<typeof agentHomeDirIn>[1], folder: string): string =>
     args.pathApi ? pathApi.join(home, folder) : agentHomeDirIn(home, variable, folder)
   const cwd = args.cwd ?? process.cwd()
   const providerRootOverrides =
