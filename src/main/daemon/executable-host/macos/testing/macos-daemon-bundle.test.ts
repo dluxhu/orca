@@ -170,15 +170,15 @@ it('copies the app behind a symbolic link rather than retaining a link to the up
 })
 
 it("gives a profile app the default app's host, checked against the host's own signature", async () => {
-  // The profile is ad hoc: its designated requirement is its own cdhash. Its app.asar link
-  // points into the default app.
-  const asar = join(source, 'Contents', 'Resources', 'app.asar')
-  await mkdir(join(source, 'Contents', 'Resources'), { recursive: true })
-  await writeFile(asar, 'asar')
+  // The profile is ad hoc: its designated requirement is its own cdhash. Its app.asar.unpacked
+  // link points into the default app; its app.asar is no link (Electron 45 reads none).
+  const unpacked = join(source, 'Contents', 'Resources', 'app.asar.unpacked')
+  await mkdir(unpacked, { recursive: true })
   const profile = join(root, 'Profiles', 'Work.app')
   await mkdir(join(profile, 'Contents', 'Resources'), { recursive: true })
   await mkdir(join(profile, 'Contents', 'MacOS'), { recursive: true })
-  await symlink(asar, join(profile, 'Contents', 'Resources', 'app.asar'))
+  await writeFile(join(profile, 'Contents', 'Resources', 'app.asar'), 'own asar')
+  await symlink(unpacked, join(profile, 'Contents', 'Resources', 'app.asar.unpacked'))
   appProfileMock.mockReturnValue({ id: 'work' })
   inspectMock.mockResolvedValue({
     identity: 'profile',
