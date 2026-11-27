@@ -225,27 +225,23 @@ describe('local webhook routes', () => {
     expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(2)
   })
 
-  it('fails an overlapping repeat with the rotation it repeats, and rotates on a later retry', async () => {
+  it('rotates once for overlapping repeats, also when removing a cancelled envelope fails', async () => {
     const hook = await mint()
-    await value(routes.sample(hook.hookId, 'sample-1'))
-    // The pending call's envelope can't be removed, so the stop-now cancellation fails.
+    const { callId } = await value(routes.sample(hook.hookId, 'sample-1'))
     removal.fail = true
     try {
-      const tries = await Promise.allSettled([
-        routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }),
-        routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true })
+      const answers = await Promise.all([
+        value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true })),
+        value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }))
       ])
-      expect(tries.map((entry) => entry.status)).toEqual(['rejected', 'rejected'])
+      expect(answers).toEqual([{ cancelledCalls: 1 }, { cancelledCalls: 1 }])
     } finally {
       removal.fail = false
     }
-    expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(1)
-    expect(await value(routes.rotate(hook.hookId, { operationId: 'r-1', stopNow: true }))).toEqual({
-      cancelledCalls: 1
-    })
     expect((await value(routes.get(hook.hookId))).keyGeneration).toBe(2)
+    // The file stayed, but no call lists it any more.
+    expect(await routes.envelope(callId)).toMatchObject({ ok: false, status: 404 })
   })
-
   it('makes one sample per operation, and delivers it again if its delivery failed', async () => {
     const hook = await mint()
     let failures = 1
@@ -280,28 +276,24 @@ describe('local webhook routes', () => {
     expect(await routes.start(callId, 'run-1')).toMatchObject({ ok: false, status: 410 })
   })
 
-  it('finishes a pause on retry when its first cancellation failed', async () => {
+  it('never reports a pause that was not saved, also to an overlapping request', async () => {
     const hook = await mint()
-    const { callId } = await value(routes.sample(hook.hookId, 'sample-1'))
-    removal.fail = true
+    removal.failWrites = true
     try {
-      await expect(
-        value(routes.setState(hook.hookId, { operationId: 'p-1', state: 'paused' }))
-      ).rejects.toThrow()
+      const tries = await Promise.allSettled([
+        routes.setState(hook.hookId, { operationId: 'p-1', state: 'paused' }),
+        routes.setState(hook.hookId, { operationId: 'p-2', state: 'paused' })
+      ])
+      expect(tries.map((entry) => entry.status)).toEqual(['rejected', 'rejected'])
     } finally {
-      removal.fail = false
+      removal.failWrites = false
     }
+    expect((await new LocalWebhookStore(dir, () => now).hook(hook.hookId))?.state).toBe('live')
     expect(
-      await value(routes.setState(hook.hookId, { operationId: 'p-1', state: 'paused' }))
-    ).toMatchObject({
-      state: 'paused',
-      epoch: 2,
-      pendingCalls: 0
-    })
-    expect(await routes.envelope(callId)).toMatchObject({ ok: false, status: 404 })
+      await value(routes.setState(hook.hookId, { operationId: 'p-3', state: 'paused' }))
+    ).toMatchObject({ state: 'paused', epoch: 2 })
     expect((await new LocalWebhookStore(dir, () => now).hook(hook.hookId))?.state).toBe('paused')
   })
-
   it('refuses sender signatures, and forgets a removed hook', async () => {
     const hook = await mint()
     expect(

@@ -74,8 +74,8 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
     get: (hookId) => withHook(hookId, async (hook) => answer(await view(hook))),
     setState: (hookId, { state }) =>
       withHook(hookId, async (hook) => {
-        await store.setState(hook, state)
-        return answer(await view(hook))
+        const changed = await store.setState(hook.hookId, state)
+        return changed ? answer(await view(changed)) : refuse(404, 'not_found')
       }),
     remove: (hookId) =>
       withHook(hookId, async () => {
@@ -84,9 +84,10 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
       }),
     reveal: (hookId) => withHook(hookId, async (hook) => answer({ key: hook.key })),
     rotate: (hookId, { operationId, stopNow }) =>
-      withHook(hookId, async (hook) =>
-        answer({ cancelledCalls: await store.rotate(hook, operationId, stopNow) })
-      ),
+      withHook(hookId, async () => {
+        const cancelledCalls = await store.rotate(hookId, operationId, stopNow)
+        return cancelledCalls === null ? refuse(404, 'not_found') : answer({ cancelledCalls })
+      }),
     setSecret: (hookId) => withHook(hookId, async () => refuse(400, LOCAL_SIGNATURES_UNSUPPORTED)),
     sample: (hookId, operationId) =>
       withHook(hookId, async (hook) => {

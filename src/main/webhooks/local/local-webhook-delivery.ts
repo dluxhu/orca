@@ -67,11 +67,14 @@ async function handOver(
   call: LocalCall
 ): Promise<void> {
   const automations = deps.automations()
-  // A hook paused since its call came in (paused now, or paused and resumed: a newer epoch) hands
-  // nothing over, as the pause would have cancelled the call.
+  // The hook as stored now: one removed, paused since the call came in, or paused and resumed (a
+  // newer epoch) hands nothing over, as the pause would have cancelled the call.
+  const live = await deps.store.hook(hook.hookId)
   const epoch = call.epoch ?? hook.epoch
   const found =
-    hook.state === 'paused' || epoch !== hook.epoch ? null : hookAutomation(automations, hook)
+    !live || live.state === 'paused' || epoch !== live.epoch
+      ? null
+      : hookAutomation(automations, live)
   const delivery: TriggerDelivery | null = found && {
     kind: 'trigger',
     deliveryId: call.callId,

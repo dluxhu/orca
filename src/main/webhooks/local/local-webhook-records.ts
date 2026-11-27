@@ -154,20 +154,6 @@ export function hookView(
 export const deliveryHash = (deliveryId: string): string =>
   createHash('sha256').update(deliveryId).digest('hex')
 
-/** The running promise for the key, or a new run; an overlapping repeat shares its outcome. */
-export function shared<T>(
-  running: Map<string, Promise<T>>,
-  key: string,
-  run: () => Promise<T>
-): Promise<T> {
-  let promise = running.get(key)
-  if (!promise) {
-    promise = run().finally(() => running.delete(key))
-    running.set(key, promise)
-  }
-  return promise
-}
-
 // Counted requests are kept a week.
 const COUNTER_MS = 7 * 24 * 60 * 60 * 1000
 

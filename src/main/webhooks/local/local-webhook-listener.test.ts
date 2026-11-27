@@ -231,7 +231,7 @@ describe('local webhook listener, keys and replays', () => {
       req.write('{"a":')
       // The listener has checked the key and waits for the rest of the body.
       setTimeout(() => {
-        void store.rotate(hook, 'r-1', true).then(() => req.end('1}'))
+        void store.rotate(hook.hookId, 'r-1', true).then(() => req.end('1}'))
       }, 50)
     })
     expect(await status).toBe(404)
@@ -292,7 +292,7 @@ describe('local webhook listener, keys and replays', () => {
 
   it('hands nothing over for a call listed just after its hook was paused', async () => {
     // The pause cancels calls already listed; this one was being stored while it ran.
-    await store.setState(hook, 'paused')
+    await store.setState(hook.hookId, 'paused')
     const call = await store.admit(hook, { receivedAt: 1, state: 'queued' }, null)
     if (!call) {
       throw new Error('not taken')
@@ -334,7 +334,7 @@ describe('local webhook listener, keys and replays', () => {
 
   it('refuses a call whose key a stop-now rotation ended before it was listed', async () => {
     const oldKey = hook.key
-    await store.rotate(hook, 'r-2', true)
+    await store.rotate(hook.hookId, 'r-2', true)
     const call = await store.admit(
       hook,
       { receivedAt: 1, state: 'queued' },

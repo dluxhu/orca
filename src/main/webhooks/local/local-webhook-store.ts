@@ -18,7 +18,6 @@ import {
   newHookId,
   newWebhookKey,
   queuedCalls,
-  shared,
   writeOwnerOnlyFile,
   type LocalCall,
   type LocalCounterKind,
@@ -42,8 +41,7 @@ const ENVELOPES_PER_HOOK = 50
 export class LocalWebhookStore {
   private loaded: Promise<StoredLocalWebhooks> | null = null
   private writes: Promise<void> = Promise.resolve()
-  private readonly rotations = new Map<string, Promise<number>>()
-  private readonly mints = new Map<string, Promise<LocalHook>>()
+  private lifecycle: Promise<unknown> = Promise.resolve()
 
   constructor(
     private readonly userDataPath: string,
@@ -121,112 +119,115 @@ export class LocalWebhookStore {
     return queuedCalls(await this.data())
   }
 
-  /** A repeat while the first try is still writing waits for it, a failure included. */
-  mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
-    return shared(this.mints, operationId, () => this.mintOnce(operationId, automationId, botId))
+  /**
+   * Hook changes run one at a time, each on the state the one before left: a change has awaits in
+   * its middle, and an overlapping one must never see it half done. A failed save drops memory
+   * (save), so the next one starts from the file.
+   */
+  private inTurn<T>(change: (data: StoredLocalWebhooks) => Promise<T>): Promise<T> {
+    const next = this.lifecycle.then(async () => await change(await this.data()))
+    this.lifecycle = next.catch(() => {})
+    return next
   }
 
-  private async mintOnce(
-    operationId: string,
-    automationId: string,
-    botId: string
-  ): Promise<LocalHook> {
-    const data = await this.data()
-    const made = data.hooks.find((hook) => hook.mintOperationId === operationId)
-    if (made) {
-      return made
-    }
-    const hook: LocalHook = {
-      hookId: newHookId(),
-      automationId,
-      botId,
-      state: 'live',
-      epoch: 1,
-      keyGeneration: 1,
-      key: newWebhookKey(),
-      previousKeyExpiresAt: null,
-      mintOperationId: operationId,
-      lastCall: null
-    }
-    data.hooks.push(hook)
-    await this.save(data)
-    return hook
+  /** The hook a create made; a repeat with the same operationId gets the same hook. */
+  mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
+    return this.inTurn(async (data) => {
+      const made = data.hooks.find((hook) => hook.mintOperationId === operationId)
+      if (made) {
+        return made
+      }
+      const hook: LocalHook = {
+        hookId: newHookId(),
+        automationId,
+        botId,
+        state: 'live',
+        epoch: 1,
+        keyGeneration: 1,
+        key: newWebhookKey(),
+        previousKeyExpiresAt: null,
+        mintOperationId: operationId,
+        lastCall: null
+      }
+      data.hooks.push(hook)
+      await this.save(data)
+      return hook
+    })
   }
 
   /** A pause cancels the calls not yet started, as Orca Cloud does, and raises the hook's epoch. */
-  async setState(hook: LocalHook, state: LocalHook['state']): Promise<void> {
-    if (hook.state === state) {
-      return
-    }
-    const data = await this.data()
-    hook.state = state
-    if (state === 'paused') {
-      hook.epoch++
-      // Unfinished: memory goes, so a retry pauses again from the file, as rotateOnce does.
-      await this.cancelPending(data, hook.hookId).catch((error: unknown) => {
-        this.loaded = null
-        throw error
-      })
-    }
-    await this.save(data)
+  setState(hookId: string, state: LocalHook['state']): Promise<LocalHook | null> {
+    return this.inTurn(async (data) => {
+      const hook = data.hooks.find((entry) => entry.hookId === hookId)
+      if (!hook || hook.state === state) {
+        return hook ?? null
+      }
+      hook.state = state
+      const cancelled = state === 'paused' ? this.cancelPending(data, hookId) : []
+      if (state === 'paused') {
+        hook.epoch++
+      }
+      await this.save(data)
+      await this.removeEnvelopes(cancelled)
+      return hook
+    })
   }
 
-  async remove(hookId: string): Promise<void> {
-    const data = await this.data()
-    const gone = data.calls.filter((entry) => entry.hookId === hookId && entry.hasEnvelope)
-    data.hooks = data.hooks.filter((hook) => hook.hookId !== hookId)
-    data.calls = data.calls.filter((call) => call.hookId !== hookId)
-    data.counters = data.counters.filter((counter) => counter.hookId !== hookId)
-    data.deliveries = data.deliveries.filter((entry) => entry.hookId !== hookId)
-    await this.save(data)
-    // Only after the save, best effort: a leftover file names no hook, a half-removed hook would.
-    await Promise.all(
-      gone.map((call) => rm(this.envelopePath(call.callId), { force: true }).catch(() => {}))
-    )
+  remove(hookId: string): Promise<void> {
+    return this.inTurn(async (data) => {
+      const gone = data.calls.filter((entry) => entry.hookId === hookId && entry.hasEnvelope)
+      data.hooks = data.hooks.filter((hook) => hook.hookId !== hookId)
+      data.calls = data.calls.filter((call) => call.hookId !== hookId)
+      data.counters = data.counters.filter((counter) => counter.hookId !== hookId)
+      data.deliveries = data.deliveries.filter((entry) => entry.hookId !== hookId)
+      await this.save(data)
+      await this.removeEnvelopes(gone)
+    })
   }
 
-  /** A new key; the old one keeps working a day, or stops now with the calls it let in. */
-  rotate(hook: LocalHook, operationId: string, stopNow: boolean): Promise<number> {
-    return shared(this.rotations, operationId, () => this.rotateOnce(hook, operationId, stopNow))
+  /** A new key; the old one keeps working a day, or stops now with the calls it let in. Null for a
+   *  hook that is gone. */
+  rotate(hookId: string, operationId: string, stopNow: boolean): Promise<number | null> {
+    return this.inTurn(async (data) => {
+      const hook = data.hooks.find((entry) => entry.hookId === hookId)
+      if (!hook || hook.rotateOperationId === operationId) {
+        return hook ? (hook.rotateCancelled ?? 0) : null
+      }
+      hook.rotateOperationId = operationId
+      if (stopNow) {
+        delete hook.previousKey
+      } else {
+        hook.previousKey = hook.key
+      }
+      hook.previousKeyExpiresAt = stopNow ? null : this.now() + PREVIOUS_KEY_MS
+      hook.key = newWebhookKey()
+      hook.keyGeneration++
+      const cancelled = stopNow ? this.cancelPending(data, hookId) : []
+      hook.rotateCancelled = cancelled.length
+      await this.save(data)
+      await this.removeEnvelopes(cancelled)
+      return cancelled.length
+    })
   }
 
-  private async rotateOnce(
-    hook: LocalHook,
-    operationId: string,
-    stopNow: boolean
-  ): Promise<number> {
-    if (hook.rotateOperationId === operationId) {
-      return hook.rotateCancelled ?? 0
-    }
-    // The key changes before any await, so a repeat of this operation can't rotate it again.
-    hook.rotateOperationId = operationId
-    if (stopNow) {
-      delete hook.previousKey
-    } else {
-      hook.previousKey = hook.key
-    }
-    hook.previousKeyExpiresAt = stopNow ? null : this.now() + PREVIOUS_KEY_MS
-    hook.key = newWebhookKey()
-    hook.keyGeneration++
-    const data = await this.data()
-    try {
-      hook.rotateCancelled = stopNow ? await this.cancelPending(data, hook.hookId) : 0
-    } catch (error) {
-      // Unfinished: memory goes, so a retry rotates again from the file.
-      this.loaded = null
-      throw error
-    }
-    await this.save(data)
-    return hook.rotateCancelled
-  }
-
-  private async cancelPending(data: StoredLocalWebhooks, hookId: string): Promise<number> {
+  /** Marks the calls not yet started cancelled, with no envelope; their files go after the save. */
+  private cancelPending(data: StoredLocalWebhooks, hookId: string): LocalCall[] {
     const pending = data.calls.filter((call) => call.hookId === hookId && isPending(call))
     for (const call of pending) {
       call.state = 'cancelled'
-      await this.dropEnvelope(call)
     }
-    return pending.length
+    return pending.filter((call) => {
+      const had = call.hasEnvelope
+      call.hasEnvelope = false
+      return had
+    })
+  }
+
+  /** Best effort, after a save: a leftover file is never read once no call lists it. */
+  private async removeEnvelopes(calls: readonly LocalCall[]): Promise<void> {
+    await Promise.all(
+      calls.map((call) => rm(this.envelopePath(call.callId), { force: true }).catch(() => {}))
+    )
   }
 
   private async dropEnvelope(call: LocalCall): Promise<void> {
@@ -293,9 +294,7 @@ export class LocalWebhookStore {
     // A failed save drops memory (save), so a refused call is never visible afterwards.
     await this.save(data)
     // Only after the save: a leftover file is harmless, a half-taken call is not.
-    await Promise.all(
-      stale.map((old) => rm(this.envelopePath(old.callId), { force: true }).catch(() => {}))
-    )
+    await this.removeEnvelopes(stale)
     return entry
   }
 
