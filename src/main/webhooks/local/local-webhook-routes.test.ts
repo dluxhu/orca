@@ -12,12 +12,18 @@ import { localWebhookCalls, switchedWebhookCalls } from './local-webhook-routes'
 import { keyMatches } from './local-webhook-records'
 import { LocalWebhookStore, type LocalCall } from './local-webhook-store'
 
-// Lets a test make the store's file removal fail.
-const removal = vi.hoisted(() => ({ fail: false }))
+// Lets a test make the store's file writes or removals fail.
+const removal = vi.hoisted(() => ({ fail: false, failWrites: false }))
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof FsPromises>()
   return {
     ...actual,
+    writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
+      if (removal.failWrites) {
+        throw new Error('write failed')
+      }
+      await actual.writeFile(...args)
+    },
     rm: async (...args: Parameters<typeof actual.rm>) => {
       if (removal.fail) {
         throw new Error('removal failed')
@@ -73,6 +79,21 @@ describe('local webhook routes', () => {
     const reopened = new LocalWebhookStore(dir, () => now)
     expect((await reopened.authenticate(hook.hookId, key))?.hookId).toBe(hook.hookId)
     expect(await reopened.authenticate(hook.hookId, `${key}x`)).toBeNull()
+  })
+
+  it('never acknowledges a mint whose write failed, also to an overlapping repeat', async () => {
+    removal.failWrites = true
+    try {
+      const tries = await Promise.allSettled([mint(), mint()])
+      expect(tries.map((entry) => entry.status)).toEqual(['rejected', 'rejected'])
+    } finally {
+      removal.failWrites = false
+    }
+    expect(await new LocalWebhookStore(dir, () => now).hooks()).toEqual([])
+    const hook = await mint()
+    expect(
+      (await new LocalWebhookStore(dir, () => now).hooks()).map((entry) => entry.hookId)
+    ).toEqual([hook.hookId])
   })
 
   it('shows the local URL, or the Public URL when one is set', async () => {

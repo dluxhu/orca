@@ -15,7 +15,7 @@ import {
   withoutKeys,
   type LocalWebhookDeliverDeps
 } from './local-webhook-delivery'
-import type { LocalHook } from './local-webhook-store'
+import type { LocalCall, LocalHook } from './local-webhook-store'
 
 // As Orca Cloud's WEBHOOK_ENVELOPE_LIMITS (connector-contract/src/webhook-envelope.ts).
 const MAX_HEADER_VALUE_LENGTH = 1024
@@ -217,13 +217,14 @@ export function createLocalWebhookHandler(
       return
     }
     const deliveryId = DELIVERY_ID_HEADERS.map((name) => headerValue(req, name)).find(Boolean)
-    if (deliveryId && (await deps.store.replayed(hook.hookId, deliveryId))) {
+    if (deliveryId && !(await deps.store.claimDelivery(hook.hookId, deliveryId))) {
       await deps.store.count(hook.hookId, 'duplicate')
       send(res, 200, { status: 'duplicate' })
       return
     }
+    let taken: Awaited<ReturnType<typeof admit>>
     try {
-      await admit(res, hook, found, key, {
+      taken = await admit(hook, found, [hook.key, hook.previousKey, key], deliveryId, {
         contentType,
         body: parsed,
         headers: Object.fromEntries(
@@ -233,56 +234,47 @@ export function createLocalWebhookHandler(
           })
         )
       })
-    } catch (error) {
-      // Not taken: the sender's retry of this delivery id is a new call, not a duplicate.
+    } finally {
+      // Saved with its call by now, or not taken: either way the claim ends.
       if (deliveryId) {
-        await deps.store.forgetDelivery(hook.hookId, deliveryId)
+        deps.store.releaseDelivery(hook.hookId, deliveryId)
       }
-      throw error
     }
+    if (taken.status === 'queued') {
+      await deliverLocalCall(deps, hook, taken.call)
+    }
+    send(res, 200, { callId: taken.call.callId, status: taken.status })
   }
 
+  /** Stores the call, with its delivery id; queued when the rule's filters take it. */
   const admit = async (
-    res: ServerResponse,
     hook: LocalHook,
     found: NonNullable<ReturnType<typeof hookAutomation>>,
-    key: string,
+    keys: (string | undefined)[],
+    deliveryId: string | undefined,
     request: Pick<WebhookEnvelope, 'contentType' | 'headers' | 'body'>
-  ): Promise<void> => {
+  ): Promise<{ call: LocalCall; status: 'queued' | 'ignored' | 'paused' }> => {
     const receivedAt = now()
     // The hook's own keys never reach the stored call, the run's file or its quote: replaced after
     // decoding, so an escaped or percent-encoded echo is caught too.
-    const { headers, body } = withoutKeys({ headers: request.headers, body: request.body }, [
-      hook.key,
-      hook.previousKey,
-      key
-    ])
-    const envelope: WebhookEnvelope = {
-      receivedAt,
-      contentType: request.contentType,
-      headers,
-      body,
-      truncated: false
-    }
+    const { contentType, headers, body } = withoutKeys(request, keys)
+    const envelope: WebhookEnvelope = { receivedAt, contentType, headers, body, truncated: false }
     const view = webhookCallView(envelope)
+    const stored = (state: 'queued' | 'ignored' | 'paused', subject?: string) =>
+      deps.store.admit(
+        hook,
+        { receivedAt, state, ...(subject === undefined ? {} : { subject }) },
+        state === 'queued' ? envelope : null,
+        deliveryId
+      )
     if (hook.state === 'paused' || !found.automation.enabled) {
-      const paused = await deps.store.admit(hook, { receivedAt, state: 'paused' }, null)
-      send(res, 200, { callId: paused.callId, status: 'paused' })
-      return
+      return { call: await stored('paused'), status: 'paused' }
     }
     if (!matchesWebhookCall(found.rule, view)) {
-      const ignored = await deps.store.admit(hook, { receivedAt, state: 'ignored' }, null)
-      send(res, 200, { callId: ignored.callId, status: 'ignored' })
-      return
+      return { call: await stored('ignored'), status: 'ignored' }
     }
     const subject = webhookCallSubject(found.rule, view)
-    const call = await deps.store.admit(
-      hook,
-      { receivedAt, state: 'queued', ...(subject === undefined ? {} : { subject }) },
-      envelope
-    )
-    await deliverLocalCall(deps, hook, call)
-    send(res, 200, { callId: call.callId, status: 'queued' })
+    return { call: await stored('queued', subject), status: 'queued' }
   }
 
   return (req, res) => {

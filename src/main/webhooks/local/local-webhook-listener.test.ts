@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, request, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -207,7 +207,8 @@ describe('local webhook listener, keys and replays', () => {
   it('scrubs a key echoed with JSON escapes or percent-encoding', async () => {
     const escaped = `\\u006f${hook.key.slice(1)}`
     await post(`/hooks/${hook.hookId}/${hook.key}`, `{"echo":"${escaped}"}`)
-    await post(`/hooks/${hook.hookId}/${hook.key}`, `echo=${encodeURIComponent(hook.key)}`, {
+    // The key's first letter, o, percent-encoded.
+    await post(`/hooks/${hook.hookId}/${hook.key}`, `echo=%6F${hook.key.slice(1)}`, {
       'content-type': 'application/x-www-form-urlencoded'
     })
     const stored = readdirSync(join(dir, 'local-webhooks', 'envelopes')).map((file) =>
@@ -237,11 +238,31 @@ describe('local webhook listener, keys and replays', () => {
     expect(received).toHaveLength(0)
   })
 
-  it('forgets a delivery id whose call was not taken', async () => {
-    expect(await store.replayed(hook.hookId, 'd-1')).toBe(false)
-    await store.forgetDelivery(hook.hookId, 'd-1')
-    expect(await store.replayed(hook.hookId, 'd-1')).toBe(false)
-    expect(await store.replayed(hook.hookId, 'd-1')).toBe(true)
+  it('keeps a delivery id only with its call: a resend after a failed admission is a new call', async () => {
+    const path = `/hooks/${hook.hookId}/${hook.key}`
+    const envelopes = join(dir, 'local-webhooks', 'envelopes')
+    // A file where the envelopes folder goes, so storing the call fails.
+    mkdirSync(join(dir, 'local-webhooks'), { recursive: true })
+    writeFileSync(envelopes, '')
+    expect((await post(path, {}, { 'x-github-delivery': 'd-1' })).status).toBe(500)
+    rmSync(envelopes)
+    expect(await (await post(path, {}, { 'x-github-delivery': 'd-1' })).json()).toMatchObject({
+      status: 'queued'
+    })
+    expect(await (await post(path, {}, { 'x-github-delivery': 'd-1' })).json()).toEqual({
+      status: 'duplicate'
+    })
+    // Hashed: the file never holds the id the sender sent.
+    expect(readFileSync(join(dir, 'local-webhooks', 'hooks.json'), 'utf8')).not.toContain('d-1')
+  })
+
+  it('scrubs a key from the content type too', async () => {
+    await post(`/hooks/${hook.hookId}/${hook.key}`, 'hello', {
+      'content-type': `text/plain; echo=${hook.key}`
+    })
+    const [file] = readdirSync(join(dir, 'local-webhooks', 'envelopes'))
+    const stored = readFileSync(join(dir, 'local-webhooks', 'envelopes', file ?? ''), 'utf8')
+    expect(stored).not.toContain(hook.key)
   })
 })
 

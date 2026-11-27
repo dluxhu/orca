@@ -146,3 +146,44 @@ export function hookView(
     pendingCalls
   }
 }
+
+/** A sender's delivery id as the store keeps it: hashed, so the file never holds what was sent. */
+export const deliveryHash = (deliveryId: string): string =>
+  createHash('sha256').update(deliveryId).digest('hex')
+
+/** The running promise for the key, or a new run; an overlapping repeat shares its outcome. */
+export function shared<T>(
+  running: Map<string, Promise<T>>,
+  key: string,
+  run: () => Promise<T>
+): Promise<T> {
+  let promise = running.get(key)
+  if (!promise) {
+    promise = run().finally(() => running.delete(key))
+    running.set(key, promise)
+  }
+  return promise
+}
+
+// Counted requests are kept a week.
+const COUNTER_MS = 7 * 24 * 60 * 60 * 1000
+
+/** The counters with one more request of this kind in the current minute; week-old ones dropped. */
+export function counted(
+  counters: LocalCounter[],
+  hookId: string,
+  kind: LocalCounterKind,
+  now: number
+): LocalCounter[] {
+  const minute = Math.floor(now / 60_000) * 60_000
+  const kept = counters.filter((counter) => counter.minute > now - COUNTER_MS)
+  const counter = kept.find(
+    (entry) => entry.hookId === hookId && entry.kind === kind && entry.minute === minute
+  )
+  if (counter) {
+    counter.count++
+  } else {
+    kept.push({ hookId, kind, minute, count: 1 })
+  }
+  return kept
+}

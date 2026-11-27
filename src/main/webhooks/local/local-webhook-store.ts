@@ -8,6 +8,8 @@ import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-regi
 import {
   StoredLocalWebhooks,
   PENDING,
+  counted,
+  deliveryHash,
   historyRows,
   hookView,
   isPending,
@@ -15,6 +17,7 @@ import {
   newCallId,
   newHookId,
   newWebhookKey,
+  shared,
   writeOwnerOnlyFile,
   type LocalCall,
   type LocalCounterKind,
@@ -34,7 +37,6 @@ const PREVIOUS_KEY_MS = DAY_MS
 const REPLAY_MS = DAY_MS
 const CALLS_PER_HOOK = 200
 const ENVELOPES_PER_HOOK = 50
-const COUNTER_MS = 7 * DAY_MS
 
 const unreadable = () =>
   console.warn('[webhooks] the local webhook file was unreadable; starting a new one')
@@ -43,6 +45,9 @@ export class LocalWebhookStore {
   private loaded: Promise<StoredLocalWebhooks> | null = null
   private writes: Promise<void> = Promise.resolve()
   private readonly rotations = new Map<string, Promise<number>>()
+  private readonly mints = new Map<string, Promise<LocalHook>>()
+  // Delivery ids a request is admitting now; saved with their call, never before it.
+  private readonly claimed = new Set<string>()
 
   constructor(
     private readonly userDataPath: string,
@@ -116,7 +121,16 @@ export class LocalWebhookStore {
   }
 
   /** The hook a create made; a repeat with the same operationId gets the same hook. */
-  async mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
+  /** A repeat while the first try is still writing waits for it, a failure included. */
+  mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
+    return shared(this.mints, operationId, () => this.mintOnce(operationId, automationId, botId))
+  }
+
+  private async mintOnce(
+    operationId: string,
+    automationId: string,
+    botId: string
+  ): Promise<LocalHook> {
     const data = await this.data()
     const made = data.hooks.find((hook) => hook.mintOperationId === operationId)
     if (made) {
@@ -167,15 +181,7 @@ export class LocalWebhookStore {
 
   /** A new key; the old one keeps working a day, or stops now with the calls it let in. */
   rotate(hook: LocalHook, operationId: string, stopNow: boolean): Promise<number> {
-    // A repeat while the first try runs shares its outcome, a failure included.
-    let running = this.rotations.get(operationId)
-    if (!running) {
-      running = this.rotateOnce(hook, operationId, stopNow).finally(() =>
-        this.rotations.delete(operationId)
-      )
-      this.rotations.set(operationId, running)
-    }
-    return running
+    return shared(this.rotations, operationId, () => this.rotateOnce(hook, operationId, stopNow))
   }
 
   private async rotateOnce(
@@ -224,41 +230,28 @@ export class LocalWebhookStore {
     }
   }
 
-  /** Whether the sender already delivered this id in the last day; remembers it if not. */
-  async replayed(hookId: string, deliveryId: string): Promise<boolean> {
-    const data = await this.data()
+  /** Claims a sender's delivery id for one call: false while another request holds it, or a call
+   *  taken in the last day carries it. Released once that call is saved, or not taken. */
+  async claimDelivery(hookId: string, deliveryId: string): Promise<boolean> {
+    const id = deliveryHash(deliveryId)
     const since = this.now() - REPLAY_MS
-    data.deliveries = data.deliveries.filter((entry) => entry.at > since)
-    if (data.deliveries.some((entry) => entry.hookId === hookId && entry.id === deliveryId)) {
-      return true
+    const data = await this.data()
+    const taken = data.deliveries.some((e) => e.hookId === hookId && e.id === id && e.at > since)
+    if (taken || this.claimed.has(`${hookId} ${id}`)) {
+      return false
     }
-    data.deliveries.push({ hookId, id: deliveryId, at: this.now() })
-    await this.save(data)
-    return false
+    this.claimed.add(`${hookId} ${id}`)
+    return true
   }
 
-  /** A delivery id whose call was not taken after all, so the sender's retry is a new call. */
-  async forgetDelivery(hookId: string, deliveryId: string): Promise<void> {
-    const data = await this.data()
-    data.deliveries = data.deliveries.filter(
-      (entry) => entry.hookId !== hookId || entry.id !== deliveryId
-    )
-    await this.save(data)
+  releaseDelivery(hookId: string, deliveryId: string): void {
+    this.claimed.delete(`${hookId} ${deliveryHash(deliveryId)}`)
   }
 
   /** A refused, over-budget or duplicate request, counted per minute as the call history shows them. */
   async count(hookId: string, kind: LocalCounterKind): Promise<void> {
     const data = await this.data()
-    const minute = Math.floor(this.now() / 60_000) * 60_000
-    data.counters = data.counters.filter((counter) => counter.minute > this.now() - COUNTER_MS)
-    const counter = data.counters.find(
-      (entry) => entry.hookId === hookId && entry.kind === kind && entry.minute === minute
-    )
-    if (counter) {
-      counter.count++
-    } else {
-      data.counters.push({ hookId, kind, minute, count: 1 })
-    }
+    data.counters = counted(data.counters, hookId, kind, this.now())
     await this.save(data)
   }
 
@@ -266,7 +259,8 @@ export class LocalWebhookStore {
   async admit(
     hook: LocalHook,
     call: Omit<LocalCall, 'callId' | 'hookId' | 'hasEnvelope'>,
-    envelope: WebhookEnvelope | null
+    envelope: WebhookEnvelope | null,
+    deliveryId?: string
   ): Promise<LocalCall> {
     const entry: LocalCall = {
       ...call,
@@ -279,6 +273,15 @@ export class LocalWebhookStore {
     }
     const data = await this.data()
     data.calls.unshift(entry)
+    if (deliveryId !== undefined) {
+      // Saved with the call itself, so a resend is a duplicate exactly when its call was taken.
+      data.deliveries = data.deliveries.filter((other) => other.at > call.receivedAt - REPLAY_MS)
+      data.deliveries.push({
+        hookId: hook.hookId,
+        id: deliveryHash(deliveryId),
+        at: call.receivedAt
+      })
+    }
     hook.lastCall = { at: call.receivedAt, state: call.state }
     const own = data.calls.filter((other) => other.hookId === hook.hookId)
     for (const old of own.slice(ENVELOPES_PER_HOOK)) {
