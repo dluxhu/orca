@@ -163,6 +163,17 @@ const ALLOWED: Allowed[] = [
     line: 'antigravity-cli',
     reason: 'the files of the run that Orca started; agy has no folder variable, so it writes there'
   },
+  {
+    file: 'src/main/skills/discovery/skill-discovery-sources.ts',
+    line: "'.gemini', 'skills'",
+    reason: ANTIGRAVITY
+  },
+  { file: 'src/main/skills/discovery/antigravity-plugin-skill-sources.ts', reason: ANTIGRAVITY },
+  {
+    file: 'src/main/antigravity/agy-login-copy.ts',
+    line: 'antigravity-cli',
+    reason: "agy's own login file, which this copy reads; agy has no folder variable"
+  },
   { file: 'src/main/antigravity/antigravity-chat-user-skills.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-host-acp.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-transcript-import.ts', reason: ANTIGRAVITY },
