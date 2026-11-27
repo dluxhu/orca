@@ -44,17 +44,17 @@ import { remarkNativeChatQuoteLines } from './native-chat-quote-lines'
 import './native-chat-markdown.css'
 
 /** Existing words stay opaque when a reply first starts growing. */
-function useWordFadeArmed(fadeWords: boolean): boolean {
+function useWordFadeArmed(fading: boolean): boolean {
   const [armed, setArmed] = useState(false)
   useEffect(() => {
-    if (!fadeWords) {
+    if (!fading) {
       setArmed(false)
       return
     }
     const frame = requestAnimationFrame(() => setArmed(true))
     return () => cancelAnimationFrame(frame)
-  }, [fadeWords])
-  return armed && fadeWords
+  }, [fading])
+  return armed && fading
 }
 
 type NativeChatMarkdownProps = Omit<
@@ -74,6 +74,8 @@ type NativeChatMarkdownProps = Omit<
   slackMentions?: boolean
   /** The agents a sent message mentions: each `@label` of them shows as a chip. Keep it stable. */
   agentMentions?: readonly SentAgentMention[]
+  /** False keeps the fade's word elements (a held selection's) but animates nothing. */
+  fadeAnimates?: boolean
 }
 
 const NO_NAMES: readonly string[] = []
@@ -197,7 +199,7 @@ function createNativeChatImageExtension(
 export function NativeChatMarkdown({
   className,
   linkifyFilePaths = false,
-  fadeWords = false,
+  fadeFrom,
   visualMessageId,
   streaming = false,
   growing = false,
@@ -207,10 +209,11 @@ export function NativeChatMarkdown({
   quoteChips = false,
   slackMentions = false,
   agentMentions,
+  fadeAnimates = true,
   ...props
 }: NativeChatMarkdownProps): React.JSX.Element {
   const onLinkClick = useNativeChatLinkClick()
-  const wordFadeArmed = useWordFadeArmed(fadeWords)
+  const wordFadeArmed = useWordFadeArmed(fadeFrom !== undefined && fadeAnimates)
   const visualExtension = useNativeChatVisualMarkdownExtension(visualMessageId)
   const mentionNames = withBoundBotMentions(useContext(NativeChatMentionNamesContext), content)
   const everyone = useContext(NativeChatMentionEveryoneContext)
@@ -277,7 +280,7 @@ export function NativeChatMarkdown({
           math
           extension={extension}
           fileLinkExists={fileLinkExists}
-          fadeWords={fadeWords}
+          fadeFrom={fadeFrom}
           renderMermaid={!streaming}
           keepMermaidSourceWhilePending
           unknownHtmlAsText
