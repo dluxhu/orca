@@ -1,4 +1,5 @@
 import { writeClaudeTerminalFailure } from './claude-terminal-failure'
+import { journalClaudeCompaction } from './claude-compaction-row'
 import { agentSessionFailureWords } from '../../../../shared/agent-session/failures/agent-session-failure-words'
 import {
   agentJournalItemKey,
@@ -89,7 +90,8 @@ export function journalClaudeMessage(
   const { requestedAt, clientMessageId, remotePrompt } = send
   const envelope = readClaudeMessageEnvelope(message)
   if (!envelope) {
-    return false
+    // A compact boundary is a system frame: it has no envelope, and its divider is its only row.
+    return journalClaudeCompaction(ctx.sink, message, ctx.turn.turnScope, ctx.turn.command !== null)
   }
   let changed = false
   const results = claudeToolResults(envelope)

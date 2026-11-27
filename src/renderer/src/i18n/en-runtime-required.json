@@ -2912,6 +2912,7 @@
       },
       "notices": {
         "compaction": "Context compacted",
+        "compactionAutomatic": "Context compacted automatically",
         "contextCleared": "Context cleared",
         "continuedOutside": "Continued outside this chat.",
         "continuedOutsideRewound": "Continued outside this chat. Earlier replies above are no longer in this conversation's history.",

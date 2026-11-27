@@ -335,6 +335,7 @@
     },
     "notice": {
       "compaction": "컨텍스트가 압축됨",
+      "compactionAutomatic": "컨텍스트가 자동으로 압축됨",
       "contextCleared": "컨텍스트 지워짐",
       "plan": "계획",
       "stoppedManually": "수동으로 중지됨",

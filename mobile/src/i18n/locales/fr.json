@@ -339,6 +339,7 @@
     },
     "notice": {
       "compaction": "Contexte compacté",
+      "compactionAutomatic": "Contexte compacté automatiquement",
       "contextCleared": "Contexte effacé",
       "plan": "Plan",
       "stoppedManually": "Arrêté manuellement",

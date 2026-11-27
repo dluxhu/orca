@@ -21515,6 +21515,7 @@
       "notices": {
         "contextCleared": "Context cleared",
         "compaction": "Context compacted",
+        "compactionAutomatic": "Context compacted automatically",
         "details": "Details",
         "plan": "Plan",
         "historyRepaired": "Part of this chat's history couldn't be loaded.",
