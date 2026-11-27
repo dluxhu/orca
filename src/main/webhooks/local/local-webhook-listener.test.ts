@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Automation } from '../../../shared/automations/automation-definition'
-import { parseWebhookBody } from './local-webhook-delivery'
+import { parseWebhookBody, redeliverQueued } from './local-webhook-delivery'
 import { createLocalWebhookHandler } from './local-webhook-listener'
 import { LocalWebhookStore, type LocalHook } from './local-webhook-store'
 import { listenOnLoopback, webhookAutomation } from './local-webhook.test-fixture'
@@ -254,6 +254,60 @@ describe('local webhook listener, keys and replays', () => {
     })
     // Hashed: the file never holds the id the sender sent.
     expect(readFileSync(join(dir, 'local-webhooks', 'hooks.json'), 'utf8')).not.toContain('d-1')
+  })
+
+  it('answers an overlapping resend only once the first is taken', async () => {
+    const path = `/hooks/${hook.hookId}/${hook.key}`
+    const headers = { 'x-github-delivery': 'd-2' }
+    const answers = await Promise.all([post(path, {}, headers), post(path, {}, headers)])
+    const statuses = await Promise.all(answers.map(async (answer) => (await answer.json()).status))
+    expect(statuses.sort()).toEqual(['duplicate', 'queued'])
+    expect((await store.history(hook.hookId)).filter((row) => row.kind === 'call')).toHaveLength(1)
+  })
+
+  it('hands a call over again after its handoff failed', async () => {
+    let failures = 1
+    const deps = {
+      store,
+      automations: () => automations,
+      bots: () => [{ id: hook.botId }],
+      receive: () => {
+        if (failures-- > 0) {
+          throw new Error('ledger write failed')
+        }
+        received.push({ callId: 'retried' })
+        return true
+      }
+    }
+    server.close()
+    server = createServer(createLocalWebhookHandler(deps))
+    base = `http://127.0.0.1:${await listenOnLoopback(server)}`
+    const answer = await post(`/hooks/${hook.hookId}/${hook.key}`, {})
+    expect(await answer.json()).toMatchObject({ status: 'queued' })
+    expect(await store.queued()).toHaveLength(1)
+    await redeliverQueued(deps)
+    expect(received).toEqual([{ callId: 'retried' }])
+    expect(await store.queued()).toEqual([])
+  })
+
+  it('refuses a call whose key a stop-now rotation ended before it was listed', async () => {
+    const oldKey = hook.key
+    await store.rotate(hook, 'r-2', true)
+    const call = await store.admit(
+      hook,
+      { receivedAt: 1, state: 'queued' },
+      {
+        receivedAt: 1,
+        contentType: null,
+        headers: {},
+        body: { kind: 'text', value: '' },
+        truncated: false
+      },
+      { key: oldKey }
+    )
+    expect(call).toBeNull()
+    expect(await store.history(hook.hookId)).toEqual([])
+    expect(readdirSync(join(dir, 'local-webhooks', 'envelopes'))).toEqual([])
   })
 
   it('scrubs a key from the content type too', async () => {

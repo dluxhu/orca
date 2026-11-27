@@ -9,7 +9,11 @@ import type { ConnectorDelivery } from '../../../shared/connectors/connector-clo
 import type { GlobalSettings } from '../../../shared/settings/global-settings-types'
 import { localWebhookConfig } from '../../../shared/webhooks/local-webhook-settings'
 import type { WebhookCloudCalls } from '../webhook-cloud-routes'
-import { deliverLocalCall } from './local-webhook-delivery'
+import {
+  deliverLocalCall,
+  redeliverQueued,
+  type LocalWebhookDeliverDeps
+} from './local-webhook-delivery'
 import { createLocalWebhookHandler } from './local-webhook-listener'
 import { localWebhookCalls } from './local-webhook-routes'
 import { LocalWebhookStore } from './local-webhook-store'
@@ -28,6 +32,7 @@ const SETTING_KEYS = [
 
 const BIND_RETRIES = 10
 const BIND_RETRY_MS = 30_000
+const REDELIVER_MS = 60_000
 
 export type LocalWebhooks = {
   /** The local routes while local webhooks are on; null hands webhooks to Orca Cloud. */
@@ -47,16 +52,32 @@ export function installLocalWebhooks(deps: {
   modeChanged: () => void
   /** For tests: the wait before a busy port is tried again. */
   bindRetryMs?: number
+  /** For tests: the wait before calls whose handoff failed go again. */
+  redeliverMs?: number
 }): LocalWebhooks {
   const store = new LocalWebhookStore(deps.userDataPath)
   let receive: (delivery: TriggerDelivery, event: AutomationRunEvent) => boolean = () => false
-  const deliverDeps = {
+  const config = () => localWebhookConfig(deps.settings())
+  let retry: NodeJS.Timeout | null = null
+  // Calls taken but not handed over (a failed handoff, or Orca quit first) go again while on.
+  const redeliver = (): void => {
+    if (config()) {
+      void redeliverQueued(deliverDeps)
+    }
+  }
+  const deliverDeps: LocalWebhookDeliverDeps = {
     store,
     automations: deps.automations,
     bots: deps.bots,
-    receive: (delivery: TriggerDelivery, event: AutomationRunEvent) => receive(delivery, event)
+    receive: (delivery, event) => receive(delivery, event),
+    retryLater: () => {
+      retry ??= setTimeout(() => {
+        retry = null
+        redeliver()
+      }, deps.redeliverMs ?? REDELIVER_MS)
+      retry.unref()
+    }
   }
-  const config = () => localWebhookConfig(deps.settings())
   const routes = localWebhookCalls({
     store,
     baseUrl: () => config()?.baseUrl ?? 'http://127.0.0.1',
@@ -129,15 +150,20 @@ export function installLocalWebhooks(deps: {
     if ((config() !== null) !== on) {
       on = !on
       deps.modeChanged()
+      redeliver()
     }
   })
   return {
     routes: () => (config() ? routes : null),
     attach: (next) => {
       receive = next
+      redeliver()
     },
     stop: () => {
       stopped = true
+      if (retry) {
+        clearTimeout(retry)
+      }
       unsubscribe()
       close()
       listening = null

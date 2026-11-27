@@ -1,6 +1,6 @@
 // What the local webhook store keeps, the ids and keys it makes in Orca Cloud's formats, and how it writes.
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import * as z from 'zod'
 import type {
@@ -12,6 +12,7 @@ import {
   WEBHOOK_HOOK_ID_PATTERN,
   type WebhookCallState
 } from '../../../shared/connector-webhook-contract'
+import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
 
 export const LocalHook = z.object({
   hookId: z.string().regex(WEBHOOK_HOOK_ID_PATTERN),
@@ -186,4 +187,23 @@ export function counted(
     kept.push({ hookId, kind, minute, count: 1 })
   }
   return kept
+}
+
+const unreadable = () =>
+  console.warn('[webhooks] the local webhook file was unreadable; starting a new one')
+
+/** The store's file, or an empty store when it is missing or unreadable. */
+export async function loadLocalWebhooks(path: string): Promise<StoredLocalWebhooks> {
+  try {
+    const parsed = StoredLocalWebhooks.safeParse(JSON.parse(await readFile(path, 'utf8')))
+    if (parsed.success) {
+      return parsed.data
+    }
+    unreadable()
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      unreadable()
+    }
+  }
+  return { hooks: [], calls: [], counters: [], deliveries: [] }
 }

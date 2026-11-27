@@ -22,7 +22,7 @@ export type LocalWebhookRoutesDeps = {
   /** The listener's base URL, read on every answer so a changed Public URL shows at once. */
   baseUrl: () => string
   /** Hands a call to this host's webhooks, as a trigger delivery would. */
-  deliver: (hook: LocalHook, call: LocalCall) => Promise<void>
+  deliver: (hook: LocalHook, call: LocalCall) => Promise<unknown>
   now?: () => number
 }
 
@@ -59,6 +59,10 @@ export function localWebhookCalls(deps: LocalWebhookRoutesDeps): WebhookCloudCal
         truncated: false
       }
     )
+    // Null only for a sender's key a rotation ended; a sample names none.
+    if (!call) {
+      throw new Error('the sample call was not taken')
+    }
     await deps.deliver(hook, call)
     return call
   }

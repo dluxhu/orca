@@ -25,7 +25,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       await actual.writeFile(...args)
     },
     rm: async (...args: Parameters<typeof actual.rm>) => {
-      if (removal.fail) {
+      // Not the writer's staged .tmp files: only a stored file's removal fails.
+      if (removal.fail && !String(args[0]).endsWith('.tmp')) {
         throw new Error('removal failed')
       }
       await actual.rm(...args)
@@ -94,6 +95,33 @@ describe('local webhook routes', () => {
     expect(
       (await new LocalWebhookStore(dir, () => now).hooks()).map((entry) => entry.hookId)
     ).toEqual([hook.hookId])
+  })
+
+  it('keeps a taken call when removing an old envelope fails afterwards', async () => {
+    const hook = await mint()
+    const local = await store.hook(hook.hookId)
+    if (!local) {
+      throw new Error('no hook')
+    }
+    const envelope = {
+      receivedAt: now,
+      contentType: null,
+      headers: {},
+      body: { kind: 'text' as const, value: '' },
+      truncated: false
+    }
+    for (let index = 0; index < 50; index++) {
+      await store.admit(local, { receivedAt: now, state: 'queued' }, envelope)
+    }
+    removal.fail = true
+    try {
+      // The 51st call pushes the oldest envelope out, and its removal fails.
+      const call = await store.admit(local, { receivedAt: now, state: 'queued' }, envelope)
+      expect(call).not.toBeNull()
+      expect(await new LocalWebhookStore(dir, () => now).call(call?.callId ?? '')).toBeDefined()
+    } finally {
+      removal.fail = false
+    }
   })
 
   it('shows the local URL, or the Public URL when one is set', async () => {

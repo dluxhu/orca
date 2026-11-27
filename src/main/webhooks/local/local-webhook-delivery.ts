@@ -22,6 +22,8 @@ export type LocalWebhookDeliverDeps = {
   automations: () => readonly Automation[]
   bots: () => readonly Pick<Bot, 'id'>[]
   receive: (delivery: TriggerDelivery, event: AutomationRunEvent) => boolean
+  /** A handoff failed: its call stays queued for redeliverQueued, soon. */
+  retryLater?: () => void
 }
 
 /** The automation that lists the hook's rule here, with that rule. */
@@ -35,8 +37,31 @@ export function hookAutomation(automations: readonly Automation[], hook: LocalHo
   return null
 }
 
-/** Hands an admitted call to this host's webhooks; refused when no rule here takes it. */
+/** Hands an admitted call to this host's webhooks; refused when no rule here takes it. False when
+ *  the handoff failed: the call stays queued and is handed over again. */
 export async function deliverLocalCall(
+  deps: LocalWebhookDeliverDeps,
+  hook: LocalHook,
+  call: LocalCall
+): Promise<boolean> {
+  try {
+    await handOver(deps, hook, call)
+    return true
+  } catch (error) {
+    console.warn('[webhooks] a local webhook call could not reach its automation yet', error)
+    deps.retryLater?.()
+    return false
+  }
+}
+
+/** Hands every queued call over again; the host takes a call it already has only once. */
+export async function redeliverQueued(deps: LocalWebhookDeliverDeps): Promise<void> {
+  for (const { hook, call } of await deps.store.queued()) {
+    await deliverLocalCall(deps, hook, call)
+  }
+}
+
+async function handOver(
   deps: LocalWebhookDeliverDeps,
   hook: LocalHook,
   call: LocalCall

@@ -4,9 +4,8 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { WebhookCallState } from '../../../shared/connector-webhook-contract'
 import { WebhookEnvelope, type WebhookView } from '../../../shared/connector-webhook-routes'
-import { isMissingFileError } from '../../runtime/rpc/server/pairing/device-registry-corruption'
 import {
-  StoredLocalWebhooks,
+  type StoredLocalWebhooks,
   PENDING,
   counted,
   deliveryHash,
@@ -14,6 +13,7 @@ import {
   hookView,
   isPending,
   keyMatches,
+  loadLocalWebhooks,
   newCallId,
   newHookId,
   newWebhookKey,
@@ -38,16 +38,11 @@ const REPLAY_MS = DAY_MS
 const CALLS_PER_HOOK = 200
 const ENVELOPES_PER_HOOK = 50
 
-const unreadable = () =>
-  console.warn('[webhooks] the local webhook file was unreadable; starting a new one')
-
 export class LocalWebhookStore {
   private loaded: Promise<StoredLocalWebhooks> | null = null
   private writes: Promise<void> = Promise.resolve()
   private readonly rotations = new Map<string, Promise<number>>()
   private readonly mints = new Map<string, Promise<LocalHook>>()
-  // Delivery ids a request is admitting now; saved with their call, never before it.
-  private readonly claimed = new Set<string>()
 
   constructor(
     private readonly userDataPath: string,
@@ -62,25 +57,8 @@ export class LocalWebhookStore {
     return join(this.dir, ENVELOPES, `${callId}.json`)
   }
 
-  private async load(): Promise<StoredLocalWebhooks> {
-    try {
-      const parsed = StoredLocalWebhooks.safeParse(
-        JSON.parse(await readFile(join(this.dir, FILE), 'utf8'))
-      )
-      if (parsed.success) {
-        return parsed.data
-      }
-      unreadable()
-    } catch (error) {
-      if (!isMissingFileError(error)) {
-        unreadable()
-      }
-    }
-    return { hooks: [], calls: [], counters: [], deliveries: [] }
-  }
-
   private data(): Promise<StoredLocalWebhooks> {
-    return (this.loaded ??= this.load())
+    return (this.loaded ??= loadLocalWebhooks(join(this.dir, FILE)))
   }
 
   /**
@@ -113,14 +91,35 @@ export class LocalWebhookStore {
     const hook = await this.hook(hookId)
     // An unknown hook still compares once, so its answer takes as long as a wrong key's.
     const current = keyMatches(key, hook?.key ?? newWebhookKey())
-    const previous =
-      hook?.previousKey !== undefined &&
-      (hook.previousKeyExpiresAt ?? 0) > this.now() &&
-      keyMatches(key, hook.previousKey)
-    return hook && (current || previous) ? hook : null
+    return hook && (current || this.previousKeyOpens(hook, key)) ? hook : null
   }
 
-  /** The hook a create made; a repeat with the same operationId gets the same hook. */
+  private previousKeyOpens(hook: LocalHook, key: string): boolean {
+    return (
+      hook.previousKey !== undefined &&
+      (hook.previousKeyExpiresAt ?? 0) > this.now() &&
+      keyMatches(key, hook.previousKey)
+    )
+  }
+
+  /** Whether a call with this sender delivery id was taken in the last day. */
+  async deliveryTaken(hookId: string, deliveryId: string): Promise<boolean> {
+    const id = deliveryHash(deliveryId)
+    const since = this.now() - REPLAY_MS
+    return (await this.data()).deliveries.some(
+      (entry) => entry.hookId === hookId && entry.id === id && entry.at > since
+    )
+  }
+
+  /** Calls taken but never handed to the host's webhooks, e.g. when that failed or Orca quit. */
+  async queued(): Promise<{ hook: LocalHook; call: LocalCall }[]> {
+    const data = await this.data()
+    return data.calls.flatMap((call) => {
+      const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
+      return hook && call.state === 'queued' ? [{ hook, call }] : []
+    })
+  }
+
   /** A repeat while the first try is still writing waits for it, a failure included. */
   mint(operationId: string, automationId: string, botId: string): Promise<LocalHook> {
     return shared(this.mints, operationId, () => this.mintOnce(operationId, automationId, botId))
@@ -230,24 +229,6 @@ export class LocalWebhookStore {
     }
   }
 
-  /** Claims a sender's delivery id for one call: false while another request holds it, or a call
-   *  taken in the last day carries it. Released once that call is saved, or not taken. */
-  async claimDelivery(hookId: string, deliveryId: string): Promise<boolean> {
-    const id = deliveryHash(deliveryId)
-    const since = this.now() - REPLAY_MS
-    const data = await this.data()
-    const taken = data.deliveries.some((e) => e.hookId === hookId && e.id === id && e.at > since)
-    if (taken || this.claimed.has(`${hookId} ${id}`)) {
-      return false
-    }
-    this.claimed.add(`${hookId} ${id}`)
-    return true
-  }
-
-  releaseDelivery(hookId: string, deliveryId: string): void {
-    this.claimed.delete(`${hookId} ${deliveryHash(deliveryId)}`)
-  }
-
   /** A refused, over-budget or duplicate request, counted per minute as the call history shows them. */
   async count(hookId: string, kind: LocalCounterKind): Promise<void> {
     const data = await this.data()
@@ -260,8 +241,8 @@ export class LocalWebhookStore {
     hook: LocalHook,
     call: Omit<LocalCall, 'callId' | 'hookId' | 'hasEnvelope'>,
     envelope: WebhookEnvelope | null,
-    deliveryId?: string
-  ): Promise<LocalCall> {
+    sender: { key?: string; deliveryId?: string } = {}
+  ): Promise<LocalCall | null> {
     const entry: LocalCall = {
       ...call,
       callId: newCallId(),
@@ -272,24 +253,40 @@ export class LocalWebhookStore {
       await writeOwnerOnlyFile(this.envelopePath(entry.callId), JSON.stringify(envelope))
     }
     const data = await this.data()
+    // Checked with no await before the call is listed, so a stop-now rotation either refuses it
+    // here or finds it to cancel.
+    if (
+      sender.key !== undefined &&
+      !keyMatches(sender.key, hook.key) &&
+      !this.previousKeyOpens(hook, sender.key)
+    ) {
+      await this.dropEnvelope(entry)
+      return null
+    }
     data.calls.unshift(entry)
-    if (deliveryId !== undefined) {
+    if (sender.deliveryId !== undefined) {
       // Saved with the call itself, so a resend is a duplicate exactly when its call was taken.
       data.deliveries = data.deliveries.filter((other) => other.at > call.receivedAt - REPLAY_MS)
       data.deliveries.push({
         hookId: hook.hookId,
-        id: deliveryHash(deliveryId),
+        id: deliveryHash(sender.deliveryId),
         at: call.receivedAt
       })
     }
     hook.lastCall = { at: call.receivedAt, state: call.state }
     const own = data.calls.filter((other) => other.hookId === hook.hookId)
-    for (const old of own.slice(ENVELOPES_PER_HOOK)) {
-      await this.dropEnvelope(old)
+    const stale = own.slice(ENVELOPES_PER_HOOK).filter((old) => old.hasEnvelope)
+    for (const old of stale) {
+      old.hasEnvelope = false
     }
     const dropped = new Set(own.slice(CALLS_PER_HOOK))
     data.calls = data.calls.filter((other) => !dropped.has(other))
+    // A failed save drops memory (save), so a refused call is never visible afterwards.
     await this.save(data)
+    // Only after the save: a leftover file is harmless, a half-taken call is not.
+    await Promise.all(
+      stale.map((old) => rm(this.envelopePath(old.callId), { force: true }).catch(() => {}))
+    )
     return entry
   }
 

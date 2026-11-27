@@ -140,6 +140,8 @@ export function createLocalWebhookHandler(
   const now = deps.now ?? Date.now
   const limits = { ...LOCAL_WEBHOOK_LIMITS, ...deps.limits }
   const counts = new MinuteCounts()
+  // Requests now being taken, by hook and sender delivery id.
+  const admitting = new Map<string, Promise<void>>()
   const notFound = (res: ServerResponse) => send(res, 404, { error: 'not_found' })
   const rateLimited = (res: ServerResponse) =>
     send(res, 429, { error: 'rate_limited' }, { 'retry-after': '60' })
@@ -217,14 +219,23 @@ export function createLocalWebhookHandler(
       return
     }
     const deliveryId = DELIVERY_ID_HEADERS.map((name) => headerValue(req, name)).find(Boolean)
-    if (deliveryId && !(await deps.store.claimDelivery(hook.hookId, deliveryId))) {
-      await deps.store.count(hook.hookId, 'duplicate')
-      send(res, 200, { status: 'duplicate' })
-      return
+    const claim = deliveryId === undefined ? null : `${hook.hookId} ${deliveryId}`
+    let release = (): void => {}
+    if (claim) {
+      // A resend while the first is still being taken waits for it, so "duplicate" means taken.
+      for (let first = admitting.get(claim); first; first = admitting.get(claim)) {
+        await first
+      }
+      admitting.set(claim, new Promise<void>((resolve) => (release = resolve)))
     }
     let taken: Awaited<ReturnType<typeof admit>>
     try {
-      taken = await admit(hook, found, [hook.key, hook.previousKey, key], deliveryId, {
+      if (deliveryId && (await deps.store.deliveryTaken(hook.hookId, deliveryId))) {
+        await deps.store.count(hook.hookId, 'duplicate')
+        send(res, 200, { status: 'duplicate' })
+        return
+      }
+      taken = await admit(hook, found, key, deliveryId, {
         contentType,
         body: parsed,
         headers: Object.fromEntries(
@@ -235,46 +246,53 @@ export function createLocalWebhookHandler(
         )
       })
     } finally {
-      // Saved with its call by now, or not taken: either way the claim ends.
-      if (deliveryId) {
-        deps.store.releaseDelivery(hook.hookId, deliveryId)
+      if (claim) {
+        admitting.delete(claim)
+        release()
       }
     }
+    if (!taken) {
+      notFound(res)
+      return
+    }
+    // A failed handoff leaves the call queued and retried, so the sender is answered as taken.
     if (taken.status === 'queued') {
       await deliverLocalCall(deps, hook, taken.call)
     }
     send(res, 200, { callId: taken.call.callId, status: taken.status })
   }
 
-  /** Stores the call, with its delivery id; queued when the rule's filters take it. */
+  /** Stores the call, with its delivery id; queued when the rule's filters take it. Null when a
+   *  stop-now rotation ended the key meanwhile. */
   const admit = async (
     hook: LocalHook,
     found: NonNullable<ReturnType<typeof hookAutomation>>,
-    keys: (string | undefined)[],
+    key: string,
     deliveryId: string | undefined,
     request: Pick<WebhookEnvelope, 'contentType' | 'headers' | 'body'>
-  ): Promise<{ call: LocalCall; status: 'queued' | 'ignored' | 'paused' }> => {
+  ): Promise<{ call: LocalCall; status: 'queued' | 'ignored' | 'paused' } | null> => {
     const receivedAt = now()
     // The hook's own keys never reach the stored call, the run's file or its quote: replaced after
     // decoding, so an escaped or percent-encoded echo is caught too.
-    const { contentType, headers, body } = withoutKeys(request, keys)
+    const { contentType, headers, body } = withoutKeys(request, [hook.key, hook.previousKey, key])
     const envelope: WebhookEnvelope = { receivedAt, contentType, headers, body, truncated: false }
     const view = webhookCallView(envelope)
-    const stored = (state: 'queued' | 'ignored' | 'paused', subject?: string) =>
-      deps.store.admit(
+    const stored = async (state: 'queued' | 'ignored' | 'paused', subject?: string) => {
+      const call = await deps.store.admit(
         hook,
         { receivedAt, state, ...(subject === undefined ? {} : { subject }) },
         state === 'queued' ? envelope : null,
-        deliveryId
+        { key, ...(deliveryId === undefined ? {} : { deliveryId }) }
       )
+      return call && { call, status: state }
+    }
     if (hook.state === 'paused' || !found.automation.enabled) {
-      return { call: await stored('paused'), status: 'paused' }
+      return await stored('paused')
     }
     if (!matchesWebhookCall(found.rule, view)) {
-      return { call: await stored('ignored'), status: 'ignored' }
+      return await stored('ignored')
     }
-    const subject = webhookCallSubject(found.rule, view)
-    return { call: await stored('queued', subject), status: 'queued' }
+    return await stored('queued', webhookCallSubject(found.rule, view))
   }
 
   return (req, res) => {
