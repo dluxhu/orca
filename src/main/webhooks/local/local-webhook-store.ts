@@ -58,7 +58,11 @@ export class LocalWebhookStore {
   }
 
   private data(): Promise<StoredLocalWebhooks> {
-    return (this.loaded ??= loadLocalWebhooks(join(this.dir, FILE)))
+    // A failed read is not kept: the next access reads the file again.
+    return (this.loaded ??= loadLocalWebhooks(join(this.dir, FILE)).catch((error: unknown) => {
+      this.loaded = null
+      throw error
+    }))
   }
 
   /**
@@ -253,12 +257,13 @@ export class LocalWebhookStore {
       await writeOwnerOnlyFile(this.envelopePath(entry.callId), JSON.stringify(envelope))
     }
     const data = await this.data()
-    // Checked with no await before the call is listed, so a stop-now rotation either refuses it
-    // here or finds it to cancel.
+    // Checked with no await before the call is listed: a hook removed meanwhile, or a key a stop-now
+    // rotation ended, refuses it; a rotation after this finds it to cancel.
+    const current = data.hooks.find((entry) => entry.hookId === hook.hookId)
+    const key = sender.key
     if (
-      sender.key !== undefined &&
-      !keyMatches(sender.key, hook.key) &&
-      !this.previousKeyOpens(hook, sender.key)
+      !current ||
+      (key !== undefined && !keyMatches(key, current.key) && !this.previousKeyOpens(current, key))
     ) {
       await this.dropEnvelope(entry)
       return null
@@ -273,7 +278,7 @@ export class LocalWebhookStore {
         at: call.receivedAt
       })
     }
-    hook.lastCall = { at: call.receivedAt, state: call.state }
+    current.lastCall = { at: call.receivedAt, state: call.state }
     const own = data.calls.filter((other) => other.hookId === hook.hookId)
     const stale = own.slice(ENVELOPES_PER_HOOK).filter((old) => old.hasEnvelope)
     for (const old of stale) {

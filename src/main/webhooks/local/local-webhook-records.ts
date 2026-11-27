@@ -189,21 +189,24 @@ export function counted(
   return kept
 }
 
-const unreadable = () =>
-  console.warn('[webhooks] the local webhook file was unreadable; starting a new one')
-
-/** The store's file, or an empty store when it is missing or unreadable. */
+/** The store's file; empty when there is none yet. An unreadable file is kept aside, never
+ *  overwritten, and a failed read throws, so a later write can't replace the hooks it holds. */
 export async function loadLocalWebhooks(path: string): Promise<StoredLocalWebhooks> {
+  let text: string
   try {
-    const parsed = StoredLocalWebhooks.safeParse(JSON.parse(await readFile(path, 'utf8')))
-    if (parsed.success) {
-      return parsed.data
-    }
-    unreadable()
+    text = await readFile(path, 'utf8')
   } catch (error) {
-    if (!isMissingFileError(error)) {
-      unreadable()
+    if (isMissingFileError(error)) {
+      return { hooks: [], calls: [], counters: [], deliveries: [] }
     }
+    throw error
   }
-  return { hooks: [], calls: [], counters: [], deliveries: [] }
+  try {
+    return StoredLocalWebhooks.parse(JSON.parse(text))
+  } catch {
+    const aside = `${path}.unreadable-${Date.now()}`
+    await rename(path, aside)
+    console.warn(`[webhooks] the local webhook file was unreadable; kept as ${aside}`)
+    return { hooks: [], calls: [], counters: [], deliveries: [] }
+  }
 }

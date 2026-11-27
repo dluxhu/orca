@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import type * as FsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,12 +12,18 @@ import { localWebhookCalls, switchedWebhookCalls } from './local-webhook-routes'
 import { keyMatches } from './local-webhook-records'
 import { LocalWebhookStore, type LocalCall } from './local-webhook-store'
 
-// Lets a test make the store's file writes or removals fail.
-const removal = vi.hoisted(() => ({ fail: false, failWrites: false }))
+// Lets a test make the store's file reads, writes or removals fail.
+const removal = vi.hoisted(() => ({ fail: false, failWrites: false, failReads: false }))
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof FsPromises>()
   return {
     ...actual,
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      if (removal.failReads) {
+        throw Object.assign(new Error('read failed'), { code: 'EIO' })
+      }
+      return await actual.readFile(...args)
+    },
     writeFile: async (...args: Parameters<typeof actual.writeFile>) => {
       if (removal.failWrites) {
         throw new Error('write failed')
@@ -122,6 +128,38 @@ describe('local webhook routes', () => {
     } finally {
       removal.fail = false
     }
+  })
+
+  it('never replaces the hooks after a failed read, and keeps an unreadable file aside', async () => {
+    const hook = await mint()
+    removal.failReads = true
+    const reopened = new LocalWebhookStore(dir, () => now)
+    try {
+      await expect(reopened.hooks()).rejects.toThrow('read failed')
+    } finally {
+      removal.failReads = false
+    }
+    expect((await reopened.hooks()).map((entry) => entry.hookId)).toEqual([hook.hookId])
+    writeFileSync(join(dir, 'local-webhooks', 'hooks.json'), '{not json')
+    expect(await new LocalWebhookStore(dir, () => now).hooks()).toEqual([])
+    expect(
+      readdirSync(join(dir, 'local-webhooks')).some((name) =>
+        name.startsWith('hooks.json.unreadable-')
+      )
+    ).toBe(true)
+  })
+
+  it('refuses a call for a hook removed while it was being stored', async () => {
+    const hook = await mint()
+    const local = await store.hook(hook.hookId)
+    if (!local) {
+      throw new Error('no hook')
+    }
+    await store.remove(hook.hookId)
+    expect(
+      await store.admit(local, { receivedAt: now, state: 'queued' }, null, { key: local.key })
+    ).toBeNull()
+    expect(await store.history(hook.hookId)).toEqual([])
   })
 
   it('shows the local URL, or the Public URL when one is set', async () => {

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Automation } from '../../../shared/automations/automation-definition'
-import { parseWebhookBody, redeliverQueued } from './local-webhook-delivery'
+import { deliverLocalCall, parseWebhookBody, redeliverQueued } from './local-webhook-delivery'
 import { createLocalWebhookHandler } from './local-webhook-listener'
 import { LocalWebhookStore, type LocalHook } from './local-webhook-store'
 import { listenOnLoopback, webhookAutomation } from './local-webhook.test-fixture'
@@ -288,6 +288,27 @@ describe('local webhook listener, keys and replays', () => {
     await redeliverQueued(deps)
     expect(received).toEqual([{ callId: 'retried' }])
     expect(await store.queued()).toEqual([])
+  })
+
+  it('hands nothing over for a call listed just after its hook was paused', async () => {
+    // The pause cancels calls already listed; this one was being stored while it ran.
+    await store.setState(hook, 'paused')
+    const call = await store.admit(hook, { receivedAt: 1, state: 'queued' }, null)
+    if (!call) {
+      throw new Error('not taken')
+    }
+    const deps = {
+      store,
+      automations: () => automations,
+      bots: () => [{ id: hook.botId }],
+      receive: () => {
+        received.push({ callId: 'handed' })
+        return true
+      }
+    }
+    expect(await deliverLocalCall(deps, hook, call)).toBe(true)
+    expect(received).toEqual([])
+    expect(await store.call(call.callId)).toMatchObject({ state: 'refused' })
   })
 
   it('refuses a call whose key a stop-now rotation ended before it was listed', async () => {
