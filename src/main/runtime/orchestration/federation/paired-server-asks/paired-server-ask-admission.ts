@@ -49,7 +49,11 @@ async function admit(runtime: OrcaRuntimeService, row: PairedServerAskRow): Prom
         messageId: row.message_id
       },
       pairing,
-      peerMailSenderSnapshot(ask.senderLabel, ask.sender),
+      peerMailSenderSnapshot(
+        ask.senderLabel,
+        ask.sender,
+        await runtime.readStoreInstallationId().catch(() => undefined)
+      ),
       {
         environmentId: row.environment_id,
         serverName,

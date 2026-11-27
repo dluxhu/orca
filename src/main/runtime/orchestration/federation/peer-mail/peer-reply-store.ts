@@ -16,12 +16,17 @@ export function storePeerReply(
   db: OrchestrationDb,
   conversation: PeerMailConversationRow,
   messageId: string,
-  payload: z.infer<typeof PeerMailRelayPayload>
+  payload: z.infer<typeof PeerMailRelayPayload>,
+  ownInstallationId?: string
 ): MessageRow | undefined {
   const handle = peerMailLocalRecipient(runtime, conversation)
   // Peer-mail replies come home to this Orca's own sender handle, never a terminal agent's id.
   const recipient = resolveBareOrchestrationRecipient({ runtime, db, handle })
-  const { from, body, ...carried } = presentImportedPeerItem({ kind: 'peer_mail', ...payload })
+  const { from, body, ...carried } = presentImportedPeerItem({
+    kind: 'peer_mail',
+    ...payload,
+    ownInstallationId
+  })
   const stored = db.insertPeerMailMessage({
     conversationId: conversation.conversation_id,
     remoteParty: payload.fromAddress,
