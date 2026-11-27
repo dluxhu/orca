@@ -302,7 +302,11 @@ it('shows the full quote in the sent chip and jumps to its reply', async () => {
   )
   const chip = screen.getByRole('button', { name: `Quote: ${LONG.replace(/\s+/g, ' ')}` })
   fireEvent.click(chip)
-  expect(jump).toHaveBeenCalledWith(IN_CHAT, LONG, expect.any(Function), expect.any(Function))
+  // The first two arguments only: dlux/quote-jump-history adds a history recorder after the callbacks.
+  const call: unknown[] = jump.mock.calls[0]!
+  const [source, text, notifyMissing, isCurrent] = call
+  expect([source, text]).toEqual([IN_CHAT, LONG])
+  expect([typeof notifyMissing, typeof isCurrent]).toEqual(['function', 'function'])
 })
 
 it('keeps the jump of a short quote after the full text is gone from memory', async () => {
