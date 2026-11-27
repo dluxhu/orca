@@ -36,6 +36,7 @@ import {
 } from './native-chat-prompt-document'
 import { openingPromptContent, promptTextContent } from './native-chat-prompt-document-text'
 import { replacePromptText } from './native-chat-quote-reparse'
+import { toLfPastedText } from '@/lib/clipboard/clipboard-line-endings'
 import type {
   NativeChatComposerInput,
   NativeChatPromptEditorProps
@@ -129,7 +130,9 @@ function NativePromptEditor({
         if (text == null) {
           return false
         }
-        const content = editor?.schema.nodeFromJSON(promptTextContent(text, { literal: true }))
+        const content = editor?.schema.nodeFromJSON(
+          promptTextContent(toLfPastedText(text), { literal: true })
+        )
         if (!content) {
           return false
         }
