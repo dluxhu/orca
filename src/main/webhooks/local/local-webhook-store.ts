@@ -17,6 +17,7 @@ import {
   newCallId,
   newHookId,
   newWebhookKey,
+  queuedCalls,
   shared,
   writeOwnerOnlyFile,
   type LocalCall,
@@ -117,11 +118,7 @@ export class LocalWebhookStore {
 
   /** Calls taken but never handed to the host's webhooks, e.g. when that failed or Orca quit. */
   async queued(): Promise<{ hook: LocalHook; call: LocalCall }[]> {
-    const data = await this.data()
-    return data.calls.flatMap((call) => {
-      const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
-      return hook && call.state === 'queued' ? [{ hook, call }] : []
-    })
+    return queuedCalls(await this.data())
   }
 
   /** A repeat while the first try is still writing waits for it, a failure included. */
@@ -165,21 +162,27 @@ export class LocalWebhookStore {
     hook.state = state
     if (state === 'paused') {
       hook.epoch++
-      await this.cancelPending(data, hook.hookId)
+      // Unfinished: memory goes, so a retry pauses again from the file, as rotateOnce does.
+      await this.cancelPending(data, hook.hookId).catch((error: unknown) => {
+        this.loaded = null
+        throw error
+      })
     }
     await this.save(data)
   }
 
   async remove(hookId: string): Promise<void> {
     const data = await this.data()
-    for (const call of data.calls.filter((entry) => entry.hookId === hookId)) {
-      await this.dropEnvelope(call)
-    }
+    const gone = data.calls.filter((entry) => entry.hookId === hookId && entry.hasEnvelope)
     data.hooks = data.hooks.filter((hook) => hook.hookId !== hookId)
     data.calls = data.calls.filter((call) => call.hookId !== hookId)
     data.counters = data.counters.filter((counter) => counter.hookId !== hookId)
     data.deliveries = data.deliveries.filter((entry) => entry.hookId !== hookId)
     await this.save(data)
+    // Only after the save, best effort: a leftover file names no hook, a half-removed hook would.
+    await Promise.all(
+      gone.map((call) => rm(this.envelopePath(call.callId), { force: true }).catch(() => {}))
+    )
   }
 
   /** A new key; the old one keeps working a day, or stops now with the calls it let in. */

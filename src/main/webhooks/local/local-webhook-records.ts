@@ -212,3 +212,11 @@ export async function loadLocalWebhooks(path: string): Promise<StoredLocalWebhoo
     return { hooks: [], calls: [], counters: [], deliveries: [] }
   }
 }
+
+/** Calls taken but not yet handed to the host's webhooks, each with its hook. */
+export function queuedCalls(data: StoredLocalWebhooks): { hook: LocalHook; call: LocalCall }[] {
+  return data.calls.flatMap((call) => {
+    const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
+    return hook && call.state === 'queued' ? [{ hook, call }] : []
+  })
+}

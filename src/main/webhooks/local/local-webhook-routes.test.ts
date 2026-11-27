@@ -280,6 +280,28 @@ describe('local webhook routes', () => {
     expect(await routes.start(callId, 'run-1')).toMatchObject({ ok: false, status: 410 })
   })
 
+  it('finishes a pause on retry when its first cancellation failed', async () => {
+    const hook = await mint()
+    const { callId } = await value(routes.sample(hook.hookId, 'sample-1'))
+    removal.fail = true
+    try {
+      await expect(
+        value(routes.setState(hook.hookId, { operationId: 'p-1', state: 'paused' }))
+      ).rejects.toThrow()
+    } finally {
+      removal.fail = false
+    }
+    expect(
+      await value(routes.setState(hook.hookId, { operationId: 'p-1', state: 'paused' }))
+    ).toMatchObject({
+      state: 'paused',
+      epoch: 2,
+      pendingCalls: 0
+    })
+    expect(await routes.envelope(callId)).toMatchObject({ ok: false, status: 404 })
+    expect((await new LocalWebhookStore(dir, () => now).hook(hook.hookId))?.state).toBe('paused')
+  })
+
   it('refuses sender signatures, and forgets a removed hook', async () => {
     const hook = await mint()
     expect(
