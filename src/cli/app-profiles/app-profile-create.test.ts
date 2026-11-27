@@ -416,7 +416,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
   })
 
   it('finds the default app through app.asar.unpacked when app.asar is no link', () => {
-    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
     // Electron 45 reads no asar archive through a link, so a profile's app.asar can be its own.
     const asar = join(work.appPath, 'Contents', 'Resources', 'app.asar')
     rmSync(asar)
