@@ -247,12 +247,13 @@ describe('local webhook listener, keys and replays', () => {
     expect(received).toHaveLength(0)
   })
 
-  it('never hands over a call a stop-now rotation cancelled', async () => {
+  it('never hands over a call a stop-now rotation cancels, also one still running at handoff', async () => {
     const call = await store.admit(hook, { receivedAt: 1, state: 'queued' }, null)
     if (!call) {
       throw new Error('not taken')
     }
-    await store.rotate(hook.hookId, 'r-3', true)
+    // Not awaited: the rotation is still running when the handoff starts.
+    const rotation = store.rotate(hook.hookId, 'r-3', true)
     const deps = {
       store,
       automations: () => automations,
@@ -263,6 +264,7 @@ describe('local webhook listener, keys and replays', () => {
       }
     }
     await deliverLocalCall(deps, hook, call)
+    await rotation
     expect(received).toEqual([])
     expect(await store.call(call.callId)).toMatchObject({ state: 'cancelled' })
   })

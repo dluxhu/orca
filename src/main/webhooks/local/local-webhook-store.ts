@@ -289,25 +289,27 @@ export class LocalWebhookStore {
     return taken ? entry : null
   }
 
-  /** A queued call was handed to the host (delivered) or not taken by it (refused). */
-  async settleQueued(
+  /**
+   * Hands a still-queued call to `take` inside the write queue, so no cancellation lands between the
+   * check and the handoff; the call is then delivered, or refused when `take` declines it.
+   */
+  async handOverQueued(
     callId: string,
-    state: 'delivered' | 'refused',
-    reason?: string
+    take: (hook: LocalHook, call: LocalCall) => boolean
   ): Promise<void> {
     await this.inTurn((data) => {
       const call = data.calls.find((entry) => entry.callId === callId)
-      // The host may already have started it; only a call still queued here changes.
+      const hook = data.hooks.find((entry) => entry.hookId === call?.hookId)
       if (!call || call.state !== 'queued') {
         return
       }
-      call.state = state
-      if (reason) {
-        call.reason = reason
+      const taken = hook !== undefined && take(hook, call)
+      call.state = taken ? 'delivered' : 'refused'
+      if (!taken) {
+        call.reason = 'automation_not_listening'
       }
-      const hook = data.hooks.find((entry) => entry.hookId === call.hookId)
       if (hook?.lastCall?.at === call.receivedAt) {
-        hook.lastCall.state = state
+        hook.lastCall.state = call.state
       }
     })
   }

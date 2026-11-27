@@ -182,7 +182,8 @@ export function createLocalWebhookHandler(
     }
     const tooLarge = () => {
       req.resume()
-      res.writeHead(413, { 'content-type': 'application/json', connection: 'close' })
+      // No "connection: close": Node would then end the socket at once, under a sender still uploading.
+      res.writeHead(413, { 'content-type': 'application/json' })
       // The rest of the body is read and dropped briefly, so a sender still uploading gets the
       // answer, then the connection closes.
       res.end(JSON.stringify({ error: 'body_too_large' }), () => {

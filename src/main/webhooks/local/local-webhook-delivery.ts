@@ -66,46 +66,36 @@ async function handOver(
   hook: LocalHook,
   call: LocalCall
 ): Promise<void> {
-  // Only a call still queued goes: one a stop-now rotation or a pause cancelled meanwhile never does.
-  if ((await deps.store.call(call.callId))?.state !== 'queued') {
-    return
-  }
-  const automations = deps.automations()
-  // The hook as stored now: one removed, paused since the call came in, or paused and resumed (a
-  // newer epoch) hands nothing over, as the pause would have cancelled the call.
-  const live = await deps.store.hook(hook.hookId)
-  const epoch = call.epoch ?? hook.epoch
-  const found =
-    !live || live.state === 'paused' || epoch !== live.epoch
-      ? null
-      : hookAutomation(automations, live)
-  const delivery: TriggerDelivery | null = found && {
-    kind: 'trigger',
-    deliveryId: call.callId,
-    expiresAt: call.receivedAt + DAY_MS,
-    conversation: { source: 'webhook', externalId: hook.hookId },
-    automationId: found.automation.id,
-    triggerId: found.rule.id,
-    botId: hook.botId,
-    event: {
-      key: call.callId,
-      actorId: webhookActorId(hook.hookId),
-      ...(call.subject === undefined ? {} : { subject: call.subject }),
-      occurredAt: call.receivedAt,
-      webhook: {
-        callId: call.callId,
-        epoch,
-        ...(call.sample ? { sample: true as const } : {})
+  // Checked and handed over in one step of the store's write queue: a call cancelled, a hook removed
+  // or paused since the call came in (paused now, or a newer epoch), hands nothing over.
+  await deps.store.handOverQueued(call.callId, (live, stored) => {
+    const automations = deps.automations()
+    const epoch = stored.epoch ?? live.epoch
+    const found =
+      live.state === 'paused' || epoch !== live.epoch ? null : hookAutomation(automations, live)
+    const delivery: TriggerDelivery | null = found && {
+      kind: 'trigger',
+      deliveryId: stored.callId,
+      expiresAt: stored.receivedAt + DAY_MS,
+      conversation: { source: 'webhook', externalId: hook.hookId },
+      automationId: found.automation.id,
+      triggerId: found.rule.id,
+      botId: live.botId,
+      event: {
+        key: stored.callId,
+        actorId: webhookActorId(live.hookId),
+        ...(stored.subject === undefined ? {} : { subject: stored.subject }),
+        occurredAt: stored.receivedAt,
+        webhook: {
+          callId: stored.callId,
+          epoch,
+          ...(stored.sample ? { sample: true as const } : {})
+        }
       }
     }
-  }
-  const event = delivery && triggerRunEvent(automations, deps.bots(), delivery)
-  const taken = delivery !== null && event !== null && deps.receive(delivery, event)
-  await deps.store.settleQueued(
-    call.callId,
-    taken ? 'delivered' : 'refused',
-    taken ? undefined : 'automation_not_listening'
-  )
+    const event = delivery && triggerRunEvent(automations, deps.bots(), delivery)
+    return delivery !== null && event !== null && deps.receive(delivery, event)
+  })
 }
 
 /** The body as a call's envelope keeps it, or null when its JSON doesn't parse. */
