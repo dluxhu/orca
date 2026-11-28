@@ -335,7 +335,8 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
     expect(electronApp.setAppPath).toHaveBeenCalledWith(realAsar)
     expect(electronApp.setVersion).toHaveBeenCalledWith('9.9.9')
     expect(electronApp.name).toBe('orca')
-    expect(Reflect.get(globalThis, 'orcaLoaderTest')).toBe(join(realAsar, 'out', 'main.js'))
+    const loaded = globalThis as typeof globalThis & { orcaLoaderTest?: string }
+    expect(loaded.orcaLoaderTest).toBe(join(realAsar, 'out', 'main.js'))
   })
 })
 

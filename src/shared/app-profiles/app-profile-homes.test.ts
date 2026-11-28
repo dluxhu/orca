@@ -99,8 +99,19 @@ describe('app profile homes', () => {
     expect(defaultAgentHomeDir('CODEX_HOME', '.codex')).toBe(join(home, '.codex'))
   })
 
+  it("ignore a removed profile's values once the default app starts", () => {
+    const gone = join(home, 'gone', 'orca-home')
+    vi.stubEnv('ORCA_HOME_DIR', gone)
+    vi.stubEnv('CODEX_HOME', join(gone, 'agents', 'codex'))
+    applyAppProfileHomes(null, process.env)
+    expect(orcaHomeDir()).toBe(join(home, '.orca'))
+    expect(defaultAgentHomeDir('CODEX_HOME', '.codex')).toBe(join(home, '.codex'))
+  })
+
   it('resolve the rewritten sites under the profile folder, also when imported first', async () => {
     // Imported before the env is set: a path that a module builds at load fails here.
+    // A profile's userData, as in the app; on Linux the default one follows XDG_CONFIG_HOME, the real home.
+    vi.stubEnv('ORCA_USER_DATA_PATH', work)
     const { getSharedManagedScriptPath } =
       await import('../../main/agent-hooks/installation/scripts/managed-hook-script-path')
     const { getUserKeybindingsPath } = await import('../../main/keybindings/keybinding-file')

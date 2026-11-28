@@ -930,8 +930,9 @@ the first module of the `orcad` bundle entry (esbuild keeps import order in one 
 CLI's `--profile` selection. Terminals, serve, `orcad` and agent launches inherit them; a profile's
 serve LaunchAgent carries them too. A profile sets all of them to its own folders, also when the
 user set a value before the profile started. The default app removes only a profile's values: a
-value under a profile's `orca-home` folder (its userData has the profile marker). It keeps every
-other value. Path code is lazy: a static test fails on a helper call at module load.
+value under a profile's `orca-home` folder (its userData has the profile marker), and always
+`ORCA_HOME_DIR`. It keeps every other value. The path helpers then honour a value only when it lies
+under `ORCA_HOME_DIR`, so they read no file. Path code is lazy: a static test fails on a helper call at module load.
 
 Known limit: a shell startup file that exports one of these variables overrides the profile's
 folder in that profile's terminals.

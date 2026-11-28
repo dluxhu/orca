@@ -63,6 +63,8 @@
 1 src/main/antigravity/native-file-credentials.ts
 12 src/main/antigravity/native-windows-credentials.ts
 1 src/main/antigravity/native-wsl-credentials.ts
+2 src/main/app-profiles/app-profile-startup.ts # app profiles (fork): one-shot start, before ready: getAppProfile and the marker write
+3 src/main/app-profiles/app-profile.ts # app profiles (fork): getAppProfile reads Info.plist and the marker once, memoized, before ready
 6 src/main/artifacts/artifact-cloud-auth-context.ts
 7 src/main/artifacts/artifact-cloud-service.ts
 2 src/main/artifacts/artifact-create-intent-store.ts # sign-out clear (bestEffortFsyncDirectorySync) plus writeArtifactFileWhileCurrent, whose only sync step is the fenced renameSync; was 8
@@ -395,7 +397,7 @@
 3 src/main/daemon/endpoint/publication/daemon-socket-endpoint-path.ts
 4 src/main/daemon/executable-host/linux/daemon-appimage-generation-launch.ts
 1 src/main/daemon/executable-host/linux/daemon-appimage-launch.ts
-1 src/main/daemon/executable-host/macos/macos-daemon-bundle.ts
+2 src/main/daemon/executable-host/macos/macos-daemon-bundle.ts # app profiles (fork): +1 getAppProfile, whose one Info.plist read is memoized and runs before ready (app-profile-startup)
 3 src/main/daemon/executable-host/macos/macos-daemon-launchd.ts
 5 src/main/daemon/executable-host/macos/macos-retired-daemon-recovery.ts
 11 src/main/daemon/executable-host/windows/daemon-host-build-inventory.ts
@@ -566,7 +568,7 @@
 3 src/main/ipc/accounts/zcode-plan-credentials.ts
 1 src/main/ipc/ai-vault/ai-vault-search.ts
 1 src/main/ipc/ai-vault/ai-vault-subagent-list.ts
-4 src/main/ipc/app.ts
+5 src/main/ipc/app.ts # app profiles (fork): +1 getAppProfile, whose one Info.plist read is memoized and runs before ready (app-profile-startup)
 1 src/main/ipc/automations.ts
 1 src/main/ipc/browser/browser-extensions.ts
 1 src/main/ipc/browser/browser-passwords-import-ipc.ts
@@ -614,7 +616,9 @@
 1 src/main/ipc/linear/register-handlers.ts
 7 src/main/ipc/notebook.ts
 1 src/main/ipc/notifications/notification-authorization-status.ts
-2 src/main/ipc/notifications/notifications.ts
+2 src/main/ipc/notifications/notification-system-settings-link.ts # app profiles (fork): runtimeAppIdentity and the settings URL read getAppProfile, memoized before ready
+3 src/main/ipc/notifications/notifications.ts # app profiles (fork): +1 getAppProfile, whose one Info.plist read is memoized and runs before ready (app-profile-startup)
+1 src/main/ipc/notifications/startup-notification-registration.ts # app profiles (fork): openNotificationSystemSettings reads getAppProfile, memoized before ready
 5 src/main/ipc/orca-uninstall.ts
 4 src/main/ipc/plugins/plugins.ts
 3 src/main/ipc/preflight/preflight-command-exec.ts
@@ -889,6 +893,7 @@
 4 src/main/orcad/host-lifecycle/managed-stop/orcad-managed-stop-request.ts
 3 src/main/orcad/host-lifecycle/managed-stop/orcad-stop-request-listener.ts
 5 src/main/orcad/host-lifecycle/orcad-lifecycle.ts
+1 src/main/orcad/host-runtime/orcad-app-profile-env.ts # app profiles (fork): one marker read at orcad entry, before any path is read
 3 src/main/orcad/host-runtime/orcad-entry.ts
 5 src/main/orcad/host-runtime/orcad-host-adapters.ts
 2 src/main/orcad/host-runtime/orcad-runtime-rpc.ts
@@ -1356,7 +1361,7 @@
 1 src/main/startup/main-process-ipc-bootstrap.ts
 2 src/main/startup/main-process-observers.ts
 1 src/main/startup/main-process-preflight-failure.ts
-25 src/main/startup/main-process-preflight.ts
+28 src/main/startup/main-process-preflight.ts # app profiles (fork): +3 one-shot profile start in the preflight
 16 src/main/startup/main-process-ready-foundation.ts # +1 app profiles (fork): the settings seed, once at ready
 3 src/main/startup/main-process-ready-runtime.ts
 4 src/main/startup/main-process-ready.ts
@@ -1369,6 +1374,7 @@
 1 src/main/startup/plugin-startup/main-process-plugin-rpc.ts
 4 src/main/startup/plugin-startup/main-process-plugins.ts
 2 src/main/startup/profile-startup/desktop-profile-instance-lock.ts
+1 src/main/startup/profile-startup/dev-instance-identity.ts # app profiles (fork): runtimeAppIdentity reads getAppProfile, memoized before ready
 5 src/main/startup/profile-startup/profile-state-recovery-preflight.ts
 2 src/main/startup/profile-startup/single-instance-lock.ts
 12 src/main/startup/pty-startup/main-process-pty-startup.ts
@@ -1412,6 +1418,7 @@
 5 src/main/updater/lifecycle/updater-install-execution.ts
 2 src/main/updater/lifecycle/updater-remote-status.ts
 4 src/main/updater/lifecycle/updater-setup.ts
+1 src/main/updater/lifecycle/updater-state.ts # app profiles (fork): getAppProfile, memoized before ready (a profile has no updater)
 1 src/main/updater/lifecycle/windows-update-install-directory.ts
 10 src/main/updater/linux-package/appimage-runtime-identity.ts
 2 src/main/updater/linux-package/linux-package-downloaded-status.ts
@@ -1431,7 +1438,7 @@
 1 src/main/webhooks/webhook-host-ledger.ts
 2 src/main/webhooks/webhook-host-newer-agent-hooks.ts # the ledger's two secure writes, moved out of webhook-host-ledger.ts (its count dropped by 2)
 8 src/main/window/attach-main-window-services.ts
-2 src/main/window/createMainWindow.ts # superseded-session unlink on a rare memory-only sign-in or rotation stays ordered with the sync saves, sign-out and quit flush (#44285)
+4 src/main/window/createMainWindow.ts # superseded-session unlink on a rare memory-only sign-in or rotation stays ordered with the sync saves, sign-out and quit flush (#44285); app profiles (fork): +2 getAppProfile, memoized before ready
 3 src/main/window/desktop-integration/app-icon.ts
 1 src/main/window/desktop-integration/custom-app-icon.ts
 2 src/main/window/desktop-integration/macos-press-and-hold-default.ts

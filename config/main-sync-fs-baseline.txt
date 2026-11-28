@@ -561,6 +561,7 @@
 5 src/shared/agent-launch/plugins/opencode/opencode-tui-config-registration.ts
 1 src/shared/agent-launch/plugins/opencode/opencode-tui-plugin-install.ts
 4 src/shared/agent-launch/startup/omp-fresh-config.ts
+2 src/shared/app-profiles/app-profile-homes.ts # app profiles (fork): the marker check of applyAppProfileHomes, once at process start (CLI selection, orcad entry)
 5 src/shared/app-profiles/app-profile-paths.ts # app profiles (fork): marker and registry reads and one marker write at start; the CLI uses them too
 2 src/shared/desktop-distribution/appimage/appimage-cache-identity.ts
 2 src/shared/file-access/real-path-sync.ts

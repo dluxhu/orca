@@ -11,6 +11,10 @@ import {
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
 import { appProfileIdError } from '../../shared/app-profiles/app-profile-rules'
+import {
+  ORCA_HOME_DIR_ENV,
+  isAppProfileHomeValue
+} from '../../shared/app-profiles/app-profile-homes'
 
 export type AppProfile = {
   id: string
@@ -151,26 +155,12 @@ export function runtimeAppIdentity(): { productName: string; appId: string } {
     : { productName: FORK_IDENTITY.productName, appId: FORK_IDENTITY.appId }
 }
 
-const markedUserData = new Map<string, boolean>()
-
 /**
  * True in a profile app, and in any process (orcad too) that serves a profile's userData.
  * Such a process installs no managed hooks (the hook commands use the `.orca` folder in HOME)
- * and changes no config of the agents that stay on the real home.
+ * and changes no config of the agents that stay on the real home. Each such process sets
+ * ORCA_HOME_DIR before any module loads (the banner, `orcad`, the CLI); the default app clears it.
  */
 export function isAppProfileRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
-  const userDataPath = env.ORCA_USER_DATA_PATH
-  if (getAppProfile() !== null) {
-    return true
-  }
-  if (!userDataPath) {
-    return false
-  }
-  // The marker exists before any check runs (create, or the profile's start), so one read is enough.
-  let marked = markedUserData.get(userDataPath)
-  if (marked === undefined) {
-    marked = readAppProfileMarker(userDataPath) !== null
-    markedUserData.set(userDataPath, marked)
-  }
-  return marked
+  return isAppProfileHomeValue(env[ORCA_HOME_DIR_ENV], env)
 }

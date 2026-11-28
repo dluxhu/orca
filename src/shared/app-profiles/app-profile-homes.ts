@@ -48,19 +48,20 @@ export function applyAppProfileHomes(userDataPath: string | null, env: NodeJS.Pr
   applyAppProfileHomesCore(env, userDataPath, APP_PROFILE_AGENT_HOME_VARIABLES, io)
 }
 
-// Positive answers only: a profile writes its marker at start, after a first negative check.
-const profileUserData = new Set<string>()
-
-/** Whether a value lies under a profile's `orca-home` folder, that is, a profile set it. */
-export function isAppProfileHomeValue(value: string | undefined): value is string {
-  const match = value ? /^(.+)\/orca-home(?:\/|$)/.exec(value) : null
-  if (!match) {
+/**
+ * Whether a value lies under the profile's `orca-home` folder, that is, a profile set it. Every
+ * process sets or clears ORCA_HOME_DIR first (the banner, `orcad`, the CLI), so it names the
+ * profile without a file read; only a profile sets it.
+ */
+export function isAppProfileHomeValue(
+  value: string | undefined,
+  env: NodeJS.ProcessEnv = process.env
+): value is string {
+  const orcaHome = env[ORCA_HOME_DIR_ENV]?.trim()
+  if (!value || !orcaHome || !orcaHome.endsWith('/orca-home')) {
     return false
   }
-  if (!profileUserData.has(match[1]) && existsSync(join(match[1], 'orca-app-profile.json'))) {
-    profileUserData.add(match[1])
-  }
-  return profileUserData.has(match[1])
+  return value === orcaHome || value.startsWith(`${orcaHome}/`)
 }
 
 function isLocalHome(home: string): boolean {
@@ -73,7 +74,7 @@ export function orcaHomeDir(
   env: NodeJS.ProcessEnv = process.env
 ): string {
   const override = env[ORCA_HOME_DIR_ENV]?.trim()
-  return isAppProfileHomeValue(override) && isLocalHome(home) ? override : join(home, '.orca')
+  return isAppProfileHomeValue(override, env) && isLocalHome(home) ? override : join(home, '.orca')
 }
 
 /** An agent's folder that a profile set; else the folder in the user's home. */
@@ -83,7 +84,7 @@ export function defaultAgentHomeDir(
   env: NodeJS.ProcessEnv = process.env
 ): string {
   const value = env[variable]?.trim()
-  return isAppProfileHomeValue(value) ? value : join(homedir(), homeRelative)
+  return isAppProfileHomeValue(value, env) ? value : join(homedir(), homeRelative)
 }
 
 /** An agent's folder in `home`: the profile's when `home` is this user's home, else `home`'s own. */
@@ -101,5 +102,7 @@ export function agentHomeDirIn(
 /** Claude's global state file: in CLAUDE_CONFIG_DIR when a profile set it, else `~/.claude.json`. */
 export function defaultClaudeJsonPath(env: NodeJS.ProcessEnv = process.env): string {
   const dir = env.CLAUDE_CONFIG_DIR?.trim()
-  return isAppProfileHomeValue(dir) ? join(dir, '.claude.json') : join(homedir(), '.claude.json')
+  return isAppProfileHomeValue(dir, env)
+    ? join(dir, '.claude.json')
+    : join(homedir(), '.claude.json')
 }

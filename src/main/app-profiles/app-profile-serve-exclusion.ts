@@ -1,5 +1,5 @@
 // A profile app and its `orca serve` exclude each other. See docs/fork/profiles-design.md, section 4.
-import { spawn, spawnSync } from 'node:child_process'
+import { runProcessSync, spawnProcess } from '@orca/process-host'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -51,7 +51,8 @@ export function classifyProfileServer(
 
 // shortcut: synchronous `ps` and `launchctl` before ready, where nothing can await; slice 5 moves them to an async start.
 function runSync(program: string, args: string[]): { status: number | null; stdout: string } {
-  return spawnSync(program, args, { encoding: 'utf8' })
+  const result = runProcessSync({ program, args })
+  return { status: result.code, stdout: result.stdout }
 }
 
 function readProcessTable(): ProcessRow[] {
@@ -74,7 +75,7 @@ function waitForExit(pid: number): boolean {
 }
 
 function launchctl(args: string[]): void {
-  spawn('/bin/launchctl', args, { detached: true, stdio: 'ignore' }).unref()
+  spawnProcess({ program: '/bin/launchctl', args, detached: true, stdio: 'ignore' }).unref()
 }
 
 /**
