@@ -11,7 +11,8 @@ type ParseWarpThemeTimeoutOptions = {
 
 function getParserWorkerPath(): string {
   if (app.isPackaged) {
-    return join(process.resourcesPath, 'app.asar', 'out', 'main', 'warp-theme-parser-worker.js')
+    // Fork: the app path, not process.resourcesPath/app.asar: a profile app runs the default app's asar.
+    return join(app.getAppPath(), 'out', 'main', 'warp-theme-parser-worker.js')
   }
   return join(__dirname, 'warp-theme-parser-worker.js')
 }
