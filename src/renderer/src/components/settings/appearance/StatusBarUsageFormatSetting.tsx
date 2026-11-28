@@ -19,8 +19,9 @@ type StatusBarUsageFormatSettingProps = {
   onChange: (format: StatusBarUsageFormat) => void
 }
 
-const EXAMPLE_TEMPLATE =
-  '{provider}[ | 5h: {5h} ({5h.reset})][ | 7d: {7d}][ | Fable: {fable}][ | 30d: {30d}]'
+/** The built-in Detailed text as a template: the field starts from it while the setting is empty. */
+export const DEFAULT_USAGE_TEMPLATE =
+  '[{5h} {5h.reset}][[ · ]][{7d} {7d.reset}][[ · ]][{fable} Fable][[ · ]][{30d} {30d.reset}][[ · ]][{buckets}]'
 
 /** Fixed sample so the preview reads meaningfully before any provider has reported usage. */
 function sampleLimits(now: number): ProviderRateLimits {
@@ -92,6 +93,13 @@ export function StatusBarUsageFormatSetting({
       )
     ],
     [
+      '{5h.time%}',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.timePercent',
+        'share of the window passed (Used) or left (Remaining), e.g. 35%'
+      )
+    ],
+    [
       '{buckets}',
       t(
         'auto.components.settings.StatusBarUsageFormatSetting.placeholder.namedUsagePools',
@@ -104,23 +112,44 @@ export function StatusBarUsageFormatSetting({
         'auto.components.settings.StatusBarUsageFormatSetting.placeholder.optional',
         'dropped when a placeholder inside is empty'
       )
+    ],
+    [
+      '[[ … ]]',
+      t(
+        'auto.components.settings.StatusBarUsageFormatSetting.placeholder.separator',
+        'separator, shown only between two shown [ … ] groups'
+      )
     ]
   ]
   const display = normalizeUsagePercentageDisplay(useAppStore((s) => s.usagePercentageDisplay))
   const entry = getStatusBarUsageFormatEntry()
-  const template = format.template
-  const hasTemplate = template.trim().length > 0
+  const hasTemplate = format.template.trim().length > 0
+  // Why a draft: an empty setting means the built-in text, so the field shows that as a template;
+  // clearing the field while typing must not snap the default back in.
+  const [draft, setDraft] = useState(() => (hasTemplate ? format.template : DEFAULT_USAGE_TEMPLATE))
+  // Why: a saved value that changes to something other than the field's text came from elsewhere (e.g. sync).
+  const [seen, setSeen] = useState(format.template)
+  if (format.template !== seen) {
+    setSeen(format.template)
+    if (format.template !== draft) {
+      setDraft(hasTemplate ? format.template : DEFAULT_USAGE_TEMPLATE)
+    }
+  }
+  const save = (template: string, shown: string): void => {
+    setDraft(shown)
+    onChange({ ...format, template })
+  }
   // Why: the sample's reset times are relative to `now`, so a mount-time clock keeps the preview stable.
   const [now] = useState(() => Date.now())
   const preview = useMemo(() => {
-    if (!hasTemplate) {
+    if (!draft.trim()) {
       return null
     }
     return renderUsageFormatTemplate(
-      template,
+      draft,
       buildUsageFormatValues(sampleLimits(now), { display, now, locale })
     )
-  }, [display, hasTemplate, now, template, locale])
+  }, [display, draft, now, locale])
 
   return (
     <div className="space-y-2">
@@ -130,11 +159,7 @@ export function StatusBarUsageFormatSetting({
         description={entry.description}
         control={
           hasTemplate ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onChange({ ...format, template: '' })}
-            >
+            <Button variant="outline" size="sm" onClick={() => save('', DEFAULT_USAGE_TEMPLATE)}>
               {t('auto.components.settings.StatusBarUsageFormatSetting.reset', 'Reset')}
             </Button>
           ) : null
@@ -143,12 +168,11 @@ export function StatusBarUsageFormatSetting({
       {/* Why full-width: templates run long, and the row's control slot would truncate them. */}
       <Input
         aria-label={entry.title}
-        value={template}
-        placeholder={EXAMPLE_TEMPLATE}
+        value={draft}
         spellCheck={false}
         variant="code"
         className="h-8"
-        onChange={(event) => onChange({ ...format, template: event.target.value })}
+        onChange={(event) => save(event.target.value, event.target.value)}
       />
       <div className="space-y-1 text-[11px] text-muted-foreground">
         <div>

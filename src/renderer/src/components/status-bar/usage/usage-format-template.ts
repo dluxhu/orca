@@ -12,9 +12,11 @@ import { formatPlanLabel } from './usage-roster-formatting'
 
 export type UsageFormatValues = Record<string, string>
 
-const PLACEHOLDER_RE = /\{([a-zA-Z0-9_.]+)\}/g
+// Why: `%` lets `{5h.time%}` match; a `{...%}` that is no key still stays verbatim.
+const PLACEHOLDER_RE = /\{([a-zA-Z0-9_.%]+)\}/g
 // Why: one level of brackets only — nested optional groups aren't worth the parsing cost for a footer string.
-const OPTIONAL_GROUP_RE = /\[([^[\]]*)\]/g
+// `[[...]]` (a separator) is tried first, so it is never read as a group.
+const SEGMENT_RE = /\[\[([^[\]]*)\]\]|\[([^[\]]*)\]/g
 
 /** Replaces known `{key}` placeholders; unknown ones are left verbatim. */
 function substitute(text: string, values: UsageFormatValues): string {
@@ -23,18 +25,45 @@ function substitute(text: string, values: UsageFormatValues): string {
   )
 }
 
-/** Renders `{key}` placeholders; `[...]` groups vanish when any known placeholder inside is empty.
+type Segment = { kind: 'text' | 'group' | 'separator'; text: string | null }
+
+/** Renders `{key}` placeholders; `[...]` groups vanish when any known placeholder inside is empty;
+ *  a `[[...]]` separator shows only when a group before it and the next group after it both show.
  *  Whitespace is the author's: nothing is collapsed or trimmed, so render it with `whitespace-pre`. */
 export function renderUsageFormatTemplate(template: string, values: UsageFormatValues): string {
-  const withGroups = template.replace(OPTIONAL_GROUP_RE, (match, inner: string) => {
-    const keys = [...inner.matchAll(PLACEHOLDER_RE)].map((m) => m[1])
-    if (keys.length === 0) {
-      return match
+  const segments: Segment[] = []
+  let last = 0
+  for (const m of template.matchAll(SEGMENT_RE)) {
+    segments.push({ kind: 'text', text: template.slice(last, m.index) })
+    last = m.index + m[0].length
+    if (m[1] !== undefined) {
+      segments.push({ kind: 'separator', text: m[1] })
+      continue
     }
+    const keys = [...m[2].matchAll(PLACEHOLDER_RE)].map((k) => k[1])
     const missing = keys.some((key) => Object.hasOwn(values, key) && values[key] === '')
-    return missing ? '' : substitute(inner, values)
-  })
-  return substitute(withGroups, values)
+    // A bracket pair without placeholders is literal text, not a group.
+    segments.push(
+      keys.length === 0
+        ? { kind: 'text', text: m[0] }
+        : { kind: 'group', text: missing ? null : m[2] }
+    )
+  }
+  segments.push({ kind: 'text', text: template.slice(last) })
+  // Why "a group before", not "the group before": `[A][[, ]][B][[, ]][C]` without B reads "A, C".
+  let shownBefore = false
+  return segments
+    .map((segment, index) => {
+      if (segment.kind === 'separator') {
+        const next = segments.slice(index + 1).find((s) => s.kind === 'group')
+        return shownBefore && next?.text != null ? substitute(segment.text ?? '', values) : ''
+      }
+      if (segment.kind === 'group' && segment.text !== null) {
+        shownBefore = true
+      }
+      return segment.text === null ? '' : substitute(segment.text, values)
+    })
+    .join('')
 }
 
 export type UsageFormatValueOptions = {
@@ -87,6 +116,12 @@ export function buildUsageFormatValues(
     values[`${key}.reset`] =
       window?.resetsAt != null ? formatResetDuration(window.resetsAt - options.now) : ''
     values[`${key}.resetAt`] = window?.resetsAt != null ? resetClock(window.resetsAt, options) : ''
+    const windowMs = window && window.windowMinutes > 0 ? window.windowMinutes * 60_000 : null
+    // Time passed in Used mode, time left in Remaining mode, rounded like the usage percentage.
+    values[`${key}.time%`] =
+      windowMs !== null && window?.resetsAt != null
+        ? `${getDisplayedUsagePercentage(100 - ((window.resetsAt - options.now) / windowMs) * 100, options.display)}%`
+        : ''
   }
   values.buckets = (p.buckets ?? [])
     .map((bucket) => `${bucket.name} ${percent(bucket, options.display)}`)
