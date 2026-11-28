@@ -89,7 +89,7 @@ async function userFiles(agent: McpConfigAgent, context: AgentMcpConfigContext):
       ]
     }
     case 'gemini':
-      return [join(agentHomeDirIn(homeDir, 'GEMINI_CLI_HOME', '.gemini'), 'settings.json')]
+      return [join(homeDir, '.gemini', 'settings.json')]
     case 'copilot':
       return [join(envDir(env, 'COPILOT_HOME') ?? join(homeDir, '.copilot'), 'mcp-config.json')]
     case 'pi':

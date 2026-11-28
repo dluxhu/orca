@@ -1,5 +1,4 @@
 import { join, resolve } from 'node:path'
-import { agentHomeDirIn } from '../../../shared/app-profiles/app-profile-homes'
 import type { BundledSkillOp } from '../../../shared/skills/bundled/bundled-skill-plan'
 import type { BundledSkillSource } from './bundled-skill-sources'
 import {
@@ -16,11 +15,10 @@ import {
   type BundledSkillTargetRoot
 } from './bundled-skill-targets'
 
-/** Global roots Orca once installed into for agents that also read ~/.agents/skills, in a home.
- *  In an app profile, the root is in the profile's agent folder. */
-const FORMER_GLOBAL_SKILL_ROOTS: readonly ((home: string) => string)[] = [
+/** Global roots Orca once installed into for agents that also read ~/.agents/skills. */
+const FORMER_GLOBAL_SKILL_ROOTS: readonly (readonly string[])[] = [
   // Orca once linked skills here for Gemini CLI; its copies still need retiring.
-  (home) => join(agentHomeDirIn(home, 'GEMINI_CLI_HOME', '.gemini'), 'skills')
+  ['.gemini', 'skills']
 ]
 
 /** Retiring writes in these roots, so installs lock them like targets. */
@@ -28,7 +26,7 @@ export function formerSkillRootPaths(
   destination: Pick<BundledSkillPlanInput['destination'], 'scope' | 'homeDirectory'>
 ): string[] {
   return destination.scope === 'global'
-    ? FORMER_GLOBAL_SKILL_ROOTS.map((rootIn) => rootIn(destination.homeDirectory))
+    ? FORMER_GLOBAL_SKILL_ROOTS.map((segments) => join(destination.homeDirectory, ...segments))
     : []
 }
 
@@ -36,13 +34,16 @@ export function formerSkillRootPaths(
 async function plainFormerRootRealPath(
   input: BundledSkillPlanInput,
   roots: readonly BundledSkillTargetRoot[],
-  rootIn: (home: string) => string
+  segments: readonly string[]
 ): Promise<string | null> {
   const { destination, filesystem } = input
   const home = await resolveBundledSkillRealPath(filesystem, destination.homeDirectory)
-  const realPath = await resolveBundledSkillRealPath(filesystem, rootIn(destination.homeDirectory))
+  const realPath = await resolveBundledSkillRealPath(
+    filesystem,
+    join(destination.homeDirectory, ...segments)
+  )
   const key = bundledSkillPathKey(realPath)
-  return key === bundledSkillPathKey(rootIn(home)) &&
+  return key === bundledSkillPathKey(join(home, ...segments)) &&
     !roots.some((root) => bundledSkillPathKey(root.realPath) === key)
     ? realPath
     : null
@@ -85,8 +86,8 @@ export async function planFormerRootPlacements(
     return []
   }
   const previous: NonNullable<BundledSkillOp['previous']>[number][] = []
-  for (const rootIn of FORMER_GLOBAL_SKILL_ROOTS) {
-    const root = rootIn(destination.homeDirectory)
+  for (const segments of FORMER_GLOBAL_SKILL_ROOTS) {
+    const root = join(destination.homeDirectory, ...segments)
     let rootRealPath: string | null | undefined
     for (const name of [source.name, ...(source.aliases ?? [])]) {
       const path = join(root, name)
@@ -99,7 +100,7 @@ export async function planFormerRootPlacements(
       if (observed.kind === 'absent' || observed.kind === 'unreadable') {
         continue
       }
-      rootRealPath ??= await plainFormerRootRealPath(input, roots, rootIn)
+      rootRealPath ??= await plainFormerRootRealPath(input, roots, segments)
       if (!rootRealPath) {
         break
       }
