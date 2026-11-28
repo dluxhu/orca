@@ -11,6 +11,7 @@ import { useShortcutLabel } from '@/lib/keyboard/useShortcutLabel'
 import { structuredAgentSessionPaneKey } from '../../../../../../shared/agent-session/view/structured-agent-session-projection'
 import { NativeChatProviderSessionIdMenuItem } from './NativeChatProviderSessionIdMenuItem'
 import { NativeChatCopyOrcaSessionIdMenuItem } from './NativeChatCopyOrcaSessionIdMenuItem'
+import { NativeChatRemoteControlMenuItems } from './NativeChatRemoteControlMenuItems'
 import { useStructuredChatPaneActions } from './use-structured-chat-pane-actions'
 
 export function NativeChatStructuredPaneMenuItems({
@@ -49,6 +50,7 @@ export function NativeChatStructuredPaneMenuItems({
       {providerSessionId || resolveOrcaSessionId ? (
         <>
           <DropdownMenuSeparator />
+          {providerSessionId ? <NativeChatRemoteControlMenuItems pane={pane} /> : null}
           {providerSessionId ? (
             <NativeChatProviderSessionIdMenuItem sessionId={providerSessionId} />
           ) : null}

@@ -149,6 +149,7 @@ export const SettingsUpdate = lazyZodSchema(() =>
       botsEnabled: z.boolean().optional(),
       agentStatusHooksEnabled: z.boolean().optional(),
       claudeSubagentNavigationEnabled: z.boolean().optional(),
+      claudeRemoteControlForNewChats: z.boolean().optional(),
       defaultRepoSelection: z.array(z.string()).nullable().optional(),
       defaultLinearTeamSelection: z.array(z.string()).nullable().optional(),
       compactWorktreeCards: z.boolean().optional(),

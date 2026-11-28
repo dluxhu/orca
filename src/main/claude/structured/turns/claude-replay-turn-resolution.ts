@@ -16,6 +16,7 @@ import type {
 } from '../claude-structured-session-state'
 import { readClaudeFrameString } from '../startup/claude-structured-init-proof'
 import { claudeDispatchContentKey } from '../dispatch/claude-structured-dispatch-content'
+import { isClaudeRemotePrompt, rememberClaudeReplayUuid } from '../claude-structured-remote-control'
 import type { AgentJournalAnsweredTurnIdentity } from '../../../../shared/agent-session/journal/agent-session-journal-types'
 
 /** Settle provider-proven delivery independently of replay-row acceptance reconciliation. */
@@ -24,6 +25,10 @@ export type ClaudeLateDispatchSettlement = (input: ClaudeLateDispatchOutcome) =>
 export type ClaudeReplayTurnOrigin = {
   requestedAt: number | null
   clientMessageId: string | null
+  /** No Orca send claims this prompt: Remote Control delivered it from claude.ai or the Claude app. */
+  remote?: true
+  /** The running provider cycle took the remote prompt in, as it folds an Orca send. */
+  folded?: true
 }
 
 export function resolveClaudeReplayTurn(
@@ -139,7 +144,17 @@ export function resolveClaudeReplayTurn(
         return null
       }
     }
-    return null
+    // No send claims it: with Remote Control on, it came from claude.ai or the Claude app.
+    if (!isClaudeRemotePrompt(session, message)) {
+      return null
+    }
+    rememberClaudeReplayUuid(session, uuid)
+    return {
+      requestedAt: null,
+      clientMessageId: null,
+      remote: true,
+      ...(session.translator?.turnCycle.openedInLiveProviderCycle ? { folded: true as const } : {})
+    }
   }
   const current = session.dispatchWaiters[0]
   if (isCompletedCommand && !current?.acceptsResult) {
@@ -208,6 +223,7 @@ function settleWaiter(
     session.dispatchWaiters.splice(index, 1)
   }
   waiter.settledUuid = uuid
+  rememberClaudeReplayUuid(session, uuid)
   waiter.resolve(uuid)
   // Admission already returned; this replay settles delivery.
   if (waiter.clientMessageId) {
@@ -226,6 +242,7 @@ function recoverLateIdentity(
   isUserReplay: boolean,
   onSettledLate?: ClaudeLateDispatchSettlement
 ): void {
+  rememberClaudeReplayUuid(session, uuid)
   if (!isUserReplay && !waiter.acceptsResult) {
     return
   }

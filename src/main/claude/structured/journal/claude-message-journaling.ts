@@ -40,6 +40,7 @@ import type { ClaudeOpenTurn } from '../turns/claude-open-turn'
 import type { ClaudeAssistantFailures } from './claude-assistant-failures'
 import type { ClaudeUsageLimits } from './claude-usage-limits'
 import type { ClaudeThreadGoal } from './claude-thread-goal'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../../shared/agent-session/journal/agent-session-journal-types'
 
 export type ClaudeMessageJournalContext = {
   sink: StructuredAgentSessionEventSink
@@ -81,10 +82,11 @@ export function journalClaudeMessage(
   message: Record<string, unknown>,
   startsTurn: boolean,
   observedAt: number,
-  /** Host clock on the submission that produced this send, when known. */
-  requestedAt?: number,
-  clientMessageId?: string
+  /** The frame's send: the host clock of its submission when known, the submission id, and
+   *  `remotePrompt` when Remote Control sent the prompt, so no host submission row shows it. */
+  send: { requestedAt?: number; clientMessageId?: string; remotePrompt?: true } = {}
 ): boolean {
+  const { requestedAt, clientMessageId, remotePrompt } = send
   const envelope = readClaudeMessageEnvelope(message)
   if (!envelope) {
     return false
@@ -151,6 +153,15 @@ export function journalClaudeMessage(
     } else {
       ctx.sink.appendItem(identity, body, { ...stamp(identity, body), lifecycle: true })
     }
+    changed = true
+  }
+  const remotePromptBody = remotePrompt ? claudeMessageBody(envelope) : null
+  if (remotePromptBody) {
+    // An opener sits outside turns like a host submission; a folded prompt joins the running turn.
+    ctx.sink.appendItem(identity, remotePromptBody, {
+      turnScope: startsTurn ? AGENT_JOURNAL_THREAD_SCOPE : ctx.turn.turnScope,
+      lifecycle: true
+    })
     changed = true
   }
   const stopHookFeedback = claudeEnvelopeStopHookFeedbackRow(envelope)

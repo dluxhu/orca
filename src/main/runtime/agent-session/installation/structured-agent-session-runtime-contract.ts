@@ -47,6 +47,8 @@ export type StructuredAgentSessionRuntimeDeps = StructuredAgentSessionTransportO
     /** Read this host's preference when a chat starts a provider process. */
     isEnabled: () => boolean
   }
+  /** The user's setting to turn on Claude Remote Control for new chats; absent leaves it off. */
+  claudeRemoteControlForNewChats?: () => boolean
   /** Whether Pi chats refresh Orca's managed extensions in their agent dir. */
   piManagedExtensionsEnabled?: () => boolean
   /** This host's preference for agents' suggested next prompts, read when a chat starts one. */
