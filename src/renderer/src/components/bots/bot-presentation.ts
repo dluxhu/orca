@@ -5,6 +5,12 @@ import {
 } from '../../../../shared/bots/bot-failure-copy'
 import { getAgentLabel } from '@/lib/agent-catalog/agent-catalog'
 import { translate } from '@/i18n/i18n'
+import {
+  APP_PROFILE_PATH_ROOT,
+  appProfileDir,
+  localOrcaHomeDir
+} from '@/lib/app-profile-path-display'
+import { isLocalExecutionHost } from '../../../../shared/execution-host/execution-host'
 import type { TerminalAgent } from '../../../../shared/agent-status/identity/terminal-agent'
 import { refusedForOlderHostPurposeLimit } from '../../../../shared/bots/bot-proposal'
 import { UNSAVED_DRAFTS_REMOVAL_REFUSAL } from '../../../../shared/worktree/removal/removal'
@@ -29,9 +35,29 @@ export function botAgentLabel(agent: TerminalAgent): string {
 
 const IS_WINDOWS = navigator.userAgent.includes('Windows')
 
-/** A bot's home, shown from the user's home rather than as a full path. */
-export function botFolderDisplay(folder: string, windows = IS_WINDOWS): string {
+/** A bot's home, shown from the user's home, or from the app profile's folder, not as a full path. */
+export function botFolderDisplay(
+  folder: string,
+  hostId: string,
+  windows = IS_WINDOWS,
+  profileDir = appProfileDir()
+): string {
+  if (profileDir && isLocalExecutionHost(hostId)) {
+    return `${APP_PROFILE_PATH_ROOT}/bots/${folder}`
+  }
   return windows ? `%USERPROFILE%\\.orca\\bots\\${folder}` : `~/.orca/bots/${folder}`
+}
+
+/** A bot's home on this computer, or null where this window cannot open local files. */
+export function localBotFolderPath(
+  folder: string,
+  windows = IS_WINDOWS,
+  profileDir = appProfileDir(),
+  orcaHome = localOrcaHomeDir()
+): string | null {
+  // shortcut: an isolated data folder (dev runs) keeps bots in <userData>/bots. There the link
+  // opens ~/.orca/bots. When that is a problem, get the bots folder from main.
+  return orcaHome ? [profileDir ?? orcaHome, 'bots', folder].join(windows ? '\\' : '/') : null
 }
 
 /** A bot chat its agent refused, as native chat words it. Its host calls itself this computer, so

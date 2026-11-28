@@ -9940,7 +9940,7 @@
           "05f5c5ab50": "Ajan yanıt bekliyor"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Yerel çalışma zamanı anahtarları, mevcut olduğunda Electron şifreli depolama kullanılarak ~/.orca içinde saklanır.",
+          "d246b2bdb3": "Yerel çalışma zamanı anahtarları, mevcut olduğunda Electron şifreli depolama kullanılarak <path>{{root}}</path> içinde saklanır.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API anahtarı yapılandırıldı",
           "07ed3e512e": "Ses, yalnızca bir OpenAI konuşma modeli seçildiğinde OpenAI'ye gönderilir.",
@@ -10555,7 +10555,7 @@
           "25b0004fbf": "Terminal etkin",
           "781cb74d22": "Terminal bölmelerinden çalışır.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "Kısayol artık kullanılamıyor.",
           "9a3a3ca03d": "Klavye Kısayolları"
         },
@@ -28109,7 +28109,7 @@
       "computer": "Bilgisayar",
       "computerAccountHint": "Botun çalıştığı yer; Orca oturumu {{account}} hesabıyla açık.",
       "computerHint": "Botun çalıştığı yer.",
-      "folder": "Klasör: {{path}}",
+      "folder": "Klasör: <path>{{path}}</path>",
       "hostNeedsServer": "Orca sunucusu gerekli",
       "hostNeedsServerHint": "Botları çalıştırmak için Ayarlar → Uzak Orca Sunucuları bölümünde {{host}} üzerinde bir Orca sunucusu kurun.",
       "noChatAgents": "Bu bilgisayarda kullanılabilir sohbet ajanı yok.",

@@ -1,7 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
-import { FORK_IDENTITY } from '../../shared/fork-identity'
 
 /** Stdin EOF tells the wrapper that Orca died. */
 export type LogStreamChild = ChildProcessByStdio<Writable, Readable, Readable>
@@ -9,17 +8,10 @@ export type LogStreamChild = ChildProcessByStdio<Writable, Readable, Readable>
 // AUTHREQ_PROMPTING identifies actual dialogs, including access attributed to Orca’s terminal children (#9756).
 
 // TCC can attribute terminal access to the detached helper independently of the main app.
-const ORCA_RESPONSIBLE_IDENTIFIERS = new Set([
-  'com.stablyai.orca',
-  'com.stablyai.orca.helper',
-  'com.stablyai.orca.dev',
-  'com.stablyai.orca.dev.helper',
-  'com.stablyai.orca.local',
-  'com.stablyai.orca.local.helper',
-  // Fork patch: the fork bundle and its helper. See docs/fork/PATCHES.md.
-  FORK_IDENTITY.appId,
-  `${FORK_IDENTITY.appId}.helper`
-])
+// Fork patch: a prefix match accepts the fork, its nightly, each app profile and their helpers.
+function isOrcaResponsibleIdentifier(identifier: string): boolean {
+  return identifier === 'com.stablyai.orca' || identifier.startsWith('com.stablyai.orca.')
+}
 
 const WATCHED_SERVICES = new Set([
   'kTCCServiceSystemPolicyAppData',
@@ -62,8 +54,7 @@ export function parseTccPromptEvent(line: string): TccPromptEvent | null {
 
 export function isOrcaAttributedPrompt(event: TccPromptEvent): boolean {
   return (
-    ORCA_RESPONSIBLE_IDENTIFIERS.has(event.responsibleIdentifier) &&
-    WATCHED_SERVICES.has(event.service)
+    isOrcaResponsibleIdentifier(event.responsibleIdentifier) && WATCHED_SERVICES.has(event.service)
   )
 }
 

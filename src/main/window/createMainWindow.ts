@@ -1,7 +1,12 @@
 import { app, BrowserWindow, nativeTheme, powerMonitor, screen } from 'electron'
 import { release } from 'node:os'
 import { join } from 'node:path'
-import { FORK_IDENTITY } from '../../shared/fork-identity'
+import { getAppProfile, runtimeAppIdentity } from '../app-profiles/app-profile'
+import {
+  formatAppProfileDirArgument,
+  formatOrcaHomeDirArgument
+} from '../../shared/app-profiles/app-profile-dir-argument'
+import { orcaHomeDir } from '../../shared/app-profiles/app-profile-homes'
 import { pathToFileURL } from 'node:url'
 import { installRendererHangStackPolicy } from '../hang-watchdog/renderer-hang-stack-policy'
 import { getAppIconPath } from './desktop-integration/app-icon'
@@ -124,13 +129,14 @@ export function createMainWindow(
   )
 
   const pumpHiddenFrames = shouldPumpHiddenWindowFrames(process.env, process.platform)
+  const appProfile = getAppProfile()
   const mainWindow = new BrowserWindow({
     width: savedBounds?.width ?? defaultBounds.width,
     height: savedBounds?.height ?? defaultBounds.height,
     ...(savedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    title: opts?.title ?? FORK_IDENTITY.productName,
+    title: opts?.title ?? runtimeAppIdentity().productName,
     show: false,
     // Deliver the app-activating click on macOS instead of requiring a second click.
     acceptFirstMouse: true,
@@ -169,6 +175,8 @@ export function createMainWindow(
         formatBrowserClientHostIdArgument(getBrowserClientHostId()),
         ...(windowMaterial === 'off' ? [] : [formatWindowMaterialArgument(windowMaterial)]),
         ...(pumpHiddenFrames ? [formatHiddenWindowFramePumpArgument()] : []),
+        ...(appProfile ? [formatAppProfileDirArgument(appProfile.userDataPath)] : []),
+        formatOrcaHomeDirArgument(orcaHomeDir()),
         ...wslHostsWindowArguments()
       ]
     }
