@@ -666,7 +666,7 @@ counted).
 | Badge image | `Logo` (`sized`, `on_white`), `fill_holes`, `key_out_white` | about 45 | ref-match |
 | Curl | `grid`, `_paper`, `page_curl`, `st_ref_match` | 70 | ref-match |
 | Parameters and `.icns` | `style_params`, `write_icns` | about 35 | ref-match |
-| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | ported, except `sticker` (see below) |
+| Other styles | tiles, `frosted`, `liquid-glass`, `round`, `sticker`, `stamp` (87); `page-curl` (34); `gentle-curve`, `rolled-cylinder`, `round-peel` (20); `dominant_color`, `tint` (14); shared helpers (17) | 172 | ported |
 | Not ported | CLI, preview sheet, SVG rendering through cairo, `.app` and `.iconset` loading, the web UI server | about 110 | — |
 
 So `ref-match` needs about 300 lines of Python. Pillow and numpy give some parts that TypeScript
@@ -690,16 +690,17 @@ notice of dock-icon-badger in the ported files.
 
 ### Ported styles
 
-The port has 13 styles (`ICON_STYLES` in `src/shared/icon-badger/badger.ts`): `ref-match` (the
-default), `ref-match-bigger`, `white-tile`, `tint-tile`, `frosted`, `round`, `stamp`,
+The port has 14 styles (`ICON_STYLES` in `src/shared/icon-badger/badger.ts`): `ref-match` (the
+default), `ref-match-bigger`, `white-tile`, `tint-tile`, `frosted`, `round`, `sticker`, `stamp`,
 `liquid-glass`, `page-curl`, `page-curl-small`, `gentle-curve`, `rolled-cylinder` and `round-peel`.
 Each one has a golden test against the tool's `web/thumbs/<style>.png`.
 
-**Known gap: `sticker`.** The port does not meet the limit with the PNG test badge: its badge size
-search picks a different die-cut box than the reference, which used the SVG badge. It meets the limit
-only with a position offset that the production code does not have. So `sticker` is not in
-`ICON_STYLES`. A badge from an SVG source can remove the difference; check that before the style is
-added.
+**`sticker` has its own limit.** The reference used the SVG badge at 4096 px; the test uses the PNG
+badge. The edge of the PNG badge is a little fainter at its top and bottom, so the traced backing is
+1 px shorter at each end. The box search then picks a different box, and the badge sits 1 px lower.
+A raster of the SVG badge's outline at 4096 px gives the reference's box and bounding box. So the
+port is correct, and the difference comes from the badge source. A second test checks the die-cut
+with the reference's box and bounding box at the normal limit.
 
 ### Tests against dock-icon-badger's own output
 
