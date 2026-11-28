@@ -41,7 +41,8 @@ import {
   botItemPendingAnswersOnly,
   botItemPendingWordsBesideAnswers
 } from '../../../../../shared/bots/bot-item-sent-answers'
-import { NATIVE_CHAT_QUOTE_SOURCE_PROPS } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
+import { nativeChatQuoteSourceProps } from '../../../../../shared/native-chat/input/quotes/native-chat-quote-selection'
+import { BotItemActivityChips, botItemActivityQuoteSource } from './BotItemActivityChips'
 
 const ACTOR = 'font-medium text-foreground/80'
 // Where a linked event's refs go in its translated sentence.
@@ -279,13 +280,14 @@ export function BotItemActivityList({
     (eventId: string) => revealBotItemComment(list.current, eventId, 'focus'),
     []
   )
+  const quoteSource = botItemActivityQuoteSource(bot, item.uid)
   // The rail runs through the event glyphs; each glyph and card sits on the panel fill over it.
   return (
-    <>
+    <BotItemActivityChips bot={bot} quoteSource={quoteSource}>
       <div
         ref={list}
         // Comments and events quote into the item's comment box, as replies do into chat's composer.
-        {...NATIVE_CHAT_QUOTE_SOURCE_PROPS}
+        {...nativeChatQuoteSourceProps(quoteSource)}
         className="relative flex flex-col before:absolute before:inset-y-2.5 before:left-[9.5px] before:w-px before:bg-foreground/12"
       >
         {entries.map((entry) => {
@@ -393,6 +395,6 @@ export function BotItemActivityList({
           {t('bots.items.activity.noComments', 'No comments yet.')}
         </p>
       )}
-    </>
+    </BotItemActivityChips>
   )
 }

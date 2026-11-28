@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { Parent, PhrasingContent, Root, RootContent } from 'mdast'
 import type { CommentMarkdownExtension } from '@/components/comment-markdown/CommentMarkdown'
 import { AgentReferencePillContent } from '../composer/editor/native-chat-agent-reference'
@@ -5,6 +6,10 @@ import type { SentAgentMention } from '../../../../../shared/orchestration/mailb
 import { useTranslate } from '@/i18n/use-translate'
 import { useNativeChatVisualOwner } from '../media/visuals/native-chat-visual-owner'
 import { openSentAgentMention } from './open-sent-agent-mention'
+import type { RuntimeClientTarget } from '../../../../../shared/remote-runtime/host-catalog/runtime-client-target'
+
+/** The host a sent mention opens on outside a chat's transcript, such as a bot item's Activity. */
+export const NativeChatAgentMentionHostContext = createContext<RuntimeClientTarget | null>(null)
 
 // The hast property that carries a mention label through sanitize to the chip.
 const MENTION_PROPERTY = 'dataNativeChatAgentMention'
@@ -80,11 +85,12 @@ export function plainNativeChatAgentMentions(
 function SentAgentMentionChip({ mention }: { mention: SentAgentMention }): React.JSX.Element {
   const t = useTranslate()
   const owner = useNativeChatVisualOwner()
+  const host = useContext(NativeChatAgentMentionHostContext) ?? owner?.target
   const pill = (
     <AgentReferencePillContent label={mention.label} kind={mention.kind} selected={false} />
   )
   // A crew or Dispatch mention names work, not a session to open.
-  if (!owner || mention.kind === null) {
+  if (!host || mention.kind === null) {
     return pill
   }
   return (
@@ -94,7 +100,7 @@ function SentAgentMentionChip({ mention }: { mention: SentAgentMention }): React
       aria-label={t('components.native-chat.agentMessage.open', 'Open {{name}}', {
         name: mention.label
       })}
-      onClick={() => void openSentAgentMention(mention, owner.target)}
+      onClick={() => void openSentAgentMention(mention, host)}
     >
       {pill}
     </button>

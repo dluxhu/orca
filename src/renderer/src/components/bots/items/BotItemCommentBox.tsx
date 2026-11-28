@@ -31,10 +31,8 @@ import {
   clearNativeChatComposerDraftIfUnchanged,
   readNativeChatComposerDraft
 } from '../../native-chat/drafts/native-chat-composer-draft-store'
-import {
-  admitNativeChatPastedText,
-  projectNativeChatPastedText
-} from '../../native-chat/paste/native-chat-composer-pasted-text-references'
+import { admitNativeChatPastedText } from '../../native-chat/paste/native-chat-composer-pasted-text-references'
+import { serializeNativeChatAgentReferences } from '../../native-chat/composer/pickers/native-chat-agent-reference-send'
 import { imageReferencesToPromptMarkers } from '../../../../../shared/native-chat/transcript/images/native-chat-sent-image-prompt-markers'
 import { botItemHeldAnswersLimitNotice } from './bot-item-held-answers'
 import {
@@ -243,9 +241,10 @@ function BotItemCommentField({
     }
     const submitted = readNativeChatComposerDraft(scopeKey)
     const sent = images.filter((image) => image.path)
-    // Chips become the [Image #N] of the images sent, as chat numbers them.
+    // Chips become the [Image #N] of the images sent, as chat numbers them; a mentioned chat or
+    // terminal gets chat's routing note, so the agent can reach it and the card can draw its chip.
     const text = imageReferencesToPromptMarkers(
-      projectNativeChatPastedText(draft, submitted.pastedTextFiles),
+      serializeNativeChatAgentReferences(draft, submitted.document, submitted.pastedTextFiles),
       sent.map((image) => image.id)
     ).trim()
     const paths = sent.map((image) => image.path)

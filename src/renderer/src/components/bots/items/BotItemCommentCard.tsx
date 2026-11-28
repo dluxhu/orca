@@ -27,6 +27,8 @@ import { BotAvatar, BotAvatarTile } from '../BotAvatar'
 import { BotOwnerAvatar } from '../bot-connector-people'
 import { BotItemClampedText } from './BotItemClampedText'
 import { BotItemMarkdown } from './BotItemMarkdown'
+import { plainNativeChatAgentMentions } from '../../native-chat/markdown/native-chat-agent-mentions'
+import { splitAgentReferenceNotes } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import type { BotItemActivityEntry } from '../../../../../shared/bots/bot-item-activity'
 import { botItemActorName } from '../../../../../shared/bots/bot-item-actor-name'
 import { botItemQuestionShape } from '../../../../../shared/bots/bot-item-ask'
@@ -119,6 +121,14 @@ export function BotItemCommentCard({
     stripSentImagePromptMarkers(entry.beside ?? shape.body, images.length)
   )
   const { files } = botItemCommentFiles(typeof event.data.text === 'string' ? event.data.text : '')
+  // The owner's words show as chat shows a sent message: quotes and mentions as the box's chips, the
+  // mentions' routing notes (for the agent) left out.
+  const owner = event.actor.kind === 'owner'
+  const sent = owner ? splitAgentReferenceNotes(words) : null
+  const shown = sent ? plainNativeChatAgentMentions(sent.body, sent.mentions) : words
+  const markdown = (text: string): React.JSX.Element => (
+    <BotItemMarkdown text={text} quoteChips={owner} agentMentions={sent?.mentions} />
+  )
   const name = botItemActorName(event, item, t)
   const fullTime = useNativeChatMessageTimeLabel(event.at)
   const jump =
@@ -178,13 +188,14 @@ export function BotItemCommentCard({
           </button>
         ) : null}
         <div className="pl-7">
-          {!words.trim() ? null : waiting ? (
+          {!shown.trim() ? null : waiting ? (
             // Whole while the item waits on its question: its choices read against all of it.
-            <BotItemMarkdown text={words} />
+            markdown(shown)
           ) : (
             // 8 lines of 19 px; a question's footer follows, so its Show more reads as the body's.
             <BotItemClampedText
-              text={words}
+              text={shown}
+              render={markdown}
               clampClassName="max-h-[152px]"
               fade
               quietToggle={shape.decisions.length > 0}
