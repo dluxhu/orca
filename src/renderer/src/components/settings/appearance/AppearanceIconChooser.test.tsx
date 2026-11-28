@@ -122,14 +122,21 @@ describe('AppIconSetting', () => {
     await waitFor(() =>
       expect(screen.getByRole('radio', { name: 'Blue' }).closest('fieldset')?.disabled).toBe(true)
     )
+    // It stays locked until the saved icon is read again.
+    let read: (profile: OwnAppProfile) => void = () => {}
+    getOwnProfile.mockReturnValueOnce(new Promise((resolve) => (read = resolve)))
     done({ ok: true, result: {} })
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('classic'))
     expect(setOwnIcon).toHaveBeenCalledWith(
       { kind: 'badge', text: '2', style: 'ref-match', base: 'watercolor' },
       'classic'
     )
-    // The saved icon is read again.
     await waitFor(() => expect(getOwnProfile).toHaveBeenCalledTimes(2))
+    const fieldset = () => screen.getByRole('radio', { name: 'Blue' }).closest('fieldset')
+    expect(fieldset()?.disabled).toBe(true)
+    read({ ...base, icon: { kind: 'badge', text: '2', style: 'ref-match', base: 'watercolor' } })
+    await waitFor(() => expect(fieldset()?.disabled).toBe(false))
+    expect(checked('Watercolor')).toBe('true')
   })
 
   it('takes the badge off the default app: the built-in setting again, as upstream has it', async () => {

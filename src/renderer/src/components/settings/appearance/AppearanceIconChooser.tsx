@@ -61,8 +61,8 @@ export function AppearanceIconChooser(props: {
   appIcon: unknown
   /** Saves the appIcon setting. */
   onAppIconChange: (appIcon: AppIconId) => void
-  /** Reads the own profile again after a change. */
-  onSaved: () => void
+  /** Reads the own profile again after a change. The chooser stays locked until it is read. */
+  onSaved: () => Promise<void>
 }): React.JSX.Element {
   const t = useTranslate()
   const { api } = props
@@ -87,7 +87,7 @@ export function AppearanceIconChooser(props: {
           return
         }
         props.onAppIconChange(appIcon)
-        props.onSaved()
+        return props.onSaved()
       })
       .catch((caught: unknown) =>
         setError(caught instanceof Error ? caught.message : String(caught))
@@ -145,7 +145,6 @@ export function AppIconSetting(props: {
   const [api] = useState(() => window.api?.appProfiles)
   const available = Boolean(api) && getRendererAppPlatform() === 'darwin' && !isWebClientLocation()
   const [own, setOwn] = useState<OwnAppProfile | null>(null)
-  const [reads, setReads] = useState(0)
   useEffect(() => {
     if (!available) {
       return
@@ -158,7 +157,7 @@ export function AppIconSetting(props: {
     return () => {
       current = false
     }
-  }, [api, available, reads])
+  }, [api, available])
 
   if (!available || !api || !own) {
     return <AppIconSelector value={props.value} onChange={props.onChange} />
@@ -169,7 +168,8 @@ export function AppIconSetting(props: {
       own={own}
       appIcon={props.value}
       onAppIconChange={props.onChange}
-      onSaved={() => setReads((n) => n + 1)}
+      // A failed read keeps the last saved icon.
+      onSaved={() => api.getOwnProfile().then(setOwn, () => {})}
     />
   )
 }
