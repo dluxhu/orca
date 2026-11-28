@@ -49,7 +49,14 @@ export function appIconSettingOf(own: OwnAppProfile, icon: AppProfileIconSource)
     : 'classic'
 }
 
+/** The own-icon calls of the profile API. */
+type OwnIconApi = Pick<
+  NonNullable<typeof window.api.appProfiles>,
+  'setOwnIcon' | 'ownIconPreview' | 'chooseOwnIconFile'
+>
+
 export function AppearanceIconChooser(props: {
+  api: OwnIconApi
   own: OwnAppProfile
   appIcon: unknown
   /** Saves the appIcon setting. */
@@ -58,7 +65,7 @@ export function AppearanceIconChooser(props: {
   onSaved: () => void
 }): React.JSX.Element {
   const t = useTranslate()
-  const api = window.api.appProfiles
+  const { api } = props
   const saved = savedAppIcon(props.own, normalizeAppIconId(props.appIcon))
   const savedKey = JSON.stringify(saved)
   const [value, setValue] = useState(saved)
@@ -68,26 +75,24 @@ export function AppearanceIconChooser(props: {
   useEffect(() => setValue(JSON.parse(savedKey) as AppProfileIconSource), [savedKey])
 
   const changed = JSON.stringify(value) !== savedKey
-  const apply = async (): Promise<void> => {
-    if (!api) {
-      return
-    }
+  const apply = (): void => {
     setBusy(true)
     setError(null)
     const appIcon = appIconSettingOf(props.own, value)
-    try {
-      const reply = await api.setOwnIcon(value, appIcon)
-      if (!reply.ok) {
-        setError(reply.error.message)
-        return
-      }
-      props.onAppIconChange(appIcon)
-      props.onSaved()
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught))
-    } finally {
-      setBusy(false)
-    }
+    void api
+      .setOwnIcon(value, appIcon)
+      .then((reply) => {
+        if (!reply.ok) {
+          setError(reply.error.message)
+          return
+        }
+        props.onAppIconChange(appIcon)
+        props.onSaved()
+      })
+      .catch((caught: unknown) =>
+        setError(caught instanceof Error ? caught.message : String(caught))
+      )
+      .then(() => setBusy(false))
   }
 
   return (
@@ -98,17 +103,10 @@ export function AppearanceIconChooser(props: {
             value={value}
             defaultText={nextBadgeText([])}
             onChange={setValue}
-            chooseFile={(kind) => api?.chooseOwnIconFile(kind) ?? Promise.resolve(null)}
+            chooseFile={api.chooseOwnIconFile}
           />
         </div>
-        <ProfileIconPreview
-          value={value}
-          busy={busy}
-          preview={(icon) =>
-            api?.ownIconPreview(icon) ??
-            Promise.resolve({ ok: false, error: { message: 'No preview.' } })
-          }
-        />
+        <ProfileIconPreview value={value} busy={busy} preview={api.ownIconPreview} />
       </div>
       {error ? (
         <p role="alert" className="text-xs text-destructive">
@@ -124,11 +122,7 @@ export function AppearanceIconChooser(props: {
         >
           {t('profileManager.icon.reset', 'Reset')}
         </Button>
-        <Button
-          size="sm"
-          disabled={busy || !changed || !iconChoiceReady(value)}
-          onClick={() => void apply()}
-        >
+        <Button size="sm" disabled={busy || !changed || !iconChoiceReady(value)} onClick={apply}>
           {busy
             ? t('profileManager.icon.applying', 'Applying…')
             : t('profileManager.icon.apply', 'Apply icon')}
@@ -146,7 +140,8 @@ export function AppIconSetting(props: {
   value: AppIconId
   onChange: (value: AppIconId) => void
 }): React.JSX.Element {
-  const api = window.api?.appProfiles
+  // Read once: the preview restarts when its function changes.
+  const [api] = useState(() => window.api?.appProfiles)
   const available = Boolean(api) && getRendererAppPlatform() === 'darwin' && !isWebClientLocation()
   const [own, setOwn] = useState<OwnAppProfile | null>(null)
   const [reads, setReads] = useState(0)
@@ -164,11 +159,12 @@ export function AppIconSetting(props: {
     }
   }, [api, available, reads])
 
-  if (!available || !own) {
+  if (!available || !api || !own) {
     return <AppIconSelector value={props.value} onChange={props.onChange} />
   }
   return (
     <AppearanceIconChooser
+      api={api}
       own={own}
       appIcon={props.value}
       onAppIconChange={props.onChange}

@@ -1,5 +1,5 @@
 // The Dock icon and the menu-bar template of a profile app. See docs/fork/profiles-design.md, section 8.
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, nativeImage, type NativeImage } from 'electron'
 import { largestIcnsPng } from '../../cli/app-profiles/app-profile-icns'
@@ -23,12 +23,13 @@ export function ownIconPath(): string {
 export function ownDockIcon(): NativeImage | null {
   if (own === undefined) {
     own = null
-    if (existsSync(ownIconPath())) {
-      try {
-        const png = largestIcnsPng(readFileSync(ownIconPath()))
-        const image = png ? nativeImage.createFromBuffer(png) : null
-        own = image && !image.isEmpty() ? image : null
-      } catch (error) {
+    try {
+      const png = largestIcnsPng(readFileSync(ownIconPath()))
+      const image = png ? nativeImage.createFromBuffer(png) : null
+      own = image && !image.isEmpty() ? image : null
+    } catch (error) {
+      // No kept icon is the usual case of the default app.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.warn('[profiles] cannot read the profile icon:', error)
       }
     }

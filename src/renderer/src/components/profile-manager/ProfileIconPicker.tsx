@@ -1,7 +1,7 @@
 // The icon chooser of the New and Edit profile dialogs and of Settings > Appearance: a base icon
 // (built-in or uploaded) and an optional badge. See docs/fork/profiles-design.md, section 8.
 // The main process makes the preview; this view only shows its PNG.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -227,18 +227,13 @@ export function ProfileIconPreview(props: {
   profileId?: string | null
   /** Save runs: no new preview starts, and the last one stays. */
   busy?: boolean
-  /** The preview call. Default: the Profile Manager's, for `profileId`. */
+  /** The preview call, a stable function: a new one starts a new preview. Default: the Profile
+   * Manager's, for `profileId`. */
   preview?: IconChooserApi['preview']
 }): React.JSX.Element {
   const t = useTranslate()
   const profiles = window.api?.appProfiles
-  const run =
-    props.preview ??
-    (profiles ? (icon: AppProfileIconSource) => profiles.iconPreview(icon, props.profileId) : null)
-  // A caller's new function on each render must not start a new preview.
-  const runRef = useRef(run)
-  runRef.current = run
-  const canRun = run !== null
+  const custom = props.preview
   const [preview, setPreview] = useState<
     { png: string; menuBarPng?: string } | { error: string } | null
   >(null)
@@ -246,7 +241,12 @@ export function ProfileIconPreview(props: {
   const ready = iconChoiceReady(props.value)
 
   useEffect(() => {
-    if (!canRun || !ready) {
+    const run =
+      custom ??
+      (profiles
+        ? (icon: AppProfileIconSource) => profiles.iconPreview(icon, props.profileId)
+        : null)
+    if (!run || !ready) {
       setPreview(null)
       return
     }
@@ -256,7 +256,7 @@ export function ProfileIconPreview(props: {
     let current = true
     setPreview(null)
     const timer = setTimeout(() => {
-      void runRef.current?.(JSON.parse(key) as AppProfileIconSource).then((reply) => {
+      void run(JSON.parse(key) as AppProfileIconSource).then((reply) => {
         if (current) {
           setPreview(
             reply.ok
@@ -270,7 +270,7 @@ export function ProfileIconPreview(props: {
       current = false
       clearTimeout(timer)
     }
-  }, [canRun, key, ready, props.profileId, props.busy])
+  }, [custom, profiles, key, ready, props.profileId, props.busy])
 
   return (
     <aside

@@ -15,14 +15,16 @@ import {
   readPlistString,
   type AppProfileIcon
 } from '../../shared/app-profiles/app-profile-paths'
-import { APP_PROFILE_MENU_BAR_FILE } from '../../shared/app-profiles/app-profile-icon-files'
+import {
+  APP_PROFILE_BASE_FILE,
+  APP_PROFILE_MENU_BAR_FILE
+} from '../../shared/app-profiles/app-profile-icon-files'
 import {
   defaultBadge,
   isBuiltInIconBase,
   nextBadgeText,
   type AppProfileIconSource
 } from '../../shared/app-profiles/app-profile-rules'
-import { APP_PROFILE_BASE_FILE } from '../../shared/app-profiles/app-profile-icon-files'
 
 export { defaultBadge, nextBadgeText, type AppProfileIconSource }
 
@@ -243,6 +245,10 @@ function appProfileIconParts(
 ): { base: Img; badge: Img; text: string } {
   if (source.kind === 'image' && !existsSync(source.path)) {
     throw new Error(`No file ${source.path}`)
+  }
+  // A missing upload is named before the badge is drawn.
+  if (source.base !== undefined && !isBuiltInIconBase(source.base) && !existsSync(source.base)) {
+    throw new Error(`No file ${source.base}`)
   }
   const text = source.kind === 'badge' ? badgeTextOf(source, used) : ''
   const badge =
