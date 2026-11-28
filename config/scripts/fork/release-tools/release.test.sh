@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-test of the release helpers: the merge plan from a PATCHES.md, and merge.sh with an
-# explicit merge base. Run: config/scripts/fork/release-tools/release.test.sh
+# explicit merge base and with a source's old head as base. Run: config/scripts/fork/release-tools/release.test.sh
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d "${TMPDIR:-/tmp}/release-test.XXXXXX")
@@ -62,5 +62,28 @@ expect "merge takes the new tag's change" "x2" "$(cat g.txt)"
 expect "merge drops the old stable-only commit" "one" "$(cat f.txt)"
 expect "merge has two parents" "2" "$(git rev-list --parents -n1 HEAD | wc -w | awk '{print $1 - 1}')"
 expect "a contained source is skipped" "contains v1.1.0: dlux/p" "$("$here/merge.sh" p "$repo" v1.1.0@v1.0.0)"
+
+# 3. A glue branch g merges a and s, which change the same line, and holds the resolution. After
+#    x (the base of both) moves and a and s merge it, g merges a, then s. git's own merge base of
+#    g and s is then x's new head, and the merge would conflict on the resolved line; merge.sh
+#    takes s's old head as base.
+# g: git with a commit time one minute after the last one, so x's new head is the newest base.
+t=1700000000
+g() { t=$((t + 60)); GIT_COMMITTER_DATE="@$t +0000" GIT_AUTHOR_DATE="@$t +0000" git "$@"; }
+git checkout -q -b dlux/x v1.0.0; printf 'base\n' >h.txt; git add h.txt; g commit -q -m x
+git checkout -q -b dlux/a; printf 'a\n' >h.txt; g commit -qam a
+git checkout -q -b dlux/s dlux/x; printf 's\n' >h.txt; g commit -qam s
+git checkout -q -b dlux/g dlux/a; g merge -q dlux/s >/dev/null 2>&1 || true
+printf 'a+s\n' >h.txt; git add h.txt; g commit -q --no-edit
+git checkout -q dlux/x; printf 'x2\n' >x.txt; git add x.txt; g commit -q -m x2
+for b in a s; do git checkout -q dlux/$b; g merge -q --no-edit dlux/x; done
+git checkout -q dlux/g
+git push -q origin dlux/g dlux/x dlux/a dlux/s; git fetch -q origin
+if "$here/merge.sh" g "$repo" dlux/a dlux/s >/dev/null; then
+  expect "criss-cross: the resolution stays" "a+s" "$(cat h.txt)"
+  expect "criss-cross: the base's new change arrives" "x2" "$(cat x.txt)"
+else
+  echo "FAIL criss-cross merge conflicted"; failures=$((failures + 1))
+fi
 
 [ $failures -eq 0 ] && echo "release.test.sh: all passed" || { echo "release.test.sh: $failures failed"; exit 1; }

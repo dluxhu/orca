@@ -3,7 +3,7 @@
 # PATCHES.md "Steps for a new upstream stable tag", step 3: merges the new tag into each branch of
 # the release order with merge.sh, each branch after the branches it is based on (the "Base"
 # cell of its table row). A branch on `upstream-stable` merges <new tag> with base <old tag>; a
-# stacked branch merges its (already updated) base branches with git's own merge base.
+# stacked branch merges its (already updated) base branches, each with its old head as base.
 # Each branch needs a worktree with it checked out. Stops at the first failure: resolve, commit,
 # then run again with --from <that branch>. Pushes nothing.
 # --plan prints the merges and changes nothing.

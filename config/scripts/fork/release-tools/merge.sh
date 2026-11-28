@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Usage: merge.sh <branch> <worktree> <source>[@<base>]...
 # Merges each source into dlux/<branch> (checked out in <worktree>) as a normal two-parent merge
-# commit, with an explicit merge base when one is given (git merge-tree --merge-base). Without
-# @<base> it uses git's own merge base.
+# commit, with an explicit merge base (git merge-tree --merge-base). Without @<base>, the base is
+# the newest commit of the source's first-parent line that the branch has (its old head).
 # Why the explicit base: each upstream stable tag is on its own release branch. Merging the new
 # tag with the default base would re-apply the old tag's stable-only commits (reverts). With
 # base = the old tag, the result is the new tag + the branch's own diff.
@@ -19,7 +19,13 @@ git merge --ff-only -q "origin/dlux/$name" || exit 1
 for pair in "$@"; do
   src=${pair%@*}
   if git merge-base --is-ancestor "$src" HEAD; then echo "contains $src: dlux/$name"; continue; fi
-  if [ "$pair" = "$src" ]; then base=$(git merge-base HEAD "$src") || { echo "no merge base with $src" >&2; exit 1; }
+  if [ "$pair" = "$src" ]; then
+    # The newest commit of the source's first-parent line that HEAD has: its old head. git's own
+    # merge base can be another branch merged into both (a criss-cross), and then the source's
+    # own change conflicts with the resolution that HEAD already has.
+    base=$(git rev-list --first-parent "$src" | while read -r c; do
+      git merge-base --is-ancestor "$c" HEAD && { echo "$c"; break; }; done)
+    [ -n "$base" ] || { echo "no commit of $src is in HEAD" >&2; exit 1; }
   else base=${pair#*@}; fi
   git merge-base --is-ancestor "$base" HEAD || { echo "HEAD lacks base $base" >&2; exit 1; }
   echo "start dlux/$name $(git rev-parse --short=11 HEAD) <- $src (base $(git rev-parse --short=11 "$base"))"
