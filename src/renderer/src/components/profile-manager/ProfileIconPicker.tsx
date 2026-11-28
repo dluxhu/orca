@@ -126,7 +126,7 @@ export function ProfileIconPicker(props: {
 
   return (
     // p-1 keeps the focus and selection rings inside the scroll box.
-    <div className={`flex flex-col gap-3 overflow-y-auto p-1 ${ICON_PICKER_SIZE}`}>
+    <div className={`scrollbar-sleek flex flex-col gap-3 overflow-y-auto p-1 ${ICON_PICKER_SIZE}`}>
       <BaseIcons
         base={base}
         onChange={(next) => {

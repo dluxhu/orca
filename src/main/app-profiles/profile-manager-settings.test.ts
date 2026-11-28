@@ -23,13 +23,13 @@ vi.mock('./profile-manager-cli', () => ({ runCli: h.runCli }))
 vi.mock('./profile-manager-icon', () => ({
   previewAppProfileIcon: h.preview,
   chooseAppProfileIconFile: vi.fn(),
-  importIconBase: async (path: string) => path.replace('custom.png', 'shaped.png')
+  importIconBase: async (path: string) =>
+    h.custom ? path.replace('custom.png', 'shaped.png') : { code: 'unreadable' }
 }))
 vi.mock('./app-profile-dock-icon', () => ({ forgetOwnDockIcon: h.forget }))
 vi.mock('../tray/system-tray', () => ({ refreshMacMenuBarImage: h.refreshMenuBar }))
 vi.mock('../window/desktop-integration/app-icon', () => ({ applyAppIcon: h.applyAppIcon }))
 vi.mock('../window/desktop-integration/custom-app-icon', () => ({
-  hasCustomAppIcon: () => h.custom,
   getCustomAppIconPath: () => '/data/default/app-icon/custom.png'
 }))
 

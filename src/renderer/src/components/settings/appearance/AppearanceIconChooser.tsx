@@ -142,7 +142,11 @@ export function AppearanceIconChooser(props: {
         >
           {t('profileManager.icon.reset', 'Reset')}
         </Button>
-        <Button size="sm" disabled={busy || !changed || !iconChoiceReady(value)} onClick={() => apply(value)}>
+        <Button
+          size="sm"
+          disabled={busy || !changed || !iconChoiceReady(value)}
+          onClick={() => apply(value)}
+        >
           {busy
             ? t('profileManager.icon.applying', 'Applying…')
             : t('profileManager.icon.apply', 'Apply icon')}

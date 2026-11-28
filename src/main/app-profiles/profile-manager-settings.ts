@@ -14,10 +14,7 @@ import { isTrustedUIRenderer } from '../ipc/ui'
 import { isProfileManagerRenderer } from './profile-manager-window'
 import { refreshMacMenuBarImage } from '../tray/system-tray'
 import { applyAppIcon } from '../window/desktop-integration/app-icon'
-import {
-  getCustomAppIconPath,
-  hasCustomAppIcon
-} from '../window/desktop-integration/custom-app-icon'
+import { getCustomAppIconPath } from '../window/desktop-integration/custom-app-icon'
 import { forgetOwnDockIcon } from './app-profile-dock-icon'
 import {
   chooseAppProfileIconFile,
@@ -67,7 +64,8 @@ export function registerOwnProfileIpc(
   ipcMain.handle(
     'appProfiles:ownProfile',
     fromSettings(async () => {
-      const custom = hasCustomAppIcon() ? await importIconBase(getCustomAppIconPath()) : null
+      // No imported icon: upstream's checks return `unreadable`.
+      const custom = await importIconBase(getCustomAppIconPath())
       return {
         ...ownAppProfile(await readState()),
         ...(typeof custom === 'string' ? { customIconPath: custom } : {})

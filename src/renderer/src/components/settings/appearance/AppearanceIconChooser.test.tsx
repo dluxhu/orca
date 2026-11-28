@@ -171,7 +171,9 @@ describe('AppIconSetting', () => {
     const badge = screen.getByRole('radio', { name: 'Badge character' })
     await waitFor(() => expect(badge.closest('fieldset')?.disabled).toBe(false))
     fireEvent.click(badge)
-    await waitFor(() => expect(screen.getByLabelText('Badge character')).toHaveProperty('value', 'W'))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Badge character')).toHaveProperty('value', 'W')
+    )
   })
 
   it('changes the icon of a profile app with an upload; a CLI error shows and saves nothing', async () => {
