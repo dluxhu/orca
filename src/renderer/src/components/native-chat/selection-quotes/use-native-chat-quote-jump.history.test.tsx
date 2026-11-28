@@ -91,13 +91,16 @@ function Transcript({
   })
   return (
     <div ref={scrollRef}>
-      {slots.map((row, index) => (
-        <div key={index} data-index={index}>
-          <div data-native-chat-quote-source={row.kind === 'message' ? row.message.id : ''}>
-            The quoted text.
+      {/* The rail jump landing finds a slot row among the transcript window's own rows. */}
+      <div data-native-chat-window="">
+        {slots.map((row, index) => (
+          <div key={index} data-index={index}>
+            <div data-native-chat-quote-source={row.kind === 'message' ? row.message.id : ''}>
+              The quoted text.
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
