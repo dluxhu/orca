@@ -4,8 +4,8 @@ import type { OrchestrationEntryCaller } from '../../../../orchestration/address
 import type { OrchestrationCompatibilityCallerAuthority } from '../../../../orchestration/terminal-authority/orchestration-compatibility-authority'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import {
+  locatedPeerMailSender,
   peerMailMessageId,
-  peerMailSender,
   peerMailSenderLabel
 } from '../../../../orchestration/federation/peer-mail/peer-mail-delivery'
 import { notifyPeerMailQueued } from '../../../../orchestration/federation/peer-mail/peer-mail-waiters'
@@ -113,7 +113,7 @@ export async function sendClientAsk(args: {
     type: type.data,
     ...(params.priority ? { priority: params.priority } : {}),
     ...(params.threadId ? { threadId: params.threadId } : {}),
-    sender: peerMailSender(runtime, caller.address),
+    sender: await locatedPeerMailSender(runtime, caller.address),
     ...(askers ? { askers } : {}),
     rootSession: clientAskRootSession(db, caller.address)
   }

@@ -87,7 +87,8 @@ const sender = lazyZodSchema(() =>
     toConversation: salvaged,
     bot: salvaged,
     host: salvaged,
-    botAvatar: salvaged
+    botAvatar: salvaged,
+    origin: salvaged
   })
 )
 const orchestration = lazyZodSchema(() =>

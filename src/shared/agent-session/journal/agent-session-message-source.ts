@@ -31,6 +31,8 @@ export type AgentMessageSender = Readonly<{
   host?: string
   /** That bot's avatar as its own Orca stores it, for a bot this Orca's catalog doesn't hold. */
   botAvatar?: string
+  /** Where the sender runs on that computer: its Orca's installation id and the sender's address there. */
+  origin?: Readonly<{ hostId: string; address: string }>
 }>
 
 /** One orchestration message a notice points at: its record, and its sender's `senders` address. */
@@ -152,6 +154,10 @@ const senderSchema = lazyZodSchema(() =>
     bot: salvagedOptional('bot', z.literal(true)),
     host: salvagedOptional('host', z.string().transform(agentMessageSenderName).pipe(z.string())),
     botAvatar: salvagedOptional('botAvatar', z.string().min(1).max(200)),
+    origin: salvagedOptional(
+      'origin',
+      z.object({ hostId: z.string().min(1).max(500), address: z.string().min(1).max(500) })
+    ),
     name: z.unknown().transform(agentMessageSenderName)
   })
 )
