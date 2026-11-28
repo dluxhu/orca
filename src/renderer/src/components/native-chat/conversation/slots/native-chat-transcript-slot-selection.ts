@@ -51,6 +51,25 @@ export function nativeChatSlotIndexOf(
   return index
 }
 
+/**
+ * The collapsed turn that hides `messageId`: the message is in `messages` (aligned with
+ * `turnKeys`), its turn is not expanded, and no slot draws it. Undefined otherwise.
+ */
+export function nativeChatFoldedTurnOf(
+  slots: readonly NativeChatTranscriptSlot[],
+  messages: readonly { id: string }[],
+  turnKeys: readonly (string | undefined)[],
+  expandedTurnKeys: ReadonlySet<string>,
+  messageId: string
+): string | undefined {
+  const turnKey = turnKeys[messages.findIndex((message) => message.id === messageId)]
+  if (turnKey === undefined || expandedTurnKeys.has(turnKey)) {
+    return undefined
+  }
+  const slot = slots[nativeChatSlotIndexOf(slots, messageId)]
+  return slot?.kind === 'message' && slot.drawsMessage ? undefined : turnKey
+}
+
 type WaitingInputs = readonly unknown[]
 
 type WaitingSplit = {
