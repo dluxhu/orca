@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { defineFixture } from '../../component-fixtures/component-fixture'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
-import { fixturePreview } from '../../component-fixtures/fixture-icon-preview'
+import { fixturePreview, waitForPreview } from '../../component-fixtures/fixture-icon-preview'
 import { ProfileIconPicker, ProfileIconPreview } from './ProfileIconPicker'
 
 function EditIcon(props: { first: AppProfileIconSource }): React.JSX.Element {
@@ -24,6 +24,7 @@ function EditIcon(props: { first: AppProfileIconSource }): React.JSX.Element {
 }
 
 export const badgeOnBuiltInBase = defineFixture({
+  interact: waitForPreview,
   width: 980,
   render: () => (
     <EditIcon
@@ -33,11 +34,13 @@ export const badgeOnBuiltInBase = defineFixture({
 })
 
 export const noBadge = defineFixture({
+  interact: waitForPreview,
   width: 980,
   render: () => <EditIcon first={{ kind: 'none', base: 'watercolor' }} />
 })
 
 export const badgeOnUpload = defineFixture({
+  interact: waitForPreview,
   width: 980,
   render: () => (
     <EditIcon

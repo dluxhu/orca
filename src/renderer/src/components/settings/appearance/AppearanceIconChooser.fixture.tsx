@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { defineFixture } from '../../../component-fixtures/component-fixture'
 import type { AppIconId } from '../../../../../shared/app-lifecycle/identity/app-icon'
 import type { OwnAppProfile } from '../../../../../shared/app-profiles/app-profile-rules'
-import { fixturePreview } from '../../../component-fixtures/fixture-icon-preview'
+import { fixturePreview, waitForPreview } from '../../../component-fixtures/fixture-icon-preview'
 import { AppIconSetting } from './AppearanceIconChooser'
 
 const own: OwnAppProfile = {
@@ -39,12 +39,14 @@ const stub = (profile: OwnAppProfile) => (): void => {
 }
 
 export const defaultAppWithBadge = defineFixture({
+  interact: waitForPreview,
   width: 860,
   setup: stub(own),
   render: () => <Setting first="classic" />
 })
 
 export const profileWithoutBadge = defineFixture({
+  interact: waitForPreview,
   width: 860,
   setup: stub({ ...own, id: 'work', icon: { kind: 'none', base: 'blue' } }),
   render: () => <Setting first="classic" />
