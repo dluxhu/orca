@@ -19,6 +19,7 @@ import {
   APP_PROFILE_TEMPLATE_KEY,
   buildProfileBundle,
   exists,
+  PROFILE_LOADER_DIR,
   templateKeyOf
 } from './app-profile-bundle'
 import type { RunTool } from './app-profile-create'
@@ -157,10 +158,12 @@ export function refreshAppProfileBundle(
   const ownKey = readPlistString(ownPlist, APP_PROFILE_TEMPLATE_KEY)
   const executable = readPlistString(ownPlist, 'CFBundleExecutable') ?? ''
   const menuName = readPlistString(ownPlist, 'CFBundleName') ?? ''
-  // The copies that a start needs: a bundle without them is checked again.
+  // The copies that a start needs: a bundle without them is checked again. A bundle with no loader
+  // has the app.asar link of older releases, which Electron 45 cannot read.
   const complete =
     exists(join(appPath, 'Contents', 'MacOS', executable)) &&
-    exists(join(appPath, 'Contents', 'Frameworks', `${menuName} Helper (Renderer).app`))
+    exists(join(appPath, 'Contents', 'Frameworks', `${menuName} Helper (Renderer).app`)) &&
+    exists(join(appPath, 'Contents', 'Resources', PROFILE_LOADER_DIR, 'boot.js'))
   const { checkFile } = options
   if (checkFile && complete && readText(checkFile) === checkTextOf(target, ownKey)) {
     return false
