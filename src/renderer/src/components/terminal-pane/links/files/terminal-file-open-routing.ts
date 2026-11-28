@@ -42,6 +42,7 @@ import type { HttpLinkDestination } from '@/lib/browser/navigation/http-link-des
 import { isHtmlFilePath, localHtmlFileDestinations } from './local-html-file-destinations'
 import type { FileOpenFailure } from './terminal-file-open-failure'
 import { openDetectedFolder } from './terminal-folder-open'
+import { activateRecordingHistory } from './terminal-file-open-history'
 
 type TerminalFileOpenDeps = {
   worktreeId: string
@@ -67,6 +68,8 @@ type TerminalFileOpenDeps = {
   openInSourceGroupSurface?: 'internal' | 'browser'
   /** Highlights this many characters from the revealed column in the editor, for a short time. */
   revealLength?: number
+  /** False: the caller records the history entries of this open, so its activation records no visit. */
+  recordsHistory?: false
 }
 
 export function openDetectedFilePath(
@@ -302,10 +305,12 @@ export function openDetectedFilePath(
 
     if (targetWorktreeId) {
       // Route by workspace shape and resolved host: folder keys are valid and worktree ids can repeat across hosts.
-      activateAndRevealWorkspace(targetWorktreeId, {
-        providesInitialSurface: true,
-        executionHostId: targetExecutionHostId
-      })
+      activateRecordingHistory(deps.recordsHistory, () =>
+        activateAndRevealWorkspace(targetWorktreeId, {
+          providesInitialSurface: true,
+          executionHostId: targetExecutionHostId
+        })
+      )
     }
 
     const opened = openLinkedFileInEditor(
