@@ -138,7 +138,7 @@ describe('ProfileIconPicker', () => {
     expect(checked('Upload…')).toBe('true')
   })
 
-  it('shows why upstream\'s import refused an upload, and keeps the choice', async () => {
+  it("shows why upstream's import refused an upload, and keeps the choice", async () => {
     render(<Chooser first={{ kind: 'none', base: 'blue' }} />)
     chooseFile.mockResolvedValue({ code: 'notSquare' })
     fireEvent.click(screen.getByRole('radio', { name: 'Upload…' }))
@@ -150,7 +150,7 @@ describe('ProfileIconPicker', () => {
 
   it('keeps one size for every base, badge kind and style', () => {
     render(<Chooser first={{ kind: 'none', base: 'blue' }} />)
-    const picker = screen.getByRole('group', { name: 'Base icon' }).closest('.overflow-y-auto')!
+    const picker = screen.getByRole('radio', { name: 'Classic' }).closest('.overflow-y-auto')!
     const preview = screen.getByRole('complementary', { name: 'Preview' })
     const sizes = (): string[] => [picker.className, preview.className]
     const first = sizes()
