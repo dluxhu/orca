@@ -362,8 +362,8 @@ describe.skipIf(process.platform !== 'darwin')(
       )
       const work = createAppProfile({ name: 'Work', defaultAppPath: manager, env: env(), run })
       expect(work.bundleId).toBe('com.stablyai.orca.dlux.profile.work')
-      expect(readlinkSync(join(work.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(
-        join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
+      expect(readlinkSync(join(work.appPath, 'Contents', 'Resources', 'app.asar.unpacked'))).toBe(
+        join(realpathSync(app), 'Contents', 'Resources', 'app.asar.unpacked')
       )
     })
   }
