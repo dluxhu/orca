@@ -611,7 +611,23 @@ profile (`src/cli/specs/profile-state.ts:6-19`).
     leftover whose `Info.plist` cannot be read as XML is no profile's. Rename and remove delete the
     profile's leftovers; this is cleanup only, so a failure there does not stop them.
   - A failure leaves the bundle as it was: the app shows the error and starts with the old runtime.
-  - A serve start does not refresh.
+  - **A serve start only checks (2026-11-28).** A profile that runs only as a background server
+    (`orca --profile <id> serve`, or its LaunchAgent) does not rebuild its bundle: the new
+    signature makes macOS ask once for the profile's Keychain item (`orca-<id> Safe Storage`), and
+    a headless server would wait on that prompt. The start of an Electron serve runs the same check
+    with `checkOnly` (`noteOutdatedServingProfileApp`): no rebuild, no leftover cleanup, no exit, so
+    a LaunchAgent cannot loop. A due refresh (another template key, a missing copy, or the
+    `app.asar` link layout of older releases) writes one line to the serve log (the LaunchAgent's
+    log file) and leaves the check file as it was. The same key writes the check file, so the
+    next serve start reads no executables. The `orcad` runtime of serve does not run the profile's
+    bundle and checks nothing.
+  - **To update a server-only profile:** open the profile app once (Finder or the Dock). Its start
+    refreshes the bundle and starts again; the new start stops the profile's serve service
+    (section 4), and starts it again when the app quits, now from the new bundle. macOS asks once
+    for the Keychain item at that start, where a person can answer it ("Always Allow"). A server
+    started by hand: the app asks to stop it; start it again after the app quits.
+  - Not built: an `orca profiles refresh <id>` command. It would rebuild without a person at the
+    screen, and the next serve start would then wait on the Keychain prompt.
 - **Menu-bar name** (owner, 2026-11-25). macOS shows `CFBundleName` in bold in the menu bar, and
   Electron finds its helpers as `Frameworks/<CFBundleName> Helper*.app`. So create and refresh
   (`copyAppRuntime`) set `CFBundleName` to the profile name, and copy each helper app as
