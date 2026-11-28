@@ -89,7 +89,13 @@ const NOTE_KINDS: Record<string, readonly (AgentReferenceKind | null)[]> = {
 // The host of a note for another host: a bare word or one single-quoted shell word.
 const NOTE_HOST = / --(?:on|environment)[= ]([\w.@:+-]+|'(?:[^']|'\\'')*')/
 
-export type SentAgentMention = { label: string; kind: AgentReferenceKind | null }
+/** `address` and `environment` are the note's: they open the mentioned session. */
+export type SentAgentMention = {
+  label: string
+  kind: AgentReferenceKind | null
+  address: string
+  environment?: string
+}
 
 /** The mention of a note exactly as agentReferenceNote writes it, with the label as the note frames it. */
 function noteMention(note: string): { framed: string; mention: SentAgentMention } | null {
@@ -105,7 +111,15 @@ function noteMention(note: string): { framed: string; mention: SentAgentMention 
     return null
   }
   // The note escapes `\ " [ ]` as Markdown does; the shown label has no escapes.
-  return { framed: head[2], mention: { label: head[2].replace(/\\(.)/g, '$1'), kind } }
+  return {
+    framed: head[2],
+    mention: {
+      label: head[2].replace(/\\(.)/g, '$1'),
+      kind,
+      address: head[3],
+      ...(environment ? { environment } : {})
+    }
+  }
 }
 
 /** A sent message is its typed text, then one routing note per mentioned agent: after a blank line
