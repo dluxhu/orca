@@ -21814,6 +21814,17 @@
         "runLiveBrowser_one": "Using the browser {{count}} time",
         "runLivePlan_one": "Updating the plan {{count}} time"
       },
+      "rawPanel": {
+        "hideReply": "Hide raw messages for this reply",
+        "image": "Image:",
+        "label": "Raw messages",
+        "sent": "Sent to agent",
+        "shortened": "shortened by the host",
+        "showLess": "Show less",
+        "showMore": "Show more",
+        "showReply": "Show raw messages for this reply",
+        "toggle": "Show raw"
+      },
       "providerFrame": {
         "byteCount_one": "{{count}} byte",
         "byteCount_other": "{{count}} bytes"
