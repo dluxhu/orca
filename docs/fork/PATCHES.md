@@ -37,22 +37,23 @@ The release build adds these branches onto the upstream stable tag, in this orde
 11. `dlux/quote-chip` - upstream candidate: "Add to chat" quotes show as chips, with a comment after each chip on its line (#5, #27).
 12. `dlux/quote-short-send` - upstream candidate: a long quote of a recent reply in the same chat goes to the agent shortened; the chat still shows it in full (#28). Stacked on `dlux/quote-chip`.
 13. `dlux/quote-jump-history` - upstream candidate: a quote chip jump joins Back and Forward (#24). Stacked on `dlux/quote-chip`.
-14. `dlux/chat-send-key` - upstream candidate: an option to send with Cmd/Ctrl+Enter, so Enter adds a new line (#22). Stacked on `dlux/session-mention`: both change the composer keydown hook.
-15. `dlux/chat-raw-view` - upstream candidate: a "Show raw" panel in a chat lists the exact messages sent to the agent and what comes back; a {} button under each reply opens it at that reply's entries, and a second click on it closes the panel (#32).
-16. `dlux/chat-bare-refs-plain` - upstream candidate: a project setting "Link bare #numbers in chat"; when it is off, a bare `#123` in a chat stays text, and `owner/repo#123` still links (fork PR #39).
-17. `dlux/chat-compaction-marker` - upstream candidate: a chat shows a "Context compacted automatically" divider when Claude Code compacts its context on its own, also in a chat read from the Claude transcript (fork PR #40).
-18. `dlux/peer-mail-sender-name` - upstream candidate: mail from a chat on another Orca names that chat in the From line, and its "Message from" card opens it on its Orca (fork PR #41).
-19. `dlux/client-bot-mention-pill` - upstream candidate: in a paired server's chat, a pick of a bot on this computer gives a bot pill, not the raw token (fork PR #54, #53).
-20. `dlux/usage-panel-format` - upstream candidate: the status bar usage format has `{5h.time%}` (share of the window passed, or left in Remaining mode) and `{5h.total}` (window length) for each window (fork PR #55).
-21. `dlux/local-webhooks` - upstream candidate: local webhooks without an Orca account; a host takes webhook calls on its own port, turned on in Settings > Automations > Local webhooks (fork PR #57).
-22. `dlux/fork-release-channel` - fork-only: the release channels Stable and Nightly; the Nightly app has its own update feed (fork PR #38).
-23. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, headless orcad fallback, this file. Stacked on `dlux/cli-wrapper-exec` and `dlux/cli-link-notice`. Last, except the branches stacked on it.
-24. `dlux/profiles` - fork-only: app profiles, each a separate app with its own data, `~/.orca` and agent folders (fork PR #43). Stacked on `dlux/fork-setup`.
-25. `dlux/profile-manager` - fork-only: the Profile Manager, `orca profiles` commands for user-set ids, kept data, rename, port and Start at login; saved ports (also the default app's `defaultPort`) that `orca serve` uses without `--port`; Settings > General "Port"; the runtime file names its owner (`role`) for the profile states (fork PR #46). Stacked on `dlux/profiles`.
-26. `dlux/profile-manager-app` - fork-only: the Profile Manager is an app inside the Orca app (fork PR #47). Stacked on `dlux/profile-manager`.
-27. `dlux/profile-manager-icons` - fork-only: icons in the Profile Manager (fork PR #48). Stacked on `dlux/profile-manager-app`. It merges `dlux/profile-icons` and `dlux/profile-icons-sticker` and holds the resolution of the branches, as a glue branch does. Right before `dlux/profile-icons`.
-28. `dlux/profile-icons` - fork-only: profile icons and badges (fork PR #45). Stacked on `dlux/profiles`. It adds nothing after `dlux/profile-manager-icons`, and the release skips it.
-29. `dlux/profile-icons-sticker` - fork-only: the `sticker` badge style; its golden test has its own limit (design section 8, "`sticker` has its own limit") (fork PR #50). Stacked on `dlux/profile-icons`. Right after `dlux/profile-icons`. It adds nothing after `dlux/profile-manager-icons`, and the release skips it.
+14. `dlux/item-chat-chips` - upstream candidate: in a bot item's Activity, the owner's comments show quotes and chat or terminal mentions as chat's chips; a quote chip shows its words in the Activity, a mention chip opens the session on the bot's host (fork PR #58). Stacked on `dlux/glue-mention-quote`, the only branch with both the quote and the mention chips.
+15. `dlux/chat-send-key` - upstream candidate: an option to send with Cmd/Ctrl+Enter, so Enter adds a new line (#22). Stacked on `dlux/session-mention`: both change the composer keydown hook.
+16. `dlux/chat-raw-view` - upstream candidate: a "Show raw" panel in a chat lists the exact messages sent to the agent and what comes back; a {} button under each reply opens it at that reply's entries, and a second click on it closes the panel (#32).
+17. `dlux/chat-bare-refs-plain` - upstream candidate: a project setting "Link bare #numbers in chat"; when it is off, a bare `#123` in a chat stays text, and `owner/repo#123` still links (fork PR #39).
+18. `dlux/chat-compaction-marker` - upstream candidate: a chat shows a "Context compacted automatically" divider when Claude Code compacts its context on its own, also in a chat read from the Claude transcript (fork PR #40).
+19. `dlux/peer-mail-sender-name` - upstream candidate: mail from a chat on another Orca names that chat in the From line, and its "Message from" card opens it on its Orca (fork PR #41).
+20. `dlux/client-bot-mention-pill` - upstream candidate: in a paired server's chat, a pick of a bot on this computer gives a bot pill, not the raw token (fork PR #54, #53).
+21. `dlux/usage-panel-format` - upstream candidate: the status bar usage format has `{5h.time%}` (share of the window passed, or left in Remaining mode) and `{5h.total}` (window length) for each window (fork PR #55).
+22. `dlux/local-webhooks` - upstream candidate: local webhooks without an Orca account; a host takes webhook calls on its own port, turned on in Settings > Automations > Local webhooks (fork PR #57).
+23. `dlux/fork-release-channel` - fork-only: the release channels Stable and Nightly; the Nightly app has its own update feed (fork PR #38).
+24. `dlux/fork-setup` - fork-only: identity, shared profile, update feed, headless orcad fallback, this file. Stacked on `dlux/cli-wrapper-exec` and `dlux/cli-link-notice`. Last, except the branches stacked on it.
+25. `dlux/profiles` - fork-only: app profiles, each a separate app with its own data, `~/.orca` and agent folders (fork PR #43). Stacked on `dlux/fork-setup`.
+26. `dlux/profile-manager` - fork-only: the Profile Manager, `orca profiles` commands for user-set ids, kept data, rename, port and Start at login; saved ports (also the default app's `defaultPort`) that `orca serve` uses without `--port`; Settings > General "Port"; the runtime file names its owner (`role`) for the profile states (fork PR #46). Stacked on `dlux/profiles`.
+27. `dlux/profile-manager-app` - fork-only: the Profile Manager is an app inside the Orca app (fork PR #47). Stacked on `dlux/profile-manager`.
+28. `dlux/profile-manager-icons` - fork-only: icons in the Profile Manager (fork PR #48). Stacked on `dlux/profile-manager-app`. It merges `dlux/profile-icons` and `dlux/profile-icons-sticker` and holds the resolution of the branches, as a glue branch does. Right before `dlux/profile-icons`.
+29. `dlux/profile-icons` - fork-only: profile icons and badges (fork PR #45). Stacked on `dlux/profiles`. It adds nothing after `dlux/profile-manager-icons`, and the release skips it.
+30. `dlux/profile-icons-sticker` - fork-only: the `sticker` badge style; its golden test has its own limit (design section 8, "`sticker` has its own limit") (fork PR #50). Stacked on `dlux/profile-icons`. Right after `dlux/profile-icons`. It adds nothing after `dlux/profile-manager-icons`, and the release skips it.
 
 | Branch                         | Base                                                                  | Kind               | Upstream PR                                                                                                                                                                                                      | Files                                                 | Check                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------ | --------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -69,6 +70,7 @@ The release build adds these branches onto the upstream stable tag, in this orde
 | `dlux/quote-chip`              | `upstream-stable`                                                     | upstream candidate | issue [#43461](https://github.com/stablyai/orca/issues/43461); planned                                                                                                                                           | fork PR [#12](https://github.com/dluxhu/orca/pull/12) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/composer/editor src/renderer/src/components/native-chat/selection-quotes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `dlux/quote-short-send`        | `dlux/quote-chip`                                                     | upstream candidate | —                                                                                                                                                                                                                | fork PR [#31](https://github.com/dluxhu/orca/pull/31) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/composer/submit src/renderer/src/components/native-chat/selection-quotes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `dlux/quote-jump-history`      | `dlux/quote-chip`                                                     | upstream candidate | planned, with `dlux/quote-chip`                                                                                                                                                                                  | fork PR [#26](https://github.com/dluxhu/orca/pull/26) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/selection-quotes`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `dlux/item-chat-chips`         | `dlux/glue-mention-quote`                                             | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#58](https://github.com/dluxhu/orca/pull/58) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/bots/items/BotItemCommentChips.test.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `dlux/chat-send-key`           | `dlux/session-mention`                                                | upstream candidate | planned, after `dlux/quote-chip`                                                                                                                                                                                 | fork PR [#23](https://github.com/dluxhu/orca/pull/23) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/composer src/renderer/src/components/settings/chat`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `dlux/chat-raw-view`           | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#33](https://github.com/dluxhu/orca/pull/33) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/messages/diagnostics/NativeChatRawPanel.test.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `dlux/chat-bare-refs-plain`    | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#39](https://github.com/dluxhu/orca/pull/39) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/markdown/NativeChatMarkdown.github-refs.test.tsx src/renderer/src/components/settings/repository/source-control/RepositoryChatReferenceLinksSection.test.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -76,13 +78,13 @@ The release build adds these branches onto the upstream stable tag, in this orde
 | `dlux/peer-mail-sender-name`   | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#41](https://github.com/dluxhu/orca/pull/41) | `pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/methods/orchestration/federation/peer-mail.test.ts src/main/runtime/orchestration/mailbox/formatting/message-formatting.test.ts src/renderer/src/components/native-chat/NativeChatAgentMessageCard.peer-sender.test.tsx`                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `dlux/client-bot-mention-pill` | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#54](https://github.com/dluxhu/orca/pull/54) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/native-chat/composer/editor/native-chat-prompt-document-text.test.ts src/renderer/src/components/bots/use-bot-mention-targets.test.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `dlux/usage-panel-format`      | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#55](https://github.com/dluxhu/orca/pull/55) | `pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/status-bar/usage/usage-format-template.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `dlux/local-webhooks`          | `upstream-stable`                                                     | upstream candidate | not submitted                                                                                                                                                                                                    | fork PR [#57](https://github.com/dluxhu/orca/pull/57) | `pnpm exec vitest run --config config/vitest.config.ts src/main/webhooks/local`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `dlux/local-webhooks`          | `upstream-stable`                                                     | upstream candidate | [#51429](https://github.com/stablyai/orca/pull/51429) (part 1 of 2; part 2, the settings, is on `dluxhu:feat/local-webhooks-settings`, not opened yet)                                                           | fork PR [#57](https://github.com/dluxhu/orca/pull/57) | `pnpm exec vitest run --config config/vitest.config.ts src/main/webhooks/local`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `dlux/fork-release-channel`    | `upstream-stable`                                                     | fork-only          | none                                                                                                                                                                                                             | fork PR [#38](https://github.com/dluxhu/orca/pull/38) | `pnpm exec vitest run --config config/vitest.config.ts src/shared/updater/release-channel-fork.test.ts src/main/updater/releases/updater-prerelease-feed-fork.test.ts src/main/updater/releases/updater-release-builds-fork.test.ts` and `config/scripts/fork/publish-nightly-feed.test.sh`                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `dlux/fork-setup`              | `upstream-stable` (+ `dlux/cli-wrapper-exec`, `dlux/cli-link-notice`) | fork-only          | none                                                                                                                                                                                                             | see "Branch dlux/fork-setup: Files"                   | see "Branch dlux/fork-setup: Check"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `dlux/profiles`                | `dlux/fork-setup`                                                     | fork-only          | none                                                                                                                                                                                                             | fork PR [#43](https://github.com/dluxhu/orca/pull/43) | see "Branch dlux/profiles"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `dlux/profile-manager`         | `dlux/profiles`                                                       | fork-only          | none                                                                                                                                                                                                             | fork PR [#46](https://github.com/dluxhu/orca/pull/46) | `pnpm exec vitest run --config config/vitest.config.ts src/cli/app-profiles src/main/app-profiles src/shared/app-profiles src/main/menu/register-app-menu-profiles.test.ts src/renderer/src/components/profile-manager src/renderer/src/components/settings/general/StartAtLoginSetting.test.tsx src/cli/server/serve-service.test.ts src/cli/runtime/commands/cli-lifecycle-handlers.test.ts src/main/runtime/rpc/server/runtime-rpc-metadata-role.test.ts src/main/orcad/host-runtime/orcad-runtime-rpc.test.ts`                                                                                                                                                                                       |
 | `dlux/profile-manager-app`     | `dlux/profile-manager`                                                | fork-only          | none                                                                                                                                                                                                             | fork PR [#47](https://github.com/dluxhu/orca/pull/47) | `pnpm exec vitest run --config config/vitest.config.ts config/scripts/desktop-distribution/macos/macos-profile-manager-app.test.mjs src/cli/app-profiles src/main/app-profiles src/main/updater/mac-install/macos-update-running-instances.test.ts src/renderer/src/components/profile-manager src/cli/runtime/commands/cli-lifecycle-handlers.test.ts src/main/runtime/rpc/server/runtime-rpc-metadata-role.test.ts src/main/orcad/host-runtime/orcad-runtime-rpc.test.ts src/shared/app-profiles src/renderer/src/components/settings/general`                                                                                                                                                         |
-| `dlux/profile-manager-icons`   | `dlux/profile-manager-app` + `dlux/profile-icons`                     | fork-only          | none                                                                                                                                                                                                             | fork PR [#48](https://github.com/dluxhu/orca/pull/48) | `pnpm exec vitest run --config config/vitest.config.ts src/cli/app-profiles src/main/app-profiles src/shared/icon-badger src/renderer/src/components/profile-manager src/cli/runtime/commands/cli-lifecycle-handlers.test.ts src/main/runtime/rpc/server/runtime-rpc-metadata-role.test.ts src/main/orcad/host-runtime/orcad-runtime-rpc.test.ts src/shared/app-profiles src/renderer/src/components/settings/general`                                                                                                                                                                                                                                                                                   |
+| `dlux/profile-manager-icons`   | `dlux/profile-manager-app` + `dlux/profile-icons-sticker`             | fork-only          | none                                                                                                                                                                                                             | fork PR [#48](https://github.com/dluxhu/orca/pull/48) | `pnpm exec vitest run --config config/vitest.config.ts src/cli/app-profiles src/main/app-profiles src/shared/icon-badger src/renderer/src/components/profile-manager src/cli/runtime/commands/cli-lifecycle-handlers.test.ts src/main/runtime/rpc/server/runtime-rpc-metadata-role.test.ts src/main/orcad/host-runtime/orcad-runtime-rpc.test.ts src/shared/app-profiles src/renderer/src/components/settings/general`                                                                                                                                                                                                                                                                                   |
 | `dlux/profile-icons`           | `dlux/profiles`                                                       | fork-only          | none                                                                                                                                                                                                             | fork PR [#45](https://github.com/dluxhu/orca/pull/45) | `pnpm exec vitest run --config config/vitest.config.ts src/cli/app-profiles src/shared/icon-badger src/main/app-profiles/app-profile-dock-icon.test.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `dlux/profile-icons-sticker`   | `dlux/profile-icons`                                                  | fork-only          | none                                                                                                                                                                                                             | fork PR [#50](https://github.com/dluxhu/orca/pull/50) | `pnpm exec vitest run --config config/vitest.config.ts src/shared/icon-badger`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -98,17 +100,55 @@ Do these steps when upstream publishes a new stable tag. Do not wait for a newer
    `git fetch upstream --tags && git checkout main && git merge --ff-only upstream/main && git push origin main`.
 2. Move `upstream-stable` to the newest stable tag:
    `git branch -f upstream-stable <tag> && git push --force-with-lease origin upstream-stable`.
-3. For each branch in "Release order": `git checkout <branch> && git merge <tag>`. A stacked
-   branch merges its updated base branch instead. Resolve the conflicts with the branch's
-   "Re-apply" notes, run its check, commit, and push it. Each stable tag is on its own upstream
-   release branch. A file that only the stable-only commits of the old tag changed takes the
-   version of the new tag.
+3. Merge the new tag into every branch. The scripts are in `config/scripts/fork/release-tools/`; run
+   them from any worktree of the fork, with each branch checked out in a worktree of its own:
+
+   ```sh
+   R=config/scripts/fork/release
+   $R/heads.sh <old tag>                        # every branch: local == origin, has the old tag
+   $R/own-diff.sh save <old tag> <dir>/before   # each branch's own diff, before the merges
+   $R/merge-all.sh <new tag> <old tag> --plan   # the merges, in order; changes nothing
+   $R/merge-all.sh <new tag> <old tag>          # stops at a conflict: fix, commit, --from <branch>
+   $R/own-diff.sh save <new tag> <dir>/after    # after pushing; reads origin/dlux/*
+   $R/own-diff.sh compare <dir>/before <dir>/after
+   ```
+
+   A branch on `upstream-stable` merges the new tag with the old tag as merge base. Each stable
+   tag is on its own upstream release branch, and git's own base would re-apply the old tag's
+   stable-only commits. So a file that only those commits changed takes the version of the new
+   tag. A stacked branch merges its updated base branches (the "Base" cell of its row). Resolve
+   the conflicts with the branch's "Re-apply" notes, run its check, and push it (a plain push).
+   `compare` prints SAME for a branch whose own change did not move; look at every DIFF.
+
 4. Build one release on that tag (below). Publish it only on the owner's go-ahead.
 
 ## Release steps
 
-1. Start from a clean tree, with the stable tag merged into every branch, and every branch pushed.
-2. Run `config/scripts/fork/build-release.sh --remote origin`. Options: `--base <tag>` picks
+The scripts are in `config/scripts/fork/release-tools/` (with `config/scripts/fork/build-release.sh`).
+Each one prints its usage when it is called without arguments. The heavy ones (`checks.sh`,
+`build-app.sh`) take minutes and a lot of memory: run each as one job. `NODE_BIN_DIR=<Node 24
+bin folder>` puts that Node first in `PATH`.
+
+1. Start from a clean tree, with the stable tag merged into every branch, and every branch
+   pushed. `heads.sh <tag>` shows each branch's origin and local head, whether it has the tag,
+   and its worktree. Turn off git's background repack in the main clone while the release runs
+   (`git config maintenance.auto false; git config gc.auto 0`; unset both after): a repack
+   during `build-release.sh` gave "packfile index unavailable" errors.
+2. The combined check tree: `combine.sh <tag> <check worktree>` detaches that worktree at the
+   tag and merges every branch of "Release order" into it. Then
+   `checks.sh <check worktree> <tag> <log dir>`: install, the targeted tests (the fork diff's
+   test files and the "Check" column paths), the `.mjs` tests, oxlint and oxfmt of the fork
+   diff, the node, web and cli typecheck, the two localization checks,
+   `test:repro:skills-cli-runtime` and the fork's `*.test.sh`. It prints `result: PASS`.
+   To check only some steps again after a fix: `checks.sh <wt> <tag> <dir> vitest tc`, and
+   `TESTS="<paths>"` for the failed test files. Fix on the owning branch, merge forward to the
+   branches stacked on it (and the glue branches), push, and combine again.
+   - Run the checks on the combined tree, not only per branch: a new tag can remove an
+     upstream API that a patch uses, and two patches can meet in one test (each branch passes
+     alone).
+   - A runtime string with `{{...}}` must also be in `src/renderer/src/i18n/en-runtime-required.json`,
+     or `verify:localization-runtime-catalog` fails.
+3. Run `config/scripts/fork/build-release.sh --remote origin`. Options: `--base <tag>` picks
    a stable tag, `--version <version>` sets the version, `--upstream <name>` names the
    upstream remote.
    - The base is the newest upstream stable tag (`vX.Y.Z`). The script refuses a base that is
@@ -126,65 +166,66 @@ Do these steps when upstream publishes a new stable tag. Do not wait for a newer
    - On a conflict it stops with the branch, the files and the clean-up commands. Merge the
      tag into the branch and resolve there, or fix the files in the release worktree and run
      `git rerere` to record the fix. Clean up, and run the script again: rerere replays the fix.
-3. Build the app in that worktree, on an Apple Silicon Mac, with Node 24 and pnpm 12.
-   Replace `<base>` with the base version (for example `1.4.259`) and `<version>` with the
-   release version:
+   - The release tree must be the checked tree: `git diff --quiet <combined HEAD> release/<version>`.
+     `build-release.sh` reads `origin/` refs and `combine.sh` local ones, so push first.
+     A fix after the checks means: remove the local tag, branch and worktree, move the local
+     `release/latest` back, and run it again.
+4. Build and check the app in the release worktree, on an Apple Silicon Mac with Node 24, pnpm
+   and a Developer ID certificate in the login keychain:
 
    ```sh
-   pnpm install --frozen-lockfile
-   pnpm -C mobile install --frozen-lockfile   # build:desktop also builds the mobile web page
-   pnpm run build:desktop
-   pnpm run build:computer-macos
-   pnpm run build:keyboard-layout-macos --single-arch
-   pnpm run build:process-footprint-macos --single-arch
-   pnpm run build:socket-owner-macos --single-arch
-   pnpm run build:notification-status-macos --single-arch
-   pnpm run ensure:electron-runtime
-   # orcad template: common files (daemon and server JS) and darwin-arm64 from this worktree.
-   pnpm run build:orcad-prebuilds
-   node config/scripts/orcad-distribution/template/build-orcad-template.mjs --targets darwin-arm64
-   # The other targets' native slots: from upstream's app of the same version.
-   gh release download v<base> -R stablyai/orca -p 'Orca-<base>-arm64-mac.zip' -D /tmp/orca-upstream
-   ditto -x -k /tmp/orca-upstream/Orca-<base>-arm64-mac.zip /tmp/orca-upstream
-   node config/scripts/fork/graft-orcad-template-targets.mjs /tmp/orca-upstream/Orca.app/Contents/Resources
-   ORCA_REQUIRE_ORCAD_TEMPLATE=1 ORCA_LOCAL_BUILD_VERSION=<version> \
-     pnpm exec electron-builder --config config/electron-builder.config.cjs --mac zip dmg --arm64 --publish never
+   gh release download v<base> -R stablyai/orca -p 'Orca-<base>-arm64-mac.zip' -D <dir>
+   LAST_RELEASE_ZIP=<last fork release zip> LAST_RELEASE_COMMIT=<its commit> \
+     config/scripts/fork/release-tools/build-app.sh <release worktree> <version> <dir>/Orca-<base>-arm64-mac.zip
    ```
 
-   - Headless `serve` and SSH hosts need `Resources/orcad-template`.
-     `ORCA_REQUIRE_ORCAD_TEMPLATE=1` stops the build when the template is missing.
-   - Upstream CI builds the native slots of each target on its own runner and merges them
-     (`.github/workflows/node-server-tests.yml`, job `desktop_template`). One Mac cannot build
-     them. The fork changes no native code, so it uses upstream's slots of the same version.
-     The graft script copies only `targets/`, checks each file against upstream's manifest, and
-     runs the template check for every target.
+   It prints `result: PASS` after these steps:
+   - The Swift helpers. A helper whose sources are the same as in the last fork release is
+     taken from that app (upstream's helpers have no fork identity); else it is built. The
+     Computer Use and socket-owner helpers are always built.
+   - `pnpm install` (also in `mobile/`: `build:desktop` builds the phone page),
+     `build:desktop`, `ensure:electron-runtime`, the orcad template: common files and
+     darwin-arm64 from this worktree, the other targets' native slots grafted from upstream's
+     app of the same version (`graft-orcad-template-targets.mjs`), then
+     `ORCA_REQUIRE_ORCAD_TEMPLATE=1 ORCA_LOCAL_BUILD_VERSION=<version> electron-builder --mac zip dmg --arm64`.
+   - The checks: version, orcad template, the nested Profile Manager app (bundle id, name,
+     role, no `orca:` claim, a real framework folder, links that stay in the outer app),
+     `codesign --verify --deep --strict` of the app and `--verify` of the nested app.
+   - The smoke tests, each with a clean environment, a temp home and a free port: `orca --help`,
+     the CLI in the Manager app finds the outer app, `orca serve` is ready, local webhooks
+     (`settings.update` over the runtime socket, then a POST without a key gives 401 and one to
+     an unknown hook 404), and the Profile Manager page renders in a hidden window
+     (`SKIP_PM_SMOKE=1` skips it).
+   - Notes:
+     - Upstream CI builds the native slots of each target on its own runner and merges them
+       (`.github/workflows/node-server-tests.yml`, job `desktop_template`). One Mac cannot build
+       them. The fork changes no native code, so it uses upstream's slots of the same version.
+       The graft script copies only `targets/`, checks each file against upstream's manifest, and
+       runs the template check for every target.
+     - The nested Profile Manager app (from the `afterPack` hook) gets `--verify` without
+       `--strict`: its links point out of the nested bundle.
+     - The `ORCA_E2E_*` variables give serve a mock Keychain. Without them, a build with a new
+       code signature waits for the "orca Safe Storage" Keychain prompt.
+     - `--mac zip dmg` is necessary: the config lists x64 and arm64 for each target, so
+       `--arm64` alone also starts an x64 package, and that fails on an arm64-only install.
+     - The Computer Use helper has no hardened runtime after electron-builder signs it (a
+       warning). Only notarization needs it.
+     - The build stops before a step when the disk has less than 10 GiB free.
 
-4. Test the app in `dist/mac-arm64`. Use a separate profile and port, so a running Orca is not
-   touched:
-
-   ```sh
-   app="$PWD/dist/mac-arm64/Orca @dLux.app"
-   codesign --verify --deep --strict "$app"
-   codesign --verify "$app/Contents/Applications/Orca Profile Manager.app"
-   "$app/Contents/Resources/bin/orca" --help
-   probe=/tmp/orca-probe; mkdir -p "$probe/home"
-   HOME="$probe/home" ORCA_E2E_HOME_DIR="$probe/home" ORCA_E2E_USER_DATA_DIR="$probe" \
-     ORCA_USER_DATA_PATH="$probe" ORCA_CLI_INSTALL_PATH="$probe/bin/orca" \
-     "$app/Contents/Resources/bin/orca" serve --port 6799 --bind 127.0.0.1 --no-pairing
-   ```
-
-   Serve prints "Orca server ready" in less than 30 s. Stop it with Ctrl+C.
-   - Both `codesign` checks must pass. The nested Profile Manager app (from the `afterPack`
-     hook) gets `--verify` without `--strict`: its links point out of the nested bundle.
-   - The `ORCA_E2E_*` variables give serve a mock Keychain. Without them, a build with a new
-     code signature waits for the "orca Safe Storage" Keychain prompt. Serve is not ready until
-     somebody clicks "Always Allow".
-   - `--mac zip dmg` is necessary: the config lists x64 and arm64 for each target, so
-     `--arm64` alone also starts an x64 package, and that fails on an arm64-only install.
-
-5. On the owner's go-ahead: `git push origin release/<version> v<version>` and
-   `git push --force-with-lease origin release/latest`. Then make the GitHub release on
-   `dluxhu/orca` from the tag.
+5. For a release that changes the profile apps (a new Electron, the loader, the profile
+   create code): `NEW_APP=<release worktree>/dist/mac-arm64/<app> config/scripts/fork/release-tools/profile-e2e.sh dry`,
+   then `run` when nobody uses the Mac (about 15 min, it starts the app). A profile made by the
+   installed release gets the new build as its default app: the refresh must run, the app
+   starts again by itself, and the menu bar shows the profile name. The script puts back what
+   LaunchServices, launchd, the Keychain and the preferences got, and prints what changed in
+   the real home folder (must be empty).
+6. On the owner's go-ahead: `git push origin release/<version> v<version>`,
+   `git push --force-with-lease=release/latest:<old sha> origin <new sha>:refs/heads/release/latest`
+   (and `upstream-stable` the same way after a base move). Then make the GitHub release on
+   `dluxhu/orca` from the tag, with the zip, the dmg, both blockmaps and `latest-mac.yml`, and
+   the notes: what is new, the patch list (one line per fork PR), the known issues. Check that
+   `/releases/latest/download/latest-mac.yml` serves the new version, and that the size and
+   sha512 of the zip and the dmg match it.
 
 ## Glue branches
 
@@ -372,10 +413,12 @@ git grep -lE "github.com/stablyai/orca/releases" -- 'src/main/updater/*' \
 ### Part 3: fork documents and release script
 
 **What.** The fork front page `.github/README.md`, this file,
-`config/scripts/fork/build-release.sh` and `config/scripts/fork/graft-orcad-template-targets.mjs`
-(see "Release steps"). The graft script refuses an upstream app of another version and a
+`config/scripts/fork/build-release.sh`, `config/scripts/fork/graft-orcad-template-targets.mjs`
+and the release helpers in `config/scripts/fork/release-tools/` (see "Steps for a new upstream stable
+tag" and "Release steps"). The graft script refuses an upstream app of another version and a
 file that does not match upstream's manifest. Its test is
-`config/scripts/fork/graft-orcad-template-targets.test.mjs`.
+`config/scripts/fork/graft-orcad-template-targets.test.mjs`. The release helpers' test is
+`config/scripts/fork/release-tools/release.test.sh` (the merge plan and `merge.sh`).
 
 The phone page fence (`MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES` in
 `config/scripts/build/mobile-web-app/verify-mobile-web-app-bundle.mjs`) has 32 KiB more for the
@@ -408,6 +451,8 @@ pnpm run typecheck
 pnpm run lint
 pnpm exec vitest run --config config/vitest.config.ts --maxWorkers=2 src/main/startup src/main/cli src/main/menu src/main/macos-permissions src/main/updater src/shared src/main/local-builds src/main/daemon/executable-host config/scripts/fork src/main/orcad/browser-providers/orcad-browser-provider.test.ts src/cli/runtime/profile/metadata.fork.test.ts
 swift test --package-path native/computer-use-macos --filter TrustedOrcaApplicationTests
+config/scripts/fork/build-release.test.sh
+config/scripts/fork/release-tools/release.test.sh
 ```
 
 By hand, on macOS, with official Orca signed in first:
@@ -420,8 +465,8 @@ By hand, on macOS, with official Orca signed in first:
 
 ### Files
 
-Source and config (23): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
-`config/scripts/fork/graft-orcad-template-targets.mjs` (new),
+Source and config (24): `src/shared/fork-identity.ts` (new), `config/scripts/fork/build-release.sh` (new),
+`config/scripts/fork/graft-orcad-template-targets.mjs` (new), `config/scripts/fork/release-tools/` (new),
 `src/main/startup/configure-process.ts`, `config/electron-builder.config.cjs`,
 `config/dev-app-update.yml`, `config/scripts/native-build/macos/build-notification-status-macos.mjs`,
 `src/main/startup/profile-startup/dev-instance-identity.ts`, `src/main/menu/register-app-menu.ts`,
@@ -438,7 +483,8 @@ Source and config (23): `src/shared/fork-identity.ts` (new), `config/scripts/for
 (the package job reads the Linux `/opt` folder from `productName`),
 `native/computer-use-macos/Sources/OrcaComputerUseMacOSCore/TrustedOrcaApplication.swift`.
 
-Tests (21): `src/main/startup/fork-identity.test.ts` (new),
+Tests (22): `src/main/startup/fork-identity.test.ts` (new),
+`config/scripts/fork/release-tools/release.test.sh` (new),
 `src/cli/runtime/profile/metadata.fork.test.ts` (new),
 `native/computer-use-macos/Tests/OrcaComputerUseMacOSTests/TrustedOrcaApplicationTests.swift` (new),
 `config/scripts/fork/graft-orcad-template-targets.test.mjs` (new),
