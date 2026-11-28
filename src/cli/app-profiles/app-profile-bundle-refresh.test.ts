@@ -353,6 +353,25 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(existsSync(join(contents, 'Resources', 'app.asar'))).toBe(false)
   })
 
+  it('with checkOnly, reports an old layout and changes nothing; same key: nothing due', () => {
+    const { entry, contents } = make()
+    const check = join(dir, 'check.txt')
+    const only = { checkFile: check, checkOnly: true }
+    expect(refreshAppProfileBundle(entry.appPath, app, run, only)).toBe(false)
+    const checked = readFileSync(check, 'utf8')
+    rmSync(join(contents, 'Resources', 'app'), { recursive: true })
+    symlinkSync(
+      join(app, 'Contents', 'Resources', 'app.asar'),
+      join(contents, 'Resources', 'app.asar')
+    )
+    calls = []
+    expect(refreshAppProfileBundle(entry.appPath, app, run, only)).toBe(true)
+    expect(refreshAppProfileBundle(entry.appPath, app, run, only)).toBe(true)
+    expect(forced()).toEqual([])
+    expect(lstatSync(join(contents, 'Resources', 'app.asar')).isSymbolicLink()).toBe(true)
+    expect(readFileSync(check, 'utf8')).toBe(checked)
+  })
+
   it('checks again when a needed copy is missing, whatever the check file says', () => {
     const { entry, contents } = make()
     const check = join(dir, 'check.txt')

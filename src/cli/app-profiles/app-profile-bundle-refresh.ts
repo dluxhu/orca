@@ -127,6 +127,8 @@ export type RefreshOptions = {
   checkFile?: string
   /** The profile's userData. */
   userDataPath?: string
+  /** Only reports whether a refresh is due and changes no bundle: a serve start (section 7). */
+  checkOnly?: boolean
 }
 
 /**
@@ -136,7 +138,8 @@ export type RefreshOptions = {
  * copy of the old bundle, so no Finder data of the old bundle can block the signature. Then it is
  * swapped in; the previous bundle stays as <app>.pre-refresh until the next start
  * (settlePreRefresh). The profile's data stays. `checkFile`: a start with the same default app
- * version and key, and complete copies, reads no executables. Returns true when the bundle changed.
+ * version and key, and complete copies, reads no executables. Returns true when the bundle changed
+ * (with `checkOnly`: when it must change).
  */
 export function refreshAppProfileBundle(
   appPath: string,
@@ -149,7 +152,9 @@ export function refreshAppProfileBundle(
   if (!id) {
     throw new RuntimeClientError('invalid_argument', `${appPath} is not a profile app.`)
   }
-  settlePreRefresh(dirname(appPath), id)
+  if (!options.checkOnly) {
+    settlePreRefresh(dirname(appPath), id)
+  }
   const source = join(defaultApp, 'Contents')
   const target = versionOf(readFileSync(join(source, 'Info.plist'), 'utf8'))
   if (target === null) {
@@ -171,6 +176,10 @@ export function refreshAppProfileBundle(
   const templateKey = templateKeyOf(defaultApp, run)
   // A rename changes only the file name (no new signature); the menu-bar name follows here.
   const changed = !complete || templateKey !== ownKey || menuName !== basename(appPath, '.app')
+  if (changed && options.checkOnly) {
+    // The check file stays: the next start checks again.
+    return true
+  }
   if (changed) {
     rebuild(appPath, defaultApp, id, ownPlist, run, options.userDataPath)
   }
