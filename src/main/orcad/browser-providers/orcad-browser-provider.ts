@@ -18,6 +18,7 @@ import { openServeBundlePark } from '../../../shared/remote-runtime/serve-superv
 import { ORCAD_BROWSER_PARK_LABEL } from '../../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 import { errorMessage } from '../../../shared/errors/error-message'
 import { ORCA_SERVE_APPIMAGE_ENV } from '../../../shared/remote-runtime/serve-supervisor/orcad-server-launch-env'
+import { FORK_IDENTITY } from '../../../shared/fork-identity'
 
 export type OrcadBrowserProvider = {
   kind: 'electron' | 'chromium'
@@ -82,9 +83,12 @@ export function installedElectronCandidates(
 ): string[] {
   const joinPath = platform === 'win32' ? win32.join : posix.join
   if (platform === 'darwin') {
+    // Fork patch: the fork's own bundle. The executable name follows productName.
+    const bundle = `${FORK_IDENTITY.productName}.app`
+    const executable = ['Contents', 'MacOS', FORK_IDENTITY.productName]
     return [
-      '/Applications/Orca.app/Contents/MacOS/Orca',
-      joinPath(homePath, 'Applications', 'Orca.app', 'Contents', 'MacOS', 'Orca')
+      joinPath('/Applications', bundle, ...executable),
+      joinPath(homePath, 'Applications', bundle, ...executable)
     ]
   }
   if (platform === 'win32') {
