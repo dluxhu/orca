@@ -1,5 +1,9 @@
 // The Profile Manager window: docs/fork/profiles-design.md, sections 4 and 9.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  installWindowVisibilityInterval,
+  isWindowVisible
+} from '@/lib/window-activity/window-visibility-interval'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTranslate, type Translate } from '@/i18n/use-translate'
@@ -86,22 +90,21 @@ export function ProfileManager(): React.JSX.Element {
   }, [api])
 
   useEffect(() => {
-    void load()
     const onFocus = (): void => void load()
-    // macOS hides a covered window; the list is old when it shows again.
-    const onVisible = (): void => {
-      if (document.visibilityState === 'visible') {
-        void load()
-      }
-    }
-    // Apps start and stop without a sign to this window, so it reads the states again.
-    const timer = setInterval(onVisible, PROFILE_STATE_POLL_MS)
     window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisible)
+    // Apps start and stop without a sign to this window, so it reads the states again. The
+    // reads pause while macOS hides the window, and run at once when it shows again. A visible
+    // window reads at once from the interval; a hidden one reads once here.
+    if (!isWindowVisible()) {
+      void load()
+    }
+    const stopPolling = installWindowVisibilityInterval({
+      run: () => void load(),
+      intervalMs: PROFILE_STATE_POLL_MS
+    })
     return () => {
-      clearInterval(timer)
+      stopPolling()
       window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [load])
 

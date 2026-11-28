@@ -131,6 +131,7 @@ describe('ProfileManager', () => {
     expect(within(rowOf('Orca - Home')).getByText('Running')).toBeTruthy()
     visibility.mockReturnValue('hidden')
     await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
       await vi.advanceTimersByTimeAsync(PROFILE_STATE_POLL_MS * 3)
     })
     expect(getState).toHaveBeenCalledTimes(2)

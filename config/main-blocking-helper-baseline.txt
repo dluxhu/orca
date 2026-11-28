@@ -64,7 +64,9 @@
 12 src/main/antigravity/native-windows-credentials.ts
 1 src/main/antigravity/native-wsl-credentials.ts
 2 src/main/app-profiles/app-profile-startup.ts # app profiles (fork): one-shot start, before ready: getAppProfile and the marker write
-3 src/main/app-profiles/app-profile.ts # app profiles (fork): getAppProfile reads Info.plist and the marker once, memoized, before ready
+6 src/main/app-profiles/app-profile.ts # app profiles (fork): getAppProfile reads Info.plist and the marker and checks the folder once, memoized, before ready
+3 src/main/app-profiles/profile-manager-cli.ts # app profiles (fork): getAppProfile, memoized before ready; the Profile Manager reads profiles through the CLI child
+21 src/main/app-profiles/profile-manager.ts # app profiles (fork): getAppProfile, memoized before ready; the Profile Manager reads profiles through the CLI child
 6 src/main/artifacts/artifact-cloud-auth-context.ts
 7 src/main/artifacts/artifact-cloud-service.ts
 2 src/main/artifacts/artifact-create-intent-store.ts # sign-out clear (bestEffortFsyncDirectorySync) plus writeArtifactFileWhileCurrent, whose only sync step is the fenced renameSync; was 8
@@ -1358,14 +1360,14 @@
 1 src/main/startup/linux-runtime/linux-dev-shm-policy.ts
 4 src/main/startup/linux-runtime/linux-realtime-scheduling-guard.ts
 2 src/main/startup/linux-runtime/linux-rttime-limit.ts
-1 src/main/startup/main-process-ipc-bootstrap.ts
+2 src/main/startup/main-process-ipc-bootstrap.ts # app profiles (fork): +1 registerProfileManagerIpc, once at start
 2 src/main/startup/main-process-observers.ts
 1 src/main/startup/main-process-preflight-failure.ts
 28 src/main/startup/main-process-preflight.ts # app profiles (fork): +3 one-shot profile start in the preflight
 16 src/main/startup/main-process-ready-foundation.ts # +1 app profiles (fork): the settings seed, once at ready
 3 src/main/startup/main-process-ready-runtime.ts
 4 src/main/startup/main-process-ready.ts
-2 src/main/startup/main-window/main-process-i18n-menu.ts # +1 app profiles (fork): startProfilesMenu, one mkdir at menu start
+3 src/main/startup/main-window/main-process-i18n-menu.ts # app profiles (fork): +1 startProfilesMenu, one mkdir at menu start; profilesMenuItems reads getAppProfile, memoized
 15 src/main/startup/main-window/main-window-controller.ts
 4 src/main/startup/main-window/main-window-core-services.ts
 1 src/main/startup/native-setting-subscriptions.ts # HTTP/1 marker write moved here from main-process-ready-foundation.ts (settings change only)
@@ -1543,6 +1545,7 @@
 1 src/shared/agent-launch/plugins/opencode/opencode-startup-prompt-install.ts
 3 src/shared/agent-launch/plugins/opencode/opencode-tui-config-registration.ts
 10 src/shared/agent-launch/plugins/opencode/opencode-tui-plugin-install.ts
+4 src/shared/app-profiles/app-profile-paths.ts # app profiles (fork): marker reads at start; the registry and app id reads run only in the CLI
 2 src/shared/file-content/node-source-copy-content-equality.ts
 4 src/shared/plugins/declarative/testing/orca-testing.ts
 7 src/shared/remote-runtime/e2ee/node/remote-runtime-e2ee-v2-host-latch.ts

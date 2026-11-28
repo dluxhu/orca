@@ -1,8 +1,8 @@
 // The sender check with the real window module, and the CLI spawn without a shell.
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type * as ChildProcess from 'node:child_process'
+import type * as ProcessHost from '@orca/process-host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
@@ -44,19 +44,12 @@ vi.mock('electron', () => {
     }
   }
 })
-vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof ChildProcess>()),
-  execFile: (file: string, args: string[], options: unknown, callback?: unknown) => {
-    const done = (typeof options === 'function' ? options : callback) as (
-      error: Error | null,
-      stdout: string
-    ) => void
-    h.execFileCalls.push({
-      file,
-      args,
-      options: (typeof options === 'object' ? options : {}) as Record<string, unknown>
-    })
-    done(null, h.stdout)
+vi.mock('@orca/process-host', async (original) => ({
+  ...(await original<typeof ProcessHost>()),
+  runProcess: async (spec: Parameters<typeof ProcessHost.runProcess>[0]) => {
+    const { program, args = [], ...options } = spec
+    h.execFileCalls.push({ file: program, args: [...args], options })
+    return { code: 0, signal: null, stdout: h.stdout, stderr: '', timedOut: false }
   }
 }))
 vi.mock('../../shared/remote-runtime/serve-supervisor/serve-service-unit-removal', () => ({
@@ -72,7 +65,6 @@ vi.mock('../window/security/privileged-window-navigation', () => ({
   installPrivilegedWindowNavigationPolicy: vi.fn()
 }))
 
-import { mkdirSync, writeFileSync } from 'node:fs'
 import { registerProfileManagerIpc } from './profile-manager'
 import { openProfileManagerWindow } from './profile-manager-window'
 

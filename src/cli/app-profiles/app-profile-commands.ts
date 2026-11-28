@@ -1,6 +1,5 @@
 // `orca profiles create|rename|set-port|remove|list|manager`: local commands, no runtime needed.
 // See docs/fork/profiles-design.md, section 6.
-import { execFileSync } from 'node:child_process'
 import {
   appProfilesRoot,
   PROFILE_MANAGER_ARG,
@@ -10,7 +9,7 @@ import { getMacAppBundlePath } from '../runtime/serve/updates/mac-app-update-bun
 import { getPackagedElectronExecutable } from '../runtime/app-launch/packaged-cli-interpreter'
 import { getPlatformUserDataPath } from '../runtime/profile/metadata'
 import { RuntimeClientError } from '../runtime/connection/types'
-import { createAppProfile, defaultAppOf } from './app-profile-create'
+import { createAppProfile, defaultAppOf, runTool } from './app-profile-create'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { setDefaultAppPort } from './app-profile-default-port'
@@ -164,7 +163,7 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
       const defaultApp =
         readAppProfileRegistry(appProfilesRoot())?.defaultAppPath ?? runningDefaultApp()
       // -n starts a second process: it gives the argument to the running app and exits.
-      execFileSync('/usr/bin/open', ['-n', '-a', defaultApp, '--args', PROFILE_MANAGER_ARG])
+      runTool('/usr/bin/open', ['-n', '-a', defaultApp, '--args', PROFILE_MANAGER_ARG])
       print({ opened: defaultApp }, json, `Opened the Profile Manager of ${defaultApp}.`)
       return
     }

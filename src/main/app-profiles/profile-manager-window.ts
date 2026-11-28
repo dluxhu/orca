@@ -1,5 +1,5 @@
 // The Profile Manager window. Each Orca app can show it. See docs/fork/profiles-design.md, section 4.
-import { execFile } from 'node:child_process'
+import { runProcess } from '@orca/process-host'
 import { join } from 'node:path'
 import { app, BrowserWindow, nativeTheme, type WebContents } from 'electron'
 import { translateMain } from '../i18n/main-i18n'
@@ -17,11 +17,14 @@ export function isProfileManagerRenderer(sender: WebContents): boolean {
 
 /** Brings the app to the front, or starts it. */
 export function openApp(appPath: string): void {
-  execFile('/usr/bin/open', ['-a', appPath], (error) => {
-    if (error) {
-      console.warn('[profiles] open failed:', error.message)
-    }
-  })
+  void runProcess({ program: '/usr/bin/open', args: ['-a', appPath] }).then(
+    ({ code, stderr }) => {
+      if (code !== 0) {
+        console.warn('[profiles] open failed:', stderr.trim() || `exit ${code}`)
+      }
+    },
+    (error: unknown) => console.warn('[profiles] open failed:', error)
+  )
 }
 
 /** Shows the one Profile Manager window of this app. `startNew` also opens the New dialog. */
