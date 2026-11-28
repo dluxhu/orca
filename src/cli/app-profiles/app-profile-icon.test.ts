@@ -366,6 +366,7 @@ describe('base icons', () => {
 
   it(
     'badges an uploaded base, records it as custom and keeps its copy',
+    // The badge renderer and the .icns sizes take seconds of CPU on a 1024 px image.
     { timeout: 120_000 },
     () => {
       const app = fakeApp()
@@ -442,45 +443,50 @@ describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () =
     expect(ink()).toEqual([0x0f, 0x17, 0x2a])
   })
 
-  it('badges the Orca icon and writes an .icns that macOS reads', { timeout: 120_000 }, () => {
-    const app = join(dir, 'Orca.app')
-    mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
-    writeFileSync(
-      join(app, 'Contents', 'Info.plist'),
-      '<plist><dict><key>CFBundleIconFile</key><string>icon</string></dict></plist>'
-    )
-    copyFileSync(
-      join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
-      join(app, 'Contents', 'Resources', 'icon.icns')
-    )
-    // The real tools, with their arguments kept: the badge drawing must get the colour.
-    const calls: string[][] = []
-    const run = (program: string, args: string[]): string => {
-      calls.push(args)
-      return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  it(
+    'badges the Orca icon and writes an .icns that macOS reads',
+    // AppKit, the badge renderer and iconutil take seconds on a 1024 px image.
+    { timeout: 120_000 },
+    () => {
+      const app = join(dir, 'Orca.app')
+      mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
+      writeFileSync(
+        join(app, 'Contents', 'Info.plist'),
+        '<plist><dict><key>CFBundleIconFile</key><string>icon</string></dict></plist>'
+      )
+      copyFileSync(
+        join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
+        join(app, 'Contents', 'Resources', 'icon.icns')
+      )
+      // The real tools, with their arguments kept: the badge drawing must get the colour.
+      const calls: string[][] = []
+      const run = (program: string, args: string[]): string => {
+        calls.push(args)
+        return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      }
+      const made = makeAppProfileIcon(
+        app,
+        { kind: 'badge', color: '#2563eb' },
+        [{ kind: 'badge', text: '2', style: 'ref-match' }],
+        run
+      )
+      expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
+      expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
+      const icns = join(dir, 'profile.icns')
+      writeFileSync(icns, made.icns)
+      execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
+      expect(readdirSync(join(dir, 'out.iconset')).sort()).toEqual([
+        'icon_128x128.png',
+        'icon_128x128@2x.png',
+        'icon_16x16.png',
+        'icon_16x16@2x.png',
+        'icon_256x256.png',
+        'icon_256x256@2x.png',
+        'icon_32x32.png',
+        'icon_32x32@2x.png',
+        'icon_512x512.png',
+        'icon_512x512@2x.png'
+      ])
     }
-    const made = makeAppProfileIcon(
-      app,
-      { kind: 'badge', color: '#2563eb' },
-      [{ kind: 'badge', text: '2', style: 'ref-match' }],
-      run
-    )
-    expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
-    expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
-    const icns = join(dir, 'profile.icns')
-    writeFileSync(icns, made.icns)
-    execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
-    expect(readdirSync(join(dir, 'out.iconset')).sort()).toEqual([
-      'icon_128x128.png',
-      'icon_128x128@2x.png',
-      'icon_16x16.png',
-      'icon_16x16@2x.png',
-      'icon_256x256.png',
-      'icon_256x256@2x.png',
-      'icon_32x32.png',
-      'icon_32x32@2x.png',
-      'icon_512x512.png',
-      'icon_512x512@2x.png'
-    ])
-  })
+  )
 })
