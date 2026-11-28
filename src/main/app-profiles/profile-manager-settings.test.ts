@@ -22,7 +22,8 @@ vi.mock('./profile-manager-window', () => ({ isProfileManagerRenderer: () => fal
 vi.mock('./profile-manager-cli', () => ({ runCli: h.runCli }))
 vi.mock('./profile-manager-icon', () => ({
   previewAppProfileIcon: h.preview,
-  chooseAppProfileIconFile: vi.fn()
+  chooseAppProfileIconFile: vi.fn(),
+  importIconBase: async (path: string) => path.replace('custom.png', 'shaped.png')
 }))
 vi.mock('./app-profile-dock-icon', () => ({ forgetOwnDockIcon: h.forget }))
 vi.mock('../tray/system-tray', () => ({ refreshMacMenuBarImage: h.refreshMenuBar }))
@@ -49,6 +50,7 @@ describe('ownAppProfile', () => {
     const rows = [row('default', 'stopped', 6769), row('work', 'running', 6768)]
     expect(ownAppProfile({ rows, currentId: 'work', keptIds: [] })).toEqual({
       id: 'work',
+      name: 'work',
       enabled: false,
       port: 6768,
       otherPorts: [],
@@ -116,14 +118,14 @@ describe('the own icon calls of Settings', () => {
     expect(h.refreshMenuBar).not.toHaveBeenCalled()
   })
 
-  it('previews for the own id, and names an imported Settings icon', async () => {
+  it('previews for the own id, and names the shaped copy of an imported Settings icon', async () => {
     h.preview.mockResolvedValue({ ok: true, result: { png: '' } })
     await call('appProfiles:ownIconPreview', { kind: 'none', base: 'classic' })
     expect(h.preview).toHaveBeenCalledWith({ kind: 'none', base: 'classic' }, 'work')
     expect(await call('appProfiles:ownProfile')).not.toHaveProperty('customIconPath')
     h.custom = true
     expect(await call('appProfiles:ownProfile')).toMatchObject({
-      customIconPath: '/data/default/app-icon/custom.png'
+      customIconPath: '/data/default/app-icon/shaped.png'
     })
   })
 })

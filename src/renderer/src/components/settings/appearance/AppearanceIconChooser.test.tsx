@@ -15,6 +15,7 @@ import { AppIconSetting, appIconSettingOf, savedAppIcon } from './AppearanceIcon
 
 const base: OwnAppProfile = {
   id: 'default',
+  name: 'Default',
   enabled: false,
   port: 6768,
   otherPorts: [],
@@ -110,7 +111,7 @@ describe('AppIconSetting', () => {
     await waitFor(() =>
       expect(ownIconPreview).toHaveBeenLastCalledWith({
         kind: 'badge',
-        text: '2',
+        text: 'D',
         style: 'ref-match',
         base: 'watercolor'
       })
@@ -128,26 +129,49 @@ describe('AppIconSetting', () => {
     done({ ok: true, result: {} })
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('classic'))
     expect(setOwnIcon).toHaveBeenCalledWith(
-      { kind: 'badge', text: '2', style: 'ref-match', base: 'watercolor' },
+      { kind: 'badge', text: 'D', style: 'ref-match', base: 'watercolor' },
       'classic'
     )
     await waitFor(() => expect(getOwnProfile).toHaveBeenCalledTimes(2))
     const fieldset = () => screen.getByRole('radio', { name: 'Blue' }).closest('fieldset')
     expect(fieldset()?.disabled).toBe(true)
-    read({ ...base, icon: { kind: 'badge', text: '2', style: 'ref-match', base: 'watercolor' } })
+    read({ ...base, icon: { kind: 'badge', text: 'D', style: 'ref-match', base: 'watercolor' } })
     await waitFor(() => expect(fieldset()?.disabled).toBe(false))
     expect(checked('Watercolor')).toBe('true')
   })
 
-  it('takes the badge off the default app: the built-in setting again, as upstream has it', async () => {
+  it('takes the badge off the default app at once: the built-in setting again, as upstream has it', async () => {
     own = { ...base, icon: { kind: 'badge', text: 'D', style: 'ref-match' } }
     const onChange = show('classic')
     await screen.findByRole('radio', { name: 'Blue' })
+    // A badge on another base waits for Apply.
     fireEvent.click(screen.getByRole('radio', { name: 'Blue' }))
+    expect(setOwnIcon).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: 'No badge' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Apply icon' }))
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('blue'))
     expect(setOwnIcon).toHaveBeenCalledWith({ kind: 'none', base: 'blue' }, 'blue')
+  })
+
+  it('applies a built-in base with no badge at once: the setting alone without a kept icon', async () => {
+    const onChange = show('classic')
+    await screen.findByRole('radio', { name: 'Blue' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Blue' }))
+    expect(onChange).toHaveBeenCalledWith('blue')
+    expect(setOwnIcon).not.toHaveBeenCalled()
+    cleanup()
+    // A profile app keeps its icon: the CLI sets it at once.
+    own = { ...base, id: 'work', name: 'Work', icon: { kind: 'none', base: 'classic' } }
+    show('classic')
+    await screen.findByRole('radio', { name: 'Watercolor' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Watercolor' }))
+    await waitFor(() =>
+      expect(setOwnIcon).toHaveBeenCalledWith({ kind: 'none', base: 'watercolor' }, 'classic')
+    )
+    // A new badge starts from the first letter of the app name.
+    const badge = screen.getByRole('radio', { name: 'Badge character' })
+    await waitFor(() => expect(badge.closest('fieldset')?.disabled).toBe(false))
+    fireEvent.click(badge)
+    await waitFor(() => expect(screen.getByLabelText('Badge character')).toHaveProperty('value', 'W'))
   })
 
   it('changes the icon of a profile app with an upload; a CLI error shows and saves nothing', async () => {

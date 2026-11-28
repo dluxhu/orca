@@ -6,8 +6,8 @@ import { useTranslate } from '@/i18n/use-translate'
 import { getRendererAppPlatform } from '@/app-shell/platform/renderer-app-platform'
 import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
 import {
+  defaultBadge,
   isBuiltInIconBase,
-  nextBadgeText,
   type AppProfileIconSource,
   type OwnAppProfile
 } from '../../../../../shared/app-profiles/app-profile-rules'
@@ -23,13 +23,18 @@ import {
 } from '../../profile-manager/ProfileIconPicker'
 import { AppIconSelector } from './AppIconSelector'
 
+/** The first badge character of a new badge: the first letter of the app name. */
+export function ownBadgeText(own: OwnAppProfile): string {
+  return defaultBadge(own.name, []).text
+}
+
 /**
  * The saved choice: the kept icon of the profile (or of the default app), else the appIcon
  * setting with no badge, as upstream has it.
  */
 export function savedAppIcon(own: OwnAppProfile, appIcon: AppIconId): AppProfileIconSource {
   if (own.icon) {
-    return editIcon(own.icon, nextBadgeText([]), own.userDataPath)
+    return editIcon(own.icon, ownBadgeText(own), own.userDataPath)
   }
   if (appIcon === 'custom') {
     return own.customIconPath
@@ -75,12 +80,17 @@ export function AppearanceIconChooser(props: {
   useEffect(() => setValue(JSON.parse(savedKey) as AppProfileIconSource), [savedKey])
 
   const changed = JSON.stringify(value) !== savedKey
-  const apply = (): void => {
-    setBusy(true)
+  const apply = (icon: AppProfileIconSource): void => {
+    const appIcon = appIconSettingOf(props.own, icon)
     setError(null)
-    const appIcon = appIconSettingOf(props.own, value)
+    // The default app with no kept icon: the appIcon setting alone is the icon, as upstream.
+    if (props.own.id === 'default' && icon.kind === 'none' && !props.own.icon) {
+      props.onAppIconChange(appIcon)
+      return
+    }
+    setBusy(true)
     void api
-      .setOwnIcon(value, appIcon)
+      .setOwnIcon(icon, appIcon)
       .then((reply) => {
         if (!reply.ok) {
           setError(reply.error.message)
@@ -95,15 +105,24 @@ export function AppearanceIconChooser(props: {
       .then(() => setBusy(false))
   }
 
+  // A built-in base with no badge applies at once, as upstream's selector does; a badge or an
+  // upload waits for Apply.
+  const choose = (icon: AppProfileIconSource): void => {
+    setValue(icon)
+    if (icon.kind === 'none' && JSON.stringify(icon) !== savedKey) {
+      apply(icon)
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap gap-8">
+      <div className="flex gap-6 overflow-x-auto">
         {/* No edit while Apply runs: the saved icon read after it replaces the choice. */}
-        <fieldset disabled={busy} className="flex min-w-0 flex-[999_1_420px] flex-col">
+        <fieldset disabled={busy} className="flex shrink-0 flex-col">
           <ProfileIconPicker
             value={value}
-            defaultText={nextBadgeText([])}
-            onChange={setValue}
+            defaultText={ownBadgeText(props.own)}
+            onChange={choose}
             chooseFile={api.chooseOwnIconFile}
           />
         </fieldset>
@@ -123,7 +142,7 @@ export function AppearanceIconChooser(props: {
         >
           {t('profileManager.icon.reset', 'Reset')}
         </Button>
-        <Button size="sm" disabled={busy || !changed || !iconChoiceReady(value)} onClick={apply}>
+        <Button size="sm" disabled={busy || !changed || !iconChoiceReady(value)} onClick={() => apply(value)}>
           {busy
             ? t('profileManager.icon.applying', 'Applying…')
             : t('profileManager.icon.apply', 'Apply icon')}

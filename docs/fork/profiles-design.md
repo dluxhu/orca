@@ -775,7 +775,10 @@ with the reference's box and bounding box at the normal limit.
   already on the macOS grid), one of the other built-in app icons of Settings > Appearance
   (`watercolor`, `blue`: `app.asar.unpacked/resources/app-icons/` of the default app), or an
   uploaded image (`--icon-base <file>`). The registry keeps a built-in id, or `custom` for an
-  upload; the userData keeps the upload as `profile-icon-base.png`.
+  upload; the userData keeps the upload as `profile-icon-base.png`. In the chooser, an upload
+  goes through upstream's custom icon import first (`importIconBase`: PNG or JPEG, square, its
+  size limits, then the macOS tile shape); the CLI puts the badge on that PNG. A refused upload
+  shows upstream's reason under the base icons.
 - **Badge:** optional. `--no-badge` gives the base alone (registry `{ kind: 'none', base }`), with
   the plain menu-bar glyph. An uploaded base with no badge is the `file` kind.
 - **Uploaded badge:** PNG, JPEG, WebP or SVG, with any style.
@@ -802,10 +805,14 @@ with the reference's box and bounding box at the normal limit.
 - **One chooser:** the Profile Manager's New and Edit dialogs and Settings > Appearance > App icon
   (macOS desktop app) use the same chooser (`ProfileIconPicker.tsx`): the base icon (three
   built-in icons or an upload), the badge (none, a character or an image, with its colour and
-  style) and the preview. Settings changes this app's own icon with "Apply icon"
-  (`appProfiles:setOwnIcon`, which runs `set-icon <own id> --while-running`); the app then sets its
-  Dock tile and menu-bar image from the new kept files. Other platforms and web clients keep
-  upstream's selector.
+  style) and the preview. The chooser has one fixed size (`ICON_PICKER_SIZE`, 420 x 640 px, and a
+  260 px preview), so a change of base, badge or style moves nothing; longer text scrolls inside
+  it. In Settings, a built-in base with no badge applies at once, as upstream's selector does; a
+  badge or an upload waits for "Apply icon" (`appProfiles:setOwnIcon`, which runs
+  `set-icon <own id> --while-running`); the app then sets its Dock tile and menu-bar image from the
+  new kept files. A new badge in Settings starts from the first letter of the app's name
+  (`defaultBadge` of the name, with no check against other profiles). Other platforms and web
+  clients keep upstream's selector.
 - **The default app:** `orca profiles set-icon default` keeps the icon in the default app's
   userData and records it as profiles.json `defaultIcon` (it makes profiles.json when there is
   none). The CLI sets no Finder icon: the app sets it with its Dock tile (`applyAppIcon`), as for

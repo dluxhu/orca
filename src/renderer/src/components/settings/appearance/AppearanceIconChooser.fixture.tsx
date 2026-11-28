@@ -8,6 +8,7 @@ import { AppIconSetting } from './AppearanceIconChooser'
 
 const own: OwnAppProfile = {
   id: 'default',
+  name: 'Default',
   enabled: false,
   port: 6768,
   otherPorts: [],
@@ -40,14 +41,14 @@ const stub = (profile: OwnAppProfile) => (): void => {
 
 export const defaultAppWithBadge = defineFixture({
   interact: waitForPreview,
-  width: 860,
+  width: 752,
   setup: stub(own),
   render: () => <Setting first="classic" />
 })
 
 export const profileWithoutBadge = defineFixture({
   interact: waitForPreview,
-  width: 860,
-  setup: stub({ ...own, id: 'work', icon: { kind: 'none', base: 'blue' } }),
+  width: 752,
+  setup: stub({ ...own, id: 'work', name: 'Work', icon: { kind: 'none', base: 'blue' } }),
   render: () => <Setting first="classic" />
 })

@@ -1,6 +1,7 @@
 // Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
 import type { IconStyle } from '../icon-badger/badger'
+import type { CustomAppIconImportFailureCode } from '../app-lifecycle/identity/app-icon'
 import type { AppProfileIcon } from './app-profile-paths'
 import { APP_PROFILE_BADGE_SWATCHES } from './app-profile-icon-files'
 
@@ -41,6 +42,9 @@ export type AppProfileIconSource =
   // No badge: a built-in base alone. An uploaded base alone is `file`.
   | { kind: 'none'; base: 'classic' | 'watercolor' | 'blue' }
   | { kind: 'file'; path: string }
+
+/** A chosen file: its path, or why upstream's custom icon import refused an uploaded base. */
+export type ChosenIconFile = string | { code: CustomAppIconImportFailureCode } | null
 
 /** The built-in bases, in the order of the appIcon setting. */
 export const APP_PROFILE_ICON_BASES = ['classic', 'watercolor', 'blue'] as const
@@ -127,6 +131,8 @@ export function appProfileIconFlags(source: AppProfileIconSource | undefined): s
 /** This app's own profile, for Settings. */
 export type OwnAppProfile = {
   id: string
+  /** The app name; the default badge character is its first letter. */
+  name: string
   /** Start at login. */
   enabled: boolean
   /** The saved port. */

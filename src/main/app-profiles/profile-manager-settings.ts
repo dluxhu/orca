@@ -19,7 +19,11 @@ import {
   hasCustomAppIcon
 } from '../window/desktop-integration/custom-app-icon'
 import { forgetOwnDockIcon } from './app-profile-dock-icon'
-import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
+import {
+  chooseAppProfileIconFile,
+  importIconBase,
+  previewAppProfileIcon
+} from './profile-manager-icon'
 import { runCli } from './profile-manager-cli'
 
 /** This app's own profile, as Settings shows it. */
@@ -32,6 +36,7 @@ export function ownAppProfile({ rows, currentId }: AppProfilesState): OwnAppProf
   }
   return {
     id: own.id,
+    name: own.name,
     enabled: own.startAtLogin,
     port: own.port,
     // appProfilePortError checks the default app's range itself.
@@ -57,13 +62,17 @@ export function registerOwnProfileIpc(
         ? handler(...args)
         : Promise.reject(new Error('Only an Orca window can do this.'))
   const ownId = async (): Promise<string> => ownAppProfile(await readState()).id
-  // An icon that Settings imported before (appIcon `custom`) can be the base of a new one.
+  // An icon that Settings imported before (appIcon `custom`) can be the base of a new one. Upstream
+  // keeps it unshaped and shapes it for the Dock; the base gets the same tile shape.
   ipcMain.handle(
     'appProfiles:ownProfile',
-    fromSettings(async () => ({
-      ...ownAppProfile(await readState()),
-      ...(hasCustomAppIcon() ? { customIconPath: getCustomAppIconPath() } : {})
-    }))
+    fromSettings(async () => {
+      const custom = hasCustomAppIcon() ? await importIconBase(getCustomAppIconPath()) : null
+      return {
+        ...ownAppProfile(await readState()),
+        ...(typeof custom === 'string' ? { customIconPath: custom } : {})
+      }
+    })
   )
   ipcMain.handle(
     'appProfiles:setOwnStartAtLogin',

@@ -9,7 +9,8 @@ import { useTranslate } from '@/i18n/use-translate'
 import {
   isBuiltInIconBase,
   type AppProfileIconSource,
-  type AppProfileReply
+  type AppProfileReply,
+  type ChosenIconFile
 } from '../../../../shared/app-profiles/app-profile-rules'
 import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile-paths'
 import {
@@ -20,6 +21,12 @@ import {
 import { Field } from './ProfileField'
 import { BadgeColors, BaseIcons, fileName } from './ProfileIconParts'
 import { ProfileStyleGrid } from './ProfileStyleGrid'
+import { importFailureText } from '../settings/appearance/AppIconSelector'
+
+// One size for the chooser in the Profile Manager and in Settings (its pane is 720 px wide): a
+// change of base, badge or style never moves the controls or the preview. Longer text scrolls.
+export const ICON_PICKER_SIZE = 'h-[640px] w-[420px] shrink-0'
+const ICON_PREVIEW_WIDTH = 'w-[260px] shrink-0'
 
 /** True when the choice is complete: a badge character, or a chosen file. */
 export function iconChoiceReady(icon: AppProfileIconSource): boolean {
@@ -78,7 +85,7 @@ export function withIconBase(icon: AppProfileIconSource, base: string): AppProfi
 
 /** What the chooser asks the main process for: the Profile Manager's calls, or Settings' own. */
 export type IconChooserApi = {
-  chooseFile: (kind: 'image' | 'file') => Promise<string | null>
+  chooseFile: (kind: 'image' | 'file') => Promise<ChosenIconFile>
   preview: (icon: AppProfileIconSource) => Promise<AppProfileReply>
 }
 
@@ -95,32 +102,44 @@ export function ProfileIconPicker(props: {
     props.chooseFile ??
     ((kind) => window.api?.appProfiles?.chooseIconFile(kind) ?? Promise.resolve(null))
   const { value, onChange } = props
+  const [baseError, setBaseError] = useState<string | null>(null)
   const base = iconBaseOf(value)
   const style =
     value.kind === 'badge' || value.kind === 'image' ? (value.style ?? 'ref-match') : 'ref-match'
   const keepBase = base === 'classic' || base === '' ? {} : { base }
   const chooseBadgeImage = (): void => {
     void chooseFile('image').then((path) => {
-      if (path) {
+      if (typeof path === 'string') {
         onChange({ kind: 'image', path, style, ...keepBase })
       }
     })
   }
   const chooseBase = (): void => {
     void chooseFile('file').then((path) => {
-      if (path) {
+      // Upstream's custom icon import refused it (not square, too small, ...).
+      setBaseError(path && typeof path === 'object' ? importFailureText(t, path.code) : null)
+      if (typeof path === 'string') {
         onChange(withIconBase(value, path))
       }
     })
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    // p-1 keeps the focus and selection rings inside the scroll box.
+    <div className={`flex flex-col gap-3 overflow-y-auto p-1 ${ICON_PICKER_SIZE}`}>
       <BaseIcons
         base={base}
-        onChange={(next) => onChange(withIconBase(value, next))}
+        onChange={(next) => {
+          setBaseError(null)
+          onChange(withIconBase(value, next))
+        }}
         choose={chooseBase}
       />
+      {baseError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {baseError}
+        </p>
+      ) : null}
       <Label id="profile-icon-mode" className="font-semibold">
         {t('profileManager.icon.label', 'Badge')}
       </Label>
@@ -275,7 +294,7 @@ export function ProfileIconPreview(props: {
   return (
     <aside
       aria-label={t('profileManager.icon.preview', 'Preview')}
-      className="flex min-w-0 flex-[1_1_280px] flex-col gap-3.5"
+      className={`flex flex-col gap-3.5 ${ICON_PREVIEW_WIDTH}`}
     >
       <span className="font-semibold">{t('profileManager.icon.preview', 'Preview')}</span>
       {dockSamples.map((sample, index) => (

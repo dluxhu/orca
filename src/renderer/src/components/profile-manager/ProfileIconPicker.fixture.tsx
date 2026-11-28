@@ -4,20 +4,21 @@ import { useState } from 'react'
 import { defineFixture } from '../../component-fixtures/component-fixture'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
 import { fixturePreview, waitForPreview } from '../../component-fixtures/fixture-icon-preview'
-import { ProfileIconPicker, ProfileIconPreview } from './ProfileIconPicker'
+import { ProfileIconPicker, ProfileIconPreview, type IconChooserApi } from './ProfileIconPicker'
 
-function EditIcon(props: { first: AppProfileIconSource }): React.JSX.Element {
+function EditIcon(props: {
+  first: AppProfileIconSource
+  chooseFile?: IconChooserApi['chooseFile']
+}): React.JSX.Element {
   const [value, setValue] = useState(props.first)
   return (
-    <div className="flex flex-wrap gap-8 p-6">
-      <div className="flex min-w-0 flex-[999_1_480px] flex-col">
-        <ProfileIconPicker
-          value={value}
-          onChange={setValue}
-          defaultText="W"
-          chooseFile={async () => '/Users/me/base.png'}
-        />
-      </div>
+    <div className="flex gap-6 p-6">
+      <ProfileIconPicker
+        value={value}
+        onChange={setValue}
+        defaultText="W"
+        chooseFile={props.chooseFile ?? (async () => '/Users/me/base.png')}
+      />
       <ProfileIconPreview value={value} preview={fixturePreview} />
     </div>
   )
@@ -25,7 +26,7 @@ function EditIcon(props: { first: AppProfileIconSource }): React.JSX.Element {
 
 export const badgeOnBuiltInBase = defineFixture({
   interact: waitForPreview,
-  width: 980,
+  width: 752,
   render: () => (
     <EditIcon
       first={{ kind: 'badge', text: 'W', style: 'sticker', color: '#2563eb', base: 'blue' }}
@@ -35,13 +36,13 @@ export const badgeOnBuiltInBase = defineFixture({
 
 export const noBadge = defineFixture({
   interact: waitForPreview,
-  width: 980,
+  width: 752,
   render: () => <EditIcon first={{ kind: 'none', base: 'watercolor' }} />
 })
 
 export const badgeOnUpload = defineFixture({
   interact: waitForPreview,
-  width: 980,
+  width: 752,
   render: () => (
     <EditIcon
       first={{
@@ -50,6 +51,21 @@ export const badgeOnUpload = defineFixture({
         style: 'ref-match',
         base: '/Users/me/base.png'
       }}
+    />
+  )
+})
+
+// Upstream's custom icon import refuses an upload that is not square.
+export const uploadNotSquare = defineFixture({
+  interact: async (frame) => {
+    ;[...frame.querySelectorAll('button')].find((b) => b.textContent === 'Upload…')?.click()
+    await waitForPreview()
+  },
+  width: 752,
+  render: () => (
+    <EditIcon
+      first={{ kind: 'badge', text: 'W', style: 'sticker', base: 'classic' }}
+      chooseFile={async () => ({ code: 'notSquare' })}
     />
   )
 })

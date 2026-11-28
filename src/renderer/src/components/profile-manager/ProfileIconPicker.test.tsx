@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
 import {
   editIcon,
+  ICON_PICKER_SIZE,
   iconBaseOf,
   iconChoiceReady,
   ProfileIconPicker,
@@ -135,5 +136,29 @@ describe('ProfileIconPicker', () => {
     await waitFor(() => expect(chooseFile).toHaveBeenCalledTimes(1))
     expect(last).toEqual({ kind: 'file', path: '/Users/me/old.png' })
     expect(checked('Upload…')).toBe('true')
+  })
+
+  it('shows why upstream\'s import refused an upload, and keeps the choice', async () => {
+    render(<Chooser first={{ kind: 'none', base: 'blue' }} />)
+    chooseFile.mockResolvedValue({ code: 'notSquare' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Upload…' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('App icons must be square.')
+    expect(last).toEqual({ kind: 'none', base: 'blue' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Classic' }))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('keeps one size for every base, badge kind and style', () => {
+    render(<Chooser first={{ kind: 'none', base: 'blue' }} />)
+    const picker = screen.getByRole('group', { name: 'Base icon' }).closest('.overflow-y-auto')!
+    const preview = screen.getByRole('complementary', { name: 'Preview' })
+    const sizes = (): string[] => [picker.className, preview.className]
+    const first = sizes()
+    expect(first[0]).toContain(ICON_PICKER_SIZE)
+    expect(first[1]).toMatch(/\bw-\[\d+px\] shrink-0\b/)
+    for (const name of ['Badge character', 'Badge image', 'Watercolor', 'No badge']) {
+      fireEvent.click(screen.getByRole('radio', { name }))
+      expect(sizes()).toEqual(first)
+    }
   })
 })
