@@ -932,7 +932,6 @@ folder in that profile's terminals.
 | `KIRO_HOME` | `agents/kiro` | Kiro agents, prompts, skills, settings, sessions |
 | `OPENCLAW_STATE_DIR` | `agents/openclaw` | OpenClaw config, credentials, sessions, logs |
 | `MIMOCODE_HOME` | `agents/mimocode` | MiMo Code config, data, state, cache |
-| `GEMINI_CLI_HOME` | `agents/gemini` (Gemini makes `.gemini` in it) | Gemini CLI user config and storage |
 | `QWEN_HOME` | `agents/qwen` | Qwen Code global config and runtime data |
 | `QODER_CONFIG_DIR` | `agents/qoder` | Qoder CLI user config |
 | `CODEBUDDY_CONFIG_DIR` | `agents/codebuddy` | CodeBuddy config, history, runtime data |
@@ -946,8 +945,7 @@ of these folders appears outside the helpers, unless the line reads the folder's
 It also flags a home held in a name (`join(home, '.codex')`) and `app.getPath('home')`. Its
 allow-list names each exception and its reason (WSL guest and other hosts' homes, Antigravity,
 test harnesses, binary folders, `orcad`'s data folder, the frozen hook command forms). Skill
-discovery, skill install roots (Gemini through `GEMINI_CLI_HOME`, CodeBuddy through
-`CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi, Qwen) take the
+discovery, skill install roots (CodeBuddy through `CODEBUDDY_CONFIG_DIR`) and the workspace trust writers (Codex, Copilot, Qoder, Kimi, Qwen) take the
 launch's variable, else the profile's folder.
 
 The Keychain item is per profile: the profile start sets the name `orca-<id>` before ready, so

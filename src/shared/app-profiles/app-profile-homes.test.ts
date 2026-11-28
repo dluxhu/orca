@@ -84,9 +84,6 @@ describe('app profile homes', () => {
       )
     ]
     expect(paths.filter((path) => !underProfile(path))).toEqual([])
-    expect(defaultAgentHomeDir('GEMINI_CLI_HOME', '.gemini')).toBe(
-      join(work, 'orca-home', 'agents', 'gemini', '.gemini')
-    )
     // Another host's home keeps its own folders.
     expect(orcaHomeDir('/remote/home')).toBe('/remote/home/.orca')
     expect(agentHomeDirIn('/remote/home', 'CODEX_HOME', '.codex')).toBe('/remote/home/.codex')
@@ -144,11 +141,6 @@ describe('app profile homes', () => {
       )
     ]
     expect(paths.filter((path) => !underProfile(path))).toEqual([])
-    const { formerSkillRootPaths } =
-      await import('../../main/skills/bundled-skill-install/former-skill-roots')
-    expect(formerSkillRootPaths({ scope: 'global', homeDirectory: homedir() })).toEqual([
-      join(work, 'orca-home', 'agents', 'gemini', '.gemini', 'skills')
-    ])
   })
 
   it('write workspace trust into the profile folders, not the user home', async () => {
