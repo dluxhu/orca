@@ -342,6 +342,21 @@ describe('ProfileManager', () => {
     expect(showInFinder).toHaveBeenCalledWith('work')
   })
 
+  it('offers "Copy settings" only in an app that has settings, not in the Profile Manager app', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    expect(screen.getByLabelText('Copy settings from this app')).toBeTruthy()
+    cleanup()
+    appState = { ...appState, currentId: null }
+    render(<ProfileManager />)
+    // The state is loaded before the form opens.
+    expect(await screen.findByText('Running in background')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    expect(screen.queryByLabelText('Copy settings from this app')).toBeNull()
+    expect(screen.queryByText('Default · this app')).toBeNull()
+    expect(screen.getByText('Default')).toBeTruthy()
+  })
+
   it('starts and stops the background service of a profile whose app does not run', async () => {
     appState.rows[1] = { ...appState.rows[1], serviceRuns: true }
     render(<ProfileManager />)

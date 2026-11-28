@@ -459,8 +459,19 @@ Simulator and Instruments inside its own bundle. It is not part of Settings.
   updates with the default app.
 - **Shape:** its own `Info.plist` (bundle id `<default appId>.profile-manager`,
   `OrcaAppRole = profile-manager`, `CFBundleURLTypes` for `orca:`), its own icon, its own copy of the
-  main executable and of the four Electron helper apps (the helper rule of section 1). Its
-  `Frameworks/*.framework` and `Resources/*` entries are relative links to the outer bundle.
+  main executable and of the four Electron helper apps (the helper rule of section 1), and a copy of
+  `Electron Framework.framework` (a linked framework stops every child process, section 12, U4).
+  Its `CFBundleName` and display name are "<outer CFBundleName> Profile Manager" ("Orca @dLux
+  Profile Manager" in the fork): macOS shows `CFBundleName` in bold in the menu bar. Electron finds
+  its helpers as `Frameworks/<CFBundleName> Helper*.app`, so the helper copies carry that name, in
+  the folder, the executable and the `Info.plist`; the release identity signs them in afterPack.
+  The About, Hide and Quit items of its app menu use that display name too
+  (`profileManagerAppMenu`). `app.setName` keeps "Orca Profile Manager": it selects the Keychain
+  item, so a change would make a new item and a prompt.
+  The other `Frameworks/*.framework` entries and all `Resources/*` entries are relative links to the
+  outer bundle. The framework copy costs 289 MB on disk and about 119 MB in the zip and the dmg
+  (about +40 %). Idea, not tried: link the framework and start the nested helpers with
+  `--browser-subprocess-path`.
   Measured: checked alone, the nested app fails `codesign --verify --strict` (its links point out of
   the nested bundle), and the outer app passes `codesign --verify --deep --strict` (the links stay
   inside the outer bundle). Slice 3 also checks Gatekeeper on a quarantined download of the whole
@@ -1003,15 +1014,33 @@ server and open" dialog; terminals over a profile restart; the browser, computer
 
 ## 13. Slice 3 status
 
-Done on `dlux/profile-manager`:
+Done on `dlux/profile-manager` and `dlux/profile-manager-app`:
 
 - CLI: `orca profiles create <name> [--id] [--port] [--settings-file]`, `rename <id> --name`,
   `set-port <id> --port`, `remove <id> [--keep-data]`, `list [--json]`, `manager`. Recreate with
   the same id adopts kept data.
-- The Profile Manager window, in each Orca app (Profiles > Profile Manager…, or `orca profiles
-  manager`): the list with the three states and "Open" (default app too), New profile (name, id,
-  port, "Copy settings from this app"), Edit (name, port, Start at login), Remove with "Keep data".
-  Changes run the app's own `orca profiles … --json`.
+- The nested `Orca Profile Manager.app` (section 4). `afterPack` in
+  `config/electron-builder.config.cjs` makes it with
+  `config/scripts/desktop-distribution/macos/macos-profile-manager-app.cjs`, after all other
+  resources: the `Info.plist` changes (no `CFBundleURLTypes`, no `CFBundleDocumentTypes` yet), a copy
+  of the main executable with its own UUID, copies of the helper apps and of the Electron framework,
+  and the relative links. It signs the copies (`--deep`) and then the nested bundle with the release
+  identity. electron-builder does not sign the nested app again (`signIgnore`), so its walk does not
+  follow the links into the outer bundle.
+- Profile Manager mode (`src/main/app-profiles/profile-manager-app.ts`): in the nested app, before
+  the app's preflight, the main process takes the userData `Orca Profiles/.manager`, the name
+  "Orca Profile Manager" and Electron's single-instance lock. It shows only the Profile Manager
+  window and a menu bar with the app, Edit, Profiles and Window menus. It quits when the window
+  closes. It starts no main window, runtime, agents, serve or updater, and takes no profile lock.
+- "Profiles > Profile Manager…" in every app and `orca profiles manager` run `open -a <nested app>`.
+  `open` starts one instance and brings it to the front after that. A build without the nested app
+  (a dev run, `pnpm dev`) shows the Profile Manager window of the app, as before. In the Manager app,
+  "Profile Manager…" shows its own window.
+- The Profile Manager (list, New profile, Edit, Remove): the list with the three states and
+  "Open" (default app too), New profile (name, id, port, "Copy settings from this app"), Edit (name,
+  port, Start at login), Remove with "Keep data". Changes run the
+  app's own `orca profiles … --json`. In the Manager app, that `orca` finds the default app through
+  the links, and no row is "this app".
 - The top-level Profiles menu: each app with its state, a check mark on the current app, and
   "Profile Manager…". It follows `profiles.json` and app activation.
 - The copied settings apply once at the first start of the new profile.
@@ -1026,11 +1055,23 @@ Done on `dlux/profile-manager`:
 
 Changes from this design:
 
-- The Profile Manager is a window of each Orca app, not the nested `Orca Profile Manager.app`. The
-  nested app needs the release signing step and the U8 and Gatekeeper checks. "Copy settings
-  from:" copies only from the app that shows the window.
+- The Manager app has a copy of the Electron framework, not a link (section 4): +289 MB on disk,
+  about +119 MB in the zip and the dmg.
+- "Copy settings from:" is not in the Manager app: it has no settings of its own. The fallback
+  window copies from the app that shows it. A dropdown needs a reader of another app's settings.
+- The Manager app has the default app's icon, and the menu bar shows the default app's
+  `CFBundleName` (the helper apps are found by that name).
+- The Manager app does not claim `orca:` yet (slice 6).
 - Remove refuses while the profile runs. It does not ask the profile to quit.
 - Ids use `-`, not `_` (section 9).
 
-Not done yet: the nested app and U8, the icon picker (slice 4 supplies the icons), the `orca:`
+Checked: unit tests for the nested layout, Profile Manager mode, the menu item and the CLI. A
+release build (`--mac dir --arm64`, Developer ID signature, 2026-11-23): the nested app has its own
+bundle id and `OrcaAppRole`, no `orca:` claim, a real framework copy, and every link resolves inside
+the outer app. The outer app passes `codesign --verify --deep --strict`. The nested app passes
+`codesign --verify` and has the release team id. The nested executable, run as Node, finds the outer
+app as the default app. Sizes: outer app 980 MB, nested app 277 MB. Not checked: the nested app's window and menu in a GUI run, U8 (Launch Services
+and `orca:`), Gatekeeper on a quarantined download of the zip or dmg.
+
+Not done yet: U8, the icon picker (slice 4 supplies the icons), the `orca:`
 section (slice 6), the update rule ("Restart all Orca apps to update").

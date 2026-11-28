@@ -20,6 +20,7 @@ import {
   appProfilesAppsDir,
   appProfilesRoot,
   ensureAppProfileMarker,
+  isProfileManagerBundle,
   readAppProfileMarker,
   readAppProfileRegistry,
   readPlistString,
@@ -200,12 +201,16 @@ function keptDataFolderId(
 }
 
 /**
- * A profile's `orca` runs in the profile app; its app.asar.unpacked link points into the default
- * app. Not the app.asar link: Electron 45 reads no asar archive through a link (EINVAL).
+ * A profile's `orca` runs in the profile app, and the Profile Manager's in the Manager app. Their
+ * app.asar.unpacked link points into the default app. Not the app.asar: Electron 45 reads no asar
+ * archive through a link (EINVAL), so that one is a copy in the Manager.
  */
 export function defaultAppOf(appPath: string): string {
   const plist = readFileSync(join(appPath, 'Contents', 'Info.plist'), 'utf8')
-  if (readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null) {
+  if (
+    readPlistString(plist, APP_PROFILE_PLIST_ID_KEY) === null &&
+    !isProfileManagerBundle(plist, appPath)
+  ) {
     return appPath
   }
   return resolve(

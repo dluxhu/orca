@@ -20,6 +20,10 @@ const {
   verifyMacTerminalHost
 } = require('./scripts/macos/terminal-host-bundle/macos-terminal-host-bundle.cjs')
 const {
+  buildMacProfileManagerApp,
+  macProfileManagerSignIgnore
+} = require('./scripts/desktop-distribution/macos/macos-profile-manager-app.cjs')
+const {
   assertPackagedNativeVariantsInstalled,
   assertProcessHostOutputBuilt,
   createPackagedRuntimeNodeModuleResources,
@@ -628,6 +632,18 @@ module.exports = {
         context.packager
       )
       await packageMacTerminalHost(join(resourcesDir, '..', '..'), context)
+      // Fork patch: last, so that its links cover every resource.
+      const entitlements = resolve(__dirname, '../resources/build/entitlements.mac.plist')
+      const sign = (path, options) =>
+        signMacStandaloneHelper(path, 'Profile Manager', context.packager, entitlements, options)
+      await buildMacProfileManagerApp({
+        appPath: join(resourcesDir, '..', '..'),
+        appId: context.packager.appInfo.id,
+        executable: context.packager.appInfo.productFilename,
+        signCode: (path) => sign(path, { deep: true }),
+        // Its links point out of the nested bundle, so only the outer app passes --strict.
+        signBundle: (path) => sign(path, { verifyStrict: false })
+      })
     }
   },
   win: {
@@ -713,7 +729,8 @@ module.exports = {
       ...orcadTemplateMacSignIgnore,
       // afterPack signs it before the orcad template hashes it.
       '/Contents/Resources/agent-browser-darwin-[^/]+$',
-      ...macTerminalHostSignIgnore
+      ...macTerminalHostSignIgnore,
+      ...macProfileManagerSignIgnore
     ],
     extendInfo: macUsageDescriptions,
     // Local macOS builds need no release credentials; hardening/notarization stay on explicit release paths.
@@ -972,7 +989,13 @@ async function packageMacTerminalHost(appPath, context) {
   })
 }
 
-async function signMacStandaloneHelper(helperPath, helperName, packager, entitlements) {
+async function signMacStandaloneHelper(
+  helperPath,
+  helperName,
+  packager,
+  entitlements,
+  { deep = false, verifyStrict = true } = {}
+) {
   if (!existsSync(helperPath)) {
     if (isMacRelease) {
       throw new Error(`Missing ${helperName} helper at ${helperPath}`)
@@ -991,7 +1014,7 @@ async function signMacStandaloneHelper(helperPath, helperName, packager, entitle
     throw new Error(`Missing signing identity for ${helperName} helper`)
   }
   // Why: nested executables must be signed before the outer app bundle is sealed.
-  const args = ['--force', '--sign', identity]
+  const args = ['--force', ...(deep ? ['--deep'] : []), '--sign', identity]
   if (isMacRelease) {
     args.push('--options', 'runtime', '--timestamp')
   }
@@ -1000,7 +1023,9 @@ async function signMacStandaloneHelper(helperPath, helperName, packager, entitle
   }
   args.push(helperPath)
   execFileSync('codesign', args, { stdio: 'inherit' })
-  execFileSync('codesign', ['--verify', '--strict', helperPath], { stdio: 'inherit' })
+  execFileSync('codesign', ['--verify', ...(verifyStrict ? ['--strict'] : []), helperPath], {
+    stdio: 'inherit'
+  })
 }
 
 function codesignArgs(identity, targetPath) {

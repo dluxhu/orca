@@ -339,6 +339,54 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
   })
 })
 
+describe.skipIf(process.platform !== 'darwin')(
+  'createAppProfile from the Profile Manager app',
+  () => {
+    it("takes the default app through the Manager app's relative links", () => {
+      // The release layout: <default app>/Contents/Applications/<Manager>.app, links to ../../../../.
+      const manager = join(app, 'Contents', 'Applications', 'Orca Profile Manager.app')
+      const contents = join(manager, 'Contents')
+      file(
+        join(contents, 'Info.plist'),
+        DEFAULT_PLIST.replace(
+          'com.stablyai.orca.dlux</string>',
+          'com.stablyai.orca.dlux.profile-manager</string>\n  <key>OrcaAppRole</key><string>profile-manager</string>'
+        )
+      )
+      mkdirSync(join(contents, 'Resources'), { recursive: true })
+      // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+      writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
+      symlinkSync(
+        join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+        join(contents, 'Resources', 'app.asar.unpacked')
+      )
+      const work = createAppProfile({ name: 'Work', defaultAppPath: manager, env: env(), run })
+      expect(work.bundleId).toBe('com.stablyai.orca.dlux.profile.work')
+      expect(readlinkSync(join(work.appPath, 'Contents', 'Resources', 'app.asar.unpacked'))).toBe(
+        join(realpathSync(app), 'Contents', 'Resources', 'app.asar.unpacked')
+      )
+    })
+  }
+)
+
+describe.skipIf(process.platform !== 'darwin')('defaultAppOf', () => {
+  it('takes the outer app for a Manager app at the nested place without its role', () => {
+    const manager = join(app, 'Contents', 'Applications', 'Orca Profile Manager.app')
+    const contents = join(manager, 'Contents')
+    // The default plist: no OrcaAppRole, as after a plist miss.
+    file(join(contents, 'Info.plist'), DEFAULT_PLIST)
+    mkdirSync(join(contents, 'Resources'), { recursive: true })
+    // The Manager's app.asar is a copy (Electron 45 reads no asar through a link).
+    writeFileSync(join(contents, 'Resources', 'app.asar'), 'asar copy')
+    symlinkSync(
+      join('..', '..', '..', '..', 'Resources', 'app.asar.unpacked'),
+      join(contents, 'Resources', 'app.asar.unpacked')
+    )
+    expect(defaultAppOf(manager)).toBe(realpathSync(app))
+    expect(defaultAppOf(app)).toBe(app)
+  })
+})
+
 describe.skipIf(process.platform !== 'darwin')('createAppProfile with --id and settings', () => {
   it('uses the given id for the data folder and the bundle id, and seeds the settings', () => {
     const settings = join(dir, 'settings.json')
