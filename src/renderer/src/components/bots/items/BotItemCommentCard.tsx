@@ -4,7 +4,7 @@
 // While the item waits on it, the asking comment stands out, shown whole: a Needs you tag by its time
 // and its question ruled off from the body. Answered, it reads as any other comment, but stays whole
 // until the item is closed, so answering never folds what was just read.
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { CornerDownRight } from 'lucide-react'
 import { useTranslate } from '@/i18n/use-translate'
 import { cn } from '@/lib/class-names'
@@ -124,7 +124,7 @@ export function BotItemCommentCard({
   // The owner's words show as chat shows a sent message: quotes and mentions as the box's chips, the
   // mentions' routing notes (for the agent) left out.
   const owner = event.actor.kind === 'owner'
-  const sent = useMemo(() => (owner ? splitAgentReferenceNotes(words) : null), [owner, words])
+  const sent = owner ? splitAgentReferenceNotes(words) : null
   const shown = sent ? plainNativeChatAgentMentions(sent.body, sent.mentions) : words
   const markdown = (text: string): React.JSX.Element => (
     <BotItemMarkdown text={text} quoteChips={owner} agentMentions={sent?.mentions} />

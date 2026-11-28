@@ -280,13 +280,14 @@ export function BotItemActivityList({
     (eventId: string) => revealBotItemComment(list.current, eventId, 'focus'),
     []
   )
+  const quoteSource = botItemActivityQuoteSource(bot, item.uid)
   // The rail runs through the event glyphs; each glyph and card sits on the panel fill over it.
   return (
-    <BotItemActivityChips bot={bot} itemUid={item.uid} list={list}>
+    <BotItemActivityChips bot={bot} quoteSource={quoteSource}>
       <div
         ref={list}
         // Comments and events quote into the item's comment box, as replies do into chat's composer.
-        {...nativeChatQuoteSourceProps(botItemActivityQuoteSource(bot, item.uid))}
+        {...nativeChatQuoteSourceProps(quoteSource)}
         className="relative flex flex-col before:absolute before:inset-y-2.5 before:left-[9.5px] before:w-px before:bg-foreground/12"
       >
         {entries.map((entry) => {
