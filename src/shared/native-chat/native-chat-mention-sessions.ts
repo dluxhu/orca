@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { lazyZodSchema } from '../schema/lazy-zod-schema'
 import { structuredAgentSessionTabId } from '../agent-session/view/structured-agent-session-projection'
 import {
   formatOrcaSessionAddress,
@@ -9,12 +10,14 @@ import type { AgentReferenceKind } from '../orchestration/mailbox/orchestration-
 /** Lists the chats and terminals that the agent of a chat can reach: its own host and its saved environments. */
 export const NATIVE_CHAT_MENTION_SESSIONS_METHOD = 'nativeChat.mentionSessions'
 
-export const NativeChatMentionSessionsParams = z.object({
-  /** The asking chat, left out of the list. */
-  sessionId: z.string().optional(),
-  /** The asking terminal, left out of the list. */
-  ptyId: z.string().nullable().optional()
-})
+export const NativeChatMentionSessionsParams = lazyZodSchema(() =>
+  z.object({
+    /** The asking chat, left out of the list. */
+    sessionId: z.string().optional(),
+    /** The asking terminal, left out of the list. */
+    ptyId: z.string().nullable().optional()
+  })
+)
 
 export type NativeChatMentionSessionRow = {
   kind: AgentReferenceKind
@@ -32,37 +35,41 @@ export type NativeChatMentionSessionsResult = { sessions: NativeChatMentionSessi
 const CHAT_TAB_PREFIX = structuredAgentSessionTabId('')
 
 // Only the fields the list reads. A remote host's answer is checked before use.
-const MentionPs = z.object({
-  worktrees: z.array(
-    z.object({
-      displayName: z.string(),
-      agents: z.array(
-        z.object({
-          paneKey: z.string(),
-          parentPaneKey: z.string().nullable(),
-          conversationName: z.string().nullish(),
-          displayName: z.string().nullish(),
-          taskTitle: z.string().nullish()
-        })
-      )
-    })
-  )
-})
+const MentionPs = lazyZodSchema(() =>
+  z.object({
+    worktrees: z.array(
+      z.object({
+        displayName: z.string(),
+        agents: z.array(
+          z.object({
+            paneKey: z.string(),
+            parentPaneKey: z.string().nullable(),
+            conversationName: z.string().nullish(),
+            displayName: z.string().nullish(),
+            taskTitle: z.string().nullish()
+          })
+        )
+      })
+    )
+  })
+)
 
-const MentionTerminals = z.object({
-  terminals: z.array(
-    z.object({
-      handle: z.string(),
-      ptyId: z.string().nullish(),
-      tabId: z.string().nullish(),
-      leafId: z.string().nullish(),
-      branch: z.string(),
-      title: z.string().nullish(),
-      paneTitle: z.string().nullish(),
-      orphaned: z.boolean().nullish()
-    })
-  )
-})
+const MentionTerminals = lazyZodSchema(() =>
+  z.object({
+    terminals: z.array(
+      z.object({
+        handle: z.string(),
+        ptyId: z.string().nullish(),
+        tabId: z.string().nullish(),
+        leafId: z.string().nullish(),
+        branch: z.string(),
+        title: z.string().nullish(),
+        paneTitle: z.string().nullish(),
+        orphaned: z.boolean().nullish()
+      })
+    )
+  })
+)
 
 /** The chats and terminals of one host, from its `worktree.ps` and `terminal.list` results; `self` is left out.
  * A missing or malformed list leaves its kind out. */
