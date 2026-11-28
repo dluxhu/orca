@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 const ROOT = join(__dirname, '..', '..', '..')
 // `~/.orca` and the folder of each agent in APP_PROFILE_AGENT_HOME_VARIABLES.
 const AGENT_DIRS =
-  'orca|claude|claude\\.json|codex|grok|copilot|hermes|kimi-code|kiro|openclaw|mimocode|gemini|qwen|qoder|codebuddy|cline'
+  'orca|claude|claude\\.json|codex|grok|copilot|hermes|kimi-code|kiro|openclaw|mimocode|qwen|qoder|codebuddy|cline'
 const RAW_PATTERNS = [
   // join(homedir(), '.claude'), os.homedir() + '.claude.json', over a line break too.
   new RegExp(`homedir\\(\\)[^;]{0,60}?['"\`/]\\.(${AGENT_DIRS})(?![\\w.-])`, 'g'),
@@ -36,7 +36,6 @@ const FOLDER_VARIABLE: Record<string, string> = {
   kiro: 'KIRO_HOME',
   openclaw: 'OPENCLAW_STATE_DIR',
   mimocode: 'MIMOCODE_HOME',
-  gemini: 'GEMINI_CLI_HOME',
   qwen: 'QWEN_HOME',
   qoder: 'QODER_CONFIG_DIR',
   codebuddy: 'CODEBUDDY_CONFIG_DIR',
@@ -76,7 +75,6 @@ const ALLOWED: Allowed[] = [
     file: 'src/main/ai-vault/scanners/opencode/reader-transport/opencode-wsl-runtime-preparation.ts',
     reason: WSL
   },
-  { file: 'src/main/antigravity/native-wsl-credentials.ts', reason: WSL },
   { file: 'src/main/claude-accounts/profiles/wsl/claude-profile-wsl-router.ts', reason: WSL },
   { file: 'src/main/claude-accounts/runtime-auth-service.ts', reason: WSL },
   { file: 'src/main/codex/hooks/installation/codex-wsl-hook-install-plan.ts', reason: WSL },
@@ -140,46 +138,12 @@ const ALLOWED: Allowed[] = [
     reason: WSL
   },
   {
-    file: 'src/main/skills/discovery/skill-discovery-sources.ts',
-    line: 'antigravity-cli',
-    reason: ANTIGRAVITY
-  },
-  {
-    file: 'src/main/agent-launch/trust/agent-trust-presets.ts',
-    line: 'antigravity-cli',
-    reason: ANTIGRAVITY
-  },
-  {
-    file: 'src/main/ai-vault/scanners/antigravity/session-scanner-antigravity-sources.ts',
-    reason: ANTIGRAVITY
-  },
-  {
-    file: 'src/main/antigravity/agy-credential-presence.ts',
-    line: 'antigravity-cli',
-    reason: "read only: a stat of agy's token file; agy has no folder variable"
-  },
-  {
     file: 'src/main/avatar-generation/avatar-image-agent-run.ts',
     line: 'antigravity-cli',
     reason: 'the files of the run that Orca started; agy has no folder variable, so it writes there'
   },
-  {
-    file: 'src/main/skills/discovery/skill-discovery-sources.ts',
-    line: "'.gemini', 'skills'",
-    reason: ANTIGRAVITY
-  },
-  { file: 'src/main/skills/discovery/antigravity-plugin-skill-sources.ts', reason: ANTIGRAVITY },
-  {
-    file: 'src/main/antigravity/agy-login-copy.ts',
-    line: 'antigravity-cli',
-    reason: "agy's own login file, which this copy reads; agy has no folder variable"
-  },
-  { file: 'src/main/antigravity/antigravity-chat-user-skills.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/antigravity-host-acp.ts', reason: ANTIGRAVITY },
-  { file: 'src/main/antigravity/antigravity-transcript-import.ts', reason: ANTIGRAVITY },
   { file: 'src/main/antigravity/hook-service.ts', reason: ANTIGRAVITY },
-  { file: 'src/main/antigravity/native-credential-backend.ts', reason: ANTIGRAVITY },
-  { file: 'src/main/antigravity/native-windows-credentials.ts', reason: ANTIGRAVITY },
   {
     file: 'src/main/codex-accounts/account-management/service-test-harness.ts',
     reason: 'a test harness with its own fake home'
