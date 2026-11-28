@@ -46,7 +46,10 @@ function isEmbeddedGitHubReference(value: string, index: number): boolean {
   return /[A-Za-z0-9_./-]/.test(value[index - 1] ?? '')
 }
 
-function splitGitHubReferenceText(value: string, defaultRepo: GitHubRepoReference): MarkdownNode[] {
+function splitGitHubReferenceText(
+  value: string,
+  defaultRepo: GitHubRepoReference | null
+): MarkdownNode[] {
   const parts: MarkdownNode[] = []
   let cursor = 0
 
@@ -57,10 +60,10 @@ function splitGitHubReferenceText(value: string, defaultRepo: GitHubRepoReferenc
       continue
     }
 
-    const owner = match[1] ?? defaultRepo.owner
-    const repo = match[2] ?? defaultRepo.repo
+    const owner = match[1] ?? defaultRepo?.owner
+    const repo = match[2] ?? defaultRepo?.repo
     const number = match[3]
-    if (!number) {
+    if (!owner || !repo || !number) {
       continue
     }
 
@@ -85,8 +88,12 @@ function splitGitHubReferenceText(value: string, defaultRepo: GitHubRepoReferenc
   return parts
 }
 
-/** Turns `#123` and `owner/repo#123` in an mdast tree's text into issue links, in place. */
-export function linkGitHubReferences(node: MarkdownNode, defaultRepo: GitHubRepoReference): void {
+/** Turns `#123` and `owner/repo#123` in an mdast tree's text into issue links, in place.
+ *  With no `defaultRepo`, a bare `#123` stays text. */
+export function linkGitHubReferences(
+  node: MarkdownNode,
+  defaultRepo: GitHubRepoReference | null
+): void {
   if (!node.children || node.type === 'link' || node.type === 'image') {
     return
   }

@@ -90,13 +90,16 @@ const repoLinkFieldsSchema = z.looseObject({
   upstream: z
     .looseObject({ owner: z.string(), repo: z.string(), host: z.string().optional() })
     .nullish(),
-  issueSourcePreference: z.enum(['upstream', 'origin', 'auto']).optional()
+  issueSourcePreference: z.enum(['upstream', 'origin', 'auto']).optional(),
+  linkBareReferencesInChat: z.boolean().optional()
 })
+
+type GitHubReferenceLinks = { repo: GitHubRepoReference; linkBare: boolean }
 
 async function loadGitHubReferenceRepo(
   client: RpcClient,
   worktreeId: string
-): Promise<GitHubRepoReference | null> {
+): Promise<GitHubReferenceLinks | null> {
   const [slug, repos] = await Promise.all([
     fetchGithubRepoSlug(client, worktreeId),
     nativeChatRepoListRead.request(client).then((reply) => nativeChatRepoListRead.interpret(reply))
@@ -106,7 +109,13 @@ async function loadGitHubReferenceRepo(
   }
   const repoId = getRepoIdFromWorktreeId(worktreeId)
   const repo = repoLinkFieldsSchema.safeParse(repos.value.find((row) => row.id === repoId))
-  return repo.success ? githubReferenceRepo(repo.data, githubRepoIdentityKey(slug.result)) : null
+  if (!repo.success) {
+    return null
+  }
+  const reference = githubReferenceRepo(repo.data, githubRepoIdentityKey(slug.result))
+  return reference
+    ? { repo: reference, linkBare: repo.data.linkBareReferencesInChat !== false }
+    : null
 }
 
 /** One per chat: file-path existence and the repo bare `#123` refs point to. */
@@ -141,10 +150,10 @@ export function useMobileNativeChatMarkdownLinks({
   // Why: answers missed while the host was unreachable stay plain until something asks again.
   useRecheckNativeChatFileLinksWhenSettled(fileLinks, !connected)
 
-  const [github, setGithub] = useState<{ worktreeId: string; repo: GitHubRepoReference } | null>(
-    null
-  )
-  const githubRepo = github?.worktreeId === worktreeId ? github.repo : null
+  const [github, setGithub] = useState<(GitHubReferenceLinks & { worktreeId: string }) | null>(null)
+  const current = github?.worktreeId === worktreeId ? github : null
+  const githubRepo = current?.repo ?? null
+  const linkBareGitHubReferences = current?.linkBare ?? true
   // Folder workspaces have no repo; their bare `#123` stays text, as on desktop.
   const asksGithub =
     enabled && connected && githubRepo === null && !worktreeId.startsWith('folder:')
@@ -155,9 +164,9 @@ export function useMobileNativeChatMarkdownLinks({
     let active = true
     void loadGitHubReferenceRepo(client, worktreeId)
       .catch(() => null)
-      .then((repo) => {
-        if (active && repo) {
-          setGithub({ worktreeId, repo })
+      .then((links) => {
+        if (active && links) {
+          setGithub({ worktreeId, ...links })
         }
       })
     return () => {
@@ -165,5 +174,8 @@ export function useMobileNativeChatMarkdownLinks({
     }
   }, [client, asksGithub, worktreeId])
 
-  return useMemo(() => ({ fileLinks, githubRepo }), [fileLinks, githubRepo])
+  return useMemo(
+    () => ({ fileLinks, githubRepo, linkBareGitHubReferences }),
+    [fileLinks, githubRepo, linkBareGitHubReferences]
+  )
 }

@@ -24328,6 +24328,12 @@
       "deleted": "The profile picked for this project was deleted, so new tabs follow the Browser setting.",
       "saveFailed": "Couldn't save the browser profile. The Orca on this project's host may need an update."
     },
+    "RepositoryChatReferenceLinksSection": {
+      "title": "Link bare #numbers in chat",
+      "description": "In chat, #123 and PR #123 link to this project’s GitHub repository. Turn this off when agents here work across several repositories. owner/repo#123 always links.",
+      "keywordIssue": "issue link",
+      "keywordPullRequest": "pull request"
+    },
     "managed-runtime": {
       "cancelled": "Installation cancelled.",
       "cancelling": "Cancelling…",
