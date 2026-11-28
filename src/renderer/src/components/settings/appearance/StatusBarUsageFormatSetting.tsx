@@ -21,7 +21,7 @@ type StatusBarUsageFormatSettingProps = {
 
 /** The built-in Detailed text as a template: the field starts from it while the setting is empty. */
 export const DEFAULT_USAGE_TEMPLATE =
-  '[{5h} {5h.reset}][[ · ]][{7d} {7d.reset}][[ · ]][{fable} Fable][[ · ]][{30d} {30d.reset}]'
+  '[{5h} {5h.reset}][[ · ]][{7d} {7d.reset}][[ · ]][{fable} Fable][[ · ]][{30d} {30d.reset}][[ · ]][{buckets}]'
 
 /** Fixed sample so the preview reads meaningfully before any provider has reported usage. */
 function sampleLimits(now: number): ProviderRateLimits {
@@ -127,8 +127,16 @@ export function StatusBarUsageFormatSetting({
   // Why a draft: an empty setting means the built-in text, so the field shows that as a template;
   // clearing the field while typing must not snap the default back in.
   const [draft, setDraft] = useState(() => (hasTemplate ? format.template : DEFAULT_USAGE_TEMPLATE))
-  const edit = (template: string): void => {
-    setDraft(template)
+  // Why: a saved value that changes to something other than the field's text came from elsewhere (e.g. sync).
+  const [seen, setSeen] = useState(format.template)
+  if (format.template !== seen) {
+    setSeen(format.template)
+    if (format.template !== draft) {
+      setDraft(hasTemplate ? format.template : DEFAULT_USAGE_TEMPLATE)
+    }
+  }
+  const save = (template: string, shown: string): void => {
+    setDraft(shown)
     onChange({ ...format, template })
   }
   // Why: the sample's reset times are relative to `now`, so a mount-time clock keeps the preview stable.
@@ -151,14 +159,7 @@ export function StatusBarUsageFormatSetting({
         description={entry.description}
         control={
           hasTemplate ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDraft(DEFAULT_USAGE_TEMPLATE)
-                onChange({ ...format, template: '' })
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={() => save('', DEFAULT_USAGE_TEMPLATE)}>
               {t('auto.components.settings.StatusBarUsageFormatSetting.reset', 'Reset')}
             </Button>
           ) : null
@@ -171,7 +172,7 @@ export function StatusBarUsageFormatSetting({
         spellCheck={false}
         variant="code"
         className="h-8"
-        onChange={(event) => edit(event.target.value)}
+        onChange={(event) => save(event.target.value, event.target.value)}
       />
       <div className="space-y-1 text-[11px] text-muted-foreground">
         <div>

@@ -2,6 +2,11 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import type { ProviderRateLimits } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import {
+  buildUsageFormatValues,
+  renderUsageFormatTemplate
+} from '../../status-bar/usage/usage-format-template'
 import { DEFAULT_USAGE_TEMPLATE, StatusBarUsageFormatSetting } from './StatusBarUsageFormatSetting'
 
 vi.mock('../../../store/index', () => ({
@@ -47,4 +52,30 @@ it('keeps a cleared field empty while typing, and Reset brings the default back'
   fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
   expect(onChange).toHaveBeenLastCalledWith({ template: '' })
   expect(field().value).toBe(DEFAULT_USAGE_TEMPLATE)
+})
+
+it('follows a saved template changed elsewhere, such as by sync', () => {
+  const { rerender } = render(
+    <StatusBarUsageFormatSetting format={{ template: '{5h}' }} onChange={() => {}} />
+  )
+  rerender(<StatusBarUsageFormatSetting format={{ template: '{7d}' }} onChange={() => {}} />)
+  expect(field().value).toBe('{7d}')
+  rerender(<StatusBarUsageFormatSetting format={{ template: '' }} onChange={() => {}} />)
+  expect(field().value).toBe(DEFAULT_USAGE_TEMPLATE)
+})
+
+it('shows plan pools in the default template for a pools-only result', () => {
+  const now = Date.UTC(2026, 0, 1)
+  const pool = { usedPercent: 64, windowMinutes: 43200, resetsAt: null, resetDescription: null }
+  const p: ProviderRateLimits = {
+    provider: 'cursor',
+    session: null,
+    weekly: null,
+    buckets: [{ ...pool, name: 'Cursor Models' }],
+    updatedAt: now,
+    error: null,
+    status: 'ok'
+  }
+  const values = buildUsageFormatValues(p, { display: 'used', now, locale: 'en-US' })
+  expect(renderUsageFormatTemplate(DEFAULT_USAGE_TEMPLATE, values)).toBe('Cursor Models 64%')
 })
