@@ -16,7 +16,9 @@ const AGENT_HOME_ENTRIES = [
   '.cursor',
   '.copilot',
   '.gemini',
-  '.qoder'
+  '.qoder',
+  // Fork patch: Grok Build's home.
+  '.grok'
 ]
 // Guard Claude file/temp prefixes beside .claude directory, not only inside it.
 const AGENT_HOME_FILE_PREFIXES = ['.claude.json']
@@ -25,7 +27,20 @@ const INHERITED_STATE_ENV = [
   'ORCA_USER_DATA_PATH',
   'CODEX_HOME',
   'ORCA_CODEX_HOME',
-  'CLAUDE_CONFIG_DIR'
+  'CLAUDE_CONFIG_DIR',
+  // Fork patch: an Orca app profile's terminal exports its own ~/.orca and agent folders.
+  'ORCA_HOME_DIR',
+  'GROK_HOME',
+  'COPILOT_HOME',
+  'HERMES_HOME',
+  'KIMI_CODE_HOME',
+  'KIRO_HOME',
+  'OPENCLAW_STATE_DIR',
+  'MIMOCODE_HOME',
+  'QWEN_HOME',
+  'QODER_CONFIG_DIR',
+  'CODEBUDDY_CONFIG_DIR',
+  'CLINE_DIR'
 ]
 // Why: an Orca terminal points this at the live app's CLI, which a test's child shell would run.
 const INHERITED_LIVE_CLI_ENV = ['ORCA_CODEX_LAUNCH_PREFLIGHT']
@@ -71,6 +86,9 @@ function protectedRoots(): string[] {
   const folders = realHomes().flatMap((home) => [
     ...AGENT_HOME_ENTRIES.map((entry) => join(home, entry)),
     join(home, 'Library', 'Application Support', 'orca'),
+    // Fork patch: the app profiles' data and apps.
+    join(home, 'Library', 'Application Support', 'Orca Profiles'),
+    join(home, 'Applications', 'Orca Profiles'),
     join(home, '.config', 'orca'),
     join(home, 'AppData', 'Roaming', 'orca')
   ])

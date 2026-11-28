@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { defaultAgentHomeDir } from '../../../shared/app-profiles/app-profile-homes'
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { isDefinitiveAbsence } from '../../../shared/errors/definitive-filesystem-absence'
 import { createIntegrationStateFileCache } from '../../credentials/integration-state-file-cache'
@@ -29,11 +29,13 @@ export type CanonicalCodexConfig = {
 
 export class CodexConfigMirror {
   private readonly hostModelProvider = createIntegrationStateFileCache({
-    filePath: () => join(homedir(), '.codex', 'config.toml'),
+    filePath: () => join(defaultAgentHomeDir('CODEX_HOME', '.codex'), 'config.toml'),
     readFromDisk: () => {
       try {
         return readCodexTopLevelModelProvider(
-          this.readHostConfigContents(join(homedir(), '.codex', 'config.toml'))
+          this.readHostConfigContents(
+            join(defaultAgentHomeDir('CODEX_HOME', '.codex'), 'config.toml')
+          )
         )
       } catch (error) {
         if (!isDefinitiveAbsence(error)) {
@@ -235,7 +237,7 @@ export class CodexConfigMirror {
   }
 
   private readHostConfig(): CanonicalCodexConfig | null {
-    const sourceHomePath = join(homedir(), '.codex')
+    const sourceHomePath = defaultAgentHomeDir('CODEX_HOME', '.codex')
     const primaryConfigPath = join(sourceHomePath, 'config.toml')
     if (!existsSync(primaryConfigPath)) {
       return null

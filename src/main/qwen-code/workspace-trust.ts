@@ -6,6 +6,7 @@ import { isPlainObject } from '../agent-hooks/installation/configuration/hooks-j
 import { writeHooksJson } from '../agent-hooks/installation/configuration/hooks-json-write'
 import { readObservedFileSync } from '../filesystem/file-content-observation'
 import { withTrustDirectory } from '../qoder/workspace-trust'
+import { agentHomeDirIn } from '../../shared/app-profiles/app-profile-homes'
 
 /** text is null when the file does not exist. */
 type JsoncObjectFile = { text: string | null; config: Record<string, unknown> }
@@ -38,10 +39,14 @@ export function markQwenWorkspaceTrusted(
   } catch {
     // Missing paths retain their supplied spelling.
   }
-  // Mirrors Qwen 1.0 getConfigHomeDir.
+  // Mirrors Qwen 1.0 getConfigHomeDir; newer Qwen reads QWEN_HOME, which an app profile sets.
   const configDir = env.QWEN_CONFIG_DIR
     ? resolve(env.QWEN_CONFIG_DIR)
-    : join(env.QWEN_CLI_HOME || home, '.qwen')
+    : env.QWEN_CLI_HOME
+      ? join(env.QWEN_CLI_HOME, '.qwen')
+      : env.QWEN_HOME
+        ? resolve(env.QWEN_HOME)
+        : agentHomeDirIn(home, 'QWEN_HOME', '.qwen')
   const settingsPath = join(configDir, 'settings.json')
   const settings = readJsoncObject(settingsPath)
   const updated = settings && withTrustDirectory(settings.config, canonicalPath)

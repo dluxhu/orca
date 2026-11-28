@@ -24,12 +24,17 @@ export function resolveWorkerThreadEntryPath(
 const SHARED_CHUNK_DIR_NAME = 'chunks'
 
 export function currentWorkerEntryLayout(moduleDir: string): WorkerEntryLayout {
+  const appPath = hasAppEnvironment() ? getAppEnvironment().getAppPath() : ''
   return {
     isPackaged: hasAppEnvironment() && getAppEnvironment().isPackaged(),
+    // Fork: a profile app's loader runs the default app's app.asar, so the folder of the app path
+    // holds the workers; in every other app it is process.resourcesPath.
     resourcesPath:
-      'resourcesPath' in process && typeof process.resourcesPath === 'string'
-        ? process.resourcesPath
-        : undefined,
+      basename(appPath) === 'app.asar'
+        ? dirname(appPath)
+        : 'resourcesPath' in process && typeof process.resourcesPath === 'string'
+          ? process.resourcesPath
+          : undefined,
     // Why: a caller bundled into a shared chunk sees `out/main/chunks` as its `__dirname`.
     moduleDir: basename(moduleDir) === SHARED_CHUNK_DIR_NAME ? dirname(moduleDir) : moduleDir
   }

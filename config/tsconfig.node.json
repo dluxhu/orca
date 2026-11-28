@@ -22,6 +22,12 @@
     "../src/cli/runtime/connection/types.ts",
     "../src/cli/runtime/connection/runtime-access-denied.ts",
     "../src/cli/runtime/connection/runtime-pid-liveness.ts",
+    // The main process refreshes app profile bundles with the CLI's code (app-profile-refresh.ts).
+    "../src/cli/app-profiles/app-profile-bundle-refresh.ts",
+    "../src/cli/app-profiles/app-profile-bundle.ts",
+    "../src/cli/app-profiles/app-profile-create.ts",
+    "../src/cli/runtime/serve/updates/mac-app-update-bundle.ts",
+    "../src/cli/runtime/app-launch/packaged-cli-interpreter.ts",
     // The eval stand-in bot-eval-stand-in-contract.test.ts holds to the real runtime, and its imports.
     "../src/cli/bot-automation-eval/bot-automation-eval-host.ts",
     "../src/cli/bot-automation-eval/bot-automation-eval-owner-tools.ts",

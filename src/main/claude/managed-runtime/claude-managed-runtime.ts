@@ -1,7 +1,7 @@
 // Orca's own Claude Code follows the user's Claude update channel; chats prefer the user's own install.
 
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { defaultAgentHomeDir } from '../../../shared/app-profiles/app-profile-homes'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { lazyZodSchema } from '../../../shared/schema/lazy-zod-schema'
@@ -54,7 +54,7 @@ export async function claudeUpdateChannel(
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform
 ): Promise<'latest' | 'stable'> {
-  const configDir = env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+  const configDir = env.CLAUDE_CONFIG_DIR || defaultAgentHomeDir('CLAUDE_CONFIG_DIR', '.claude')
   const files = [join(configDir, 'settings.json'), claudeManagedSettingsFile(env, platform)]
   const channels = await Promise.all(
     files.map(async (path) => {

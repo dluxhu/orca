@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs'
+import { agentHomeDirIn } from '../../../shared/app-profiles/app-profile-homes'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { markQoderWorkspaceTrusted } from '../../qoder/workspace-trust'
 import { markQwenWorkspaceTrusted } from '../../qwen-code/workspace-trust'
 import {
@@ -108,11 +109,16 @@ async function writePreset(
     case 'cursor':
       return markCursorWorkspaceTrusted(storedPath, host.agentHome)
     case 'copilot':
-      return markCopilotFolderTrusted(storedPath, host.agentHome)
+      return markCopilotFolderTrusted(storedPath, host.agentHome, host.agentEnv?.COPILOT_HOME)
     case 'qoder-cn':
       return markQoderWorkspaceTrusted(storedPath, host.agentHome, '.qoder-cn')
     case 'qoder':
-      return markQoderWorkspaceTrusted(storedPath, host.agentHome)
+      return markQoderWorkspaceTrusted(
+        storedPath,
+        host.agentHome,
+        '.qoder',
+        host.agentEnv?.QODER_CONFIG_DIR
+      )
     case 'qwen-code':
       return markQwenWorkspaceTrusted(storedPath, host.agentEnv ?? {}, host.agentHome)
     case 'antigravity':
@@ -120,7 +126,7 @@ async function writePreset(
     case 'kimi':
       return markKimiWorkspaceTrusted(
         storedPath,
-        host.kimiHome || join(host.agentHome, '.kimi-code')
+        host.kimiHome || agentHomeDirIn(host.agentHome, 'KIMI_CODE_HOME', '.kimi-code')
       )
   }
 }

@@ -9470,7 +9470,7 @@
           "05f5c5ab50": "L'agent attend une saisie"
         },
         "OpenAiTranscriptionKeyDialog": {
-          "d246b2bdb3": "Les clés locales d'exécution sont stockées dans ~/.orca via le stockage chiffré d'Electron quand celui-ci est disponible.",
+          "d246b2bdb3": "Les clés locales d'exécution sont stockées dans <path>{{root}}</path> via le stockage chiffré d'Electron quand celui-ci est disponible.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "Clé API configurée",
           "07ed3e512e": "L'audio n'est envoyé à OpenAI que lorsqu'un modèle vocal OpenAI est sélectionné.",
@@ -10086,7 +10086,7 @@
           "25b0004fbf": "Terminal actif",
           "781cb74d22": "S'exécute depuis les volets de terminal.",
           "cb02e00202": "Terminal",
-          "d8c988dab4": "~/.orca/keybindings.json",
+          "d8c988dab4": "{{root}}/keybindings.json",
           "shortcutUnavailable": "Le raccourci n'est plus disponible.",
           "9a3a3ca03d": "Raccourcis clavier"
         },
@@ -27850,7 +27850,7 @@
       "useChatDefaults": "Utiliser les réglages par défaut du chat",
       "chatDefault": "Du chat",
       "agent": "Agent",
-      "folder": "Dossier : {{path}}",
+      "folder": "Dossier : <path>{{path}}</path>",
       "name": "Nom",
       "validation": {
         "addName": "Ajoutez un nom",

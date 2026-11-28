@@ -1,0 +1,204 @@
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile
+} from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import type { ProcessResult, ProcessSpec } from '@orca/process-host/process-spec'
+
+const { runProcessMock, inspectMock, appProfileMock } = vi.hoisted(() => ({
+  runProcessMock: vi.fn<(spec: ProcessSpec) => Promise<ProcessResult>>(),
+  inspectMock: vi.fn(),
+  appProfileMock: vi.fn((): unknown => null)
+}))
+vi.mock('@orca/process-host', () => ({ runProcess: runProcessMock }))
+vi.mock('../daemon-mac-code-identity', () => ({ inspectMacProcessCodeIdentity: inspectMock }))
+vi.mock('../../../../app-profiles/app-profile', () => ({ getAppProfile: appProfileMock }))
+
+import { materializeMacDaemonBundle } from '../macos-daemon-bundle'
+
+const APP_REQUIREMENT = 'identifier "com.stablyai.orca" and anchor apple generic'
+const ok: ProcessResult = { code: 0, signal: null, stdout: '', stderr: '', timedOut: false }
+let root: string
+let source: string
+let helper: string
+let copies: string
+let cdhash: string
+let cloneLeavesPartialTree: boolean
+let verifyCode: number
+let onCopy: (() => Promise<void>) | null
+
+const signal = (): AbortSignal => new AbortController().signal
+const helperExecutable = (): string => join(helper, 'Contents', 'MacOS', 'Orca Agents')
+
+beforeEach(async () => {
+  root = await realpath(await mkdtemp(join(tmpdir(), 'orca-mac-runtime-')))
+  // Model an update that moved the running bundle and replaced its original path.
+  source = join(root, 'com.stablyai.orca.ShipIt.old', 'Orca.app')
+  helper = join(source, 'Contents', 'Helpers', 'Orca Agents.app')
+  copies = join(root, 'profile', 'daemon-host', 'macos')
+  await mkdir(join(source, 'Contents', 'MacOS'), { recursive: true })
+  await mkdir(join(helper, 'Contents', 'MacOS'), { recursive: true })
+  await mkdir(join(helper, 'Contents', 'Resources', 'daemon', 'out', 'main'), { recursive: true })
+  await writeFile(helperExecutable(), 'signed-node')
+  await writeFile(
+    join(helper, 'Contents', 'Resources', 'daemon', 'out', 'main', 'daemon-entry.js'),
+    'daemon-code'
+  )
+  cdhash = 'a'.repeat(40)
+  cloneLeavesPartialTree = false
+  verifyCode = 0
+  onCopy = null
+  inspectMock.mockReset().mockResolvedValue({
+    identity: 'parked',
+    executablePath: join(source, 'Contents', 'MacOS', 'Orca')
+  })
+  runProcessMock.mockReset().mockImplementation(async (spec) => {
+    const args = spec.args ?? []
+    if (spec.program === '/bin/cp') {
+      const [flag, from, destination] = args
+      if (!from || !destination) {
+        throw new Error('No copy source or destination')
+      }
+      if (cloneLeavesPartialTree && flag === '-cR') {
+        await mkdir(destination)
+        await writeFile(join(destination, 'partial'), 'partial-copy')
+        return { ...ok, code: 1 }
+      }
+      await cp(from, destination, { recursive: true })
+      await onCopy?.()
+      return ok
+    }
+    if (args[0] === '-dvvv') {
+      return args[1] === helper
+        ? { ...ok, stderr: `Identifier=x\nCDHash=${cdhash}\n` }
+        : { ...ok, code: 1 }
+    }
+    if (args[0] === '--display') {
+      return args.at(-1) === source
+        ? { ...ok, stderr: `designated => ${APP_REQUIREMENT}\n` }
+        : { ...ok, code: 1 }
+    }
+    if (args[0] === '--verify') {
+      return { ...ok, code: args.includes(`=${APP_REQUIREMENT}`) ? verifyCode : 3 }
+    }
+    throw new Error(`Unexpected ${spec.program} ${args.join(' ')}`)
+  })
+})
+
+afterEach(async () => {
+  appProfileMock.mockReturnValue(null)
+  await rm(root, { recursive: true, force: true })
+})
+
+it('publishes one verified copy per helper build, from the running app rather than its replacement', async () => {
+  const copy = await materializeMacDaemonBundle(copies, signal())
+  await rm(source, { recursive: true })
+  expect(copy.directory).toBe(join(copies, `terminal-host-${cdhash}`))
+  expect(copy.execPath).toBe(
+    join(copy.directory, 'app.noindex', 'Orca Agents.app', 'Contents', 'MacOS', 'Orca Agents')
+  )
+  expect(await readFile(copy.execPath, 'utf8')).toBe('signed-node')
+  expect(await readFile(copy.entryPath, 'utf8')).toBe('daemon-code')
+  expect(await readdir(copies)).toEqual([`terminal-host-${cdhash}`])
+})
+
+it('publishes a new copy beside the old one when the helper build changes', async () => {
+  const first = await materializeMacDaemonBundle(copies, signal())
+  cdhash = 'b'.repeat(40)
+  await writeFile(helperExecutable(), 'next-build')
+  const second = await materializeMacDaemonBundle(copies, signal())
+  expect(second.directory).not.toBe(first.directory)
+  expect(await readFile(second.execPath, 'utf8')).toBe('next-build')
+  expect(await readFile(first.execPath, 'utf8')).toBe('signed-node')
+})
+
+it("rejects a copy that does not satisfy the running app's requirement and publishes nothing", async () => {
+  verifyCode = 3
+  await expect(materializeMacDaemonBundle(copies, signal())).rejects.toThrow(
+    "does not satisfy the app's signature"
+  )
+  expect(await readdir(copies)).toEqual([])
+})
+
+it('keeps the winning copy when a concurrent publisher renames first', async () => {
+  onCopy = async () => {
+    onCopy = null
+    const winner = join(copies, `terminal-host-${cdhash}`, 'app.noindex', 'Orca Agents.app')
+    await cp(helper, winner, { recursive: true })
+    await writeFile(join(winner, 'Contents', 'MacOS', 'Orca Agents'), 'winner')
+  }
+  const copy = await materializeMacDaemonBundle(copies, signal())
+  expect(await readFile(copy.execPath, 'utf8')).toBe('winner')
+  expect(await readdir(copies)).toEqual([`terminal-host-${cdhash}`])
+})
+
+it('stops at the shared deadline and removes the staging copy', async () => {
+  const controller = new AbortController()
+  const signed = runProcessMock.getMockImplementation()
+  runProcessMock.mockImplementation(async (spec) => {
+    if (spec.program === '/bin/cp') {
+      controller.abort()
+    }
+    return controller.signal.aborted ? { ...ok, code: null } : (signed?.(spec) ?? ok)
+  })
+  await expect(materializeMacDaemonBundle(copies, controller.signal)).rejects.toThrow(
+    'Could not copy Orca Agents.app'
+  )
+  expect(await readdir(copies)).toEqual([])
+})
+
+it('copies the app behind a symbolic link rather than retaining a link to the updater path', async () => {
+  const alias = join(root, 'Linked.app')
+  await symlink(source, alias, 'junction')
+  inspectMock.mockResolvedValue({
+    identity: 'resolved',
+    executablePath: join(alias, 'Contents', 'MacOS', 'Orca')
+  })
+  const copy = await materializeMacDaemonBundle(copies, signal())
+  await rm(alias)
+  await rm(source, { recursive: true })
+  expect(await readFile(copy.execPath, 'utf8')).toBe('signed-node')
+})
+
+it("gives a profile app the default app's host, checked against the host's own signature", async () => {
+  // The profile is ad hoc: its designated requirement is its own cdhash. Its app.asar.unpacked
+  // link points into the default app; its app.asar is no link (Electron 45 reads none).
+  const unpacked = join(source, 'Contents', 'Resources', 'app.asar.unpacked')
+  await mkdir(unpacked, { recursive: true })
+  const profile = join(root, 'Profiles', 'Work.app')
+  await mkdir(join(profile, 'Contents', 'Resources'), { recursive: true })
+  await mkdir(join(profile, 'Contents', 'MacOS'), { recursive: true })
+  await writeFile(join(profile, 'Contents', 'Resources', 'app.asar'), 'own asar')
+  await symlink(unpacked, join(profile, 'Contents', 'Resources', 'app.asar.unpacked'))
+  appProfileMock.mockReturnValue({ id: 'work' })
+  inspectMock.mockResolvedValue({
+    identity: 'profile',
+    executablePath: join(profile, 'Contents', 'MacOS', 'Orca')
+  })
+  const hostRequirement = `cdhash H"${cdhash}"`
+  const signed = runProcessMock.getMockImplementation()
+  runProcessMock.mockImplementation(async (spec) => {
+    const args = spec.args ?? []
+    if (args[0] === '--display') {
+      return args.at(-1) === helper
+        ? { ...ok, stderr: `# designated => ${hostRequirement}\n` }
+        : { ...ok, stderr: '# designated => cdhash H"0000"\n' }
+    }
+    if (args[0] === '--verify') {
+      return { ...ok, code: args.includes(`=${hostRequirement}`) ? 0 : 3 }
+    }
+    return signed!(spec)
+  })
+  const copy = await materializeMacDaemonBundle(copies, signal())
+  expect(await readFile(copy.execPath, 'utf8')).toBe('signed-node')
+  expect(copy.directory).toBe(join(copies, `terminal-host-${cdhash}`))
+})
