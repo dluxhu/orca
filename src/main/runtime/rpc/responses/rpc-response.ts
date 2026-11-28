@@ -12,6 +12,7 @@ import {
 import { RecipeWorkspaceRemovalError } from '../../../../shared/remote-runtime/ephemeral-vm-recipes/recipe-host-removal'
 import { formatTerminalStartFailure } from '../../../../shared/terminal/pty/lifecycle/terminal-start-failure'
 // Centralize the runtimeId envelope and error-code contracts that clients use for decisions and display.
+import { passthroughMessage } from './passthrough-message'
 import { AGENT_LAUNCH_SURFACE_UNAVAILABLE_CODE } from '../../../../shared/agent-launch/contracts/agent-launch-surface'
 import {
   agentSessionRefusalReference,
@@ -248,7 +249,7 @@ export function mapRuntimeError(id: string, meta: RpcEnvelopeMeta, error: unknow
     )
   }
   if (RUNTIME_PASSTHROUGH_CODES.has(message)) {
-    return errorResponse(id, meta, message, formatTerminalStartFailure(error) ?? message)
+    return errorResponse(id, meta, message, passthroughMessage(error, message))
   }
   const deferral = parseTerminalSpawnDeferral(message)
   if (deferral) {
