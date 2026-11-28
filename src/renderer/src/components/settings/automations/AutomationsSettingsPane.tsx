@@ -5,13 +5,17 @@ import { SettingsSwitchRow } from '../form-controls/SettingsFormControls'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useAppStore } from '@/store/index'
 import { useTranslate } from '@/i18n/use-translate'
+import type { SettingsHostScope } from '../host-scope/settings-host-scope'
+import { LocalWebhooksSettings } from './LocalWebhooksSettings'
 
 export function AutomationsSettingsPane({
   settings,
-  updateSettings
+  updateSettings,
+  hostScope
 }: {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void>
+  hostScope: SettingsHostScope
 }): React.JSX.Element {
   const t = useTranslate()
   const openAutomationsPage = useAppStore((state) => state.openAutomationsPage)
@@ -33,6 +37,7 @@ export function AutomationsSettingsPane({
           }
         />
       </SettingsGroup>
+      <LocalWebhooksSettings settings={settings} hostScope={hostScope} />
       <SettingsGroup
         title={t('auto.components.settings.automations.howItWorksTitle', 'How Automations work')}
         description={t(
