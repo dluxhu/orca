@@ -11,6 +11,7 @@ import {
   symlinkSync,
   writeFileSync
 } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -155,9 +156,18 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       join(app, 'Contents', 'Frameworks', 'Squirrel.framework')
     )
     expect(isLink(join(contents, 'Resources'))).toBe(false)
-    expect(readlinkSync(join(contents, 'Resources', 'app.asar'))).toBe(
-      join(app, 'Contents', 'Resources', 'app.asar')
+    // No app.asar link (Electron 45 reads no asar through one): the loader runs the real one.
+    expect(existsSync(join(contents, 'Resources', 'app.asar'))).toBe(false)
+    expect(readlinkSync(join(contents, 'Resources', 'app.asar.unpacked'))).toBe(
+      join(app, 'Contents', 'Resources', 'app.asar.unpacked')
     )
+    expect(
+      JSON.parse(readFileSync(join(contents, 'Resources', 'app', 'package.json'), 'utf8'))
+    ).toEqual({
+      name: 'orca',
+      private: true,
+      main: 'boot.js'
+    })
 
     const plist = join(contents, 'Info.plist')
     expect(plistValue(plist, 'CFBundleIdentifier')).toBe(entry.bundleId)
@@ -290,8 +300,8 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
     // A profile's own `orca` passes the profile app as the running app.
     const home = createAppProfile({ name: 'Home', defaultAppPath: work.appPath, env: env(), run })
     expect(home.bundleId).toBe('com.stablyai.orca.dlux.profile.home')
-    expect(readlinkSync(join(home.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(
-      join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
+    expect(readlinkSync(join(home.appPath, 'Contents', 'Resources', 'app.asar.unpacked'))).toBe(
+      join(realpathSync(app), 'Contents', 'Resources', 'app.asar.unpacked')
     )
     for (const entry of [work, home]) {
       const plist = join(entry.appPath, 'Contents', 'Info.plist')
@@ -299,13 +309,33 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
     }
   })
 
-  it('finds the default app through app.asar.unpacked when app.asar is no link', () => {
+  it('finds the default app through app.asar.unpacked: a profile has no app.asar', () => {
     const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
-    // Electron 45 reads no asar archive through a link, so a profile's app.asar can be its own.
-    const asar = join(work.appPath, 'Contents', 'Resources', 'app.asar')
-    rmSync(asar)
-    writeFileSync(asar, 'own asar')
+    expect(existsSync(join(work.appPath, 'Contents', 'Resources', 'app.asar'))).toBe(false)
     expect(defaultAppOf(work.appPath)).toBe(realpathSync(app))
+  })
+
+  it("the loader runs the default app's real app.asar with its version and name", () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
+    // A folder stands in for the archive: plain Node reads it as Electron reads an asar.
+    const asar = join(app, 'Contents', 'Resources', 'app.asar')
+    rmSync(asar)
+    file(join(asar, 'package.json'), '{"name":"orca","version":"9.9.9","main":"./out/main.js"}')
+    file(join(asar, 'out', 'main.js'), 'globalThis.orcaLoaderTest = __filename')
+    const electronApp = { setAppPath: vi.fn(), setVersion: vi.fn(), name: '' }
+    const resources = join(work.appPath, 'Contents', 'Resources')
+    const boot = join(resources, 'app', 'boot.js')
+    const load = createRequire(boot)
+    // oxlint-disable-next-line typescript/no-implied-eval -- the loader is a generated CommonJS file; this runs it with a fake electron.
+    new Function('require', 'process', readFileSync(boot, 'utf8'))(
+      (id: string) => (id === 'electron' ? { app: electronApp } : load(id)),
+      { resourcesPath: resources }
+    )
+    const realAsar = join(realpathSync(app), 'Contents', 'Resources', 'app.asar')
+    expect(electronApp.setAppPath).toHaveBeenCalledWith(realAsar)
+    expect(electronApp.setVersion).toHaveBeenCalledWith('9.9.9')
+    expect(electronApp.name).toBe('orca')
+    expect(Reflect.get(globalThis, 'orcaLoaderTest')).toBe(join(realAsar, 'out', 'main.js'))
   })
 })
 
