@@ -18,5 +18,18 @@ export const getAutomationsSettingsSearchEntries = createLocalizedCatalog(() => 
       ...translateSearchKeyword('auto.components.settings.automations.keywordAgent', 'agent'),
       ...translateSearchKeyword('auto.components.settings.automations.keywordRuns', 'runs')
     ]
+  },
+  {
+    title: translate('components.settings.localWebhooks.title', 'Local webhooks'),
+    description: translate(
+      'components.settings.localWebhooks.searchDescription',
+      'Take webhook calls on a port of this computer, without an Orca account.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('components.settings.localWebhooks.keywordWebhook', 'webhook'),
+      ...translateSearchKeyword('components.settings.localWebhooks.keywordPort', 'port'),
+      ...translateSearchKeyword('components.settings.localWebhooks.keywordProxy', 'proxy'),
+      ...translateSearchKeyword('components.settings.localWebhooks.keywordTailscale', 'tailscale')
+    ]
   }
 ])

@@ -183,7 +183,11 @@ export function renderAutomationsSettingsSection(
       searchEntries={navigation.getSectionSearchEntries('automations')}
     >
       {view.isSectionMounted('automations') ? (
-        <AutomationsSettingsPane settings={model.settings} updateSettings={model.updateSettings} />
+        <AutomationsSettingsPane
+          settings={model.settings}
+          updateSettings={model.updateSettings}
+          hostScope={model.settingsHostScope}
+        />
       ) : null}
     </SettingsSection>
   )
