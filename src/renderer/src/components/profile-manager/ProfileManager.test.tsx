@@ -6,6 +6,7 @@ import type {
   AppProfileRow,
   AppProfilesState
 } from '../../../../shared/app-profiles/app-profile-rules'
+import { ICON_STYLES } from '../../../../shared/icon-badger/badger'
 import { PROFILE_STATE_POLL_MS, ProfileManager } from './ProfileManager'
 
 const row = (id: string, name: string, state: AppProfileRow['state'], port: number) => ({
@@ -23,6 +24,8 @@ const getState = vi.fn()
 const change = vi.fn()
 const open = vi.fn()
 const showInFinder = vi.fn()
+const iconPreview = vi.fn()
+const chooseIconFile = vi.fn()
 let startNew: (() => void) | null = null
 const onStartNew = (callback: () => void) => {
   startNew = callback
@@ -45,9 +48,21 @@ beforeEach(() => {
   change.mockReset().mockResolvedValue({ ok: true, result: {} })
   open.mockReset().mockResolvedValue({ ok: true, result: {} })
   showInFinder.mockReset().mockResolvedValue({ ok: true, result: {} })
+  iconPreview.mockReset().mockResolvedValue({ ok: true, result: { png: 'UE5H' } })
+  chooseIconFile.mockReset().mockResolvedValue('/Users/me/logo.svg')
   Object.defineProperty(window, 'api', {
     configurable: true,
-    value: { appProfiles: { getState, change, open, showInFinder, onStartNew } }
+    value: {
+      appProfiles: {
+        getState,
+        change,
+        open,
+        showInFinder,
+        iconPreview,
+        chooseIconFile,
+        onStartNew
+      }
+    }
   })
 })
 
@@ -70,6 +85,11 @@ const openMore = (name: string): void => {
   })
 }
 
+const editWork = async (): Promise<void> => {
+  await screen.findByText('Orca - Work')
+  fireEvent.click(within(rowOf('Orca - Work')).getByRole('button', { name: 'Edit' }))
+}
+
 /** Clicks "New profile" after the list loads: the dialog defaults need it. */
 const clickNew = async (): Promise<void> => {
   await screen.findByText('Orca - Work')
@@ -85,6 +105,37 @@ describe('ProfileManager', () => {
     expect(button.disabled).toBe(true)
     await act(async () => loaded(appState))
     expect(button.disabled).toBe(false)
+  })
+
+  it("shows each app's own Dock icon from the main process", async () => {
+    appState = { ...appState, icons: { default: 'data:image/png;base64,T1JDQQ==' } }
+    render(<ProfileManager />)
+    await screen.findByText('Orca - Work')
+    expect(rowOf('Orca').querySelector('img')?.getAttribute('src')).toBe(
+      'data:image/png;base64,T1JDQQ=='
+    )
+    // A row without an icon keeps the space, so the names line up.
+    expect(rowOf('Orca - Work').querySelector('img')).toBeNull()
+  })
+
+  it('offers every badge style, and shows the preview on a light and a dark Dock and menu bar', async () => {
+    appState = { ...appState, icons: { default: 'data:image/png;base64,T1JDQQ==' } }
+    iconPreview.mockResolvedValue({ ok: true, result: { png: 'UE5H', menuBarPng: 'TUVOVQ==' } })
+    render(<ProfileManager />)
+    await clickNew()
+    const styles = within(
+      document.querySelector('[aria-labelledby="profile-icon-style"]') as HTMLElement
+    ).getAllByRole('radio')
+    expect(styles).toHaveLength(ICON_STYLES.length)
+    await screen.findByAltText('Preview of the icon')
+    const aside = screen.getByRole('complementary', { name: 'Preview' })
+    expect(aside.querySelectorAll('img[src="data:image/png;base64,UE5H"]')).toHaveLength(2)
+    // No small icon of the default app next to the preview.
+    expect(aside.querySelectorAll('img[src="data:image/png;base64,T1JDQQ=="]')).toHaveLength(0)
+    const templates = aside.querySelectorAll('img[src="data:image/png;base64,TUVOVQ=="]')
+    expect(screen.getByAltText('Preview of the menu-bar icon')).toBe(templates[0])
+    // Black on the light menu bar, white on the dark one.
+    expect([...templates].map((img) => img.classList.contains('invert'))).toEqual([false, true])
   })
 
   it('lists every app with its state; Open opens it', async () => {
@@ -160,10 +211,304 @@ describe('ProfileManager', () => {
         name: 'Orca - Customer',
         id: 'client',
         port: 6864,
-        copySettings: false
+        copySettings: false,
+        // The badge follows the name.
+        icon: { kind: 'badge', text: 'C', color: '#16a34a', style: 'ref-match' }
       })
     )
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('offers the first unused badge when the letter of the name is taken, shows the preview from the main process and creates with it', async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: 'N', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    await clickNew()
+    expect(field('Badge character').value).toBe('2')
+    const preview = (await screen.findByAltText('Preview of the icon')) as HTMLImageElement
+    expect(preview.src).toBe('data:image/png;base64,UE5H')
+    expect(iconPreview).toHaveBeenLastCalledWith(
+      { kind: 'badge', text: '2', color: '#dc2626', style: 'ref-match' },
+      undefined
+    )
+    fireEvent.click(screen.getByRole('radio', { name: 'Page curl, bigger' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Badge image' }))
+    // No image yet: no preview and no create.
+    expect(
+      (screen.getByRole('button', { name: 'Create profile' }) as HTMLButtonElement).disabled
+    ).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a badge image…' }))
+    expect(await screen.findByText('logo.svg')).toBeTruthy()
+    expect(chooseIconFile).toHaveBeenCalledWith('image')
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'create',
+          icon: { kind: 'image', path: '/Users/me/logo.svg', style: 'ref-match-bigger' }
+        })
+      )
+    )
+  })
+
+  it('shows the CLI error of a preview', async () => {
+    iconPreview.mockResolvedValue({
+      ok: false,
+      error: { message: 'A badge has one visible character' }
+    })
+    render(<ProfileManager />)
+    await clickNew()
+    expect((await screen.findByRole('alert')).textContent).toContain('one visible character')
+  })
+
+  it("keeps the row's own badge in an edit: a rename sends no set-icon", async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: 'W', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    expect(field('Badge character').value).toBe('W')
+    type('App name', 'Orca - Job')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
+  })
+
+  it("offers the profile's own badge again in an edit: it is not taken", async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    fireEvent.click(screen.getByRole('radio', { name: 'Badge image' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Badge character' }))
+    expect(field('Badge character').value).toBe('2')
+  })
+
+  it.each([
+    [{ kind: 'image', style: 'ref-match-bigger' }, 'Badge image', 'profile-icon-badge.png'],
+    [{ kind: 'file' }, 'Own icon', 'profile-icon.icns']
+  ] as const)('starts an edit from the saved %o icon', async (icon, mode, file) => {
+    appState.rows[1] = { ...appState.rows[1], icon }
+    render(<ProfileManager />)
+    await editWork()
+    expect(screen.getByRole('radio', { name: mode }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText(file)).toBeTruthy()
+    const path = `/data/work/${file}`
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        icon.kind === 'image'
+          ? { kind: 'image', path, style: 'ref-match-bigger' }
+          : { kind: 'file', path },
+        'work'
+      )
+    )
+    // Work's server runs, so its port is read-only; a rename is the one change.
+    type('App name', 'Orca - Job')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
+  })
+
+  it('sends no set-icon when an edit keeps the icon', async () => {
+    render(<ProfileManager />)
+    await editWork()
+    // Work's server runs, so its port is read-only; a rename is the one change.
+    type('App name', 'Orca - Job')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
+  })
+
+  it('sends a new icon of an edit as set-icon, with the own badge free for the preview', async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    expect(field('Badge character').value).toBe('2')
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: '2', style: 'ref-match' },
+        'work'
+      )
+    )
+    type('Badge character', 'W')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    // A saved icon without a colour gives no color key.
+    expect(change.mock.calls[0][0]).toStrictEqual({
+      kind: 'set-icon',
+      id: 'work',
+      icon: { kind: 'badge', text: 'W', style: 'ref-match' }
+    })
+  })
+
+  it('starts with the colour of the name, and creates with another swatch colour', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    const colors = screen.getByRole('group', { name: 'Character color' })
+    expect(within(colors).getByRole('button', { name: 'Red' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: 'N', style: 'ref-match', color: '#2563eb' },
+        undefined
+      )
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await waitFor(() =>
+      expect(change).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'create',
+          icon: { kind: 'badge', text: 'N', style: 'ref-match', color: '#2563eb' }
+        })
+      )
+    )
+  })
+
+  it('makes the badge of a new profile follow the typed name until the icon changes', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    expect(field('Badge character').value).toBe('N')
+    type('App name', 'Orca - Zeta')
+    expect(field('Badge character').value).toBe('Z')
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: 'Z', color: '#9333ea', style: 'ref-match' },
+        undefined
+      )
+    )
+    type('Badge character', 'Q')
+    type('App name', 'Orca - Beta')
+    expect(field('Badge character').value).toBe('Q')
+  })
+
+  /** Opens the New dialog under fake timers and waits for its first preview. */
+  const newWithFakeTimers = async (): Promise<HTMLElement> => {
+    vi.useFakeTimers()
+    render(<ProfileManager />)
+    await act(async () => {})
+    fireEvent.click(screen.getByRole('button', { name: 'New profile' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
+    expect(iconPreview).toHaveBeenCalledTimes(1)
+    iconPreview.mockClear()
+    return screen.getByRole('group', { name: 'Character color' })
+  }
+  const advance = async (ms: number): Promise<void> => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('makes one preview 300 ms after the last of a quick series of changes', async () => {
+    const colors = await newWithFakeTimers()
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await advance(200)
+    fireEvent.click(within(colors).getByRole('button', { name: 'Green' }))
+    await advance(299)
+    expect(iconPreview).not.toHaveBeenCalled()
+    await advance(1)
+    expect(iconPreview.mock.calls).toEqual([
+      [{ kind: 'badge', text: 'N', style: 'ref-match', color: '#16a34a' }, undefined]
+    ])
+  })
+
+  it('starts no preview for a change inside the delay when Save follows', async () => {
+    change.mockReturnValue(new Promise(() => {}))
+    const colors = await newWithFakeTimers()
+    fireEvent.click(within(colors).getByRole('button', { name: 'Blue' }))
+    await advance(100)
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await advance(1000)
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(iconPreview).not.toHaveBeenCalled()
+  })
+
+  it('keeps the last preview while Save runs', async () => {
+    change.mockReturnValue(new Promise(() => {}))
+    await newWithFakeTimers()
+    fireEvent.click(screen.getByRole('button', { name: 'Create profile' }))
+    await advance(1000)
+    expect(change).toHaveBeenCalledTimes(1)
+    expect(screen.getAllByAltText('Preview of the icon')).toHaveLength(1)
+    expect(iconPreview).not.toHaveBeenCalled()
+  })
+
+  it('never shows a late reply over the preview of a newer choice', async () => {
+    let late: (reply: unknown) => void = () => {}
+    iconPreview
+      .mockReturnValueOnce(new Promise((resolve) => (late = resolve)))
+      .mockResolvedValueOnce({ ok: true, result: { png: 'TkVX' } })
+    render(<ProfileManager />)
+    await clickNew()
+    await waitFor(() => expect(iconPreview).toHaveBeenCalledTimes(1))
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Character color' })).getByRole('button', {
+        name: 'Blue'
+      })
+    )
+    const preview = (await screen.findByAltText('Preview of the icon')) as HTMLImageElement
+    expect(preview.src).toBe('data:image/png;base64,TkVX')
+    await act(async () => late({ ok: true, result: { png: 'T0xE' } }))
+    expect((screen.getByAltText('Preview of the icon') as HTMLImageElement).src).toBe(
+      'data:image/png;base64,TkVX'
+    )
+  })
+
+  it('takes a custom character colour', async () => {
+    render(<ProfileManager />)
+    await clickNew()
+    fireEvent.click(screen.getByRole('button', { name: 'Custom color' }))
+    fireEvent.change(await screen.findByLabelText('Hex'), { target: { value: '#123456' } })
+    expect(
+      screen
+        .getByRole('button', { name: 'Custom color', hidden: true })
+        .getAttribute('aria-pressed')
+    ).toBe('true')
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: 'N', style: 'ref-match', color: '#123456' },
+        undefined
+      )
+    )
+  })
+
+  it('shows the saved character colour in an edit, and sends a new one as set-icon', async () => {
+    appState.rows[1] = {
+      ...appState.rows[1],
+      icon: { kind: 'badge', text: '2', style: 'ref-match', color: '#dc2626' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    const colors = screen.getByRole('group', { name: 'Character color' })
+    expect(within(colors).getByRole('button', { name: 'Red' }).getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: '2', style: 'ref-match', color: '#dc2626' },
+        'work'
+      )
+    )
+    // The default swatch stores no colour: the icon has no color key.
+    fireEvent.click(within(colors).getByRole('button', { name: 'Dark' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
+    expect(change.mock.calls[0][0]).toStrictEqual({
+      kind: 'set-icon',
+      id: 'work',
+      icon: { kind: 'badge', text: '2', style: 'ref-match' }
+    })
   })
 
   it('opens the New dialog when the window starts with #new, after the list loads', async () => {

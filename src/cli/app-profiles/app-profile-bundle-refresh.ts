@@ -23,6 +23,8 @@ import {
   templateKeyOf
 } from './app-profile-bundle'
 import type { RunTool } from './app-profile-create'
+import { setFinderIcon, writeBundleIcon } from './app-profile-bundle-icon'
+import { APP_PROFILE_ICON_FILE } from '../../shared/app-profiles/app-profile-icon-files'
 
 const PRE_REFRESH = '.pre-refresh'
 
@@ -30,6 +32,14 @@ const versionOf = (plist: string): string | null => {
   const short = readPlistString(plist, 'CFBundleShortVersionString')
   const build = readPlistString(plist, 'CFBundleVersion')
   return short === null && build === null ? null : `${short ?? ''} (${build ?? ''})`
+}
+
+function readIcon(path: string): Buffer | null {
+  try {
+    return readFileSync(path)
+  } catch {
+    return null
+  }
 }
 
 function readText(path: string): string | null {
@@ -162,7 +172,7 @@ export function refreshAppProfileBundle(
   // A rename changes only the file name (no new signature); the menu-bar name follows here.
   const changed = !complete || templateKey !== ownKey || menuName !== basename(appPath, '.app')
   if (changed) {
-    rebuild(appPath, defaultApp, id, ownPlist, run)
+    rebuild(appPath, defaultApp, id, ownPlist, run, options.userDataPath)
   }
   if (checkFile) {
     try {
@@ -179,7 +189,8 @@ function rebuild(
   defaultApp: string,
   id: string,
   ownPlist: string,
-  run: RunTool
+  run: RunTool,
+  userDataPath?: string
 ): void {
   // The file name is the profile name: a rename moves only the bundle.
   const name = basename(appPath, '.app')
@@ -187,7 +198,24 @@ function rebuild(
   const staging = mkdtempSync(join(dirname(appPath), `.${id}.refresh-`))
   try {
     const next = join(staging, basename(appPath))
-    buildProfileBundle(defaultApp, next, { id, name, root }, run, staging)
+    // The kept icon of the profile: its file goes in before the seal, the Finder icon after it.
+    const icon = userDataPath ? readIcon(join(userDataPath, APP_PROFILE_ICON_FILE)) : null
+    buildProfileBundle(
+      defaultApp,
+      next,
+      { id, name, root },
+      run,
+      staging,
+      icon ? (contents, plist) => writeBundleIcon(contents, plist, icon) : undefined
+    )
+    if (icon) {
+      // Best effort: the Dock reads the icon file in the seal; the Finder icon is the stopped app's.
+      try {
+        setFinderIcon(next, icon, run)
+      } catch (error) {
+        console.warn('[profiles] cannot set the Finder icon of the refreshed app:', error)
+      }
+    }
     // The live bundle moves to a visible sibling first: staging never holds the only copy.
     const previous = preRefreshPathOf(appPath)
     renameSync(appPath, previous)
