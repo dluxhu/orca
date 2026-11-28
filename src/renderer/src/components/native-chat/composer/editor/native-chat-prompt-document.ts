@@ -97,11 +97,13 @@ export const NativeChatBotMention = Node.create({
   addNodeView: () => ReactNodeViewRenderer(NativeChatBotMentionPill),
   // `chatId`: one of the bot's chats, picked in its list; empty for the bot alone (its Home Chat).
   // `server`: the paired server a bot on another computer runs on; empty for the chat's own host.
+  // `client`: the installation id of the paired computer a bot runs on, in a paired server's chat.
   addAttributes: () => ({
     id: { default: '' },
     name: { default: '' },
     chatId: { default: '' },
-    server: { default: '' }
+    server: { default: '' },
+    client: { default: '' }
   }),
   renderText: ({ node }) => promptLeafString(BOT_MENTION_NODE, node.attrs),
   renderHTML: ({ node }) => [

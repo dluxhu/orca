@@ -28,7 +28,8 @@ export function NativeChatBotMentionPill({
   const id = String(node.attrs.id)
   const chatId = String(node.attrs.chatId ?? '')
   const server = String(node.attrs.server ?? '') || undefined
-  const target = useContext(NativeChatBotMentionTargetContext)(id, server)
+  const client = String(node.attrs.client ?? '') || undefined
+  const target = useContext(NativeChatBotMentionTargetContext)(id, server, client)
   const picker = useContext(NativeChatBotChatPickerContext)
   const chooser = useContext(NativeChatBotChatChooserContext)
   const [hovered, setHovered] = useState(false)
@@ -87,7 +88,8 @@ export function NativeChatBotMentionPill({
     />
   )
   // A chat pill always offers its list; the bot alone only while hovered or selected.
-  const offers = picker !== undefined && state === undefined && !server && picker.offers(id)
+  const offers =
+    picker !== undefined && state === undefined && !server && !client && picker.offers(id)
   // Its place among the draft's bot pills, as the composer counts its tokens.
   const at = (): number | null => {
     const pos = getPos()

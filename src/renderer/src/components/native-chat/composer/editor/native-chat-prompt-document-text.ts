@@ -39,7 +39,11 @@ export function promptLeafString(
   if (type === BOT_MENTION_NODE) {
     const chatId = typeof attrs?.chatId === 'string' && attrs.chatId ? attrs.chatId : undefined
     const server = typeof attrs?.server === 'string' && attrs.server ? attrs.server : undefined
-    return botMentionToken({ id: String(attrs?.id), name: String(attrs?.name) }, chatId, server)
+    const bot = { id: String(attrs?.id), name: String(attrs?.name) }
+    if (typeof attrs?.client === 'string' && attrs.client) {
+      return botClientMentionToken(bot, attrs.client)
+    }
+    return botMentionToken(bot, chatId, server)
   }
   return type === 'hardBreak' ? '\n' : (text ?? String(attrs?.token ?? ''))
 }
@@ -49,18 +53,16 @@ function botMentionContent(text: string): JSONContent[] {
   return splitBotMentions(text).map((part) =>
     typeof part === 'string'
       ? { type: 'text', text: part }
-      : part.client
-        ? // The editor has no pill for a paired computer's bot yet, so its token stays as typed.
-          { type: 'text', text: botClientMentionToken(part, part.client) }
-        : {
-            type: BOT_MENTION_NODE,
-            attrs: {
-              id: part.id,
-              name: part.name,
-              chatId: part.chatId ?? '',
-              server: part.server ?? ''
-            }
+      : {
+          type: BOT_MENTION_NODE,
+          attrs: {
+            id: part.id,
+            name: part.name,
+            chatId: part.chatId ?? '',
+            server: part.server ?? '',
+            client: part.client ?? ''
           }
+        }
   )
 }
 
