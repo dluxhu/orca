@@ -134,8 +134,16 @@ Mac, not changed at most updates) is the same as Chrome's.
   A helper copy inside the profile finds the profile as its main bundle, so the name matches. Its
   `process.resourcesPath` is the profile's `Contents/Resources`, which the links serve.
 - **`Resources`** is a real folder, because the icon must be in it. It holds one link for each
-  top-level entry of the default app's `Resources` (73 entries today: `app.asar`,
-  `app.asar.unpacked`, `bin`, the `.lproj` folders, `orcad-template`, `Orca Computer Use.app`, …).
+  top-level entry of the default app's `Resources` (73 entries today: `app.asar.unpacked`, `bin`,
+  the `.lproj` folders, `orcad-template`, `Orca Computer Use.app`, …), except `app.asar`.
+- **The loader** (since 1.4.280, Electron 45). Electron 45 reads no asar archive through a link
+  (`realpath` and `readlink` of a linked `app.asar` throw EINVAL), so a profile has no `app.asar`.
+  Electron then loads `Resources/app`: a fixed `package.json` and `boot.js`. `boot.js` finds the
+  default app's real `app.asar` next to the real path of the `app.asar.unpacked` link, sets
+  `app.setAppPath`, `app.setVersion` and `app.name` from its `package.json`, as Electron does for an
+  app it loads, and runs its main entry. The two files never change, so the seal stays as below.
+  Code that needs the default app follows the `app.asar.unpacked` link or the app path, never
+  `process.resourcesPath/app.asar`. A refresh rebuilds a bundle that has no loader.
 - **The seal.** The links point to fixed paths, so their targets do not change when the default app
   updates. Measured: `CodeResources` records each file link as its target path, and the cdhash was
   the same after the default bundle was replaced. Slice 1 dumps `CodeResources` after signing and
@@ -150,7 +158,7 @@ Mac, not changed at most updates) is the same as Chrome's.
 | `CFBundleDocumentTypes` | not changed | The default app registers `md`, `markdown`, `mdx`, `csv` and `tsv` as an "Alternate" editor (`config/electron-builder.config.cjs:611-626` (fork)). Each profile shows in "Open With" (owner: "exactly what we want"). |
 | `ElectronAsarIntegrity` | removed | The fuse is off (section 0). The value would be out of date after each update. If upstream turns the fuse on, the plist must carry the hash, and it changes at each update. |
 | `CFBundleName`, `CFBundleExecutable`, usage descriptions, `LSEnvironment`, `NSPrincipalClass` | not changed | Electron finds `<CFBundleName> Helper*.app` from the bundle name. TCC prompts read the usage descriptions of the profile bundle. |
-| `CFBundleShortVersionString` | not changed | It stays the version of creation. Finder shows that version (owner: accepted). `app.getVersion()` reads `package.json` in `app.asar`, which follows the default app. |
+| `CFBundleShortVersionString` | not changed | It stays the version of creation. Finder shows that version (owner: accepted). `app.getVersion()` is the default app's version: the loader sets it from the real `app.asar`. |
 
 The `.app` file name is the name that Finder and the Dock show.
 
