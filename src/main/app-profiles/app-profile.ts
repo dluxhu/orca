@@ -1,6 +1,7 @@
 // Which app profile this process runs. See docs/fork/profiles-design.md, section 1.
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { FORK_IDENTITY } from '../../shared/fork-identity'
 import {
   APP_PROFILE_PLIST_ID_KEY,
@@ -9,6 +10,7 @@ import {
   readAppProfileMarker,
   readPlistString
 } from '../../shared/app-profiles/app-profile-paths'
+import { appProfileIdError } from '../../shared/app-profiles/app-profile-rules'
 
 export type AppProfile = {
   id: string
@@ -22,9 +24,31 @@ export type AppProfile = {
 export type AppProfileInput = {
   /** The XML Info.plist of the running bundle, or null. */
   plist: string | null
+  /** The running bundle. A rename in Finder changes only its file name. */
+  bundlePath?: string
   userDataDirArg: string | null
   defaultRoot: string
   readMarker: (userDataPath: string) => string | null
+  /** The default app's data folder. A profile never takes it. */
+  defaultDataPath?: string
+}
+
+function pathExists(path: string): boolean {
+  try {
+    lstatSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** True when the folder is missing (it is made inside the root) or resolves inside the root. */
+function staysInRoot(path: string, root: string): boolean {
+  try {
+    return realpathSync(path).startsWith(`${realpathSync(root)}${sep}`)
+  } catch {
+    return true
+  }
 }
 
 /** Order: the bundle's own profile id, then the marker in --user-data-dir. */
@@ -32,18 +56,42 @@ export function resolveAppProfile(input: AppProfileInput): AppProfile | null {
   const plistId = input.plist ? readPlistString(input.plist, APP_PROFILE_PLIST_ID_KEY) : null
   if (input.plist && plistId) {
     const root = readPlistString(input.plist, APP_PROFILE_PLIST_ROOT_KEY) ?? input.defaultRoot
+    // Info.plist is plain data: an id such as "../orca" must never point at another app's data.
+    if (appProfileIdError(plistId, []) !== null) {
+      throw new Error(`This app has a profile id that Orca does not accept: "${plistId}".`)
+    }
     const userDataPath = input.userDataDirArg ?? join(root, plistId)
+    // OrcaAppProfilesRoot is plain data too: never the default app's data, never a folder that
+    // is not this profile's. `orca profiles create` writes the marker first.
+    const defaultData =
+      input.defaultDataPath ?? join(homedir(), 'Library', 'Application Support', 'orca')
+    if (
+      input.userDataDirArg === null &&
+      resolve(userDataPath).toLowerCase() === resolve(defaultData).toLowerCase()
+    ) {
+      throw new Error(`The profile "${plistId}" points at the default app's data: ${userDataPath}.`)
+    }
+    if (input.userDataDirArg === null && !staysInRoot(userDataPath, root)) {
+      throw new Error(
+        `The data folder of the profile "${plistId}" is outside ${root}: ${userDataPath}.`
+      )
+    }
     const markerId = input.readMarker(userDataPath)
     // A given folder must carry this profile's marker: a profile app must never take, and mark,
     // the default folder or another profile's folder.
-    if (markerId ? markerId !== plistId : input.userDataDirArg !== null) {
+    if (
+      markerId ? markerId !== plistId : input.userDataDirArg !== null || pathExists(userDataPath)
+    ) {
       throw new Error(
         `This app is the profile "${plistId}", but ${userDataPath} is ${markerId ? `the profile "${markerId}"` : 'not this profile'}.`
       )
     }
     return {
       id: plistId,
-      name: readPlistString(input.plist, 'CFBundleDisplayName') ?? plistId,
+      // The file name: a rename in Finder does not change Info.plist (its signature seals it).
+      name: input.bundlePath
+        ? basename(input.bundlePath, '.app')
+        : (readPlistString(input.plist, 'CFBundleDisplayName') ?? plistId),
       bundleId: readPlistString(input.plist, 'CFBundleIdentifier') ?? FORK_IDENTITY.appId,
       userDataPath
     }
@@ -85,6 +133,7 @@ export function getAppProfile(): AppProfile | null {
       process.platform === 'darwin' && packagedElectron
         ? resolveAppProfile({
             plist: readOwnInfoPlist(),
+            bundlePath: resolve(dirname(process.execPath), '..', '..'),
             userDataDirArg: userDataDirArg(),
             defaultRoot: appProfilesRoot(),
             readMarker: readAppProfileMarker

@@ -28,6 +28,7 @@ export type WindowShortcutAction =
   | { type: 'zoom'; direction: 'in' | 'out' | 'reset' }
   | { type: 'openSettings' }
   | { type: 'forceReload' }
+  | { type: 'openProfileManager' }
   | { type: 'toggleWorktreePalette' }
   | { type: 'toggleFloatingTerminal' }
   | { type: 'toggleLeftSidebar' }
@@ -196,6 +197,10 @@ export function resolveWindowShortcutAction(
     return { type: 'toggleWorktreePalette' }
   }
 
+  if (keybindingMatchesAction('app.profileManager', input, platform, keybindings, options)) {
+    return { type: 'openProfileManager' }
+  }
+
   if (keybindingMatchesAction('sidebar.left.toggle', input, platform, keybindings, options)) {
     return { type: 'toggleLeftSidebar' }
   }
@@ -276,6 +281,8 @@ export function getWindowShortcutActionId(action: WindowShortcutAction): Keybind
       return 'app.settings'
     case 'forceReload':
       return 'app.forceReload'
+    case 'openProfileManager':
+      return 'app.profileManager'
     case 'toggleWorktreePalette':
       return 'worktree.palette'
     case 'toggleFloatingTerminal':

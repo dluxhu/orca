@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import type { RuntimeTransportMetadata } from '../../../../shared/remote-runtime/bootstrap/runtime-bootstrap'
+import type {
+  RuntimeRole,
+  RuntimeTransportMetadata
+} from '../../../../shared/remote-runtime/bootstrap/runtime-bootstrap'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { RpcDispatcher } from '../dispatcher'
 import { ALL_RPC_METHODS } from '../methods/rpc-method-registry'
@@ -57,6 +60,7 @@ export class RuntimeRpcState {
   protected readonly dispatcher: RpcDispatcher
   protected readonly streamingMethods: ReadonlySet<string>
   protected readonly userDataPath: string
+  protected readonly role: RuntimeRole
   protected readonly pid: number
   protected readonly platform: NodeJS.Platform
   protected readonly enableWebSocket: boolean
@@ -136,6 +140,8 @@ export class RuntimeRpcState {
   constructor({
     runtime,
     userDataPath,
+    // An Electron `orca serve` has --serve, as main-process-preflight reads it. orcad passes its role.
+    role = process.argv.includes('--serve') ? 'serve' : 'app',
     pid = process.pid,
     platform = process.platform,
     enableWebSocket = false,
@@ -160,6 +166,7 @@ export class RuntimeRpcState {
         .map((method) => method.name)
     )
     this.userDataPath = userDataPath
+    this.role = role
     this.pid = pid
     this.platform = platform
     this.enableWebSocket = enableWebSocket
