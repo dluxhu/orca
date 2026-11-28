@@ -1,10 +1,21 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
-import { ensureAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
+import {
+  ensureAppProfileMarker,
+  readAppProfileMarker
+} from '../../shared/app-profiles/app-profile-paths'
 import { applyAppProfileHomes } from '../../shared/app-profiles/app-profile-homes'
 
 const plist = (entries: Record<string, string>): string =>
@@ -45,6 +56,99 @@ describe('resolveAppProfile', () => {
       '/test root/work'
     )
     expect(resolveAppProfile({ ...input, userDataDirArg: '/given' })?.userDataPath).toBe('/given')
+  })
+
+  it('keeps the id and folder after a Finder rename, and shows the file name', () => {
+    expect(
+      resolveAppProfile({
+        plist: profilePlist,
+        bundlePath: '/Users/x/Applications/Orca Profiles/Orca - Finder.app',
+        userDataDirArg: null,
+        defaultRoot: '/root',
+        readMarker: () => null
+      })
+    ).toMatchObject({ id: 'work', name: 'Orca - Finder', userDataPath: '/root/work' })
+  })
+
+  it('refuses an id or a data folder that leaves the profiles root', () => {
+    const base = mkdtempSync(join(tmpdir(), 'orca-profile-id-'))
+    try {
+      const root = join(base, 'profiles')
+      mkdirSync(root)
+      mkdirSync(join(base, 'orca'))
+      const resolveId = (id: string) =>
+        resolveAppProfile({
+          plist: plist({ CFBundleIdentifier: 'b', OrcaAppProfileId: id }),
+          userDataDirArg: null,
+          defaultRoot: root,
+          readMarker: readAppProfileMarker
+        })
+      for (const id of ['../orca', '/tmp/x', 'default']) {
+        expect(() => resolveId(id)).toThrow('does not accept')
+      }
+      // A link at <root>/<id> to another folder.
+      symlinkSync(join(base, 'orca'), join(root, 'work'))
+      expect(() => resolveId('work')).toThrow('is outside')
+      expect(existsSync(join(base, 'orca', 'orca-app-profile.json'))).toBe(false)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+
+  it("refuses a plist root that points at the default app's data, or a folder without its marker", () => {
+    const base = mkdtempSync(join(tmpdir(), 'orca-profile-root-'))
+    try {
+      const appSupport = join(base, 'Library', 'Application Support')
+      const defaultData = join(appSupport, 'orca')
+      mkdirSync(defaultData, { recursive: true })
+      writeFileSync(join(defaultData, 'orca-settings.json'), '{}')
+      const resolveWith = (id: string, root: string, defaultDataPath = defaultData) =>
+        resolveAppProfile({
+          plist: plist({
+            CFBundleIdentifier: 'b',
+            OrcaAppProfileId: id,
+            OrcaAppProfilesRoot: root
+          }),
+          userDataDirArg: null,
+          defaultRoot: join(base, 'profiles'),
+          readMarker: readAppProfileMarker,
+          defaultDataPath
+        })
+      expect(() => resolveWith('orca', appSupport)).toThrow("default app's data")
+      // Without the default-data rule, the marker rule still refuses the folder.
+      expect(() => resolveWith('orca', appSupport, join(base, 'elsewhere'))).toThrow(
+        'is not this profile'
+      )
+      expect(existsSync(join(defaultData, 'orca-app-profile.json'))).toBe(false)
+      // A missing folder is fine: the profile app makes it with its marker.
+      expect(resolveWith('work', join(base, 'profiles'))?.userDataPath).toBe(
+        join(base, 'profiles', 'work')
+      )
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a link into a sibling folder whose name starts with the root name', () => {
+    const base = mkdtempSync(join(tmpdir(), 'orca-profile-sibling-'))
+    try {
+      const root = join(base, 'profiles')
+      const sibling = join(base, 'profiles-x', 'work')
+      mkdirSync(root)
+      mkdirSync(sibling, { recursive: true })
+      writeFileSync(join(sibling, 'orca-app-profile.json'), '{"id":"work"}')
+      symlinkSync(sibling, join(root, 'work'))
+      expect(() =>
+        resolveAppProfile({
+          plist: plist({ CFBundleIdentifier: 'b', OrcaAppProfileId: 'work' }),
+          userDataDirArg: null,
+          defaultRoot: root,
+          readMarker: readAppProfileMarker
+        })
+      ).toThrow('is outside')
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
   })
 
   it('stops when the bundle and the marker name different profiles', () => {

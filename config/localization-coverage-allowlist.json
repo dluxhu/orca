@@ -452,5 +452,13 @@
   {
     "filePath": "src/shared/bots/bot-item-ask-advice.ts",
     "reason": "Agent mail for item asks."
+  },
+  {
+    "filePath": "src/renderer/src/components/profile-manager/ProfileManager.tsx",
+    "kind": "jsx-expression",
+    "text": "orca --profile work chat list orca --profile work serve",
+    "dynamic": false,
+    "count": 1,
+    "reason": "Literal orca command lines shown as code; command syntax and the sample profile id are not translated."
   }
 ]

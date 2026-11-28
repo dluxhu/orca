@@ -8,18 +8,14 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  createAppProfile,
-  defaultAppOf,
-  nextAppProfilePort,
-  type RunTool
-} from './app-profile-create'
+import { createAppProfile, defaultAppOf, type RunTool } from './app-profile-create'
 
 const DEFAULT_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -113,7 +109,7 @@ function plistValue(path: string, key: string): string | null {
 
 describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
   it('builds the thin bundle: copied executables and helpers, linked frameworks and resources', () => {
-    const entry = createAppProfile({
+    const { adoptedData, ...entry } = createAppProfile({
       name: 'Orca - Work',
       defaultAppPath: app,
       env: env(),
@@ -121,13 +117,14 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
       now: () => 1,
       pinRoot: true
     })
+    expect(adoptedData).toBe(false)
     const contents = join(entry.appPath, 'Contents')
     expect(entry).toEqual({
-      id: 'orca-work',
+      id: 'work',
       name: 'Orca - Work',
-      bundleId: 'com.stablyai.orca.dlux.profile.orca-work',
+      bundleId: 'com.stablyai.orca.dlux.profile.work',
       appPath: join(dir, 'apps', 'Orca - Work.app'),
-      userDataPath: join(dir, 'data', 'orca-work'),
+      userDataPath: join(dir, 'data', 'work'),
       port: 6800,
       createdAt: 1
     })
@@ -182,7 +179,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
         join(contents, 'Frameworks', `${plistValue(plist, 'CFBundleName')} Helper (Renderer).app`)
       )
     ).toBe(true)
-    expect(plistValue(plist, 'OrcaAppProfileId')).toBe('orca-work')
+    expect(plistValue(plist, 'OrcaAppProfileId')).toBe('work')
     expect(plistValue(plist, 'OrcaAppProfilesRoot')).toBe(join(dir, 'data'))
     expect(plistValue(plist, 'CFBundleURLTypes')).toBeNull()
     expect(plistValue(plist, 'ElectronAsarIntegrity')).toBeNull()
@@ -209,7 +206,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
     expect(
       JSON.parse(readFileSync(join(entry.userDataPath, 'orca-app-profile.json'), 'utf8'))
     ).toEqual({
-      id: 'orca-work'
+      id: 'work'
     })
     const registry = JSON.parse(readFileSync(join(dir, 'data', 'profiles.json'), 'utf8'))
     expect(registry).toMatchObject({ version: 1, defaultAppPath: app, profiles: [entry] })
@@ -217,24 +214,33 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile', () => {
 
   it('refuses a name longer than 200 bytes: its helper apps carry it in their file names', () => {
     expect(() =>
-      createAppProfile({ name: 'w'.repeat(201), defaultAppPath: app, env: env(), run })
+      createAppProfile({ name: 'w'.repeat(201), id: 'long', defaultAppPath: app, env: env(), run })
     ).toThrow('The profile name is too long: at most 200 bytes.')
     // 'é' is 2 bytes, so the limit counts bytes, not characters.
     expect(() =>
-      createAppProfile({ name: `w${'é'.repeat(100)}`, defaultAppPath: app, env: env(), run })
+      createAppProfile({
+        name: `w${'é'.repeat(100)}`,
+        id: 'long',
+        defaultAppPath: app,
+        env: env(),
+        run
+      })
     ).toThrow('too long')
     const name = 'w'.repeat(200)
-    const entry = createAppProfile({ name, defaultAppPath: app, env: env(), run })
+    const entry = createAppProfile({ name, id: 'long', defaultAppPath: app, env: env(), run })
     const helper = join(entry.appPath, 'Contents', 'Frameworks', `${name} Helper (Renderer).app`)
     expect(existsSync(helper)).toBe(true)
   })
 
-  it('gives the next profile the next port and refuses a taken id or port', () => {
+  it('gives the next profile the next port and refuses a taken name, id or port', () => {
     createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run })
     expect(createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).port).toBe(6832)
     expect(() => createAppProfile({ name: 'work', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "work" exists.'
+      'A profile with the name "work" exists.'
     )
+    expect(() =>
+      createAppProfile({ name: 'Other', id: 'WORK', defaultAppPath: app, env: env(), run })
+    ).toThrow('A profile with the id "WORK" exists.')
     expect(() =>
       createAppProfile({ name: 'Other', port: 6810, defaultAppPath: app, env: env(), run })
     ).toThrow('inside the port range')
@@ -250,7 +256,7 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile refusals and fa
       'com.stablyai.orca.dlux.profile.a-b'
     )
     expect(() => createAppProfile({ name: 'a-b', defaultAppPath: app, env: env(), run })).toThrow(
-      'The profile "a-b" exists.'
+      'A profile with the id "a-b" exists.'
     )
   })
 
@@ -334,11 +340,115 @@ describe.skipIf(process.platform !== 'darwin')('createAppProfile from a profile 
   })
 })
 
-describe('nextAppProfilePort', () => {
-  it('skips the ports of other profiles', () => {
-    const profile = (port: number) => ({ port }) as never
-    expect(nextAppProfilePort([])).toBe(6800)
-    expect(nextAppProfilePort([profile(6800), profile(6864)])).toBe(6832)
-    expect(nextAppProfilePort([profile(6801)])).toBe(6864)
+describe.skipIf(process.platform !== 'darwin')('createAppProfile with --id and settings', () => {
+  it('uses the given id for the data folder and the bundle id, and seeds the settings', () => {
+    const settings = join(dir, 'settings.json')
+    writeFileSync(settings, '{"theme":"dark"}')
+    const entry = createAppProfile({
+      name: 'Orca - Client',
+      id: 'client',
+      settingsFile: settings,
+      defaultAppPath: app,
+      env: env(),
+      run
+    })
+    expect(entry).toMatchObject({
+      id: 'client',
+      bundleId: 'com.stablyai.orca.dlux.profile.client',
+      userDataPath: join(dir, 'data', 'client')
+    })
+    expect(readFileSync(join(entry.userDataPath, 'orca-settings-seed.json'), 'utf8')).toBe(
+      '{"theme":"dark"}'
+    )
+  })
+
+  it('refuses an id that is not valid or is reserved', () => {
+    expect(() =>
+      createAppProfile({ name: 'A', id: 'a_b', defaultAppPath: app, env: env(), run })
+    ).toThrow('letters, digits and -')
+    expect(() =>
+      createAppProfile({ name: 'A', id: 'Manager', defaultAppPath: app, env: env(), run })
+    ).toThrow('reserved')
   })
 })
+
+describe.skipIf(process.platform !== 'darwin')('createAppProfile on kept data', () => {
+  it('adopts the data folder that a removal with "Keep data" left for this id', () => {
+    const userDataPath = join(dir, 'data', 'work')
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}\n')
+    writeFileSync(join(userDataPath, 'orca-data.json'), 'old chats')
+    const entry = createAppProfile({
+      name: 'Job',
+      id: 'work',
+      defaultAppPath: app,
+      env: env(),
+      run
+    })
+    expect(entry).toMatchObject({ id: 'work', userDataPath, adoptedData: true })
+    expect(readFileSync(join(userDataPath, 'orca-data.json'), 'utf8')).toBe('old chats')
+    expect(
+      createAppProfile({ name: 'Home', defaultAppPath: app, env: env(), run }).adoptedData
+    ).toBe(false)
+  })
+
+  it('refuses a data folder whose marker names another profile', () => {
+    const userDataPath = join(dir, 'data', 'work')
+    mkdirSync(userDataPath, { recursive: true })
+    writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"Work"}\n')
+    expect(() =>
+      createAppProfile({ name: 'Job', id: 'work', defaultAppPath: app, env: env(), run })
+    ).toThrow('is the data folder of the profile "Work"')
+    expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
+  })
+})
+
+describe.skipIf(process.platform !== 'darwin')(
+  'createAppProfile refuses a data folder that is not its own',
+  () => {
+    const create = (id: string) =>
+      createAppProfile({ name: 'Job', id, defaultAppPath: app, env: env(), run })
+
+    it('refuses a folder without a marker, also under another case of the id', () => {
+      mkdirSync(join(dir, 'data', 'work'), { recursive: true })
+      writeFileSync(join(dir, 'data', 'work', 'notes.txt'), 'mine')
+      expect(() => create('work')).toThrow('has no profile marker')
+      expect(() => create('Work')).toThrow('has no profile marker')
+      expect(existsSync(join(dir, 'data', 'work', 'orca-app-profile.json'))).toBe(false)
+      expect(existsSync(join(dir, 'apps', 'Job.app'))).toBe(false)
+    })
+
+    it('refuses a link, also a link to a folder with the right marker', () => {
+      const outside = join(dir, 'outside')
+      mkdirSync(outside)
+      writeFileSync(join(outside, 'orca-app-profile.json'), '{"id":"work"}')
+      mkdirSync(join(dir, 'data'), { recursive: true })
+      symlinkSync(outside, join(dir, 'data', 'work'))
+      expect(() => create('work')).toThrow('is not a profile data folder')
+    })
+
+    it("refuses the default app's data folder", () => {
+      const appSupport = join(dir, 'Library', 'Application Support')
+      mkdirSync(join(appSupport, 'orca'), { recursive: true })
+      expect(() =>
+        createAppProfile({
+          name: 'Job',
+          id: 'orca',
+          defaultAppPath: app,
+          env: { ...env(), ORCA_PROFILES_ROOT: appSupport },
+          home: dir,
+          run
+        })
+      ).toThrow("is the default app's data")
+    })
+
+    it('removes a seed that kept data holds when this create copies no settings', () => {
+      const userDataPath = join(dir, 'data', 'work')
+      mkdirSync(userDataPath, { recursive: true })
+      writeFileSync(join(userDataPath, 'orca-app-profile.json'), '{"id":"work"}')
+      writeFileSync(join(userDataPath, 'orca-settings-seed.json'), '{"theme":"dark"}')
+      create('work')
+      expect(existsSync(join(userDataPath, 'orca-settings-seed.json'))).toBe(false)
+    })
+  }
+)

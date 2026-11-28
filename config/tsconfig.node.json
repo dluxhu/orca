@@ -22,6 +22,9 @@
     "../src/cli/runtime/connection/types.ts",
     "../src/cli/runtime/connection/runtime-access-denied.ts",
     "../src/cli/runtime/connection/runtime-pid-liveness.ts",
+    // The Profile Manager reads the profile list in the main process.
+    "../src/cli/app-profiles/app-profile-list.ts",
+    "../src/cli/app-profiles/app-profile-registry.ts",
     // The main process refreshes app profile bundles with the CLI's code (app-profile-refresh.ts).
     "../src/cli/app-profiles/app-profile-bundle-refresh.ts",
     "../src/cli/app-profiles/app-profile-bundle.ts",

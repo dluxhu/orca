@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
   bootoutStatus: 0,
-  unitExists: false,
+  exists: (_path: string): boolean => false,
   spawnSync: vi.fn(),
   spawn: vi.fn(() => ({ unref: () => {} })),
   once: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('node:child_process', async (original) => ({
 }))
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof Fs>()),
-  existsSync: () => h.unitExists
+  existsSync: (path: string) => h.exists(path)
 }))
 vi.mock('../orcad/instance-lock/orcad-instance-lock-record', () => ({
   readOrcadInstanceLockRecord: () => ({ pid: 11, role: 'orcad' })
@@ -88,7 +88,7 @@ describe('takeProfileFromServer', () => {
 
   beforeEach(() => {
     h.bootoutStatus = 0
-    h.unitExists = false
+    h.exists = () => false
     for (const mock of [h.spawnSync, h.spawn, h.once, h.showMessageBoxSync]) {
       mock.mockClear()
     }
@@ -103,11 +103,25 @@ describe('takeProfileFromServer', () => {
     expect(bootouts()).toHaveLength(1)
     expect(bootouts()[0][1][1]).toMatch(new RegExp(`^gui/${uid}/`))
     expect(h.showMessageBoxSync).not.toHaveBeenCalled()
-    expect(h.once).not.toHaveBeenCalled()
+    h.once.mock.calls[0][1]()
+    expect(h.spawn).not.toHaveBeenCalled()
+  })
+
+  it('chooses the file at quit: Start at login can change while the app runs', () => {
+    h.exists = (path) => path.includes('/LaunchAgents/')
+    expect(takeProfileFromServer('/data/work')).toBe(true)
+    // Start at login goes off: the LaunchAgent moves to the userData copy.
+    h.exists = (path) => path === '/data/work/serve-service-unit.plist'
+    h.once.mock.calls[0][1]()
+    expect((h.spawn.mock.calls[0] as unknown as [string, string[]])[1]).toEqual([
+      'bootstrap',
+      `gui/${uid}`,
+      '/data/work/serve-service-unit.plist'
+    ])
   })
 
   it('starts the job again from its LaunchAgent file after a normal quit', () => {
-    h.unitExists = true
+    h.exists = (path) => path.includes('/LaunchAgents/')
     expect(takeProfileFromServer('/data/work')).toBe(true)
     expect(h.once).toHaveBeenCalledWith('will-quit', expect.any(Function))
     h.once.mock.calls[0][1]()
@@ -116,9 +130,20 @@ describe('takeProfileFromServer', () => {
     expect(args[2]).toMatch(/LaunchAgents\/.+\.plist$/)
   })
 
+  it('starts the job again from its userData copy when it has no LaunchAgent file', () => {
+    h.exists = (path) => path === '/data/work/serve-service-unit.plist'
+    expect(takeProfileFromServer('/data/work')).toBe(true)
+    h.once.mock.calls[0][1]()
+    expect(h.spawn.mock.calls[0]).toEqual([
+      '/bin/launchctl',
+      ['bootstrap', `gui/${uid}`, '/data/work/serve-service-unit.plist'],
+      expect.anything()
+    ])
+  })
+
   it('asks the user when no job of the profile is loaded', () => {
     h.bootoutStatus = 113
-    h.unitExists = true
+    h.exists = () => true
     expect(takeProfileFromServer('/data/work')).toBe(false)
     expect(h.showMessageBoxSync).toHaveBeenCalledTimes(1)
     expect(h.once).not.toHaveBeenCalled()

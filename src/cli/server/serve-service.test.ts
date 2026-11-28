@@ -91,6 +91,34 @@ describe('orca serve service', () => {
     ])
   })
 
+  it('changes only the login item with --no-start and --keep-running (fork)', async () => {
+    const d = deps('darwin')
+    const result = await installServeService({ command: null, dryRun: false, start: false }, d)
+    const content = await readFile(String(result.unitPath), 'utf8')
+    await expect(uninstallServeService(d, { keepRunning: true })).resolves.toMatchObject({
+      removed: true
+    })
+    expect(existsSync(String(result.unitPath))).toBe(false)
+    // No launchctl step: a running server keeps running, a stopped one stays stopped.
+    expect(calls).toEqual([])
+    // The unit stays in userData, out of the login items, so the profile app can load it again.
+    const copy = join(home, 'profile', 'serve-service-unit.plist')
+    expect(await readFile(copy, 'utf8')).toBe(content)
+    // A full uninstall removes the copy too.
+    await uninstallServeService(d)
+    expect(existsSync(copy)).toBe(false)
+  })
+
+  it('removes a left copy when an install writes the LaunchAgent again (fork)', async () => {
+    const d = deps('darwin')
+    await installServeService({ command: null, dryRun: false, start: false }, d)
+    await uninstallServeService(d, { keepRunning: true })
+    const copy = join(home, 'profile', 'serve-service-unit.plist')
+    expect(existsSync(copy)).toBe(true)
+    await installServeService({ command: null, dryRun: false, start: false }, d)
+    expect(existsSync(copy)).toBe(false)
+  })
+
   it('skips a profile launcher and refuses a bare Linux orca', async () => {
     const scoped = join(home, 'profile', 'cli', 'bin')
     await mkdir(scoped, { recursive: true })

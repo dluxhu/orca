@@ -9,6 +9,7 @@ import {
   serveProfileSuffix
 } from '../../shared/remote-runtime/serve-supervisor/serve-bundle-coordination'
 import { ORCAD_LOCK_FILE_NAME } from '../orcad/instance-lock/orcad-instance-lock'
+import { serveUnitCopyPath } from '../../shared/app-profiles/app-profile-paths'
 import {
   readOrcadInstanceLockRecord,
   type OrcadLockRecord
@@ -97,10 +98,15 @@ export function takeProfileFromServer(userDataPath: string): boolean {
     const unitPath = join(homedir(), 'Library', 'LaunchAgents', `${label}.plist`)
     // The job can be loaded without its file, so bootout runs in every case.
     if (runSync('/bin/launchctl', ['bootout', `gui/${uid}/${label}`]).status === 0) {
-      if (existsSync(unitPath)) {
-        // Detached, so it runs after this process has exited.
-        app.once('will-quit', () => launchctl(['bootstrap', `gui/${uid}`, unitPath]))
-      }
+      app.once('will-quit', () => {
+        // Chosen at quit: Start at login can change while the app runs. The LaunchAgent, else its
+        // copy that `serve service uninstall --keep-running` keeps.
+        const jobFile = [unitPath, serveUnitCopyPath(userDataPath)].find(existsSync)
+        if (jobFile) {
+          // Detached, so it runs after this process has exited.
+          launchctl(['bootstrap', `gui/${uid}`, jobFile])
+        }
+      })
       if (waitForExit(server.pid)) {
         return true
       }
