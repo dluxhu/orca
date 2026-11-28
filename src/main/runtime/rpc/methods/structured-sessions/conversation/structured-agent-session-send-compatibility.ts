@@ -7,6 +7,8 @@ import type { StructuredAgentSessionHost } from '../../../../../native-chat/agen
 import { STRUCTURED_AGENT_SESSION_START_WAIT_MS } from '../../../../../native-chat/agent-session-wire/delivery/structured-agent-session-send-settlement'
 import type { RpcContext } from '../../../core'
 import {
+  clientReadsAndSendsOnly,
+  requireReadSendStructuredHost,
   requireStructuredSessionHost,
   structuredCallerFor
 } from '../creation/structured-agent-session-gate'
@@ -23,7 +25,9 @@ export async function sendStructuredAgentSessionForClient(
   if (params.envelope.sessionId.startsWith('bot-group-')) {
     throw new Error('Send through the group conversation to preserve its audience and provenance.')
   }
-  const host = requireStructuredSessionHost(context, params.envelope.sessionId)
+  const host = clientReadsAndSendsOnly(context)
+    ? await requireReadSendStructuredHost(context, params.envelope.sessionId)
+    : requireStructuredSessionHost(context, params.envelope.sessionId)
   // Person provenance lets undelivered text recover as an ordinary queued card.
   const typedBy = typedByOf(context)
   const result = await host.send(structuredCallerFor(context), {
