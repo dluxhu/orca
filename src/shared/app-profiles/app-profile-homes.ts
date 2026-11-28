@@ -23,16 +23,11 @@ export const APP_PROFILE_AGENT_HOME_VARIABLES = {
   KIRO_HOME: 'kiro',
   OPENCLAW_STATE_DIR: 'openclaw',
   MIMOCODE_HOME: 'mimocode',
-  // Gemini CLI makes its `.gemini` folder inside this one.
-  GEMINI_CLI_HOME: 'gemini',
   QWEN_HOME: 'qwen',
   QODER_CONFIG_DIR: 'qoder',
   CODEBUDDY_CONFIG_DIR: 'codebuddy',
   CLINE_DIR: 'cline'
 } as const
-
-// Variables that name the folder that holds the agent's dot folder, not the dot folder itself.
-const PARENT_FOLDER_VARIABLES: ReadonlySet<string> = new Set(['GEMINI_CLI_HOME'])
 
 export type AppProfileAgentHomeVariable = keyof typeof APP_PROFILE_AGENT_HOME_VARIABLES
 
@@ -88,10 +83,7 @@ export function defaultAgentHomeDir(
   env: NodeJS.ProcessEnv = process.env
 ): string {
   const value = env[variable]?.trim()
-  if (!isAppProfileHomeValue(value)) {
-    return join(homedir(), homeRelative)
-  }
-  return PARENT_FOLDER_VARIABLES.has(variable) ? join(value, homeRelative) : value
+  return isAppProfileHomeValue(value) ? value : join(homedir(), homeRelative)
 }
 
 /** An agent's folder in `home`: the profile's when `home` is this user's home, else `home`'s own. */
