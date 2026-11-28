@@ -36,9 +36,12 @@ function render(
 }
 
 describe('window time placeholders', () => {
-  it('fills {5h.time%} and {5h.total}', () => {
+  it('fills {5h.time%}', () => {
     expect(render('{5h.time%}')).toBe('60%')
-    expect(render('{5h.total}')).toBe('5h')
+  })
+
+  it('leaves the removed {5h.total} as literal text', () => {
+    expect(render('{5h.total} {7d.total}')).toBe('{5h.total} {7d.total}')
   })
 
   it('renders a usage-of-time-passed template', () => {
@@ -51,8 +54,8 @@ describe('window time placeholders', () => {
 
   it('works for the weekly and Fable windows', () => {
     const weekly = { ...session, windowMinutes: 10080, resetsAt: now + 42 * hour }
-    expect(render('{7d.time%} {7d.total}', { weekly })).toBe('75% 7d')
-    expect(render('{fable.time%} {fable.total}', { fableWeekly: weekly })).toBe('75% 7d')
+    expect(render('{7d.time%}', { weekly })).toBe('75%')
+    expect(render('{fable.time%}', { fableWeekly: weekly })).toBe('75%')
   })
 
   it('rounds like the usage percentage and clamps to 0..100', () => {
@@ -67,8 +70,7 @@ describe('window time placeholders', () => {
   it('is empty without a reset time, so optional groups drop', () => {
     const noReset = { ...session, resetsAt: null }
     expect(render('{5h}[ of {5h.time%}]', { session: noReset })).toBe('45%')
-    expect(render('{5h.total}', { session: noReset })).toBe('5h')
-    expect(render('[{7d.time%}][{7d.total}]')).toBe('')
+    expect(render('[{7d.time%}][{7d}]')).toBe('')
   })
 
   it('leaves unknown placeholders as literal text, also with a %', () => {
@@ -82,5 +84,51 @@ describe('window time placeholders', () => {
       'Claude | 5h: 45% (2h) 14:00'
     )
     expect(render('{5h} is 100% [{7d} 7d]')).toBe('45% is 100% ')
+  })
+})
+
+describe('[[ ]] separators', () => {
+  const weekly = { ...session, usedPercent: 20, windowMinutes: 10080, resetsAt: now + 42 * hour }
+  const both = { weekly }
+
+  it('shows between two shown groups', () => {
+    expect(render('[5h {5h}][[ · ]][wk {7d}]', both)).toBe('5h 45% · wk 20%')
+  })
+
+  it('drops when the left, the right or both groups drop', () => {
+    expect(render('[5h {5h}][[ · ]][wk {7d}]', { session: null, weekly })).toBe('wk 20%')
+    expect(render('[5h {5h}][[ · ]][wk {7d}]')).toBe('5h 45%')
+    expect(render('[5h {5h}][[ · ]][wk {7d}]', { session: null })).toBe('')
+  })
+
+  it('drops at the start or end, with no group on one side', () => {
+    expect(render('[[ · ]][{5h}]')).toBe('45%')
+    expect(render('[{5h}][[ · ]]')).toBe('45%')
+    expect(render('[[ · ]]')).toBe('')
+  })
+
+  it('joins the shown groups of a chain with one separator each', () => {
+    const t = '[{5h}][[ · ]][{7d}][[ | ]][{fable}]'
+    expect(render(t, { weekly, fableWeekly: weekly })).toBe('45% · 20% | 20%')
+    // The middle group drops: one separator, the one before the next shown group.
+    expect(render(t, { fableWeekly: weekly })).toBe('45% | 20%')
+    expect(render(t, { session: null, fableWeekly: weekly })).toBe('20%')
+    expect(render(t, both)).toBe('45% · 20%')
+  })
+
+  it('looks past plain text to the groups, and fills placeholders inside it', () => {
+    expect(render('{provider} [{5h}] x [[ / {plan} ]] y [{7d}]', both)).toBe(
+      'Claude 45% x  /   y 20%'
+    )
+  })
+
+  it('needs a group, not literal brackets, on each side', () => {
+    expect(render('[note][[ · ]][{5h}]')).toBe('[note]45%')
+  })
+
+  it('leaves unmatched or nested brackets as before', () => {
+    expect(render('[[{5h}]')).toBe('[45%')
+    expect(render('[{5h}]]')).toBe('45%]')
+    expect(render('[[ [{5h}] ]]')).toBe('[[ 45% ]]')
   })
 })
