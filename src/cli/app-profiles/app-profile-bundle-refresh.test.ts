@@ -338,6 +338,21 @@ describe.skipIf(process.platform !== 'darwin')('refreshAppProfileBundle', () => 
     expect(refreshAppProfileBundle(entry.appPath, app, run, { checkFile: check })).toBe(true)
   })
 
+  it('rebuilds a bundle of the app.asar link layout with the loader, also with the same key', () => {
+    const { entry, contents } = make()
+    const check = join(dir, 'check.txt')
+    refreshAppProfileBundle(entry.appPath, app, run, { checkFile: check })
+    // The layout of releases before Electron 45: an app.asar link and no loader.
+    rmSync(join(contents, 'Resources', 'app'), { recursive: true })
+    symlinkSync(
+      join(app, 'Contents', 'Resources', 'app.asar'),
+      join(contents, 'Resources', 'app.asar')
+    )
+    expect(refreshAppProfileBundle(entry.appPath, app, run, { checkFile: check })).toBe(true)
+    expect(existsSync(join(contents, 'Resources', 'app', 'boot.js'))).toBe(true)
+    expect(existsSync(join(contents, 'Resources', 'app.asar'))).toBe(false)
+  })
+
   it('checks again when a needed copy is missing, whatever the check file says', () => {
     const { entry, contents } = make()
     const check = join(dir, 'check.txt')

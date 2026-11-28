@@ -24,6 +24,34 @@ const NOTIFICATION_HELPER = 'orca-notification-status'
 const ELECTRON_FRAMEWORK = 'Electron Framework.framework'
 /** The Info.plist key with the template key of the profile's copies (templateKeyOf). */
 export const APP_PROFILE_TEMPLATE_KEY = 'OrcaProfileTemplateKey'
+/**
+ * The profile app's own app folder: Electron 45 reads no asar archive through a link, so a profile
+ * has no app.asar link. Electron loads Resources/app, which runs the default app's real app.asar.
+ * The files never change, so an Orca update needs no new signature (and no Keychain prompt).
+ */
+export const PROFILE_LOADER_DIR = 'app'
+const PROFILE_LOADER_PACKAGE = `${JSON.stringify({ name: 'orca', private: true, main: 'boot.js' }, null, 2)}\n`
+const PROFILE_LOADER_BOOT = `'use strict'
+// Orca profile app loader: runs the default app's code from its real app.asar, which the
+// app.asar.unpacked link sits next to. Name and version come from there, as for the default app.
+const { app } = require('electron')
+const { dirname, join } = require('node:path')
+const { realpathSync } = require('node:fs')
+const asar = join(dirname(realpathSync(join(process.resourcesPath, 'app.asar.unpacked'))), 'app.asar')
+const pkg = require(join(asar, 'package.json'))
+app.setAppPath(asar)
+app.setVersion(pkg.version)
+app.name = pkg.productName || pkg.name
+require(join(asar, pkg.main))
+`
+
+/** Writes the loader (PROFILE_LOADER_DIR) into the profile's Resources. */
+function writeProfileLoader(resources: string): void {
+  const dir = join(resources, PROFILE_LOADER_DIR)
+  mkdirSync(dir)
+  writeFileSync(join(dir, 'package.json'), PROFILE_LOADER_PACKAGE)
+  writeFileSync(join(dir, 'boot.js'), PROFILE_LOADER_BOOT)
+}
 
 export function exists(path: string): boolean {
   try {
@@ -232,8 +260,9 @@ export function templateKeyOf(defaultApp: string, run: RunTool): string {
 
 /**
  * Builds a new profile bundle at `bundle` from the default app, as create and refresh do: the
- * copied runtime with the helpers in the profile's name, links for every Resources entry, the
- * profile's Info.plist keys with the template key, and an ad hoc signature. `beforeSign` can add
+ * copied runtime with the helpers in the profile's name, links for every Resources entry but
+ * app.asar, the loader in its place, the profile's Info.plist keys with the template key, and an
+ * ad hoc signature. `beforeSign` can add
  * files to the bundle before the seal (an icon file).
  */
 export function buildProfileBundle(
@@ -260,8 +289,11 @@ export function buildProfileBundle(
   const bundleId = `${defaultAppId}.profile.${profile.id}`
   const helpers = copyAppRuntime(source, contents, executable, profile.name, run)
   for (const entry of readdirSync(join(source, 'Resources'))) {
-    symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
+    if (entry !== 'app.asar' && entry !== PROFILE_LOADER_DIR) {
+      symlinkSync(join(source, 'Resources', entry), join(contents, 'Resources', entry))
+    }
   }
+  writeProfileLoader(join(contents, 'Resources'))
   beforeSign?.(contents, defaultPlist)
   const templateKey = templateKeyOf(defaultApp, run)
   applyProfilePlist(plistPath, { ...profile, bundleId, templateKey }, run)
