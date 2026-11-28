@@ -31,6 +31,7 @@ import {
   read,
   deps,
   lsappinfoOut,
+  makeIcon,
   makeProfile,
   writeRuntimePid
 } from './app-profile-edit.test-support'
@@ -469,6 +470,7 @@ describe.skipIf(process.platform !== 'darwin')('removeAppProfile', () => {
     writeFileSync(join(work.userDataPath, 'orca-data.json'), 'old chats')
     await removeAppProfile({ id: 'work', keepData: true, trash, ...deps() })
     const again = createAppProfile({
+      makeIcon,
       name: 'Orca - Work again',
       id: 'work',
       defaultAppPath: app,
