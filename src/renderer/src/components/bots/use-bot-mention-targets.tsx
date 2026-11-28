@@ -1,5 +1,8 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
+import {
+  LOCAL_EXECUTION_HOST_ID,
+  type ExecutionHostId
+} from '../../../../shared/execution-host/execution-host'
 import { useBots, useBotsEnabled } from '@/lib/bot-catalog'
 import {
   readBotHostIds,
@@ -9,22 +12,31 @@ import {
 import type { NativeChatBotMentionTarget } from '../native-chat/native-chat-room-context'
 import { BotAvatar } from './BotAvatar'
 import { botMentionServerHost } from './bot-mention-server'
+import { useOwnInstallation } from './use-paired-server-client-mentions'
 
 const listedHosts = (): string => readBotHostIds().filter(readBotHostListed).join('\n')
 
 /** Each bot a draft names, looked up by id among the bots on the computer the chat's agent runs
- *  on, or on the paired server its token names: its current name, picture and whether it is paused;
- *  null for one that computer's list no longer has; undefined until that list is read. */
+ *  on, on the paired server its token names, or on this computer when its token names this
+ *  computer's installation: its current name, picture and whether it is paused; null for one that
+ *  computer's list no longer has; undefined until that list is read. */
 export function useBotMentionTargets(
   hostId: ExecutionHostId | null
-): (id: string, server?: string) => NativeChatBotMentionTarget | null | undefined {
+): (id: string, server?: string, client?: string) => NativeChatBotMentionTarget | null | undefined {
   const enabled = useBotsEnabled() && hostId !== null
   const bots = useBots(enabled)
+  const ownInstallation = useOwnInstallation()
   // The hosts that have answered their bot list, so a bot missing from one is gone.
   const listed = useSyncExternalStore(subscribeToBotChanges, listedHosts, listedHosts)
   return useCallback(
-    (id: string, server?: string) => {
-      const host = server ? botMentionServerHost(server) : hostId
+    (id: string, server?: string, client?: string) => {
+      const host = client
+        ? client === ownInstallation
+          ? LOCAL_EXECUTION_HOST_ID
+          : null
+        : server
+          ? botMentionServerHost(server)
+          : hostId
       if (!enabled || host === null) {
         return undefined
       }
@@ -38,6 +50,6 @@ export function useBotMentionTargets(
         avatar: <BotAvatar bot={bot} className="size-full rounded-sm text-3xs" />
       }
     },
-    [bots, enabled, hostId, listed]
+    [bots, enabled, hostId, listed, ownInstallation]
   )
 }
