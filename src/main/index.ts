@@ -63,6 +63,7 @@ import { installStdioWriteErrorSink } from './startup/process-failure/main-proce
 import { installWorkerThreadDiagnostics } from './worker-threads/worker-thread-diagnostics'
 import { PROFILE_MANAGER_ARG } from '../shared/app-profiles/app-profile-paths'
 import { openProfileManagerWindow } from './app-profiles/profile-manager-window'
+import { runProfileManagerApp } from './app-profiles/profile-manager-app'
 
 // Before anything spawns, so no daemon, PTY or agent inherits it outside e2e.
 dropE2eSpawnLogOutsideE2e()
@@ -163,7 +164,9 @@ installWindowsIsolatedSpawner()
 // A relaunch or installer inherits the parent's published WSL gate state; this process recomputes.
 ignoreInheritedWslHostsGateState()
 // The uninstaller's holder release and hook removal run instead of the app, never alongside it.
+// The Profile Manager app runs only its own window, instead of the app (fork patch).
 const preflightReady =
+  !runProfileManagerApp() &&
   !runWslHolderUninstallPreflight() &&
   !runAgentHooksUninstallPreflight() &&
   runMainProcessPreflight({

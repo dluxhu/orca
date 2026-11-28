@@ -1,9 +1,11 @@
 // `orca profiles create|rename|set-port|remove|list|manager`: local commands, no runtime needed.
 // See docs/fork/profiles-design.md, section 6.
 import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import {
   appProfilesRoot,
   PROFILE_MANAGER_ARG,
+  profileManagerAppPath,
   readAppProfileRegistry
 } from '../../shared/app-profiles/app-profile-paths'
 import { getMacAppBundlePath } from '../runtime/serve/updates/mac-app-update-bundle'
@@ -75,6 +77,22 @@ function oneId(parsed: Parsed): string {
     throw new RuntimeClientError('invalid_argument', USAGE)
   }
   return parsed.positional[0]
+}
+
+/**
+ * The `open` arguments of `orca profiles manager`: the Profile Manager app, which `open` starts
+ * once and brings to the front after that. A default app without it opens its own window.
+ */
+export function profileManagerOpenArgs(
+  defaultApp: string,
+  exists: (path: string) => boolean = existsSync
+): string[] {
+  const managerApp = profileManagerAppPath(defaultApp)
+  // The app is always args[1]. -n starts a second process: it gives the argument to the running
+  // app and exits.
+  return exists(managerApp)
+    ? ['-a', managerApp]
+    : ['-a', defaultApp, '-n', '--args', PROFILE_MANAGER_ARG]
 }
 
 export async function runProfilesCommand(argv: string[]): Promise<void> {
@@ -163,9 +181,9 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
     case 'manager': {
       const defaultApp =
         readAppProfileRegistry(appProfilesRoot())?.defaultAppPath ?? runningDefaultApp()
-      // -n starts a second process: it gives the argument to the running app and exits.
-      execFileSync('/usr/bin/open', ['-n', '-a', defaultApp, '--args', PROFILE_MANAGER_ARG])
-      print({ opened: defaultApp }, json, `Opened the Profile Manager of ${defaultApp}.`)
+      const args = profileManagerOpenArgs(defaultApp)
+      execFileSync('/usr/bin/open', args)
+      print({ opened: args[1] }, json, `Opened the Profile Manager: ${args[1]}`)
       return
     }
     default:

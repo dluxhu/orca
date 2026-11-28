@@ -13,9 +13,11 @@ import { isProfileManagerRenderer } from './profile-manager-window'
 
 /** This app's own profile, as Settings shows it. */
 export function ownAppProfile({ rows, currentId }: AppProfilesState): OwnAppProfile {
-  const own = rows.find((row) => row.id === currentId)
+  // The Profile Manager app has no Settings, so a null id does not come here.
+  const id = currentId ?? 'default'
+  const own = rows.find((row) => row.id === id)
   if (!own) {
-    throw new Error(`No profile "${currentId}".`)
+    throw new Error(`No profile "${id}".`)
   }
   return {
     id: own.id,
