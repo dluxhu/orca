@@ -44,7 +44,8 @@ export type ConnectorCloudHost = {
   webhooks: Pick<
     WebhookHostService,
     'receive' | 'notice' | 'helloAnswered' | 'pausing' | 'onConfirmed'
-  >
+  > &
+    Partial<Pick<WebhookHostService, 'local'>>
 }
 
 /** The connector acts as this host's own signed-in Orca account; null without Orca Cloud auth config. */
@@ -137,7 +138,11 @@ export function createConnectorCloud({
         ])
       },
       triggers: () =>
-        connectorTriggers(store.listAutomations(), (hookId) => webhooks.pausing(hookId)),
+        connectorTriggers(
+          store.listAutomations(),
+          (hookId) => webhooks.pausing(hookId),
+          !webhooks.local?.()
+        ),
       runTrigger: (delivery) =>
         runTriggerDelivery(
           {
@@ -168,7 +173,11 @@ export function createConnectorCloud({
       wantsConnection: () =>
         hostNeedsConnector(
           store.getBots?.() ?? [],
-          connectorTriggers(store.listAutomations(), (hookId) => webhooks.pausing(hookId))
+          connectorTriggers(
+            store.listAutomations(),
+            (hookId) => webhooks.pausing(hookId),
+            !webhooks.local?.()
+          )
         ),
       onHelloInputsChanged: (listener) => {
         runtime.onBotsWritten(listener)
