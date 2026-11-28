@@ -39,6 +39,7 @@ import {
 import type { AgentMessageSender } from '../../../../../shared/agent-session/journal/agent-session-message-source'
 import { SenderChip } from '../messages/agent-senders/NativeChatAgentMessageSenders'
 import { useNativeChatVisualOwner } from '../media/visuals/native-chat-visual-owner'
+import { splitAgentReferenceNotes } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import { useNativeChatWorkers } from '../native-chat-workers-context'
 
 /** The chat's bot is the one whose home it is in. */
@@ -285,7 +286,9 @@ function CommentRow({
   line: BotItemNoteLine & { kind: 'comment' }
   belowAnother: boolean
 }) {
-  const text = stripSentImagePromptMarkers(line.text, line.images?.length ?? 0)
+  const words = stripSentImagePromptMarkers(line.text, line.images?.length ?? 0)
+  // The mentions' routing notes are for the agent; the bubble shows the typed `@Label`s.
+  const text = splitAgentReferenceNotes(words)?.body ?? words
   const unkerned = useMemo(() => nativeChatTextHasUnkernedRun(text), [text])
   return (
     // A message, so a full row gap (gap-5) below what the note drew above it, not the lines' gap-1.5.

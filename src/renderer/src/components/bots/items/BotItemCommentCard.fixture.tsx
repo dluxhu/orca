@@ -6,6 +6,9 @@ import type { BotItemAsk } from '../../../../../shared/bots/bot-item-ask'
 import type { BotItemAskEnd } from '../../../../../shared/bots/bot-item-question-answers'
 import type { BotItemEvent } from '../../../../../shared/bots/bot-items'
 import { BotItemCommentCard } from './BotItemCommentCard'
+import { BotItemActivityList } from './BotItemActivityList'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { agentReferenceNote } from '../../../../../shared/orchestration/mailbox/orchestration-agent-reference'
 import type { BotItemQuickReplyActions } from './use-bot-item-question-steps'
 
 const AT = new Date(2026, 10, 20, 14, 58).getTime()
@@ -351,4 +354,34 @@ export const recommendedToken = defineFixture({
 export const recommendedTokenNarrow = defineFixture({
   width: 260,
   render: () => <Recommended data={TOKEN} />
+})
+
+// The owner's comment shows its quote and its chat mention as the comment box's chips.
+const chips: BotItemEvent[] = [
+  { ...plain, id: 'c1' },
+  {
+    id: 'c2',
+    kind: 'commented',
+    actor: { kind: 'owner' },
+    data: {
+      text: [
+        '> Final review passed: only the 3 lines, nothing equivalent already on main.',
+        '',
+        'Good. Ask @Release notes to add a line for it.',
+        '',
+        agentReferenceNote('Release notes', 'orca_session_id:fixture-notes', 'chat')
+      ].join('\n')
+    },
+    at: AT
+  }
+]
+export const ownerChips = defineFixture({
+  width: 340,
+  render: () => (
+    <TooltipProvider>
+      <Feed>
+        <BotItemActivityList bot={bot} item={item} events={chips} />
+      </Feed>
+    </TooltipProvider>
+  )
 })
