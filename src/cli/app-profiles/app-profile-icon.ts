@@ -1,4 +1,4 @@
-// Profile icons: the default app's icon with a badge, or an uploaded icon, written as .icns.
+// Profile icons: a base icon with an optional badge, or an uploaded icon, written as .icns.
 // See docs/fork/profiles-design.md, section 8. The CLI runs it; electron-vite does not keep
 // src/main modules for the CLI.
 import { execFileSync } from 'node:child_process'
@@ -15,9 +15,13 @@ import {
   readPlistString,
   type AppProfileIcon
 } from '../../shared/app-profiles/app-profile-paths'
-import { APP_PROFILE_MENU_BAR_FILE } from '../../shared/app-profiles/app-profile-icon-files'
+import {
+  APP_PROFILE_BASE_FILE,
+  APP_PROFILE_MENU_BAR_FILE
+} from '../../shared/app-profiles/app-profile-icon-files'
 import {
   defaultBadge,
+  isBuiltInIconBase,
   nextBadgeText,
   type AppProfileIconSource
 } from '../../shared/app-profiles/app-profile-rules'
@@ -50,7 +54,10 @@ export function isIconStyle(value: string): value is IconStyle {
   return (ICON_STYLES as readonly string[]).includes(value)
 }
 
-/** The icon of the `--icon-badge`, `--icon-style`, `--icon-color`, `--icon-image` and `--icon-file` flags. */
+/**
+ * The icon of the `--icon-badge`, `--icon-style`, `--icon-color`, `--icon-image`, `--icon-file`,
+ * `--icon-base` and `--no-badge` flags. `value` gives '' for `--no-badge`, which has no value.
+ */
 export function appProfileIconSourceFromFlags(
   value: (flag: string) => string | undefined
 ): AppProfileIconSource | undefined {
@@ -59,9 +66,26 @@ export function appProfileIconSourceFromFlags(
   const image = value('--icon-image')
   const file = value('--icon-file')
   const color = value('--icon-color')?.toLowerCase()
-  if ([text, image, file].filter((v) => v !== undefined).length > 1) {
-    throw new Error('Use only one of --icon-badge, --icon-image and --icon-file.')
+  const rawBase = value('--icon-base')
+  const noBadge = value('--no-badge') !== undefined
+  if ([text, image, file, noBadge || undefined].filter((v) => v !== undefined).length > 1) {
+    throw new Error('Use only one of --icon-badge, --icon-image, --icon-file and --no-badge.')
   }
+  if (rawBase !== undefined && file !== undefined) {
+    throw new Error('--icon-base does not apply to --icon-file, which is the whole icon.')
+  }
+  if (noBadge && (style ?? color) !== undefined) {
+    throw new Error('--icon-style and --icon-color need a badge.')
+  }
+  // A base that is not a built-in id is the path of an image.
+  const base = rawBase === undefined || isBuiltInIconBase(rawBase) ? rawBase : resolve(rawBase)
+  if (noBadge) {
+    if (base !== undefined && !isBuiltInIconBase(base)) {
+      return { kind: 'file', path: base }
+    }
+    return { kind: 'none', base: base ?? 'classic' }
+  }
+  const withBase = base === undefined ? {} : { base }
   if (style !== undefined && !isIconStyle(style)) {
     throw new Error(`--icon-style must be one of: ${ICON_STYLES.join(', ')}.`)
   }
@@ -78,10 +102,10 @@ export function appProfileIconSourceFromFlags(
     return { kind: 'file', path: resolve(file) }
   }
   if (image !== undefined) {
-    return { kind: 'image', path: resolve(image), style }
+    return { kind: 'image', path: resolve(image), style, ...withBase }
   }
-  if (text !== undefined || style !== undefined || color !== undefined) {
-    return { kind: 'badge', text, style, ...(color ? { color } : {}) }
+  if (text !== undefined || style !== undefined || color !== undefined || base !== undefined) {
+    return { kind: 'badge', text, style, ...(color ? { color } : {}), ...withBase }
   }
   return undefined
 }
@@ -175,6 +199,30 @@ export function readAppIcon(appPath: string, run: RunTool = runTool): Img {
   return img && img.width === 1024 ? img : rasterizeWithAppKit('file', path, run)
 }
 
+// The macOS files of the built-in app icons (app-icon.ts); electron-builder unpacks resources/.
+const BASE_FILES = { watercolor: 'orca-watercolor-mac.png', blue: 'orca-blue.png' } as const
+
+/** The base icon at 1024 px: the default app's own icon, a built-in one or an uploaded image. */
+export function readBaseIcon(
+  appPath: string,
+  base: string | undefined,
+  run: RunTool = runTool
+): Img {
+  if (base === undefined || base === 'classic') {
+    return readAppIcon(appPath, run)
+  }
+  if (isBuiltInIconBase(base)) {
+    const resources = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'resources')
+    const path = join(resources, 'app-icons', BASE_FILES[base])
+    const img = existsSync(path) ? decodePng(readFileSync(path)) : null
+    return img && img.width === 1024 ? img : rasterizeWithAppKit('file', path, run)
+  }
+  if (!existsSync(base)) {
+    throw new Error(`No file ${base}`)
+  }
+  return rasterizeWithAppKit('file', base, run)
+}
+
 /** The badge character of a badge source: its own, else the first free one. One visible character. */
 function badgeTextOf(
   source: AppProfileIconSource & { kind: 'badge' },
@@ -188,7 +236,7 @@ function badgeTextOf(
   return text
 }
 
-/** The two inputs of a badged icon at 1024 px: the default app's icon and the badge image. */
+/** The two inputs of a badged icon at 1024 px: the base icon and the badge image. */
 function appProfileIconParts(
   defaultAppPath: string,
   source: AppProfileIconSource & { kind: 'badge' | 'image' },
@@ -198,12 +246,16 @@ function appProfileIconParts(
   if (source.kind === 'image' && !existsSync(source.path)) {
     throw new Error(`No file ${source.path}`)
   }
+  // A missing upload is named before the badge is drawn.
+  if (source.base !== undefined && !isBuiltInIconBase(source.base) && !existsSync(source.base)) {
+    throw new Error(`No file ${source.base}`)
+  }
   const text = source.kind === 'badge' ? badgeTextOf(source, used) : ''
   const badge =
     source.kind === 'badge'
       ? rasterizeWithAppKit('text', text, run, source.color)
       : rasterizeWithAppKit('file', source.path, run)
-  return { base: readAppIcon(defaultAppPath, run), badge, text }
+  return { base: readBaseIcon(defaultAppPath, source.base, run), badge, text }
 }
 
 /**
@@ -215,7 +267,13 @@ export function makeAppProfileIcon(
   source: AppProfileIconSource,
   used: readonly (AppProfileIcon | undefined)[] = [],
   run: RunTool = runTool
-): { icns: Buffer; icon: AppProfileIcon; badgePng?: Buffer; menuBarPng?: Buffer } {
+): {
+  icns: Buffer
+  icon: AppProfileIcon
+  badgePng?: Buffer
+  basePng?: Buffer
+  menuBarPng?: Buffer
+} {
   if (source.kind === 'file') {
     if (!existsSync(source.path)) {
       throw new Error(`No file ${source.path}`)
@@ -234,38 +292,54 @@ export function makeAppProfileIcon(
     const menuBar = img ? menuBarPng(defaultAppPath, markAlpha(img, true), false) : undefined
     return { icns, icon: { kind: 'file' }, menuBarPng: menuBar }
   }
+  if (source.kind === 'none') {
+    // No badge: the base alone, and the default menu-bar glyph (no kept template).
+    return { icns: writeIcns(readBaseIcon(defaultAppPath, source.base, run)), icon: source }
+  }
   const style = source.style ?? 'ref-match'
   const { base, badge, text } = appProfileIconParts(defaultAppPath, source, used, run)
   const img = renderBadgedIcon(base, badge, style)
   // A character: its shape only. An image: its dark parts.
   const menuBar = menuBarPng(defaultAppPath, markAlpha(badge, source.kind === 'image'))
+  // An uploaded base is kept as PNG, so the Edit form and a later change start from it.
+  const uploaded = source.base !== undefined && !isBuiltInIconBase(source.base)
+  const baseId = uploaded
+    ? { base: 'custom' as const }
+    : source.base && source.base !== 'classic'
+      ? { base: source.base as 'watercolor' | 'blue' }
+      : {}
+  const basePng = uploaded ? { basePng: encodePng(base) } : {}
   if (source.kind === 'badge') {
     const color = source.color ? { color: source.color } : {}
     return {
       icns: writeIcns(img),
-      icon: { kind: 'badge', text, style, ...color },
-      menuBarPng: menuBar
+      icon: { kind: 'badge', text, style, ...color, ...baseId },
+      menuBarPng: menuBar,
+      ...basePng
     }
   }
   return {
     icns: writeIcns(img),
-    icon: { kind: 'image', style },
+    icon: { kind: 'image', style, ...baseId },
     badgePng: encodePng(badge),
-    menuBarPng: menuBar
+    menuBarPng: menuBar,
+    ...basePng
   }
 }
 
 /**
- * Keeps the icon, an uploaded badge and the menu-bar template in the profile's userData. The Edit
- * form reads the first two; the profile app reads the icon and the template.
+ * Keeps the icon, an uploaded badge or base and the menu-bar template in the profile's userData.
+ * The Edit form reads the first three; the app reads the icon and the template. A missing part
+ * removes its file.
  */
 export function keepProfileIcon(
   userDataPath: string,
-  made: { icns: Buffer; badgePng?: Buffer; menuBarPng?: Buffer }
+  made: { icns?: Buffer; badgePng?: Buffer; basePng?: Buffer; menuBarPng?: Buffer }
 ): void {
   for (const [name, bytes] of [
     [APP_PROFILE_ICON_FILE, made.icns],
     [APP_PROFILE_BADGE_FILE, made.badgePng],
+    [APP_PROFILE_BASE_FILE, made.basePng],
     [APP_PROFILE_MENU_BAR_FILE, made.menuBarPng]
   ] as const) {
     // Kept data can hold a link here; the write must not follow it.

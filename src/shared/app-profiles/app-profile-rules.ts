@@ -1,6 +1,7 @@
 // Names, ids and ports of app profiles: docs/fork/profiles-design.md, sections 4 and 9.
 // The CLI applies these rules. The Profile Manager shows the same errors before it calls the CLI.
 import type { IconStyle } from '../icon-badger/badger'
+import type { CustomAppIconImportFailureCode } from '../app-lifecycle/identity/app-icon'
 import type { AppProfileIcon } from './app-profile-paths'
 import { APP_PROFILE_BADGE_SWATCHES } from './app-profile-icon-files'
 
@@ -28,16 +29,31 @@ export type AppProfileRow = {
   startAtLogin: boolean
   /** The profile's own serve service job runs. */
   serviceRuns?: boolean
-  /** The registry `icon` field. The default app has none. */
+  /** The registry `icon` field; for the default app, `defaultIcon`. */
   icon?: AppProfileIcon
 }
 
 /** What makes a profile icon: a badge character, a badge image file or a full icon file. */
+// base: a built-in id of AppProfileIconBase (none is `classic`), or the path of an uploaded image.
 export type AppProfileIconSource =
   // No text: the name's badge (withNameBadge), else the first free character (nextBadgeText).
-  | { kind: 'badge'; text?: string; style?: IconStyle; color?: string }
-  | { kind: 'image'; path: string; style?: IconStyle }
+  | { kind: 'badge'; text?: string; style?: IconStyle; color?: string; base?: string }
+  | { kind: 'image'; path: string; style?: IconStyle; base?: string }
+  // No badge: a built-in base alone. An uploaded base alone is `file`.
+  | { kind: 'none'; base: 'classic' | 'watercolor' | 'blue' }
   | { kind: 'file'; path: string }
+
+/** A chosen file: its path, or why upstream's custom icon import refused an uploaded base. */
+export type ChosenIconFile = string | { code: CustomAppIconImportFailureCode } | null
+
+/** The built-in bases, in the order of the appIcon setting. */
+export const APP_PROFILE_ICON_BASES = ['classic', 'watercolor', 'blue'] as const
+
+export function isBuiltInIconBase(
+  value: unknown
+): value is (typeof APP_PROFILE_ICON_BASES)[number] {
+  return (APP_PROFILE_ICON_BASES as readonly unknown[]).includes(value)
+}
 
 const BADGE_CHARACTERS = [...'23456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
 
@@ -91,24 +107,32 @@ export function appProfileIconFlags(source: AppProfileIconSource | undefined): s
   if (!source) {
     return []
   }
-  const style = source.kind !== 'file' && source.style ? ['--icon-style', source.style] : []
   if (source.kind === 'file') {
     return ['--icon-file', source.path]
   }
+  // `classic` is the default app's own icon, as no flag is.
+  const base = source.base && source.base !== 'classic' ? ['--icon-base', source.base] : []
+  if (source.kind === 'none') {
+    return ['--no-badge', ...base]
+  }
+  const style = source.style ? ['--icon-style', source.style] : []
   if (source.kind === 'image') {
-    return ['--icon-image', source.path, ...style]
+    return ['--icon-image', source.path, ...style, ...base]
   }
   // No text and no style still means a badge: the CLI makes the default one.
   return [
     ...(source.text ? ['--icon-badge', source.text] : []),
     ...style,
-    ...(source.color ? ['--icon-color', source.color] : [])
+    ...(source.color ? ['--icon-color', source.color] : []),
+    ...base
   ]
 }
 
 /** This app's own profile, for Settings. */
 export type OwnAppProfile = {
   id: string
+  /** The app name; the default badge character is its first letter. */
+  name: string
   /** Start at login. */
   enabled: boolean
   /** The saved port. */
@@ -119,6 +143,11 @@ export type OwnAppProfile = {
   defaultPort: number
   /** A server of the profile runs, so its port must not change now. */
   serverRuns: boolean
+  userDataPath: string
+  /** The saved icon; for the default app, profiles.json `defaultIcon`. */
+  icon?: AppProfileIcon
+  /** The image that Settings imported (appIcon `custom`), when there is one. */
+  customIconPath?: string
 }
 
 /** One change that the Profile Manager asks for. The main process runs `orca profiles` for it. */

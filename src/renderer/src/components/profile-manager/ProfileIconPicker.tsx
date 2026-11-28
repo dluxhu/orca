@@ -1,27 +1,44 @@
-// The icon part of the New and Edit profile dialogs: docs/fork/profiles-design.md, section 8.
+// The icon chooser of the New and Edit profile dialogs and of Settings > Appearance: a base icon
+// (built-in or uploaded) and an optional badge. See docs/fork/profiles-design.md, section 8.
 // The main process makes the preview; this view only shows its PNG.
-import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { ColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useTranslate } from '@/i18n/use-translate'
-import { cn } from '@/lib/class-names'
-import type { AppProfileIconSource } from '../../../../shared/app-profiles/app-profile-rules'
+import {
+  isBuiltInIconBase,
+  type AppProfileIconSource,
+  type AppProfileReply,
+  type ChosenIconFile
+} from '../../../../shared/app-profiles/app-profile-rules'
 import type { AppProfileIcon } from '../../../../shared/app-profiles/app-profile-paths'
 import {
-  APP_PROFILE_BADGE_COLOR,
   APP_PROFILE_BADGE_FILE,
-  APP_PROFILE_BADGE_SWATCHES,
+  APP_PROFILE_BASE_FILE,
   APP_PROFILE_ICON_FILE
 } from '../../../../shared/app-profiles/app-profile-icon-files'
 import { Field } from './ProfileField'
+import { BadgeColors, BaseIcons, fileName } from './ProfileIconParts'
 import { ProfileStyleGrid } from './ProfileStyleGrid'
+import { importFailureText } from '../settings/appearance/AppIconSelector'
+
+// One size for the chooser in the Profile Manager and in Settings (its pane is 720 px wide): a
+// change of base, badge or style never moves the controls or the preview. Longer text scrolls.
+export const ICON_PICKER_SIZE = 'h-[684px] w-[420px] shrink-0'
+const ICON_PREVIEW_WIDTH = 'w-[260px] shrink-0'
 
 /** True when the choice is complete: a badge character, or a chosen file. */
 export function iconChoiceReady(icon: AppProfileIconSource): boolean {
+  if (icon.kind === 'none') {
+    return true
+  }
   return icon.kind === 'badge' ? Boolean(icon.text?.trim()) : Boolean(icon.path)
+}
+
+/** The base of a choice: a built-in id, or the path of an uploaded image ('' before the choice). */
+export function iconBaseOf(icon: AppProfileIconSource): string {
+  return icon.kind === 'file' ? icon.path : (icon.base ?? 'classic')
 }
 
 /**
@@ -33,12 +50,23 @@ export function editIcon(
   defaultText: string,
   userDataPath = ''
 ): AppProfileIconSource {
+  // A kept uploaded base is `custom`; a built-in base other than classic is its id.
+  const keptBase = (base?: string): { base?: string } =>
+    base === 'custom'
+      ? { base: `${userDataPath}/${APP_PROFILE_BASE_FILE}` }
+      : base && base !== 'classic'
+        ? { base }
+        : {}
   if (icon?.kind === 'badge') {
     const color = icon.color ? { color: icon.color } : {}
-    return { kind: 'badge', text: icon.text, style: icon.style, ...color }
+    return { kind: 'badge', text: icon.text, style: icon.style, ...color, ...keptBase(icon.base) }
   }
   if (icon?.kind === 'image') {
-    return { kind: 'image', path: `${userDataPath}/${APP_PROFILE_BADGE_FILE}`, style: icon.style }
+    const path = `${userDataPath}/${APP_PROFILE_BADGE_FILE}`
+    return { kind: 'image', path, style: icon.style, ...keptBase(icon.base) }
+  }
+  if (icon?.kind === 'none') {
+    return { kind: 'none', base: icon.base }
   }
   if (icon?.kind === 'file') {
     return { kind: 'file', path: `${userDataPath}/${APP_PROFILE_ICON_FILE}` }
@@ -46,81 +74,19 @@ export function editIcon(
   return { kind: 'badge', text: defaultText, style: 'ref-match' }
 }
 
-function fileName(path: string): string {
-  return path.split('/').pop() ?? path
+/** The same choice on another base. No badge on an uploaded base is the `file` kind. */
+export function withIconBase(icon: AppProfileIconSource, base: string): AppProfileIconSource {
+  if (icon.kind === 'none' || icon.kind === 'file') {
+    return isBuiltInIconBase(base) ? { kind: 'none', base } : { kind: 'file', path: base }
+  }
+  const { base: _old, ...rest } = icon
+  return base === 'classic' ? rest : { ...rest, base }
 }
 
-/** The badge character colour: the swatches, then any colour. The default colour is no colour. */
-function BadgeColors(props: {
-  color?: string
-  onChange: (color: string | undefined) => void
-}): React.JSX.Element {
-  const t = useTranslate()
-  const current = props.color ?? APP_PROFILE_BADGE_COLOR
-  const isCustom = !APP_PROFILE_BADGE_SWATCHES.some((swatch) => swatch === current)
-  const names: Record<(typeof APP_PROFILE_BADGE_SWATCHES)[number], string> = {
-    [APP_PROFILE_BADGE_COLOR]: t('profileManager.icon.colorDark', 'Dark'),
-    '#dc2626': t('profileManager.icon.colorRed', 'Red'),
-    '#ea580c': t('profileManager.icon.colorOrange', 'Orange'),
-    '#16a34a': t('profileManager.icon.colorGreen', 'Green'),
-    '#2563eb': t('profileManager.icon.colorBlue', 'Blue'),
-    '#9333ea': t('profileManager.icon.colorPurple', 'Purple')
-  }
-  const pick = (color: string): void =>
-    props.onChange(color === APP_PROFILE_BADGE_COLOR ? undefined : color)
-  const custom = t('profileManager.icon.colorCustom', 'Custom color')
-  const ring = 'ring-2 ring-foreground ring-offset-2 ring-offset-background'
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label id="profile-badge-color" className="font-semibold">
-        {t('profileManager.icon.color', 'Character color')}
-      </Label>
-      <div
-        role="group"
-        aria-labelledby="profile-badge-color"
-        className="flex h-9 items-center gap-2"
-      >
-        {APP_PROFILE_BADGE_SWATCHES.map((swatch) => (
-          <button
-            key={swatch}
-            type="button"
-            aria-label={names[swatch]}
-            aria-pressed={swatch === current}
-            style={{ backgroundColor: swatch }}
-            onClick={() => pick(swatch)}
-            className={cn(
-              'size-5 cursor-pointer rounded-full border border-black/10 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:border-white/15',
-              swatch === current && ring
-            )}
-          />
-        ))}
-        {isCustom ? (
-          <span
-            aria-hidden
-            style={{ backgroundColor: current }}
-            className={cn('size-5 rounded-full border border-black/10 dark:border-white/15', ring)}
-          />
-        ) : null}
-        <ColorPicker
-          value={current}
-          onChange={(next) => pick(next.toLowerCase())}
-          label={custom}
-          selected={isCustom}
-          trigger={
-            <button
-              type="button"
-              aria-label={custom}
-              aria-pressed={isCustom}
-              title={custom}
-              className="flex size-5 cursor-pointer items-center justify-center rounded-full border border-border bg-muted text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            >
-              <Plus className="size-3" />
-            </button>
-          }
-        />
-      </div>
-    </div>
-  )
+/** What the chooser asks the main process for: the Profile Manager's calls, or Settings' own. */
+export type IconChooserApi = {
+  chooseFile: (kind: 'image' | 'file') => Promise<ChosenIconFile>
+  preview: (icon: AppProfileIconSource) => Promise<AppProfileReply>
 }
 
 export function ProfileIconPicker(props: {
@@ -128,48 +94,79 @@ export function ProfileIconPicker(props: {
   onChange: (icon: AppProfileIconSource) => void
   /** The first free badge character. */
   defaultText: string
+  /** The file choice. Default: the Profile Manager's. */
+  chooseFile?: IconChooserApi['chooseFile']
 }): React.JSX.Element {
   const t = useTranslate()
-  const api = window.api.appProfiles
+  const chooseFile =
+    props.chooseFile ??
+    ((kind) => window.api?.appProfiles?.chooseIconFile(kind) ?? Promise.resolve(null))
   const { value, onChange } = props
-  const style = value.kind === 'file' ? undefined : (value.style ?? 'ref-match')
-  const choose = (kind: 'image' | 'file'): void => {
-    void api?.chooseIconFile(kind).then((path) => {
-      if (path) {
-        onChange(kind === 'image' ? { kind, path, style } : { kind, path })
+  const [baseError, setBaseError] = useState<string | null>(null)
+  const base = iconBaseOf(value)
+  const style =
+    value.kind === 'badge' || value.kind === 'image' ? (value.style ?? 'ref-match') : 'ref-match'
+  const keepBase = base === 'classic' || base === '' ? {} : { base }
+  const chooseBadgeImage = (): void => {
+    void chooseFile('image').then((path) => {
+      if (typeof path === 'string') {
+        onChange({ kind: 'image', path, style, ...keepBase })
+      }
+    })
+  }
+  const chooseBase = (): void => {
+    void chooseFile('file').then((path) => {
+      // Upstream's custom icon import refused it (not square, too small, ...).
+      setBaseError(path && typeof path === 'object' ? importFailureText(t, path.code) : null)
+      if (typeof path === 'string') {
+        onChange(withIconBase(value, path))
       }
     })
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    // p-1 keeps the focus and selection rings inside the scroll box.
+    <div className={`scrollbar-sleek flex flex-col gap-3 overflow-y-auto p-1 ${ICON_PICKER_SIZE}`}>
+      <BaseIcons
+        base={base}
+        onChange={(next) => {
+          setBaseError(null)
+          onChange(withIconBase(value, next))
+        }}
+        choose={chooseBase}
+      />
+      {baseError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {baseError}
+        </p>
+      ) : null}
       <Label id="profile-icon-mode" className="font-semibold">
-        {t('profileManager.icon.label', 'Icon')}
+        {t('profileManager.icon.label', 'Badge')}
       </Label>
       <ToggleGroup
         type="single"
         variant="segmented-card"
         className="grid-cols-3"
         aria-labelledby="profile-icon-mode"
-        value={value.kind}
+        value={value.kind === 'file' ? 'none' : value.kind}
         onValueChange={(kind) => {
           if (kind === 'badge') {
-            onChange({ kind, text: props.defaultText, style })
+            onChange({ kind, text: props.defaultText, style, ...keepBase })
           } else if (kind === 'image') {
-            onChange({ kind, path: '', style })
-          } else if (kind === 'file') {
-            onChange({ kind, path: '' })
+            onChange({ kind, path: '', style, ...keepBase })
+          } else if (kind === 'none') {
+            onChange(withIconBase({ kind: 'none', base: 'classic' }, base || 'classic'))
           }
         }}
       >
+        <ToggleGroupItem value="none">
+          {t('profileManager.icon.modeNone', 'No badge')}
+        </ToggleGroupItem>
         <ToggleGroupItem value="badge">
           {t('profileManager.icon.modeBadge', 'Badge character')}
         </ToggleGroupItem>
         <ToggleGroupItem value="image">
           {t('profileManager.icon.modeImage', 'Badge image')}
-        </ToggleGroupItem>
-        <ToggleGroupItem value="file">
-          {t('profileManager.icon.modeFile', 'Own icon')}
         </ToggleGroupItem>
       </ToggleGroup>
       {value.kind === 'badge' ? (
@@ -196,29 +193,22 @@ export function ProfileIconPicker(props: {
             }}
           />
         </div>
-      ) : (
+      ) : value.kind === 'image' ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => choose(value.kind)}>
-            {value.kind === 'image'
-              ? t('profileManager.icon.chooseImage', 'Choose a badge image…')
-              : t('profileManager.icon.chooseFile', 'Choose an icon file…')}
+          <Button size="sm" variant="outline" onClick={chooseBadgeImage}>
+            {t('profileManager.icon.chooseImage', 'Choose a badge image…')}
           </Button>
           <span className="min-w-0 truncate text-xs text-muted-foreground">
             {value.path
               ? fileName(value.path)
-              : value.kind === 'image'
-                ? t(
-                    'profileManager.icon.imageNote',
-                    'PNG, JPEG, WebP, SVG or ICNS. Orca puts it in the corner.'
-                  )
-                : t(
-                    'profileManager.icon.fileNote',
-                    'A 1024 × 1024 PNG or an ICNS file. It replaces the Orca icon; no badge.'
-                  )}
+              : t(
+                  'profileManager.icon.imageNote',
+                  'PNG, JPEG, WebP, SVG or ICNS. Orca puts it in the corner.'
+                )}
           </span>
         </div>
-      )}
-      {value.kind !== 'file' && style ? (
+      ) : null}
+      {value.kind === 'badge' || value.kind === 'image' ? (
         <ProfileStyleGrid style={style} onChange={(next) => onChange({ ...value, style: next })} />
       ) : null}
     </div>
@@ -256,9 +246,13 @@ export function ProfileIconPreview(props: {
   profileId?: string | null
   /** Save runs: no new preview starts, and the last one stays. */
   busy?: boolean
+  /** The preview call, a stable function: a new one starts a new preview. Default: the Profile
+   * Manager's, for `profileId`. */
+  preview?: IconChooserApi['preview']
 }): React.JSX.Element {
   const t = useTranslate()
-  const api = window.api.appProfiles
+  const profiles = window.api?.appProfiles
+  const custom = props.preview
   const [preview, setPreview] = useState<
     { png: string; menuBarPng?: string } | { error: string } | null
   >(null)
@@ -266,7 +260,12 @@ export function ProfileIconPreview(props: {
   const ready = iconChoiceReady(props.value)
 
   useEffect(() => {
-    if (!api || !ready) {
+    const run =
+      custom ??
+      (profiles
+        ? (icon: AppProfileIconSource) => profiles.iconPreview(icon, props.profileId)
+        : null)
+    if (!run || !ready) {
       setPreview(null)
       return
     }
@@ -276,28 +275,26 @@ export function ProfileIconPreview(props: {
     let current = true
     setPreview(null)
     const timer = setTimeout(() => {
-      void api
-        .iconPreview(JSON.parse(key) as AppProfileIconSource, props.profileId)
-        .then((reply) => {
-          if (current) {
-            setPreview(
-              reply.ok
-                ? (reply.result as { png: string; menuBarPng?: string })
-                : { error: reply.error.message }
-            )
-          }
-        })
+      void run(JSON.parse(key) as AppProfileIconSource).then((reply) => {
+        if (current) {
+          setPreview(
+            reply.ok
+              ? (reply.result as { png: string; menuBarPng?: string })
+              : { error: reply.error.message }
+          )
+        }
+      })
     }, PREVIEW_DELAY_MS)
     return () => {
       current = false
       clearTimeout(timer)
     }
-  }, [api, key, ready, props.profileId, props.busy])
+  }, [custom, profiles, key, ready, props.profileId, props.busy])
 
   return (
     <aside
       aria-label={t('profileManager.icon.preview', 'Preview')}
-      className="flex min-w-0 flex-[1_1_280px] flex-col gap-3.5"
+      className={`flex flex-col gap-3.5 ${ICON_PREVIEW_WIDTH}`}
     >
       <span className="font-semibold">{t('profileManager.icon.preview', 'Preview')}</span>
       {dockSamples.map((sample, index) => (

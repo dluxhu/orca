@@ -164,7 +164,7 @@ export function ProfileFormDialog(props: {
         busy={props.busy}
         scrollable
         surface="opaque-panel"
-        className="sm:max-w-[980px]"
+        className="sm:max-w-[752px]"
       >
         <DialogHeader className="gap-1 border-b px-6 py-5 text-left">
           <DialogTitle>
@@ -184,8 +184,9 @@ export function ProfileFormDialog(props: {
                 )}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-wrap gap-8 p-6">
-          <div className="flex min-w-0 flex-[999_1_480px] flex-col gap-5">
+        {/* The fields share the icon chooser's fixed width. */}
+        <div className="flex gap-6 overflow-x-auto p-6">
+          <div className="flex w-[420px] shrink-0 flex-col gap-5">
             <Field
               name="name"
               label={t('profileManager.field.name', 'App name')}

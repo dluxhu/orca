@@ -296,11 +296,13 @@ describe('Profile Manager IPC', () => {
     expect(h.execFileCalls[0].args).toContain('6768')
     await expect(h.handlers.get('appProfiles:ownProfile')?.(settings)).resolves.toEqual({
       id: 'default',
+      name: 'Default',
       enabled: false,
       port: 6768,
       otherPorts: [6832, 6864],
       defaultPort: 6768,
-      serverRuns: false
+      serverRuns: false,
+      userDataPath: '/default-data'
     })
   })
 

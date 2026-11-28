@@ -34,7 +34,8 @@ import { getTerminalAppearanceSearchEntries } from '../terminal/terminal-search'
 import { TerminalAppearanceSection } from '../terminal/appearance/TerminalAppearanceSection'
 import type { UseTerminalConfigImportReturn } from '../terminal/configuration/useTerminalConfigImport'
 import type { UseWarpThemeImportReturn } from '../terminal/themes/useWarpThemeImport'
-import { AppIconSelector } from './AppIconSelector'
+// Fork patch: the icon chooser of the Profile Manager on macOS.
+import { AppIconSetting } from './AppearanceIconChooser'
 import { normalizeAppIconId } from '../../../../../shared/app-lifecycle/identity/app-icon'
 import { getRendererAppPlatform } from '@/app-shell/platform/renderer-app-platform'
 import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
@@ -207,7 +208,7 @@ export function AppearancePane({
             ])}
             className="py-4"
           >
-            <AppIconSelector
+            <AppIconSetting
               value={normalizeAppIconId(settings.appIcon)}
               onChange={(appIcon) => updateSettings({ appIcon })}
             />

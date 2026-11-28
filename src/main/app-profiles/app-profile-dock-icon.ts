@@ -7,7 +7,6 @@ import {
   APP_PROFILE_ICON_FILE,
   APP_PROFILE_MENU_BAR_FILE
 } from '../../shared/app-profiles/app-profile-icon-files'
-import { getAppProfile } from './app-profile'
 
 let own: NativeImage | null | undefined
 
@@ -17,19 +16,20 @@ export function ownIconPath(): string {
 }
 
 /**
- * In a profile app: the image of the profile icon that its userData keeps. That copy is the source
- * of truth; macOS can show an older bundle icon from its cache. Null in every other app, and in a
- * profile with no kept icon.
+ * The image of the profile icon that the userData keeps. That copy is the source of truth; macOS
+ * can show an older bundle icon from its cache. A profile app keeps one; the default app keeps one
+ * only for an icon with a badge or an uploaded icon (`set-icon default`). Null without a kept icon.
  */
 export function ownDockIcon(): NativeImage | null {
   if (own === undefined) {
     own = null
-    if (getAppProfile()) {
-      try {
-        const png = largestIcnsPng(readFileSync(ownIconPath()))
-        const image = png ? nativeImage.createFromBuffer(png) : null
-        own = image && !image.isEmpty() ? image : null
-      } catch (error) {
+    try {
+      const png = largestIcnsPng(readFileSync(ownIconPath()))
+      const image = png ? nativeImage.createFromBuffer(png) : null
+      own = image && !image.isEmpty() ? image : null
+    } catch (error) {
+      // No kept icon is the usual case of the default app.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.warn('[profiles] cannot read the profile icon:', error)
       }
     }

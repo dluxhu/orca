@@ -6,7 +6,6 @@ import { largestIcnsPng, writeIcns } from '../../cli/app-profiles/app-profile-ic
 
 const h = vi.hoisted(() => ({
   userData: '',
-  profile: null as { id: string } | null,
   createFromBuffer: vi.fn(),
   createFromPath: vi.fn()
 }))
@@ -15,7 +14,6 @@ vi.mock('electron', () => ({
   app: { getPath: (name: string) => (name === 'userData' ? h.userData : '') },
   nativeImage: { createFromBuffer: h.createFromBuffer, createFromPath: h.createFromPath }
 }))
-vi.mock('./app-profile', () => ({ getAppProfile: () => h.profile }))
 
 let dir: string
 let icns: Buffer
@@ -45,7 +43,6 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('ownDockIcon', () => {
   it('reads the icon that the profile userData keeps, once', async () => {
-    h.profile = { id: 'work' }
     const { ownDockIcon } = await import('./app-profile-dock-icon')
     const image = ownDockIcon()
     expect(ownDockIcon()).toBe(image)
@@ -54,7 +51,6 @@ describe('ownDockIcon', () => {
   })
 
   it('reads the kept copy again after forgetOwnDockIcon: a new icon replaces none', async () => {
-    h.profile = { id: 'work' }
     rmSync(join(h.userData, 'profile-icon.icns'))
     const { forgetOwnDockIcon, ownDockIcon } = await import('./app-profile-dock-icon')
     expect(ownDockIcon()).toBeNull()
@@ -64,11 +60,13 @@ describe('ownDockIcon', () => {
     expect(ownDockIcon()).not.toBeNull()
   })
 
-  it('is null in the default app', async () => {
-    h.profile = null
-    const { ownDockIcon } = await import('./app-profile-dock-icon')
+  it('reads the kept icon of the default app too (set-icon default), and is null without one', async () => {
+    const { forgetOwnDockIcon, ownDockIcon } = await import('./app-profile-dock-icon')
+    expect(ownDockIcon()).not.toBeNull()
+    rmSync(join(h.userData, 'profile-icon.icns'))
+    forgetOwnDockIcon()
     expect(ownDockIcon()).toBeNull()
-    expect(h.createFromBuffer).not.toHaveBeenCalled()
+    expect(h.createFromBuffer).toHaveBeenCalledTimes(1)
   })
 })
 

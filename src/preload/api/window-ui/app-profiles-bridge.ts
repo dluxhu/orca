@@ -5,6 +5,7 @@ import type {
   AppProfileIconSource,
   AppProfileReply,
   AppProfilesState,
+  ChosenIconFile,
   OwnAppProfile
 } from '../../../shared/app-profiles/app-profile-rules'
 
@@ -16,7 +17,7 @@ export const appProfilesApi = {
   /** The reply's result is `{ png: <base64 PNG>, icon }`. */
   iconPreview: (icon: AppProfileIconSource, id?: string | null): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:iconPreview', icon, id),
-  chooseIconFile: (kind: 'image' | 'file'): Promise<string | null> =>
+  chooseIconFile: (kind: 'image' | 'file'): Promise<ChosenIconFile> =>
     ipcRenderer.invoke('appProfiles:chooseIconFile', kind),
   showInFinder: (id: string): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:showInFinder', id),
@@ -31,7 +32,14 @@ export const appProfilesApi = {
   setOwnStartAtLogin: (enabled: boolean): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:setOwnStartAtLogin', enabled),
   setOwnPort: (port: number): Promise<AppProfileReply> =>
-    ipcRenderer.invoke('appProfiles:setOwnPort', port)
+    ipcRenderer.invoke('appProfiles:setOwnPort', port),
+  /** This app's own icon (Settings > Appearance). `appIcon`: the setting saved with it. */
+  ownIconPreview: (icon: AppProfileIconSource): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:ownIconPreview', icon),
+  chooseOwnIconFile: (kind: 'image' | 'file'): Promise<ChosenIconFile> =>
+    ipcRenderer.invoke('appProfiles:chooseOwnIconFile', kind),
+  setOwnIcon: (icon: AppProfileIconSource, appIcon: string): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:setOwnIcon', icon, appIcon)
 }
 
 export type AppProfilesApi = typeof appProfilesApi

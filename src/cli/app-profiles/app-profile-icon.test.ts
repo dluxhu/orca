@@ -126,13 +126,55 @@ describe('profile icon sources', () => {
       { kind: 'badge', text: 'Q', style: 'ref-match', color: '#2563eb' },
       { kind: 'badge', text: undefined, style: 'ref-match' },
       { kind: 'image', path: '/x/logo.svg', style: 'ref-match' },
-      { kind: 'file', path: '/x/icon.icns' }
+      { kind: 'file', path: '/x/icon.icns' },
+      { kind: 'badge', text: 'Q', style: 'ref-match', base: 'blue' },
+      { kind: 'image', path: '/x/logo.svg', style: 'ref-match', base: '/x/base.png' },
+      { kind: 'none', base: 'watercolor' },
+      { kind: 'none', base: 'classic' }
     ] as const) {
       const args = appProfileIconFlags(source)
-      const values = new Map(args.flatMap((arg, i) => (i % 2 === 0 ? [[arg, args[i + 1]]] : [])))
-      expect(flags(Object.fromEntries(values))).toEqual(source)
+      // As the CLI parses them: --no-badge has no value.
+      const values: Record<string, string> = {}
+      for (let i = 0; i < args.length; i++) {
+        values[args[i]] = args[i] === '--no-badge' ? '' : args[++i]
+      }
+      expect(flags(values)).toEqual(source)
     }
+    // classic is the default app's own icon: no flag.
+    expect(appProfileIconFlags({ kind: 'badge', text: 'Q', base: 'classic' })).toEqual([
+      '--icon-badge',
+      'Q'
+    ])
     expect(appProfileIconFlags(undefined)).toEqual([])
+  })
+
+  it('reads --icon-base and --no-badge: a built-in id or a file, with or without a badge', () => {
+    expect(flags({ '--icon-base': 'blue' })).toEqual({
+      kind: 'badge',
+      text: undefined,
+      style: undefined,
+      base: 'blue'
+    })
+    expect(flags({ '--icon-base': '/x/base.png', '--icon-badge': 'Q' })).toMatchObject({
+      kind: 'badge',
+      text: 'Q',
+      base: '/x/base.png'
+    })
+    expect(flags({ '--no-badge': '' })).toEqual({ kind: 'none', base: 'classic' })
+    expect(flags({ '--no-badge': '', '--icon-base': 'blue' })).toEqual({
+      kind: 'none',
+      base: 'blue'
+    })
+    // An uploaded base alone is the whole icon.
+    expect(flags({ '--no-badge': '', '--icon-base': '/x/base.png' })).toEqual({
+      kind: 'file',
+      path: '/x/base.png'
+    })
+    expect(() => flags({ '--no-badge': '', '--icon-badge': 'Q' })).toThrow('only one')
+    expect(() => flags({ '--no-badge': '', '--icon-style': 'ref-match' })).toThrow('need a badge')
+    expect(() => flags({ '--icon-file': '/x/a.png', '--icon-base': 'blue' })).toThrow(
+      'does not apply'
+    )
   })
 
   it('reads --icon-color as a #rrggbb colour of a badge character', () => {
@@ -287,6 +329,80 @@ describe('menu-bar template', () => {
   })
 })
 
+describe('base icons', () => {
+  const plain = (rgba: number[]) => {
+    const img = newImg(1024, 1024, 4)
+    for (let i = 0; i < 1024 * 1024; i++) {
+      img.data.set(rgba, i * 4)
+    }
+    return img
+  }
+  /** A default app with its own icon and the built-in icons, as electron-builder unpacks them. */
+  const fakeApp = (): string => {
+    const app = join(dir, 'Orca.app')
+    const icons = join(app, 'Contents', 'Resources', 'app.asar.unpacked', 'resources', 'app-icons')
+    mkdirSync(icons, { recursive: true })
+    writeFileSync(join(app, 'Contents', 'Info.plist'), '<plist><dict></dict></plist>')
+    writeFileSync(join(app, 'Contents', 'Resources', 'icon.icns'), writeIcns(plain([1, 1, 1, 255])))
+    writeFileSync(join(icons, 'orca-blue.png'), encodePng(plain([0, 0, 200, 255])))
+    writeFileSync(join(icons, 'orca-watercolor-mac.png'), encodePng(plain([0, 200, 0, 255])))
+    return app
+  }
+  const firstPixel = (icns: Buffer) => [...decodePng(largestIcnsPng(icns)!)!.data.subarray(0, 4)]
+
+  it('makes an icon with no badge from a built-in base, with no menu-bar template', () => {
+    const app = fakeApp()
+    const blue = makeAppProfileIcon(app, { kind: 'none', base: 'blue' })
+    expect(blue.icon).toEqual({ kind: 'none', base: 'blue' })
+    expect(firstPixel(blue.icns)).toEqual([0, 0, 200, 255])
+    expect(blue.menuBarPng).toBeUndefined()
+    expect(firstPixel(makeAppProfileIcon(app, { kind: 'none', base: 'watercolor' }).icns)).toEqual([
+      0, 200, 0, 255
+    ])
+    expect(firstPixel(makeAppProfileIcon(app, { kind: 'none', base: 'classic' }).icns)).toEqual([
+      1, 1, 1, 255
+    ])
+  })
+
+  it(
+    'badges an uploaded base, records it as custom and keeps its copy',
+    // The badge renderer and the .icns sizes take seconds of CPU on a 1024 px image.
+    { timeout: 120_000 },
+    () => {
+      const app = fakeApp()
+      const base = join(dir, 'base.png')
+      writeFileSync(base, 'any image')
+      // AppKit stands in: the badge text and the uploaded file each come back as an image.
+      const drawn: string[] = []
+      const run = (_program: string, args: string[]): string => {
+        drawn.push(args.at(-3) ?? '')
+        return encodePng(plain(args.includes('text') ? [0, 0, 0, 255] : [200, 0, 0, 255])).toString(
+          'base64'
+        )
+      }
+      const made = makeAppProfileIcon(app, { kind: 'badge', text: 'Q', base }, [], run)
+      expect(made.icon).toEqual({ kind: 'badge', text: 'Q', style: 'ref-match', base: 'custom' })
+      expect(drawn).toEqual(['text', 'file'])
+      expect(decodePng(made.basePng!)!.data.subarray(0, 4)).toEqual(
+        new Uint8Array([200, 0, 0, 255])
+      )
+      const userData = join(dir, 'work')
+      mkdirSync(userData)
+      keepProfileIcon(userData, made)
+      expect(readFileSync(join(userData, 'profile-icon-base.png'))).toEqual(made.basePng)
+      // A built-in base keeps no copy, and removes an old one.
+      keepProfileIcon(userData, makeAppProfileIcon(app, { kind: 'none', base: 'blue' }))
+      expect(existsSync(join(userData, 'profile-icon-base.png'))).toBe(false)
+    }
+  )
+
+  it('names a missing uploaded base', () => {
+    expect(() =>
+      makeAppProfileIcon(fakeApp(), { kind: 'badge', text: 'Q', base: join(dir, 'gone.png') })
+    ).toThrow('No file')
+  })
+})
+
 describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () => {
   // The text is drawn by AppKit, not by Pillow, so only the glyph box is checked (design, section 8).
   it('names the file, not the script, when AppKit cannot read an image', () => {
@@ -327,45 +443,50 @@ describe.skipIf(process.platform !== 'darwin')('AppKit and the whole icon', () =
     expect(ink()).toEqual([0x0f, 0x17, 0x2a])
   })
 
-  it('badges the Orca icon and writes an .icns that macOS reads', { timeout: 120_000 }, () => {
-    const app = join(dir, 'Orca.app')
-    mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
-    writeFileSync(
-      join(app, 'Contents', 'Info.plist'),
-      '<plist><dict><key>CFBundleIconFile</key><string>icon</string></dict></plist>'
-    )
-    copyFileSync(
-      join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
-      join(app, 'Contents', 'Resources', 'icon.icns')
-    )
-    // The real tools, with their arguments kept: the badge drawing must get the colour.
-    const calls: string[][] = []
-    const run = (program: string, args: string[]): string => {
-      calls.push(args)
-      return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  it(
+    'badges the Orca icon and writes an .icns that macOS reads',
+    // AppKit, the badge renderer and iconutil take seconds on a 1024 px image.
+    { timeout: 120_000 },
+    () => {
+      const app = join(dir, 'Orca.app')
+      mkdirSync(join(app, 'Contents', 'Resources'), { recursive: true })
+      writeFileSync(
+        join(app, 'Contents', 'Info.plist'),
+        '<plist><dict><key>CFBundleIconFile</key><string>icon</string></dict></plist>'
+      )
+      copyFileSync(
+        join(__dirname, '..', '..', '..', 'resources', 'build', 'icon.icns'),
+        join(app, 'Contents', 'Resources', 'icon.icns')
+      )
+      // The real tools, with their arguments kept: the badge drawing must get the colour.
+      const calls: string[][] = []
+      const run = (program: string, args: string[]): string => {
+        calls.push(args)
+        return execFileSync(program, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      }
+      const made = makeAppProfileIcon(
+        app,
+        { kind: 'badge', color: '#2563eb' },
+        [{ kind: 'badge', text: '2', style: 'ref-match' }],
+        run
+      )
+      expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
+      expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
+      const icns = join(dir, 'profile.icns')
+      writeFileSync(icns, made.icns)
+      execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
+      expect(readdirSync(join(dir, 'out.iconset')).sort()).toEqual([
+        'icon_128x128.png',
+        'icon_128x128@2x.png',
+        'icon_16x16.png',
+        'icon_16x16@2x.png',
+        'icon_256x256.png',
+        'icon_256x256@2x.png',
+        'icon_32x32.png',
+        'icon_32x32@2x.png',
+        'icon_512x512.png',
+        'icon_512x512@2x.png'
+      ])
     }
-    const made = makeAppProfileIcon(
-      app,
-      { kind: 'badge', color: '#2563eb' },
-      [{ kind: 'badge', text: '2', style: 'ref-match' }],
-      run
-    )
-    expect(made.icon).toEqual({ kind: 'badge', text: '3', style: 'ref-match', color: '#2563eb' })
-    expect(calls.find((args) => args.includes('text'))?.slice(-2)).toEqual(['3', '#2563eb'])
-    const icns = join(dir, 'profile.icns')
-    writeFileSync(icns, made.icns)
-    execFileSync('/usr/bin/iconutil', ['-c', 'iconset', '-o', join(dir, 'out.iconset'), icns])
-    expect(readdirSync(join(dir, 'out.iconset')).sort()).toEqual([
-      'icon_128x128.png',
-      'icon_128x128@2x.png',
-      'icon_16x16.png',
-      'icon_16x16@2x.png',
-      'icon_256x256.png',
-      'icon_256x256@2x.png',
-      'icon_32x32.png',
-      'icon_32x32@2x.png',
-      'icon_512x512.png',
-      'icon_512x512@2x.png'
-    ])
-  })
+  )
 })

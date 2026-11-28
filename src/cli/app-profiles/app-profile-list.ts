@@ -238,7 +238,8 @@ export async function listAppProfiles(
       name: 'Default',
       appPath: defaultAppPath,
       userDataPath: options.defaultUserDataPath,
-      port: registry?.defaultPort ?? DEFAULT_APP_PORT
+      port: registry?.defaultPort ?? DEFAULT_APP_PORT,
+      ...(registry?.defaultIcon ? { icon: registry.defaultIcon } : {})
     },
     ...(registry?.profiles ?? []).map(({ id, name, appPath, userDataPath, port, icon }) => {
       try {

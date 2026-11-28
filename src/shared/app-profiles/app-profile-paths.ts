@@ -25,11 +25,21 @@ export const PROFILE_MANAGER_USER_DATA = '.manager'
 /** Overrides the folder that holds the profile apps. */
 export const APP_PROFILES_APPS_DIR_ENV = 'ORCA_PROFILES_APPS_DIR'
 
-/** The source of the profile icon: a badge character, an uploaded badge image or an uploaded icon. */
+/**
+ * The base icon of a profile icon: a built-in app icon (appIcon ids; none is `classic`), or
+ * `custom`, an uploaded image kept as APP_PROFILE_BASE_FILE.
+ */
+export type AppProfileIconBase = 'classic' | 'watercolor' | 'blue' | 'custom'
+
+/**
+ * The source of the profile icon: a base icon with a badge character, an uploaded badge image or
+ * no badge. `file` is an uploaded icon with no badge; the kept icon is that image.
+ */
 export type AppProfileIcon =
   // color: #rrggbb; none is APP_PROFILE_BADGE_COLOR.
-  | { kind: 'badge'; text: string; style: IconStyle; color?: string }
-  | { kind: 'image'; style: IconStyle }
+  | { kind: 'badge'; text: string; style: IconStyle; color?: string; base?: AppProfileIconBase }
+  | { kind: 'image'; style: IconStyle; base?: AppProfileIconBase }
+  | { kind: 'none'; base: Exclude<AppProfileIconBase, 'custom'> }
   | { kind: 'file' }
 
 export {
@@ -54,6 +64,8 @@ export type AppProfileRegistry = {
   defaultAppPath: string
   /** The default app's saved port. Without it, the default app uses DEFAULT_WS_PORT. */
   defaultPort?: number
+  /** The default app's own icon (Settings > Appearance). None: the appIcon setting alone. */
+  defaultIcon?: AppProfileIcon
   urlHandler: { mode: 'ask' } | { mode: 'profile'; profileId: string }
   profiles: AppProfileEntry[]
 }

@@ -40,7 +40,8 @@ function getOffsetIcon(options: readonly AppIconId[], value: AppIconId, offset: 
   return options[(index + offset + options.length) % options.length] ?? DEFAULT_APP_ICON_ID
 }
 
-function importFailureText(t: Translate, code: CustomAppIconImportFailureCode): string {
+// Fork patch: exported for the icon chooser's uploaded base.
+export function importFailureText(t: Translate, code: CustomAppIconImportFailureCode): string {
   switch (code) {
     case 'unsupportedFormat':
       return t(

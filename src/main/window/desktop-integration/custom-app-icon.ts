@@ -48,7 +48,8 @@ function isPngOrJpeg(bytes: Uint8Array): boolean {
   return isPng || (bytes[0] === 0xff && bytes[1] === 0xd8)
 }
 
-class CustomAppIconImportError extends Error {
+// Fork patch: exported, so an uploaded base of the icon chooser gets the same checks.
+export class CustomAppIconImportError extends Error {
   constructor(readonly code: CustomAppIconImportFailureCode) {
     super(code)
   }
@@ -64,7 +65,7 @@ function previewDataUrl(image: Electron.NativeImage): string {
     : shaped.toDataURL()
 }
 
-async function decodeCustomAppIcon(sourcePath: string): Promise<Electron.NativeImage> {
+export async function decodeCustomAppIcon(sourcePath: string): Promise<Electron.NativeImage> {
   const sourceStat = await stat(sourcePath).catch(() => null)
   if (!sourceStat?.isFile()) {
     throw new CustomAppIconImportError('unreadable')
