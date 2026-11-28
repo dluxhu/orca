@@ -49,7 +49,9 @@ export const MOBILE_WEB_APP_HOST_CATALOG_MAX_BYTES = 1024 * 1024
 // update (shellDownloadedAssets), so this budget also bounds that download.
 // Eager: main's own fence. 11 MiB since reverting #48282 put the diagram engine back in it, at 11,479,156
 // bytes (2026-11-24); +16 KiB when main reached 11,534,272 and item reply targets added ~1.8 KB (2026-11-26).
-export const MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES = 11 * 1024 * 1024 + 16 * 1024
+// Fork: 32 KiB more for the fork patches' phone page code: the bare #number setting, the compaction
+// divider copy, and the shared mention, quote, raw view and launch code. Upstream's fence stays below it.
+export const MOBILE_WEB_APP_BUNDLE_MAX_EAGER_BYTES = 11 * 1024 * 1024 + 16 * 1024 + 32 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_BYTES = 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_MAX_ON_DEMAND_FILE_BYTES = 128 * 1024
 
