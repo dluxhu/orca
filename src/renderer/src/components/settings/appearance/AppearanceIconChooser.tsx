@@ -98,14 +98,15 @@ export function AppearanceIconChooser(props: {
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap gap-8">
-        <div className="flex min-w-0 flex-[999_1_420px] flex-col">
+        {/* No edit while Apply runs: the saved icon read after it replaces the choice. */}
+        <fieldset disabled={busy} className="flex min-w-0 flex-[999_1_420px] flex-col">
           <ProfileIconPicker
             value={value}
             defaultText={nextBadgeText([])}
             onChange={setValue}
             chooseFile={api.chooseOwnIconFile}
           />
-        </div>
+        </fieldset>
         <ProfileIconPreview value={value} busy={busy} preview={api.ownIconPreview} />
       </div>
       {error ? (

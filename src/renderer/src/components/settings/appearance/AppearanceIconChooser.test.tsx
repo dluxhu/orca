@@ -115,7 +115,14 @@ describe('AppIconSetting', () => {
         base: 'watercolor'
       })
     )
+    // The choice is locked while Apply runs.
+    let done: (reply: unknown) => void = () => {}
+    setOwnIcon.mockReturnValueOnce(new Promise((resolve) => (done = resolve)))
     fireEvent.click(apply)
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Blue' }).closest('fieldset')?.disabled).toBe(true)
+    )
+    done({ ok: true, result: {} })
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('classic'))
     expect(setOwnIcon).toHaveBeenCalledWith(
       { kind: 'badge', text: '2', style: 'ref-match', base: 'watercolor' },

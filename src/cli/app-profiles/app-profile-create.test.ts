@@ -733,8 +733,8 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
   })
 
   it('keeps the default app icon in its userData and profiles.json; no badge removes both', async () => {
+    // No userData folder yet: set-icon makes it.
     const userData = join(dir, 'default-data')
-    mkdirSync(userData)
     const options = {
       env: env(),
       home: dir,

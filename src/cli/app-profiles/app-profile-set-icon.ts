@@ -106,6 +106,8 @@ export async function setDefaultAppIcon(
       withNameBadge(icon, 'Orca', used),
       used
     )
+    // A default app that never ran has no userData folder yet.
+    mkdirSync(userDataPath, { recursive: true })
     keepProfileIcon(userDataPath, made)
     writeRegistry(root, { ...rest, defaultIcon: made.icon })
     return { id: 'default', icon: made.icon }
