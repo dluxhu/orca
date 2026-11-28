@@ -42,10 +42,10 @@ export function BotItemActivityChips({
       // The list that carries this source; a quote from elsewhere jumps as chat's does.
       const source =
         messageId === quoteSource
-          ? document.querySelector<HTMLElement>(
-              `[data-native-chat-quote-source="${CSS.escape(quoteSource)}"]`
+          ? [...document.querySelectorAll<HTMLElement>('[data-native-chat-quote-source]')].find(
+              (node) => node.dataset.nativeChatQuoteSource === quoteSource
             )
-          : null
+          : undefined
       if (!source) {
         return false
       }
