@@ -24195,6 +24195,35 @@
       },
       "git": {
         "branchPrefixHostGitUsername": "Git username on {{host}}"
+      },
+      "localWebhooks": {
+        "loopback": "{{address}} (this computer only)",
+        "title": "Local webhooks",
+        "description": "Take webhook calls on a port of {{host}}, without an Orca account. When on, they replace Orca Cloud webhooks on {{host}}; make each webhook again to get its local URL.",
+        "enabled": "Local webhooks",
+        "on": "Enabled",
+        "off": "Disabled",
+        "interface": "Listen on interface",
+        "interfaceHelp": "The address the listener binds on {{host}}. A reverse proxy, NetBird or Tailscale can forward to it.",
+        "customOption": "{{address}} (custom)",
+        "addCustom": "Use another address…",
+        "customTitle": "Listen address",
+        "customDescription": "An IPv4 or IPv6 address of {{host}}.",
+        "customLabel": "Address",
+        "customHint": "Enter an IP address, without a port.",
+        "cancel": "Cancel",
+        "useAddress": "Use address",
+        "port": "Port",
+        "portHelp": "Its own port, apart from the server port, so only webhooks are reachable on it.",
+        "publicUrl": "Public URL",
+        "publicUrlHelp": "Optional: the URL senders reach the listener at, for Copy URL. Empty shows the local address.",
+        "urlPreview": "Webhook URLs: {{url}}",
+        "searchDescription": "Take webhook calls on a port of this computer, without an Orca account.",
+        "keywordWebhook": "webhook",
+        "keywordPort": "port",
+        "keywordNetbird": "netbird",
+        "keywordTailscale": "tailscale",
+        "publicUrlPlaceholder": "https://hooks.example.net"
       }
     },
     "agentChildRow": {
