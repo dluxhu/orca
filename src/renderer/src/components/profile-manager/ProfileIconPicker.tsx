@@ -25,7 +25,7 @@ import { importFailureText } from '../settings/appearance/AppIconSelector'
 
 // One size for the chooser in the Profile Manager and in Settings (its pane is 720 px wide): a
 // change of base, badge or style never moves the controls or the preview. Longer text scrolls.
-export const ICON_PICKER_SIZE = 'h-[640px] w-[420px] shrink-0'
+export const ICON_PICKER_SIZE = 'h-[684px] w-[420px] shrink-0'
 const ICON_PREVIEW_WIDTH = 'w-[260px] shrink-0'
 
 /** True when the choice is complete: a badge character, or a chosen file. */

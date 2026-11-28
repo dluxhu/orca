@@ -26,7 +26,7 @@ function EditIcon(props: {
 
 export const badgeOnBuiltInBase = defineFixture({
   interact: waitForPreview,
-  width: 752,
+  width: 784,
   render: () => (
     <EditIcon
       first={{ kind: 'badge', text: 'W', style: 'sticker', color: '#2563eb', base: 'blue' }}
@@ -36,13 +36,13 @@ export const badgeOnBuiltInBase = defineFixture({
 
 export const noBadge = defineFixture({
   interact: waitForPreview,
-  width: 752,
+  width: 784,
   render: () => <EditIcon first={{ kind: 'none', base: 'watercolor' }} />
 })
 
 export const badgeOnUpload = defineFixture({
   interact: waitForPreview,
-  width: 752,
+  width: 784,
   render: () => (
     <EditIcon
       first={{
@@ -61,7 +61,7 @@ export const uploadNotSquare = defineFixture({
     ;[...frame.querySelectorAll('button')].find((b) => b.textContent === 'Upload…')?.click()
     await waitForPreview()
   },
-  width: 752,
+  width: 784,
   render: () => (
     <EditIcon
       first={{ kind: 'badge', text: 'W', style: 'sticker', base: 'classic' }}

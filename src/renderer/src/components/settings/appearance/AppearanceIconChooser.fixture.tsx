@@ -41,14 +41,14 @@ const stub = (profile: OwnAppProfile) => (): void => {
 
 export const defaultAppWithBadge = defineFixture({
   interact: waitForPreview,
-  width: 752,
+  width: 784,
   setup: stub(own),
   render: () => <Setting first="classic" />
 })
 
 export const profileWithoutBadge = defineFixture({
   interact: waitForPreview,
-  width: 752,
+  width: 784,
   setup: stub({ ...own, id: 'work', name: 'Work', icon: { kind: 'none', base: 'blue' } }),
   render: () => <Setting first="classic" />
 })
