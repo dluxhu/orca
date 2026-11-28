@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { isAppProfileRuntime, resolveAppProfile } from './app-profile'
 import { ensureAppProfileMarker } from '../../shared/app-profiles/app-profile-paths'
+import { applyAppProfileHomes } from '../../shared/app-profiles/app-profile-homes'
 
 const plist = (entries: Record<string, string>): string =>
   `<plist><dict>${Object.entries(entries)
@@ -102,24 +103,13 @@ describe('resolveAppProfile', () => {
 
 describe('isAppProfileRuntime', () => {
   it("is true for a process that serves a profile's userData, orcad too", () => {
-    const dir = mkdtempSync(join(tmpdir(), 'orca-profile-runtime-'))
-    try {
-      const plain = join(dir, 'plain')
-      const work = join(dir, 'work')
-      mkdirSync(work)
-      writeFileSync(join(work, 'orca-app-profile.json'), '{"id":"work"}')
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: plain })).toBe(false)
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: work })).toBe(true)
-      expect(isAppProfileRuntime({})).toBe(false)
-      // One read per folder: the checks run on every terminal and hook event.
-      mkdirSync(plain)
-      writeFileSync(join(plain, 'orca-app-profile.json'), '{"id":"late"}')
-      rmSync(join(work, 'orca-app-profile.json'))
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: plain })).toBe(false)
-      expect(isAppProfileRuntime({ ORCA_USER_DATA_PATH: work })).toBe(true)
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
+    const env: NodeJS.ProcessEnv = {}
+    expect(isAppProfileRuntime(env)).toBe(false)
+    applyAppProfileHomes('/profiles/work', env)
+    expect(isAppProfileRuntime(env)).toBe(true)
+    applyAppProfileHomes(null, env)
+    expect(isAppProfileRuntime(env)).toBe(false)
+    expect(isAppProfileRuntime({ ORCA_HOME_DIR: '/user/orca' })).toBe(false)
   })
 })
 

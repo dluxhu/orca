@@ -1,6 +1,5 @@
 // `orca profiles create <name> [--port N]`: makes the thin profile bundle of
 // docs/fork/profiles-design.md, sections 1 and 2. Hidden while profiles are a prototype.
-import { execFileSync } from 'node:child_process'
 import {
   existsSync,
   mkdirSync,
@@ -13,6 +12,7 @@ import {
   rmSync,
   writeFileSync
 } from 'node:fs'
+import { runProcessSync } from '@orca/process-host'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -44,8 +44,15 @@ export const APP_PROFILE_NAME_MAX_BYTES = 200
 /** Runs a tool and returns its stdout; throws when it fails. */
 export type RunTool = (program: string, args: string[]) => string
 
-export const runTool: RunTool = (program, args) =>
-  execFileSync(program, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+export const runTool: RunTool = (program, args) => {
+  // No timeout: a copy of the app bundle can take long. Throws on a failed exit, as callers expect.
+  const result = runProcessSync({ program, args, timeoutMs: null })
+  if (result.code !== 0) {
+    const reason = result.stderr.trim() || `exit ${result.code ?? result.signal}`
+    throw new Error(`${program} failed: ${reason}`)
+  }
+  return result.stdout
+}
 
 export type CreateAppProfileOptions = {
   name: string

@@ -11,8 +11,8 @@ export type AppProfileEnvIo = {
 /**
  * Sets `ORCA_HOME_DIR` and the agent folder variables to the profile whose userData is
  * `userDataPath`. A profile replaces every value, also one that the user set. With null, removes
- * only a profile's values: a value under a profile's `orca-home` folder (its userData has the
- * profile marker). The default app keeps every other value.
+ * `ORCA_HOME_DIR` and a profile's values: a value under a profile's `orca-home` folder (its
+ * userData has the profile marker). The default app keeps every other value.
  */
 export function applyAppProfileHomesCore(
   env: NodeJS.ProcessEnv,
@@ -26,7 +26,8 @@ export function applyAppProfileHomesCore(
   }
   for (const key of ['ORCA_HOME_DIR', ...Object.keys(variables)]) {
     const current = env[key]
-    if (userDataPath === null && current && !isProfileValue(current)) {
+    // ORCA_HOME_DIR always goes: only a profile sets it, and it names the profile to the helpers.
+    if (userDataPath === null && current && key !== 'ORCA_HOME_DIR' && !isProfileValue(current)) {
       continue
     }
     if (userDataPath === null) {

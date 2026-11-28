@@ -1,5 +1,5 @@
 // A profile app after an Orca update: docs/fork/profiles-design.md, section 7.
-import { spawn } from 'node:child_process'
+import { spawnProcess } from '@orca/process-host'
 import { dirname, join, resolve } from 'node:path'
 import { app, dialog } from 'electron'
 import { refreshAppProfileBundle } from '../../cli/app-profiles/app-profile-bundle-refresh'
@@ -8,16 +8,17 @@ import { defaultAppOf, runTool } from '../../cli/app-profiles/app-profile-create
 /** Starts the bundle again after this process exits; a detached shell outlives it. */
 function startAgainAfterExit(bundle: string): void {
   // app.relaunch() would use the helper path of the old CFBundleName, which a refresh renames.
-  spawn(
-    '/bin/sh',
-    [
+  spawnProcess({
+    program: '/bin/sh',
+    args: [
       '-c',
       'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; exec /usr/bin/open -n "$0"',
       bundle,
       String(process.pid)
     ],
-    { detached: true, stdio: 'ignore' }
-  ).unref()
+    detached: true,
+    stdio: 'ignore'
+  }).unref()
 }
 
 /**
