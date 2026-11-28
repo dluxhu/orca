@@ -291,13 +291,17 @@ describe('ProfileManager', () => {
 
   it.each([
     [{ kind: 'image', style: 'ref-match-bigger' }, 'Badge image', 'profile-icon-badge.png'],
-    [{ kind: 'file' }, 'Own icon', 'profile-icon.icns']
+    [{ kind: 'file' }, 'No badge', 'profile-icon.icns']
   ] as const)('starts an edit from the saved %o icon', async (icon, mode, file) => {
     appState.rows[1] = { ...appState.rows[1], icon }
     render(<ProfileManager />)
     await editWork()
     expect(screen.getByRole('radio', { name: mode }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByText(file)).toBeTruthy()
+    // An uploaded icon is the base: Upload is on, and the kept copy has no file name to show.
+    expect(screen.getByText(icon.kind === 'file' ? 'The uploaded image' : file)).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Upload…' }).getAttribute('aria-checked')).toBe(
+      icon.kind === 'file' ? 'true' : 'false'
+    )
     const path = `/data/work/${file}`
     await waitFor(() =>
       expect(iconPreview).toHaveBeenLastCalledWith(
@@ -312,6 +316,34 @@ describe('ProfileManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
     expect(change.mock.calls).toEqual([[{ kind: 'rename', id: 'work', name: 'Orca - Job' }]])
+  })
+
+  it('starts an edit from a saved base: a built-in id, or the kept upload with its badge', async () => {
+    appState.rows[1] = { ...appState.rows[1], icon: { kind: 'none', base: 'watercolor' } }
+    appState.rows[2] = {
+      ...appState.rows[2],
+      icon: { kind: 'badge', text: 'H', style: 'ref-match', base: 'custom' }
+    }
+    render(<ProfileManager />)
+    await editWork()
+    expect(screen.getByRole('radio', { name: 'Watercolor' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+    expect(screen.getByRole('radio', { name: 'No badge' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith({ kind: 'none', base: 'watercolor' }, 'work')
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(within(rowOf('Orca - Home')).getByRole('button', { name: 'Edit' }))
+    expect(screen.getByRole('radio', { name: 'Upload…' }).getAttribute('aria-checked')).toBe('true')
+    await waitFor(() =>
+      expect(iconPreview).toHaveBeenLastCalledWith(
+        { kind: 'badge', text: 'H', style: 'ref-match', base: '/data/home/profile-icon-base.png' },
+        'home'
+      )
+    )
   })
 
   it('sends no set-icon when an edit keeps the icon', async () => {

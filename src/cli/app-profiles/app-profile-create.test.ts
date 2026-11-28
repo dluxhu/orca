@@ -16,7 +16,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppProfile, defaultAppOf, type RunTool } from './app-profile-create'
-import { setAppProfileIcon, type SetAppProfileIconOptions } from './app-profile-set-icon'
+import {
+  setAppProfileIcon,
+  setDefaultAppIcon,
+  type SetAppProfileIconOptions
+} from './app-profile-set-icon'
 import { getRuntimeMetadataPath } from '../../shared/remote-runtime/bootstrap/runtime-bootstrap'
 import { appIconFileName, nextBadgeText } from './app-profile-icon'
 
@@ -714,6 +718,51 @@ describe.skipIf(process.platform !== 'darwin')('setAppProfileIcon', () => {
     // set-icon writes the kept copy and the Finder custom icon; the signed bundle never changes.
     expect(customIcons).toEqual([])
     expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns W')
+  })
+
+  it('with whileRunning, changes the icon of the running profile app (its own Settings)', async () => {
+    const work = createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    writeFileSync(getRuntimeMetadataPath(work.userDataPath), JSON.stringify({ pid: process.pid }))
+    const changed = await setAppProfileIcon(
+      'work',
+      { kind: 'badge', text: 'Q' },
+      opts({ whileRunning: true })
+    )
+    expect(changed.icon).toMatchObject({ kind: 'badge', text: 'Q' })
+    expect(read(join(work.userDataPath, 'profile-icon.icns'))).toBe('icns Q')
+  })
+
+  it('keeps the default app icon in its userData and profiles.json; no badge removes both', async () => {
+    const userData = join(dir, 'default-data')
+    mkdirSync(userData)
+    const options = {
+      env: env(),
+      home: dir,
+      makeIcon,
+      defaultAppPath: app,
+      defaultUserDataPath: userData
+    }
+    // No profile yet: the first default icon makes profiles.json.
+    const made = await setDefaultAppIcon({ kind: 'badge', text: 'D' }, options)
+    expect(made).toEqual({ id: 'default', icon: { kind: 'badge', text: 'D', style: 'ref-match' } })
+    expect(read(join(userData, 'profile-icon.icns'))).toBe('icns D')
+    const registryPath = join(dir, 'data', 'profiles.json')
+    expect(JSON.parse(read(registryPath))).toMatchObject({
+      defaultAppPath: app,
+      profiles: [],
+      defaultIcon: { kind: 'badge', text: 'D' }
+    })
+    // A profile made after it keeps the default icon in profiles.json.
+    createAppProfile({ name: 'Work', defaultAppPath: app, env: env(), run, makeIcon })
+    expect(JSON.parse(read(registryPath)).defaultIcon).toMatchObject({ text: 'D' })
+    // The default app needs no Finder icon: it shows the kept one itself.
+    expect(customIcons).toEqual([])
+    expect(await setDefaultAppIcon({ kind: 'none', base: 'blue' }, options)).toEqual({
+      id: 'default'
+    })
+    expect(existsSync(join(userData, 'profile-icon.icns'))).toBe(false)
+    expect(JSON.parse(read(registryPath)).defaultIcon).toBeUndefined()
+    expect(JSON.parse(read(registryPath)).profiles).toHaveLength(1)
   })
 
   it('replaces a link at the icon copy in the data folder, and leaves its target alone', async () => {

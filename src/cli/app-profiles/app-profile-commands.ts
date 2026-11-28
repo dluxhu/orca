@@ -15,7 +15,7 @@ import { RuntimeClientError } from '../runtime/connection/types'
 import { createAppProfile, defaultAppOf } from './app-profile-create'
 import { appProfileIconSourceFromFlags, makeAppProfileIcon } from './app-profile-icon'
 import { largestIcnsPng } from './app-profile-icns'
-import { setAppProfileIcon } from './app-profile-set-icon'
+import { setAppProfileIcon, setDefaultAppIcon } from './app-profile-set-icon'
 import { renameAppProfile, setAppProfilePort } from './app-profile-edit'
 import { removeAppProfile } from './app-profile-remove'
 import { setDefaultAppPort } from './app-profile-default-port'
@@ -25,8 +25,9 @@ const USAGE = `Usage:
   orca profiles create <name> [--id <id>] [--port <port>] [--icon-badge <char>] [--icon-style <style>]
       [--icon-color <#rrggbb>] [--icon-image <file>] [--icon-file <file>]
   orca profiles rename <id> --name <name>
-  orca profiles set-icon <id> [--icon-badge <char>] [--icon-style <style>] [--icon-color <#rrggbb>]
-      [--icon-image <file>] [--icon-file <file>] [--if-missing]
+  orca profiles set-icon <id|default> [--icon-badge <char>] [--icon-style <style>]
+      [--icon-color <#rrggbb>] [--icon-image <file>] [--icon-file <file>] [--no-badge]
+      [--icon-base <classic|watercolor|blue|file>] [--if-missing] [--while-running]
   orca profiles icon-preview [--id <id>] [--icon-…] --json
   orca profiles set-port <id|default> --port <port>
   orca profiles remove <id> [--keep-data]
@@ -44,7 +45,8 @@ const VALUE_FLAGS = new Set([
   '--icon-style',
   '--icon-color',
   '--icon-image',
-  '--icon-file'
+  '--icon-file',
+  '--icon-base'
 ])
 
 function parse(argv: string[]): Parsed {
@@ -90,7 +92,9 @@ function print(result: unknown, json: boolean, text: string): void {
 }
 
 function iconOf(parsed: Parsed): ReturnType<typeof appProfileIconSourceFromFlags> {
-  return appProfileIconSourceFromFlags((flag) => parsed.values.get(flag))
+  return appProfileIconSourceFromFlags(
+    (flag) => parsed.values.get(flag) ?? (parsed.flags.has(flag) ? '' : undefined)
+  )
 }
 
 function oneId(parsed: Parsed): string {
@@ -154,9 +158,20 @@ export async function runProfilesCommand(argv: string[]): Promise<void> {
       return
     }
     case 'set-icon': {
+      const id = oneId(parsed)
+      if (id.toLowerCase() === 'default') {
+        const result = await setDefaultAppIcon(iconOf(parsed) ?? { kind: 'badge' }, {
+          defaultAppPath:
+            readAppProfileRegistry(appProfilesRoot())?.defaultAppPath ?? runningDefaultApp(),
+          defaultUserDataPath: getPlatformUserDataPath()
+        })
+        print(result, json, 'The icon of the default app is new.')
+        return
+      }
       // --if-missing: the profile app asks for the icon of a profile made before profile icons.
-      const entry = await setAppProfileIcon(oneId(parsed), iconOf(parsed) ?? { kind: 'badge' }, {
-        ifMissing: parsed.flags.has('--if-missing')
+      const entry = await setAppProfileIcon(id, iconOf(parsed) ?? { kind: 'badge' }, {
+        ifMissing: parsed.flags.has('--if-missing'),
+        whileRunning: parsed.flags.has('--while-running')
       })
       print(entry, json, `The icon of "${entry.id}" is new.`)
       return

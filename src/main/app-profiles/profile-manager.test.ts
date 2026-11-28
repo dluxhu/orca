@@ -283,6 +283,9 @@ describe('registerProfileManagerIpc', () => {
       'appProfiles:showInFinder',
       'appProfiles:ownProfile',
       'appProfiles:setOwnStartAtLogin',
+      'appProfiles:ownIconPreview',
+      'appProfiles:chooseOwnIconFile',
+      'appProfiles:setOwnIcon',
       'appProfiles:setOwnPort'
     ])
     await expect(handlers.get('appProfiles:state')?.({ sender: {} })).resolves.toMatchObject({
@@ -306,6 +309,9 @@ describe('registerProfileManagerIpc', () => {
     for (const channel of [
       'appProfiles:ownProfile',
       'appProfiles:setOwnStartAtLogin',
+      'appProfiles:ownIconPreview',
+      'appProfiles:chooseOwnIconFile',
+      'appProfiles:setOwnIcon',
       'appProfiles:setOwnPort'
     ]) {
       await expect(handlers.get(channel)?.({ sender: {} }, true)).rejects.toThrow(

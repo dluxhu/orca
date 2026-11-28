@@ -118,14 +118,20 @@ describe.skipIf(process.platform !== 'darwin')('orca profiles icon-preview', () 
 })
 
 describe.skipIf(process.platform !== 'darwin')('orca profiles set-icon', () => {
-  it('passes --if-missing to setAppProfileIcon as ifMissing', async () => {
+  it('passes --if-missing and --while-running to setAppProfileIcon', async () => {
     const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     await runProfilesCommand(['set-icon', 'work', '--if-missing', '--json'])
     await runProfilesCommand(['set-icon', 'work', '--icon-badge', 'Q', '--json'])
+    await runProfilesCommand(['set-icon', 'work', '--no-badge', '--while-running', '--json'])
     write.mockRestore()
     expect(created.setIcon).toEqual([
-      ['work', { kind: 'badge' }, { ifMissing: true }],
-      ['work', { kind: 'badge', text: 'Q', style: undefined }, { ifMissing: false }]
+      ['work', { kind: 'badge' }, { ifMissing: true, whileRunning: false }],
+      [
+        'work',
+        { kind: 'badge', text: 'Q', style: undefined },
+        { ifMissing: false, whileRunning: false }
+      ],
+      ['work', { kind: 'none', base: 'classic' }, { ifMissing: false, whileRunning: true }]
     ])
   })
 })

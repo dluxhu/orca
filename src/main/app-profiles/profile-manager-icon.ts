@@ -41,7 +41,7 @@ export async function chooseAppProfileIconFile(
           }
         : {
             name: translateMain('profileManager.icon.iconFiles', 'Icons'),
-            extensions: ['icns', 'png']
+            extensions: ['icns', 'png', 'jpg', 'jpeg']
           }
     ]
   }

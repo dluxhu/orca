@@ -31,7 +31,14 @@ export const appProfilesApi = {
   setOwnStartAtLogin: (enabled: boolean): Promise<AppProfileReply> =>
     ipcRenderer.invoke('appProfiles:setOwnStartAtLogin', enabled),
   setOwnPort: (port: number): Promise<AppProfileReply> =>
-    ipcRenderer.invoke('appProfiles:setOwnPort', port)
+    ipcRenderer.invoke('appProfiles:setOwnPort', port),
+  /** This app's own icon (Settings > Appearance). `appIcon`: the setting saved with it. */
+  ownIconPreview: (icon: AppProfileIconSource): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:ownIconPreview', icon),
+  chooseOwnIconFile: (kind: 'image' | 'file'): Promise<string | null> =>
+    ipcRenderer.invoke('appProfiles:chooseOwnIconFile', kind),
+  setOwnIcon: (icon: AppProfileIconSource, appIcon: string): Promise<AppProfileReply> =>
+    ipcRenderer.invoke('appProfiles:setOwnIcon', icon, appIcon)
 }
 
 export type AppProfilesApi = typeof appProfilesApi

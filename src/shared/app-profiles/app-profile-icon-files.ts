@@ -5,6 +5,8 @@
 export const APP_PROFILE_ICON_FILE = 'profile-icon.icns'
 /** A copy of an uploaded badge as PNG, next to the icon. The Edit form starts from it. */
 export const APP_PROFILE_BADGE_FILE = 'profile-icon-badge.png'
+/** A copy of an uploaded base icon as PNG, next to the icon. The Edit form starts from it. */
+export const APP_PROFILE_BASE_FILE = 'profile-icon-base.png'
 /** The colour of a badge character without its own colour. */
 export const APP_PROFILE_BADGE_COLOR = '#0f172a'
 /** The swatches of the badge character colour. The first is the default. */

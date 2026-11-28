@@ -1,8 +1,10 @@
-// Settings of this app's own profile: Start at login and the saved port.
+// Settings of this app's own profile: Start at login, the saved port and the icon.
 // See docs/fork/profiles-design.md, section 4.
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
 import {
+  appProfileIconFlags,
   DEFAULT_APP_PORT,
+  type AppProfileIconSource,
   type AppProfileChange,
   type AppProfileReply,
   type AppProfilesState,
@@ -10,6 +12,15 @@ import {
 } from '../../shared/app-profiles/app-profile-rules'
 import { isTrustedUIRenderer } from '../ipc/ui'
 import { isProfileManagerRenderer } from './profile-manager-window'
+import { refreshMacMenuBarImage } from '../tray/system-tray'
+import { applyAppIcon } from '../window/desktop-integration/app-icon'
+import {
+  getCustomAppIconPath,
+  hasCustomAppIcon
+} from '../window/desktop-integration/custom-app-icon'
+import { forgetOwnDockIcon } from './app-profile-dock-icon'
+import { chooseAppProfileIconFile, previewAppProfileIcon } from './profile-manager-icon'
+import { runCli } from './profile-manager-cli'
 
 /** This app's own profile, as Settings shows it. */
 export function ownAppProfile({ rows, currentId }: AppProfilesState): OwnAppProfile {
@@ -28,7 +39,9 @@ export function ownAppProfile({ rows, currentId }: AppProfilesState): OwnAppProf
       .filter((row) => row.id !== own.id && row.id !== 'default')
       .map((row) => row.port),
     defaultPort: rows.find((row) => row.id === 'default')?.port ?? DEFAULT_APP_PORT,
-    serverRuns: own.state === 'background'
+    serverRuns: own.state === 'background',
+    userDataPath: own.userDataPath,
+    ...(own.icon ? { icon: own.icon } : {})
   }
 }
 
@@ -44,15 +57,53 @@ export function registerOwnProfileIpc(
         ? handler(...args)
         : Promise.reject(new Error('Only an Orca window can do this.'))
   const ownId = async (): Promise<string> => ownAppProfile(await readState()).id
+  // An icon that Settings imported before (appIcon `custom`) can be the base of a new one.
   ipcMain.handle(
     'appProfiles:ownProfile',
-    fromSettings(async () => ownAppProfile(await readState()))
+    fromSettings(async () => ({
+      ...ownAppProfile(await readState()),
+      ...(hasCustomAppIcon() ? { customIconPath: getCustomAppIconPath() } : {})
+    }))
   )
   ipcMain.handle(
     'appProfiles:setOwnStartAtLogin',
     fromSettings(async (enabled: unknown) =>
       change({ kind: 'start-at-login', id: await ownId(), enabled: enabled === true })
     )
+  )
+  // The icon: the same preview and file choice as the Profile Manager, for this app's own id.
+  ipcMain.handle(
+    'appProfiles:ownIconPreview',
+    fromSettings(async (icon: unknown) =>
+      previewAppProfileIcon(icon as AppProfileIconSource, await ownId())
+    )
+  )
+  ipcMain.handle('appProfiles:chooseOwnIconFile', (event: IpcMainInvokeEvent, kind: unknown) =>
+    fromSettings(async () =>
+      chooseAppProfileIconFile(kind === 'file' ? 'file' : 'image', event.sender)
+    )(event)
+  )
+  // The CLI checks the icon. This app runs, and shows the new icon itself (`appIcon`: the setting
+  // that the window saves with it).
+  ipcMain.handle(
+    'appProfiles:setOwnIcon',
+    fromSettings(async (icon: unknown, appIcon: unknown) => {
+      const flags = appProfileIconFlags(icon as AppProfileIconSource)
+      const reply = await runCli([
+        'profiles',
+        'set-icon',
+        await ownId(),
+        ...flags,
+        '--while-running',
+        '--json'
+      ])
+      if (reply.ok) {
+        forgetOwnDockIcon()
+        applyAppIcon(appIcon)
+        refreshMacMenuBarImage()
+      }
+      return reply
+    })
   )
   // The CLI checks the port: its range, and the ports of the other profiles.
   ipcMain.handle(
